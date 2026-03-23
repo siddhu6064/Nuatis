@@ -45,3 +45,4 @@ Thumbs.db
 *.tfstate
 *.tfstate.backup
 .terraform/
+apps/web/.env.local
