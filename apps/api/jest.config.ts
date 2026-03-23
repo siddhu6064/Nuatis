@@ -11,7 +11,12 @@ const config: Config = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
   },
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.test.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/lib/redis.ts', // infrastructure — tested via integration tests
+    '!src/index.ts', // entry point — tested via smoke tests
+  ],
   coverageThreshold: {
     global: { lines: 80 },
   },
