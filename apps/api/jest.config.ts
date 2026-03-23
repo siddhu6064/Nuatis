@@ -9,7 +9,7 @@ const config: Config = {
     '^@nuatis/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
+    '^.+\\.tsx?$': ['ts-jest', { useESM: true, isolatedModules: true }],
   },
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.test.ts'],
   coverageThreshold: {
