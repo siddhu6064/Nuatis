@@ -11,10 +11,17 @@
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.6",
     "@nuatis/shared": "*",
+    "@supabase/supabase-js": "^2.100.0",
+    "@tailwindcss/forms": "^0.5.11",
+    "autoprefixer": "^10.4.27",
     "next": "^16.2.1",
+    "next-auth": "^5.0.0-beta.30",
+    "postcss": "^8.5.8",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.0",

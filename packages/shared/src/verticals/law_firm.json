@@ -1,0 +1,54 @@
+{
+  "slug": "law_firm",
+  "label": "Law firm",
+  "fields": [
+    { "key": "matter_number", "label": "Matter number", "type": "text", "required": false },
+    {
+      "key": "case_type",
+      "label": "Case type",
+      "type": "select",
+      "options": [
+        "family",
+        "criminal_defense",
+        "personal_injury",
+        "corporate",
+        "real_estate",
+        "immigration",
+        "other"
+      ],
+      "required": false
+    },
+    { "key": "assigned_attorney", "label": "Assigned attorney", "type": "text", "required": false },
+    {
+      "key": "retainer_status",
+      "label": "Retainer status",
+      "type": "select",
+      "options": ["active", "depleted", "unpaid", "none"],
+      "required": false
+    },
+    { "key": "next_court_date", "label": "Next court date", "type": "date", "required": false },
+    { "key": "jurisdiction", "label": "Jurisdiction", "type": "text", "required": false },
+    {
+      "key": "conflict_check_status",
+      "label": "Conflict check",
+      "type": "select",
+      "options": ["pending", "cleared", "conflict"],
+      "required": false
+    },
+    {
+      "key": "case_status",
+      "label": "Case status",
+      "type": "select",
+      "options": ["active", "closed", "pending", "settled"],
+      "required": false
+    }
+  ],
+  "pipeline_stages": [
+    { "name": "New inquiry", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Conflict check", "position": 2, "color": "#378ADD" },
+    { "name": "Consultation set", "position": 3, "color": "#EF9F27" },
+    { "name": "Retained", "position": 4, "color": "#1D9E75" },
+    { "name": "Active matter", "position": 5, "color": "#7F77DD" }
+  ],
+  "system_prompt_template": "You are the intake receptionist for {{business_name}}. You help prospective clients schedule consultations, answer general questions about practice areas, and collect basic intake information. Never give legal advice. Always collect the caller's name, contact number, and a brief description of their legal matter. Inform callers that a conflict check is required before a consultation can be confirmed."
+}

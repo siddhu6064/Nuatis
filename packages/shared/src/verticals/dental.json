@@ -1,0 +1,49 @@
+{
+  "slug": "dental",
+  "label": "Dental practice",
+  "fields": [
+    { "key": "date_of_birth", "label": "Date of birth", "type": "date", "required": false },
+    {
+      "key": "insurance_provider",
+      "label": "Insurance provider",
+      "type": "text",
+      "required": false
+    },
+    { "key": "insurance_plan_id", "label": "Plan ID", "type": "text", "required": false },
+    {
+      "key": "last_cleaning_date",
+      "label": "Last cleaning date",
+      "type": "date",
+      "required": false
+    },
+    {
+      "key": "recall_interval_months",
+      "label": "Recall interval (months)",
+      "type": "number",
+      "required": false
+    },
+    { "key": "preferred_dentist", "label": "Preferred dentist", "type": "text", "required": false },
+    {
+      "key": "treatment_plan_status",
+      "label": "Treatment plan status",
+      "type": "select",
+      "options": ["none", "active", "completed", "pending"],
+      "required": false
+    },
+    { "key": "allergies", "label": "Allergies", "type": "text", "required": false },
+    {
+      "key": "hipaa_consent_date",
+      "label": "HIPAA consent date",
+      "type": "date",
+      "required": false
+    }
+  ],
+  "pipeline_stages": [
+    { "name": "New inquiry", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Consultation booked", "position": 2, "color": "#378ADD" },
+    { "name": "Treatment planned", "position": 3, "color": "#EF9F27" },
+    { "name": "Active patient", "position": 4, "color": "#1D9E75" },
+    { "name": "Recall due", "position": 5, "color": "#D85A30" }
+  ],
+  "system_prompt_template": "You are the front-desk receptionist for {{business_name}}, a dental practice. You help patients schedule appointments, answer questions about services, and handle general inquiries. Always verify the caller's name and date of birth before accessing their record. Never discuss clinical advice — always refer clinical questions to the dentist."
+}

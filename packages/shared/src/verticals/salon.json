@@ -1,0 +1,38 @@
+{
+  "slug": "salon",
+  "label": "Hair salon",
+  "fields": [
+    { "key": "preferred_stylist", "label": "Preferred stylist", "type": "text", "required": false },
+    { "key": "last_service", "label": "Last service", "type": "text", "required": false },
+    { "key": "last_service_date", "label": "Last service date", "type": "date", "required": false },
+    {
+      "key": "hair_type",
+      "label": "Hair type",
+      "type": "select",
+      "options": ["fine", "medium", "coarse", "curly", "wavy"],
+      "required": false
+    },
+    { "key": "product_allergies", "label": "Product allergies", "type": "text", "required": false },
+    {
+      "key": "rebooking_interval_weeks",
+      "label": "Rebooking interval (weeks)",
+      "type": "number",
+      "required": false
+    },
+    {
+      "key": "color_formula",
+      "label": "Colour formula notes",
+      "type": "textarea",
+      "required": false
+    },
+    { "key": "birthday", "label": "Birthday", "type": "date", "required": false }
+  ],
+  "pipeline_stages": [
+    { "name": "New client", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "First booked", "position": 2, "color": "#378ADD" },
+    { "name": "Returning", "position": 3, "color": "#1D9E75" },
+    { "name": "VIP", "position": 4, "color": "#7F77DD" },
+    { "name": "Lapsed", "position": 5, "color": "#D85A30" }
+  ],
+  "system_prompt_template": "You are the front-desk receptionist for {{business_name}}, a hair salon. You help clients book appointments with their preferred stylist, answer questions about services and pricing, and handle general inquiries. Always ask for the client's name and preferred stylist when booking."
+}

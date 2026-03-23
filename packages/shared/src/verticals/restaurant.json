@@ -1,0 +1,36 @@
+{
+  "slug": "restaurant",
+  "label": "Restaurant",
+  "fields": [
+    {
+      "key": "party_size_preference",
+      "label": "Usual party size",
+      "type": "number",
+      "required": false
+    },
+    {
+      "key": "seating_preference",
+      "label": "Seating preference",
+      "type": "text",
+      "required": false
+    },
+    {
+      "key": "dietary_restrictions",
+      "label": "Dietary restrictions",
+      "type": "text",
+      "required": false
+    },
+    { "key": "last_visit_date", "label": "Last visit", "type": "date", "required": false },
+    { "key": "vip_status", "label": "VIP", "type": "boolean", "required": false },
+    { "key": "birthday", "label": "Birthday", "type": "date", "required": false },
+    { "key": "anniversary", "label": "Anniversary", "type": "date", "required": false },
+    { "key": "no_show_count", "label": "No-show count", "type": "number", "required": false }
+  ],
+  "pipeline_stages": [
+    { "name": "New guest", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Returning", "position": 2, "color": "#1D9E75" },
+    { "name": "Regular", "position": 3, "color": "#378ADD" },
+    { "name": "VIP", "position": 4, "color": "#7F77DD" }
+  ],
+  "system_prompt_template": "You are the reservations host for {{business_name}}. You take table reservations, answer questions about the menu, hours, and special events, and handle general inquiries. Always confirm party size, date, time, and the guest's name and phone number for every reservation."
+}

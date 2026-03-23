@@ -1,4 +1,7 @@
-export const metadata = {
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
   title: 'Nuatis',
   description: 'AI-powered front-office platform',
 }
