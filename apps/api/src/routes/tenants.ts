@@ -82,8 +82,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   if (tenantError || !tenant) {
     // Rollback: delete auth user
+    console.error('Tenant insert error:', JSON.stringify(tenantError))
     await supabase.auth.admin.deleteUser(supabaseUserId)
-    res.status(500).json({ error: 'Failed to create tenant' })
+    res.status(500).json({ error: 'Failed to create tenant', detail: tenantError?.message })
     return
   }
 
