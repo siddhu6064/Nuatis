@@ -44,13 +44,7 @@ export type AppointmentStatus =
 
 export type CallDirection = 'inbound' | 'outbound'
 
-export type CallStatus =
-  | 'ringing'
-  | 'active'
-  | 'completed'
-  | 'missed'
-  | 'failed'
-  | 'voicemail'
+export type CallStatus = 'ringing' | 'active' | 'completed' | 'missed' | 'failed' | 'voicemail'
 
 export type AutomationType =
   | 'appointment_reminder'
@@ -171,7 +165,14 @@ export interface SalonVerticalData {
 
 export interface LawFirmVerticalData {
   matterNumber?: string
-  caseType?: 'family' | 'criminal_defense' | 'personal_injury' | 'corporate' | 'real_estate' | 'immigration' | 'other'
+  caseType?:
+    | 'family'
+    | 'criminal_defense'
+    | 'personal_injury'
+    | 'corporate'
+    | 'real_estate'
+    | 'immigration'
+    | 'other'
   assignedAttorney?: string
   paralegal?: string
   retainerStatus?: 'active' | 'depleted' | 'unpaid'

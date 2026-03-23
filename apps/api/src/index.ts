@@ -8,7 +8,12 @@ const PORT = process.env['PORT'] ?? 3001
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(helmet())
-app.use(cors({ origin: process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000' }))
+app.use(
+  cors({
+    origin:
+      process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000',
+  })
+)
 app.use(express.json())
 
 // ── Health check ─────────────────────────────────────────────
@@ -27,7 +32,7 @@ app.get('/', (_req, res) => {
 
 // ── Start server ─────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`Nuatis API running on http://localhost:${PORT}`)
+  console.info(`Nuatis API running on http://localhost:${PORT}`)
 })
 
 export default app
