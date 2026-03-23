@@ -1,0 +1,44 @@
+{
+  "slug": "real_estate",
+  "label": "Real estate",
+  "fields": [
+    {
+      "key": "buyer_or_seller",
+      "label": "Buyer or seller",
+      "type": "select",
+      "options": ["buyer", "seller", "both"],
+      "required": false
+    },
+    { "key": "budget_max", "label": "Budget max ($)", "type": "number", "required": false },
+    {
+      "key": "target_neighborhoods",
+      "label": "Target neighborhoods",
+      "type": "text",
+      "required": false
+    },
+    {
+      "key": "pre_approval_status",
+      "label": "Pre-approval status",
+      "type": "select",
+      "options": ["none", "in_progress", "approved"],
+      "required": false
+    },
+    { "key": "assigned_agent", "label": "Assigned agent", "type": "text", "required": false },
+    { "key": "target_close_date", "label": "Target close date", "type": "date", "required": false },
+    { "key": "showings_count", "label": "Showings count", "type": "number", "required": false },
+    {
+      "key": "last_showing_address",
+      "label": "Last showing address",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "pipeline_stages": [
+    { "name": "New lead", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Qualified", "position": 2, "color": "#378ADD" },
+    { "name": "Showing booked", "position": 3, "color": "#EF9F27" },
+    { "name": "Offer stage", "position": 4, "color": "#D85A30" },
+    { "name": "Under contract", "position": 5, "color": "#1D9E75" }
+  ],
+  "system_prompt_template": "You are the front-desk assistant for {{business_name}}, a real estate agency. You help buyers and sellers schedule consultations with agents, answer questions about listings and the buying or selling process, and collect initial inquiry details. Always ask whether the caller is buying, selling, or both, and their target timeline."
+}

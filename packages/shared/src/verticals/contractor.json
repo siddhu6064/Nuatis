@@ -1,0 +1,39 @@
+{
+  "slug": "contractor",
+  "label": "Contractor",
+  "fields": [
+    { "key": "property_address", "label": "Property address", "type": "text", "required": false },
+    {
+      "key": "property_type",
+      "label": "Property type",
+      "type": "select",
+      "options": ["residential", "commercial"],
+      "required": false
+    },
+    { "key": "last_job_type", "label": "Last job type", "type": "text", "required": false },
+    { "key": "last_job_date", "label": "Last job date", "type": "date", "required": false },
+    {
+      "key": "estimate_status",
+      "label": "Estimate status",
+      "type": "select",
+      "options": ["none", "sent", "accepted", "expired", "rejected"],
+      "required": false
+    },
+    {
+      "key": "warranty_expiry_date",
+      "label": "Warranty expiry",
+      "type": "date",
+      "required": false
+    },
+    { "key": "referral_source", "label": "Referral source", "type": "text", "required": false },
+    { "key": "permit_notes", "label": "Permit notes", "type": "textarea", "required": false }
+  ],
+  "pipeline_stages": [
+    { "name": "New lead", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Estimate sent", "position": 2, "color": "#378ADD" },
+    { "name": "Estimate accepted", "position": 3, "color": "#EF9F27" },
+    { "name": "Job scheduled", "position": 4, "color": "#1D9E75" },
+    { "name": "Job completed", "position": 5, "color": "#7F77DD" }
+  ],
+  "system_prompt_template": "You are the front-office assistant for {{business_name}}, a contracting company. You help homeowners and businesses request estimates, schedule job site visits, and answer questions about services. Always collect the property address, job type, and best contact number when taking a new inquiry."
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "sales_crm",
+  "label": "Sales CRM",
+  "fields": [
+    { "key": "company", "label": "Company", "type": "text", "required": true },
+    {
+      "key": "vertical_interest",
+      "label": "Vertical interest",
+      "type": "select",
+      "options": ["dental", "salon", "restaurant", "contractor", "law_firm", "real_estate"],
+      "required": true
+    },
+    {
+      "key": "demo_status",
+      "label": "Demo status",
+      "type": "select",
+      "options": ["not_contacted", "demo_scheduled", "demo_done", "pilot", "paying", "lost"],
+      "required": false
+    },
+    { "key": "follow_up_date", "label": "Follow-up date", "type": "date", "required": false },
+    { "key": "notes", "label": "Notes", "type": "textarea", "required": false }
+  ],
+  "pipeline_stages": [
+    { "name": "Prospect", "position": 1, "color": "#888780", "is_default": true },
+    { "name": "Demo scheduled", "position": 2, "color": "#378ADD" },
+    { "name": "Demo done", "position": 3, "color": "#EF9F27" },
+    { "name": "Pilot", "position": 4, "color": "#7F77DD" },
+    { "name": "Paying", "position": 5, "color": "#1D9E75" },
+    { "name": "Lost", "position": 6, "color": "#E05252", "is_terminal": true }
+  ],
+  "system_prompt_template": "You are the front-desk assistant for {{business_name}}. You help qualify prospective customers, answer questions about Nuatis, and schedule product demos. Always be professional and concise."
+}
