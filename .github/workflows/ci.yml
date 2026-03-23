@@ -35,3 +35,6 @@ jobs:
 
       - name: Build (API)
         run: npm run build --workspace=apps/api --if-present
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
