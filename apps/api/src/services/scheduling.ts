@@ -15,7 +15,6 @@ export interface CreateEventParams {
   attendeeEmail?: string
 }
 
-// Get available slots — returns free 1-hour windows in a date range
 export async function getAvailableSlots(
   refreshToken: string,
   calendarId: string,
@@ -34,17 +33,25 @@ export async function getAvailableSlots(
 
   const busy = freeBusy.data.calendars?.[calendarId]?.busy ?? []
 
-  // Generate 1-hour slots during business hours (9am–5pm)
   const slots: TimeSlot[] = []
-  const start = new Date(dateStart)
-  const end = new Date(dateEnd)
+  const rangeStart = new Date(dateStart)
+  const rangeEnd = new Date(dateEnd)
 
-  for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+  // Iterate day by day within range
+  const cursor = new Date(rangeStart)
+  cursor.setUTCHours(0, 0, 0, 0)
+
+  while (cursor < rangeEnd) {
+    // Business hours 9am–5pm UTC
     for (let hour = 9; hour < 17; hour++) {
-      const slotStart = new Date(d)
-      slotStart.setHours(hour, 0, 0, 0)
-      const slotEnd = new Date(d)
-      slotEnd.setHours(hour + 1, 0, 0, 0)
+      const slotStart = new Date(cursor)
+      slotStart.setUTCHours(hour, 0, 0, 0)
+
+      const slotEnd = new Date(cursor)
+      slotEnd.setUTCHours(hour + 1, 0, 0, 0)
+
+      // Skip slots outside the requested range
+      if (slotStart < rangeStart || slotEnd > rangeEnd) continue
 
       const conflict = busy.some((b) => {
         const busyStart = new Date(b.start ?? '')
@@ -59,6 +66,7 @@ export async function getAvailableSlots(
         })
       }
     }
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
   }
 
   return slots
@@ -88,7 +96,6 @@ export async function updateEvent(
   updates: Partial<{ title: string; description: string; start: string; end: string }>
 ): Promise<void> {
   const calendar = getCalendarClient(refreshToken)
-
   await calendar.events.patch({
     calendarId,
     eventId,

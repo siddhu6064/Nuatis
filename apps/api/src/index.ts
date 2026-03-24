@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import 'dotenv/config'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
+import appointmentsRouter from './routes/appointments.js'
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3001
@@ -23,6 +24,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
+app.use('/api/appointments', appointmentsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })
