@@ -76,6 +76,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       vertical: vertical_slug,
       auth_provider: 'authjs',
       timezone,
+      subscription_status: 'active',
+      subscription_plan: 'starter',
     })
     .select('id')
     .single()
