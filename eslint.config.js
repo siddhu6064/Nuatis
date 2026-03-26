@@ -16,5 +16,9 @@ export default tseslint.config(
   },
   {
     ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/coverage/**'],
+  },
+  {
+    files: ['**/postcss.config.js', '**/tailwind.config.js'],
+    env: { node: true },
   }
 )
