@@ -19,6 +19,11 @@ export default tseslint.config(
   },
   {
     files: ['**/postcss.config.js', '**/tailwind.config.js'],
-    env: { node: true },
+    languageOptions: {
+      globals: {
+        module: 'writable',
+        require: 'readonly',
+      },
+    },
   }
 )
