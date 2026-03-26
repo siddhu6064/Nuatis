@@ -46,3 +46,4 @@ Thumbs.db
 *.tfstate.backup
 .terraform/
 apps/web/.env.local
+.claude/

@@ -3,7 +3,14 @@ import Credentials from 'next-auth/providers/credentials'
 import type { Session } from 'next-auth'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+// anon key — for signInWithPassword
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// service role key — for users table query (bypasses RLS)
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -39,14 +46,14 @@ const result = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabaseAuth.auth.signInWithPassword({
           email: credentials.email as string,
           password: credentials.password as string,
         })
 
         if (error || !data.user) return null
 
-        const { data: user } = await supabase
+        const { data: user } = await supabaseAdmin
           .from('users')
           .select('id, tenant_id, role, full_name, tenants(vertical, name, subscription_status)')
           .eq('authjs_user_id', data.user.id)

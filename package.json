@@ -43,5 +43,8 @@
     "*.{js,json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.2.2"
   }
 }
