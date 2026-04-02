@@ -27,7 +27,7 @@ export async function createGeminiLiveSession(
   let audioCallback: ((chunk: Buffer) => void) | null = null
 
   const session = await client.live.connect({
-    model: 'gemini-2.0-flash-live-preview',
+    model: 'gemini-3.1-flash-live-preview',
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: {
