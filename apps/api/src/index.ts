@@ -1,10 +1,13 @@
+import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
+import { WebSocketServer } from 'ws'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
 import appointmentsRouter from './routes/appointments.js'
+import { registerVoiceWebSocket } from './voice/telnyx-handler.js'
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3001
@@ -30,8 +33,14 @@ app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })
 })
 
-app.listen(PORT, () => {
+const server = createServer(app)
+
+const wss = new WebSocketServer({ server, path: '/voice/stream' })
+registerVoiceWebSocket(wss)
+
+server.listen(PORT, () => {
   console.info(`Nuatis API running on http://localhost:${PORT}`)
+  console.info(`Voice WebSocket listening at ws://localhost:${PORT}/voice/stream`)
 })
 
 export default app
