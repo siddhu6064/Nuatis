@@ -1,6 +1,8 @@
 import alawmulaw from 'alawmulaw'
 const { mulaw } = alawmulaw
-import type { WebSocketServer } from 'ws'
+import type { WebSocketServer, WebSocket } from 'ws'
+import { createGeminiLiveSession } from './gemini-live.js'
+import { logCall } from './call-logger.js'
 
 // ── Audio transcoding ─────────────────────────────────────────────────────────
 
@@ -56,8 +58,114 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
   return tenantMap.get(toNumber)
 }
 
-// ── WebSocket handler (registered in index.ts) ────────────────────────────────
+// ── Telnyx message types ──────────────────────────────────────────────────────
 
-export function registerVoiceWebSocket(_wss: WebSocketServer): void {
-  // Implemented in Task 6
+interface TelnyxStartEvent {
+  event: 'start'
+  start: { call_sid: string; from: string; to: string }
+}
+
+interface TelnyxMediaEvent {
+  event: 'media'
+  media: { track: string; payload: string }
+}
+
+interface TelnyxStopEvent {
+  event: 'stop'
+  stop: { call_sid: string }
+}
+
+type TelnyxEvent = TelnyxStartEvent | TelnyxMediaEvent | TelnyxStopEvent
+
+// ── WebSocket handler ─────────────────────────────────────────────────────────
+
+export function registerVoiceWebSocket(wss: WebSocketServer): void {
+  const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
+  const tenantMap = parseTenantMap(tenantMapRaw)
+
+  wss.on('connection', (ws: WebSocket) => {
+    console.info('[telnyx-handler] WebSocket connection opened')
+
+    let geminiSession: Awaited<ReturnType<typeof createGeminiLiveSession>> | null = null
+    let tenantId: string | null = null
+    let callStartTime: number | null = null
+
+    ws.on('message', (data: Buffer) => {
+      let event: TelnyxEvent
+      try {
+        event = JSON.parse(data.toString()) as TelnyxEvent
+      } catch {
+        return
+      }
+
+      if (event.event === 'start') {
+        const toNumber = event.start.to
+        tenantId = lookupTenant(toNumber, tenantMap) ?? null
+
+        if (!tenantId) {
+          console.warn(
+            `[telnyx-handler] No tenant found for number ${toNumber} — using dev fallback`
+          )
+          tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
+        }
+
+        callStartTime = Date.now()
+        console.info(`[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}`)
+
+        createGeminiLiveSession(tenantId, 'sales_crm')
+          .then((session) => {
+            geminiSession = session
+            session.onAudio((audioChunk: Buffer) => {
+              if (ws.readyState !== ws.OPEN) return
+              // Gemini → Telnyx: PCM16 16kHz → PCMU 8kHz → base64
+              const pcmu = linear16ToPcmu(audioChunk)
+              ws.send(
+                JSON.stringify({
+                  event: 'media',
+                  media: { payload: pcmu.toString('base64') },
+                })
+              )
+            })
+          })
+          .catch((err: unknown) => {
+            console.error('[telnyx-handler] Failed to open Gemini session', err)
+          })
+      } else if (event.event === 'media') {
+        if (!geminiSession) return
+        if (event.media.track !== 'inbound') return
+        // Telnyx → Gemini: base64 PCMU 8kHz → PCM16 16kHz
+        const pcmuBuffer = Buffer.from(event.media.payload, 'base64')
+        const pcm16 = pcmuToLinear16(pcmuBuffer)
+        geminiSession.send(pcm16)
+      } else if (event.event === 'stop') {
+        handleCallEnd()
+      }
+    })
+
+    ws.on('close', () => {
+      handleCallEnd()
+    })
+
+    ws.on('error', (err: Error) => {
+      console.error('[telnyx-handler] WebSocket error', err)
+      handleCallEnd()
+    })
+
+    function handleCallEnd(): void {
+      if (!geminiSession) return
+      geminiSession.close()
+      geminiSession = null
+
+      const duration = callStartTime ? Math.round((Date.now() - callStartTime) / 1000) : 0
+      logCall({
+        tenant_id: tenantId ?? 'unknown',
+        duration_seconds: duration,
+        language: 'unknown', // language detection added in future task
+        timestamp: new Date(),
+      })
+      console.info(`[telnyx-handler] Call ended — duration: ${duration}s`)
+    }
+  })
+
+  console.info('[telnyx-handler] WebSocket server registered at /voice/stream')
 }
