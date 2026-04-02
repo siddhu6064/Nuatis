@@ -47,3 +47,6 @@ Thumbs.db
 .terraform/
 apps/web/.env.local
 .claude/
+
+# Git worktrees
+.worktrees/
