@@ -89,6 +89,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let geminiSession: Awaited<ReturnType<typeof createGeminiLiveSession>> | null = null
     let tenantId: string | null = null
     let callStartTime: number | null = null
+    let sessionReady = false
+    const mediaQueue: Buffer[] = []
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -123,20 +125,34 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 JSON.stringify({
                   event: 'media',
                   media: { payload: pcmu.toString('base64') },
-                })
+                }),
+                (err) => {
+                  if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
+                }
               )
             })
+            // Flush any media that arrived before session was ready
+            for (const pcm16 of mediaQueue) {
+              session.send(pcm16)
+            }
+            mediaQueue.length = 0
+            sessionReady = true
           })
           .catch((err: unknown) => {
             console.error('[telnyx-handler] Failed to open Gemini session', err)
+            sessionReady = true
+            mediaQueue.length = 0
           })
       } else if (event.event === 'media') {
-        if (!geminiSession) return
         if (event.media.track !== 'inbound') return
         // Telnyx → Gemini: base64 PCMU 8kHz → PCM16 16kHz
         const pcmuBuffer = Buffer.from(event.media.payload, 'base64')
         const pcm16 = pcmuToLinear16(pcmuBuffer)
-        geminiSession.send(pcm16)
+        if (!sessionReady) {
+          mediaQueue.push(pcm16)
+        } else if (geminiSession) {
+          geminiSession.send(pcm16)
+        }
       } else if (event.event === 'stop') {
         handleCallEnd()
       }
