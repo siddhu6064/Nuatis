@@ -1,7 +1,22 @@
-import { describe, it, expect, jest } from '@jest/globals'
+import { describe, it, expect, jest, beforeAll } from '@jest/globals'
+
+// Mock @supabase/supabase-js so no real DB call is made
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    from: () => ({
+      insert: () => Promise.resolve({ error: null }),
+    }),
+  }),
+}))
+
 import { logCall } from './call-logger.js'
 
 describe('logCall', () => {
+  beforeAll(() => {
+    process.env['SUPABASE_URL'] = 'https://test.supabase.co'
+    process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'test-key'
+  })
+
   it('logs call details to console', () => {
     const spy = jest.spyOn(console, 'info').mockImplementation(() => {})
 
