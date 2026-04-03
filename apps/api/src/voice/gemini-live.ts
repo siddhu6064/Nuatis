@@ -53,6 +53,15 @@ export async function createGeminiLiveSession(
         console.info(
           `[gemini-live] message keys=${Object.keys(msg).join(',')}, turnComplete=${msg.serverContent?.turnComplete}`
         )
+        if (msg.setupComplete !== undefined) {
+          console.info('[gemini-live] setupComplete received — sending greeting')
+          session.sendClientContent({
+            turns: [
+              { role: 'user', parts: [{ text: 'A caller just connected. Please greet them.' }] },
+            ],
+            turnComplete: true,
+          })
+        }
         const parts = msg.serverContent?.modelTurn?.parts ?? []
         for (const part of parts) {
           if (part.inlineData?.data) {

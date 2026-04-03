@@ -131,7 +131,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 JSON.stringify({
                   event: 'media',
                   stream_id: streamId,
-                  media: { payload: pcmu.toString('base64') },
+                  media: { payload: pcmu.toString('base64'), track: 'outbound' },
                 }),
                 (err) => {
                   if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
