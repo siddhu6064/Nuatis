@@ -40,11 +40,6 @@ export async function createGeminiLiveSession(
     callbacks: {
       onopen: () => {
         console.info('[gemini-live] session opened')
-        // Prime Gemini to start the conversation with audio
-        session.sendClientContent({
-          turns: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-          turnComplete: true,
-        })
       },
       onmessage: (e) => {
         const msg = e as {
@@ -78,6 +73,11 @@ export async function createGeminiLiveSession(
         console.info('[gemini-live] session closed')
       },
     },
+  })
+
+  session.sendClientContent({
+    turns: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+    turnComplete: true,
   })
 
   return {
