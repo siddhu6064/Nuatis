@@ -24,7 +24,7 @@ export async function createGeminiLiveSession(
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
   const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'this business')
 
-  const client = new GoogleGenAI({ apiKey })
+  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
   const pendingAudio: Buffer[] = []
