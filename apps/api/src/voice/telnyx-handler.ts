@@ -62,6 +62,7 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
 
 interface TelnyxStartEvent {
   event: 'start'
+  stream_id: string
   start: { call_sid: string; from: string; to: string }
 }
 
@@ -88,6 +89,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
 
     let geminiSession: Awaited<ReturnType<typeof createGeminiLiveSession>> | null = null
     let tenantId: string | null = null
+    let streamId: string | null = null
     let callStartTime: number | null = null
     let sessionReady = false
     const mediaQueue: Buffer[] = []
@@ -101,6 +103,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       }
 
       if (event.event === 'start') {
+        streamId = event.stream_id ?? null
         const toNumber = event.start.to
         tenantId = lookupTenant(toNumber, tenantMap) ?? null
 
@@ -112,7 +115,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
 
         callStartTime = Date.now()
-        console.info(`[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}`)
+        console.info(
+          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}`
+        )
 
         createGeminiLiveSession(tenantId, 'sales_crm')
           .then((session) => {
@@ -125,6 +130,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               ws.send(
                 JSON.stringify({
                   event: 'media',
+                  stream_id: streamId,
                   media: { payload: pcmu.toString('base64') },
                 }),
                 (err) => {
