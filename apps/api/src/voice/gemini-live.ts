@@ -13,14 +13,16 @@ export interface GeminiLiveSession {
 
 export async function createGeminiLiveSession(
   _tenantId: string,
-  vertical: string
+  vertical: string,
+  businessName?: string
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not set')
   }
 
-  const systemPrompt = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
+  const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
+  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'this business')
 
   const client = new GoogleGenAI({ apiKey })
 
