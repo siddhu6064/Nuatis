@@ -27,9 +27,10 @@ export async function createGeminiLiveSession(
   const client = new GoogleGenAI({ apiKey })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
+  const pendingAudio: Buffer[] = []
 
   const session = await client.live.connect({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-2.0-flash-live-001',
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: {
@@ -38,19 +39,35 @@ export async function createGeminiLiveSession(
     },
     callbacks: {
       onopen: () => {
-        // connection established
+        console.info('[gemini-live] session opened')
+        // Prime Gemini to start the conversation with audio
+        session.sendClientContent({
+          turns: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+          turnComplete: true,
+        })
       },
       onmessage: (e) => {
         const msg = e as {
           serverContent?: {
             modelTurn?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> }
+            turnComplete?: boolean
           }
+          setupComplete?: unknown
+          toolCall?: unknown
         }
+        console.info(
+          `[gemini-live] message keys=${Object.keys(msg).join(',')}, turnComplete=${msg.serverContent?.turnComplete}`
+        )
         const parts = msg.serverContent?.modelTurn?.parts ?? []
         for (const part of parts) {
           if (part.inlineData?.data) {
             const decoded = Buffer.from(part.inlineData.data, 'base64')
-            audioCallback?.(decoded)
+            console.info(`[gemini-live] audio part decoded: ${decoded.length}b`)
+            if (audioCallback) {
+              audioCallback(decoded)
+            } else {
+              pendingAudio.push(decoded)
+            }
           }
         }
       },
@@ -58,7 +75,7 @@ export async function createGeminiLiveSession(
         console.error('[gemini-live] WebSocket error:', e)
       },
       onclose: () => {
-        // connection closed
+        console.info('[gemini-live] session closed')
       },
     },
   })
@@ -74,6 +91,8 @@ export async function createGeminiLiveSession(
 
     onAudio(cb: (chunk: Buffer) => void): void {
       audioCallback = cb
+      for (const chunk of pendingAudio) cb(chunk)
+      pendingAudio.length = 0
     },
 
     sendText(text: string): void {
