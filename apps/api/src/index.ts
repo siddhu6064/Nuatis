@@ -38,21 +38,45 @@ app.post('/voice/inbound', (req, res) => {
   console.info(`[voice/inbound] event: ${event}`, JSON.stringify(req.body?.data ?? req.body))
 
   if (event === 'call.initiated') {
+    const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
     const webhookUrl = process.env['VOICE_WEBHOOK_URL'] ?? ''
     const streamUrl = webhookUrl
       .replace('/voice/inbound', '/voice/stream')
       .replace(/^http:\/\//, 'ws://')
       .replace(/^https:\/\//, 'wss://')
+    const apiKey = process.env['TELNYX_API_KEY'] ?? ''
 
-    const texml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="${streamUrl}" />
-  </Connect>
-</Response>`
+    console.info(`[voice/inbound] answering call_control_id=${callControlId} stream=${streamUrl}`)
 
-    res.setHeader('Content-Type', 'application/xml')
-    res.status(200).send(texml)
+    // Respond immediately — Telnyx requires fast webhook response
+    res.status(200).json({ received: true })
+
+    // Fire answer + streaming_start asynchronously
+    void (async () => {
+      try {
+        const base = `https://api.telnyx.com/v2/calls/${encodeURIComponent(callControlId)}/actions`
+        const headers = {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        }
+
+        const answerRes = await fetch(`${base}/answer`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({}),
+        })
+        console.info(`[voice/inbound] answer status=${answerRes.status}`)
+
+        const streamRes = await fetch(`${base}/streaming_start`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ stream_url: streamUrl, stream_track: 'both_tracks' }),
+        })
+        console.info(`[voice/inbound] streaming_start status=${streamRes.status}`)
+      } catch (err) {
+        console.error('[voice/inbound] call control API error', err)
+      }
+    })()
     return
   }
 
