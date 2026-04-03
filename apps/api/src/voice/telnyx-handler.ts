@@ -125,8 +125,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             session.onAudio((audioChunk: Buffer) => {
               if (ws.readyState !== ws.OPEN) return
               console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
-              // Gemini → Telnyx: PCM16 16kHz → PCMU 8kHz → base64
-              const pcmu = linear16ToPcmu(audioChunk)
+              // Gemini → Telnyx: PCM16 24kHz → 3:1 downsample → PCM16 8kHz → PCMU 8kHz → base64
+              const samples24k = Math.floor(audioChunk.length / 2)
+              const downsampled = Buffer.alloc(Math.floor(samples24k / 3) * 2)
+              for (let i = 0, j = 0; i < samples24k - 2; i += 3, j++) {
+                downsampled.writeInt16LE(audioChunk.readInt16LE(i * 2), j * 2)
+              }
+              const pcmu = linear16ToPcmu(downsampled)
               ws.send(
                 JSON.stringify({
                   event: 'media',
