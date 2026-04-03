@@ -69,16 +69,13 @@ export async function createGeminiLiveSession(
       onerror: (e) => {
         console.error('[gemini-live] WebSocket error:', e)
       },
-      onclose: () => {
-        console.info('[gemini-live] session closed')
+      onclose: (e) => {
+        console.info('[gemini-live] session closed', e)
       },
     },
   })
 
-  session.sendClientContent({
-    turns: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-    turnComplete: true,
-  })
+  // Gemini Live will respond when it receives audio input
 
   return {
     send(audioChunk: Buffer): void {
