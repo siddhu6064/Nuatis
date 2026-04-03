@@ -30,7 +30,7 @@ export async function createGeminiLiveSession(
   const pendingAudio: Buffer[] = []
 
   const session = await client.live.connect({
-    model: 'gemini-2.0-flash-live-preview-04-09',
+    model: 'gemini-2.5-flash-native-audio-latest',
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: {
