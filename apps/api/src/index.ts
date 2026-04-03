@@ -63,14 +63,18 @@ app.post('/voice/inbound', (req, res) => {
         const answerRes = await fetch(`${base}/answer`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({}),
+          body: JSON.stringify({ preferred_codecs: 'PCMU' }),
         })
         console.info(`[voice/inbound] answer status=${answerRes.status}`)
 
         const streamRes = await fetch(`${base}/streaming_start`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ stream_url: streamUrl, stream_track: 'both_tracks' }),
+          body: JSON.stringify({
+            stream_url: streamUrl,
+            stream_track: 'both_tracks',
+            codec: 'PCMU',
+          }),
         })
         console.info(`[voice/inbound] streaming_start status=${streamRes.status}`)
       } catch (err) {
