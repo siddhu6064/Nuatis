@@ -23,18 +23,18 @@ export function pcmuToLinear16(pcmuBuffer: Buffer): Buffer {
 
 /**
  * Gemini → Telnyx
- * Converts linear PCM 16-bit (16 kHz) to µ-law PCMU (8 kHz) by
- * taking every other sample (naive downsample) then µ-law encoding.
+ * Converts linear PCM 16-bit (24 kHz) to µ-law PCMU (8 kHz) by
+ * taking every 3rd sample (3:1 naive downsample) then µ-law encoding.
  */
-export function linear16ToPcmu(pcm16Buffer: Buffer): Buffer {
-  const samples16k = new Int16Array(
-    pcm16Buffer.buffer,
-    pcm16Buffer.byteOffset,
-    Math.floor(pcm16Buffer.byteLength / 2)
+export function linear16ToPcmu(pcm24Buffer: Buffer): Buffer {
+  const samples24k = new Int16Array(
+    pcm24Buffer.buffer,
+    pcm24Buffer.byteOffset,
+    Math.floor(pcm24Buffer.byteLength / 2)
   )
-  const samples8k = new Int16Array(Math.floor(samples16k.length / 2))
+  const samples8k = new Int16Array(Math.floor(samples24k.length / 3))
   for (let i = 0; i < samples8k.length; i++) {
-    samples8k[i] = samples16k[i * 2]!
+    samples8k[i] = samples24k[i * 3]!
   }
   return Buffer.from(mulaw.encode(samples8k))
 }
@@ -125,13 +125,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             session.onAudio((audioChunk: Buffer) => {
               if (ws.readyState !== ws.OPEN) return
               console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
-              // Gemini → Telnyx: PCM16 24kHz → 3:1 downsample → PCM16 8kHz → PCMU 8kHz → base64
-              const samples24k = Math.floor(audioChunk.length / 2)
-              const downsampled = Buffer.alloc(Math.floor(samples24k / 3) * 2)
-              for (let i = 0, j = 0; i < samples24k - 2; i += 3, j++) {
-                downsampled.writeInt16LE(audioChunk.readInt16LE(i * 2), j * 2)
-              }
-              const pcmu = linear16ToPcmu(downsampled)
+              // Gemini → Telnyx: PCM16 24kHz → 3:1 downsample + µ-law encode → PCMU 8kHz → base64
+              const pcmu = linear16ToPcmu(audioChunk)
               ws.send(
                 JSON.stringify({
                   event: 'media',
