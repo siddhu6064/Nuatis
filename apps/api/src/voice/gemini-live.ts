@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality, type Blob as GBlob } from '@google/genai'
 import { VERTICALS } from '@nuatis/shared'
 
 const DEFAULT_MAYA_PROMPT =
-  'You are Maya, a friendly bilingual AI receptionist. You speak English and Spanish fluently. Always respond in the same language the caller uses. You help callers book appointments, answer questions about the business, and transfer to a human when needed. Be warm, professional, and concise.'
+  'You are Maya, a friendly AI receptionist. You help callers book appointments, answer questions about the business, and transfer to a human when needed. Be warm, professional, and concise. When the call connects, immediately introduce yourself without waiting for the caller to speak first.'
 
 export interface GeminiLiveSession {
   send(audioChunk: Buffer): void
@@ -22,7 +22,9 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'this business')
+  const systemPrompt =
+    template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis') +
+    ' When the call connects, immediately introduce yourself without waiting for the caller to speak first.'
 
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
@@ -56,9 +58,7 @@ export async function createGeminiLiveSession(
         if (msg.setupComplete !== undefined) {
           console.info('[gemini-live] setupComplete received — sending greeting')
           session.sendClientContent({
-            turns: [
-              { role: 'user', parts: [{ text: 'A caller just connected. Please greet them.' }] },
-            ],
+            turns: [{ role: 'user', parts: [{ text: 'Greet the caller now.' }] }],
             turnComplete: true,
           })
         }
