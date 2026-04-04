@@ -115,11 +115,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
 
         callStartTime = Date.now()
+        const callControlId = event.start.call_sid ?? null
         console.info(
-          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}`
+          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
 
-        createGeminiLiveSession(tenantId, 'sales_crm')
+        createGeminiLiveSession(tenantId, 'sales_crm', undefined, callControlId ?? undefined)
           .then((session) => {
             geminiSession = session
             session.onAudio((audioChunk: Buffer) => {
