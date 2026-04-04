@@ -74,6 +74,8 @@ app.post('/voice/inbound', (req, res) => {
             stream_url: streamUrl,
             stream_track: 'both_tracks',
             codec: 'PCMU',
+            stream_bidirectional_mode: 'rtp',
+            stream_bidirectional_codec: 'PCMU',
           }),
         })
         console.info(`[voice/inbound] streaming_start status=${streamRes.status}`)
