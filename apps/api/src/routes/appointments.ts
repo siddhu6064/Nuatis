@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { createEvent, updateEvent, deleteEvent } from '../services/scheduling.js'
+import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 
 const router = Router()
 
@@ -128,6 +129,12 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     .single()
 
   if (error) {
+    void publishActivityEvent({
+      tenant_id: authed.tenantId,
+      event_id: contact_id,
+      event_type: 'booking.failed',
+      payload_json: { severity: 'high', reason: error.message, booking_id: contact_id },
+    })
     res.status(500).json({ error: error.message })
     return
   }
@@ -202,6 +209,28 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  if (parsed.data.status === 'no_show') {
+    void (async () => {
+      let contactName = 'unknown'
+      const contactId = (appointment as Record<string, unknown>)['contact_id']
+      if (typeof contactId === 'string') {
+        const { data: contact } = await supabase
+          .from('contacts')
+          .select('full_name')
+          .eq('id', contactId)
+          .eq('tenant_id', authed.tenantId)
+          .single()
+        contactName = (contact as { full_name?: string } | null)?.full_name ?? 'unknown'
+      }
+      await publishActivityEvent({
+        tenant_id: authed.tenantId,
+        event_id: id ?? '',
+        event_type: 'appointment.no_show',
+        payload_json: { severity: 'high', appointment_id: id ?? '', contact_name: contactName },
+      })
+    })()
   }
 
   res.json({ data: appointment })

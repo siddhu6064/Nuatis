@@ -3,6 +3,7 @@ const { mulaw } = alawmulaw
 import type { WebSocketServer, WebSocket } from 'ws'
 import { createGeminiLiveSession } from './gemini-live.js'
 import { logCall } from './call-logger.js'
+import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 
 // ── Audio transcoding ─────────────────────────────────────────────────────────
 
@@ -148,6 +149,16 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           })
           .catch((err: unknown) => {
             console.error('[telnyx-handler] Failed to open Gemini session', err)
+            void publishActivityEvent({
+              tenant_id: tenantId ?? 'unknown',
+              event_id: streamId ?? 'unknown',
+              event_type: 'call.failed',
+              payload_json: {
+                severity: 'high',
+                reason: err instanceof Error ? err.message : String(err),
+                call_id: streamId ?? 'unknown',
+              },
+            })
             sessionReady = true
             mediaQueue.length = 0
           })
