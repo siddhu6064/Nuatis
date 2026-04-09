@@ -149,7 +149,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
-    const geminiAudioBuf: Buffer[] = []
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -181,22 +180,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         let safeName = ''
         let safeVertical = ''
 
-        function flushAudioToTelnyx(): void {
-          if (geminiAudioBuf.length === 0 || ws.readyState !== ws.OPEN) return
-          const combined = Buffer.concat(geminiAudioBuf)
-          geminiAudioBuf.length = 0
-          ws.send(
-            JSON.stringify({
-              event: 'media',
-              stream_id: streamId,
-              media: { payload: combined.toString('base64'), track: 'outbound' },
-            }),
-            (err) => {
-              if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
-            }
-          )
-        }
-
         function connectGemini(): void {
           createGeminiLiveSession(
             resolvedTenantId,
@@ -215,15 +198,17 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                     `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
                   )
                 }
-                // Convert to PCMU and buffer; flush every 5 chunks (~200ms)
                 const pcmu = linear16ToPcmu(audioChunk)
-                geminiAudioBuf.push(pcmu)
-                if (geminiAudioBuf.length >= 5) {
-                  flushAudioToTelnyx()
-                }
-              })
-              session.onTurnComplete(() => {
-                flushAudioToTelnyx()
+                ws.send(
+                  JSON.stringify({
+                    event: 'media',
+                    stream_id: streamId,
+                    media: { payload: pcmu.toString('base64'), track: 'outbound' },
+                  }),
+                  (err) => {
+                    if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
+                  }
+                )
               })
               session.onClose((code: number) => {
                 if (
