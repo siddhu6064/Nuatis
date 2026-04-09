@@ -160,7 +160,9 @@ export async function createGeminiLiveSession(
         for (const part of parts) {
           if (part.inlineData?.data) {
             const decoded = Buffer.from(part.inlineData.data, 'base64')
-            console.info(`[gemini-live] audio part decoded: ${decoded.length}b`)
+            console.info(
+              `[gemini-live] audio part decoded: ${decoded.length}b mime=${part.inlineData.mimeType ?? 'unknown'}`
+            )
             if (audioCallback) {
               audioCallback(decoded)
             } else {
