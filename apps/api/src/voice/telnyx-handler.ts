@@ -149,9 +149,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
-    const outboundChunks: Buffer[] = []
-    let outboundBytes = 0
-    const FLUSH_THRESHOLD = 9600 // 200ms at 24kHz 16-bit mono
+    const geminiAudioBuf: Buffer[] = []
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -183,17 +181,15 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         let safeName = ''
         let safeVertical = ''
 
-        function flushOutboundAudio(): void {
-          if (outboundChunks.length === 0 || ws.readyState !== ws.OPEN) return
-          const combined = Buffer.concat(outboundChunks)
-          outboundChunks.length = 0
-          outboundBytes = 0
-          const pcmu = linear16ToPcmu(combined)
+        function flushAudioToTelnyx(): void {
+          if (geminiAudioBuf.length === 0 || ws.readyState !== ws.OPEN) return
+          const combined = Buffer.concat(geminiAudioBuf)
+          geminiAudioBuf.length = 0
           ws.send(
             JSON.stringify({
               event: 'media',
               stream_id: streamId,
-              media: { payload: pcmu.toString('base64'), track: 'outbound' },
+              media: { payload: combined.toString('base64'), track: 'outbound' },
             }),
             (err) => {
               if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
@@ -219,15 +215,15 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                     `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
                   )
                 }
-                // Buffer Gemini audio and flush in larger frames to avoid stuttering
-                outboundChunks.push(audioChunk)
-                outboundBytes += audioChunk.length
-                if (outboundBytes >= FLUSH_THRESHOLD) {
-                  flushOutboundAudio()
+                // Convert to PCMU and buffer; flush every 5 chunks (~200ms)
+                const pcmu = linear16ToPcmu(audioChunk)
+                geminiAudioBuf.push(pcmu)
+                if (geminiAudioBuf.length >= 5) {
+                  flushAudioToTelnyx()
                 }
               })
               session.onTurnComplete(() => {
-                flushOutboundAudio()
+                flushAudioToTelnyx()
               })
               session.onClose((code: number) => {
                 if (
