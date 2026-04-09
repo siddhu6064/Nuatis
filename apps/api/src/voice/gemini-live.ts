@@ -70,7 +70,7 @@ export async function createGeminiLiveSession(
     template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis') +
     ' When the call connects, immediately introduce yourself without waiting for the caller to speak first.'
 
-  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
+  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
   const pendingAudio: Buffer[] = []
@@ -107,7 +107,7 @@ export async function createGeminiLiveSession(
   }
 
   const session = await client.live.connect({
-    model: 'gemini-2.0-flash-live-001',
+    model: 'gemini-2.0-flash-exp',
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
