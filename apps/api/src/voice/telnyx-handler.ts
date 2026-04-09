@@ -150,6 +150,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
+    let greetingSent = false
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -195,7 +196,21 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               geminiSession = session
               session.onSetupComplete(() => {
                 console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
+                if (!greetingSent && isCallActive) {
+                  greetingSent = true
+                  session.sendGreeting('Thank you for calling, how can I help you today?')
+                }
               })
+              // Fallback: if setupComplete doesn't arrive in 3500ms, send greeting anyway
+              setTimeout(() => {
+                if (!greetingSent && isCallActive && geminiSession) {
+                  console.warn(
+                    '[telnyx-handler] setupComplete timeout — sending greeting as fallback'
+                  )
+                  greetingSent = true
+                  geminiSession.sendGreeting('Thank you for calling, how can I help you today?')
+                }
+              }, 3500)
               session.onAudio((audioChunk: Buffer) => {
                 if (!isCallActive || ws.readyState !== ws.OPEN) return
                 if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {

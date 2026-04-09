@@ -53,6 +53,7 @@ export interface GeminiLiveSession {
   onAudio(cb: (chunk: Buffer) => void): void
   onTurnComplete(cb: () => void): void
   onSetupComplete(cb: () => void): void
+  sendGreeting(text: string): void
   sendText(text: string): void
   close(): void
   onClose(cb: (code: number) => void): void
@@ -152,17 +153,8 @@ export async function createGeminiLiveSession(
         )
 
         if (msg.setupComplete !== undefined) {
-          console.info('[gemini-live] setupComplete received — sending greeting')
+          console.info('[gemini-live] setupComplete received')
           if (setupCompleteCallback) setupCompleteCallback()
-          session.sendClientContent({
-            turns: [
-              {
-                role: 'user',
-                parts: [{ text: 'Thank you for calling, how can I help you today?' }],
-              },
-            ],
-            turnComplete: true,
-          })
         }
 
         const parts = msg.serverContent?.modelTurn?.parts ?? []
@@ -240,6 +232,14 @@ export async function createGeminiLiveSession(
 
     onSetupComplete(cb: () => void): void {
       setupCompleteCallback = cb
+    },
+
+    sendGreeting(text: string): void {
+      console.info('[gemini-live] sending greeting')
+      session.sendClientContent({
+        turns: [{ role: 'user', parts: [{ text }] }],
+        turnComplete: true,
+      })
     },
 
     sendText(text: string): void {
