@@ -137,6 +137,7 @@ interface PrewarmedEntry {
   tenantId: string
   vertical: string
   businessName: string
+  callControlId: string
   cleanupTimer: ReturnType<typeof setTimeout>
 }
 
@@ -189,6 +190,7 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
       tenantId,
       vertical: safeVertical,
       businessName: safeName,
+      callControlId,
       cleanupTimer,
     })
   })
@@ -267,7 +269,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
 
         callStartTime = Date.now()
-        const callControlId = event.start.call_sid ?? null
+        let callControlId: string | null = event.start.call_sid ?? null
         console.info(
           `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
@@ -365,6 +367,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           clearTimeout(prewarmed.cleanupTimer)
           console.info(`[telnyx-handler] using pre-warmed Gemini session (stream_id=${streamId})`)
           tenantId = prewarmed.tenantId
+          callControlId = prewarmed.callControlId
           wireSession(prewarmed.session, prewarmed.vertical, prewarmed.businessName)
         } else if (streamId) {
           // Wait up to 1000ms for rekey from streaming.started webhook
@@ -384,9 +387,15 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             clearTimeout(waited.cleanupTimer)
             console.info(`[telnyx-handler] pre-warm claimed via waiter (stream_id=${streamId})`)
             tenantId = waited.tenantId
+            callControlId = waited.callControlId
             wireSession(waited.session, waited.vertical, waited.businessName)
           } else {
             console.info('[telnyx-handler] pre-warm wait timeout — creating fresh')
+            if (!callControlId) {
+              console.warn(
+                '[telnyx-handler] fresh session created with null callControlId — hangup via API will not work'
+              )
+            }
             try {
               const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
               const safeName = businessName || 'the business'
@@ -420,6 +429,11 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           }
         } else {
           console.warn('[telnyx-handler] no stream_id in start event — creating fresh')
+          if (!callControlId) {
+            console.warn(
+              '[telnyx-handler] fresh session created with null callControlId — hangup via API will not work'
+            )
+          }
           try {
             const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
             const safeName = businessName || 'the business'
