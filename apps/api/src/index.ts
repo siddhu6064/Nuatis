@@ -87,13 +87,16 @@ app.post('/voice/inbound', (req, res) => {
 
         if (streamRes.ok) {
           try {
-            const streamBody = (await streamRes.json()) as { data?: { stream_id?: string } }
-            const streamId = streamBody?.data?.stream_id
+            const streamBody = await streamRes.json()
+            console.info('[debug] streaming_start response body:', JSON.stringify(streamBody))
+            const streamId = (streamBody as { data?: { stream_id?: string } })?.data?.stream_id
             if (streamId) {
               rekeyPrewarmedSession(callControlId, streamId)
               console.info(`[voice/inbound] streaming_start stream_id=${streamId}`)
             } else {
-              console.warn('[voice/inbound] streaming_start response missing stream_id')
+              console.warn(
+                '[voice/inbound] streaming_start response missing stream_id — waiting for streaming.started webhook'
+              )
             }
           } catch {
             console.warn('[voice/inbound] failed to parse streaming_start response')
@@ -114,6 +117,21 @@ app.post('/voice/inbound', (req, res) => {
 
   if (event === 'call.hangup') {
     console.info('[voice/inbound] call hung up')
+    res.sendStatus(200)
+    return
+  }
+
+  if (event === 'streaming.started') {
+    const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
+    const streamId: string = req.body?.data?.payload?.stream_id ?? ''
+    if (callControlId && streamId) {
+      rekeyPrewarmedSession(callControlId, streamId)
+      console.info(`[prewarm] rekeyed via webhook ${callControlId} → ${streamId}`)
+    } else {
+      console.warn(
+        `[voice/inbound] streaming.started missing ids — call_control_id=${callControlId} stream_id=${streamId}`
+      )
+    }
     res.sendStatus(200)
     return
   }
