@@ -137,6 +137,7 @@ interface PrewarmedEntry {
   tenantId: string
   vertical: string
   businessName: string
+  cleanupTimer: ReturnType<typeof setTimeout>
 }
 
 const prewarmedSessions = new Map<string, PrewarmedEntry>()
@@ -174,22 +175,45 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
       done()
     }, 3500)
 
-    prewarmedSessions.set(callControlId, {
-      session,
-      tenantId,
-      vertical: safeVertical,
-      businessName: safeName,
-    })
-
-    // Clean up if never claimed within 30s
-    setTimeout(() => {
-      if (prewarmedSessions.has(callControlId)) {
+    const cleanupTimer = setTimeout(() => {
+      if (prewarmedSessions.get(callControlId)?.session === session) {
         console.warn(`[prewarm] unclaimed session for ${callControlId} — closing`)
         prewarmedSessions.delete(callControlId)
         session.close()
       }
     }, 30_000)
+
+    prewarmedSessions.set(callControlId, {
+      session,
+      tenantId,
+      vertical: safeVertical,
+      businessName: safeName,
+      cleanupTimer,
+    })
   })
+}
+
+/**
+ * Rekey a pre-warmed session from callControlId to streamId.
+ * Called after streaming_start returns the stream_id.
+ */
+export function rekeyPrewarmedSession(callControlId: string, streamId: string): void {
+  const entry = prewarmedSessions.get(callControlId)
+  if (!entry) {
+    console.warn(`[prewarm] rekey failed — no session for ${callControlId}`)
+    return
+  }
+  prewarmedSessions.delete(callControlId)
+  clearTimeout(entry.cleanupTimer)
+  const newTimer = setTimeout(() => {
+    if (prewarmedSessions.get(streamId)?.session === entry.session) {
+      console.warn(`[prewarm] unclaimed session for stream ${streamId} — closing`)
+      prewarmedSessions.delete(streamId)
+      entry.session.close()
+    }
+  }, 30_000)
+  prewarmedSessions.set(streamId, { ...entry, cleanupTimer: newTimer })
+  console.info(`[prewarm] rekeyed ${callControlId} → ${streamId}`)
 }
 
 // ── WebSocket handler ─────────────────────────────────────────────────────────
@@ -323,11 +347,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           }
         }
 
-        // Claim pre-warmed session if available, otherwise create fresh
-        const prewarmed = callControlId ? prewarmedSessions.get(callControlId) : undefined
-        if (prewarmed && callControlId) {
-          prewarmedSessions.delete(callControlId)
-          console.info('[telnyx-handler] using pre-warmed Gemini session')
+        // Claim pre-warmed session by streamId (rekeyed after streaming_start)
+        const prewarmed = streamId ? prewarmedSessions.get(streamId) : undefined
+        if (prewarmed && streamId) {
+          prewarmedSessions.delete(streamId)
+          clearTimeout(prewarmed.cleanupTimer)
+          console.info(`[telnyx-handler] using pre-warmed Gemini session (stream_id=${streamId})`)
           tenantId = prewarmed.tenantId
           wireSession(prewarmed.session, prewarmed.vertical, prewarmed.businessName)
         } else {

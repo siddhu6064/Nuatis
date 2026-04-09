@@ -7,7 +7,11 @@ import { WebSocketServer } from 'ws'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
 import appointmentsRouter from './routes/appointments.js'
-import { registerVoiceWebSocket, prewarmGemini } from './voice/telnyx-handler.js'
+import {
+  registerVoiceWebSocket,
+  prewarmGemini,
+  rekeyPrewarmedSession,
+} from './voice/telnyx-handler.js'
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3001
@@ -80,6 +84,21 @@ app.post('/voice/inbound', (req, res) => {
           }),
         })
         console.info(`[voice/inbound] streaming_start status=${streamRes.status}`)
+
+        if (streamRes.ok) {
+          try {
+            const streamBody = (await streamRes.json()) as { data?: { stream_id?: string } }
+            const streamId = streamBody?.data?.stream_id
+            if (streamId) {
+              rekeyPrewarmedSession(callControlId, streamId)
+              console.info(`[voice/inbound] streaming_start stream_id=${streamId}`)
+            } else {
+              console.warn('[voice/inbound] streaming_start response missing stream_id')
+            }
+          } catch {
+            console.warn('[voice/inbound] failed to parse streaming_start response')
+          }
+        }
       } catch (err) {
         console.error('[voice/inbound] call control API error', err)
       }
