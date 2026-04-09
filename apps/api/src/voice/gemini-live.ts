@@ -52,6 +52,7 @@ export interface GeminiLiveSession {
   send(audioChunk: Buffer): void
   onAudio(cb: (chunk: Buffer) => void): void
   onTurnComplete(cb: () => void): void
+  onSetupComplete(cb: () => void): void
   sendText(text: string): void
   close(): void
   onClose(cb: (code: number) => void): void
@@ -75,6 +76,7 @@ export async function createGeminiLiveSession(
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
   let turnCompleteCallback: (() => void) | null = null
+  let setupCompleteCallback: (() => void) | null = null
   let closeCallback: ((code: number) => void) | null = null
   const pendingAudio: Buffer[] = []
 
@@ -151,6 +153,7 @@ export async function createGeminiLiveSession(
 
         if (msg.setupComplete !== undefined) {
           console.info('[gemini-live] setupComplete received — sending greeting')
+          if (setupCompleteCallback) setupCompleteCallback()
           session.sendClientContent({
             turns: [
               {
@@ -233,6 +236,10 @@ export async function createGeminiLiveSession(
 
     onTurnComplete(cb: () => void): void {
       turnCompleteCallback = cb
+    },
+
+    onSetupComplete(cb: () => void): void {
+      setupCompleteCallback = cb
     },
 
     sendText(text: string): void {

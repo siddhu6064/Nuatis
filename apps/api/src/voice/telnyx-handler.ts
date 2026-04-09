@@ -144,6 +144,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let streamId: string | null = null
     let callStartTime: number | null = null
     let sessionReady = false
+    let isCallActive = true
     const mediaQueue: Buffer[] = []
     let firstAudioReceivedAt: number | null = null
     let firstAudioSentAt: number | null = null
@@ -177,20 +178,26 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         )
 
         const resolvedTenantId = tenantId
-        let safeName = ''
-        let safeVertical = ''
+        const prewarmStart = Date.now()
 
-        function connectGemini(): void {
+        function connectGemini(vertical: string, businessName: string): void {
           createGeminiLiveSession(
             resolvedTenantId,
-            safeVertical,
-            safeName,
+            vertical,
+            businessName,
             callControlId ?? undefined
           )
             .then((session) => {
+              if (!isCallActive) {
+                session.close()
+                return
+              }
               geminiSession = session
+              session.onSetupComplete(() => {
+                console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
+              })
               session.onAudio((audioChunk: Buffer) => {
-                if (ws.readyState !== ws.OPEN) return
+                if (!isCallActive || ws.readyState !== ws.OPEN) return
                 if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
                   firstAudioSentAt = Date.now()
                   const callId = streamId ?? 'unknown'
@@ -201,6 +208,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 const pcmu = linear16ToPcmu(audioChunk)
                 const FRAME_SIZE = 160 // 20ms of 8kHz PCMU (standard RTP frame)
                 for (let offset = 0; offset < pcmu.length; offset += FRAME_SIZE) {
+                  if (ws.readyState !== ws.OPEN) break
                   const frame = pcmu.subarray(offset, offset + FRAME_SIZE)
                   ws.send(
                     JSON.stringify({
@@ -217,6 +225,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               session.onClose((code: number) => {
                 if (
                   code === 1011 &&
+                  isCallActive &&
                   ws.readyState === ws.OPEN &&
                   reconnectAttempts < MAX_RECONNECTS
                 ) {
@@ -225,7 +234,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                     `[telnyx-handler] Gemini 1011 — reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECTS})`
                   )
                   geminiSession = null
-                  connectGemini()
+                  connectGemini(vertical, businessName)
                 }
               })
               // Flush any media that arrived before session was ready
@@ -252,13 +261,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             })
         }
 
-        getTenantConfig(resolvedTenantId).then(({ businessName, vertical }) => {
-          safeName = businessName || 'the business'
-          safeVertical = vertical || 'sales_crm'
-          connectGemini()
-        })
+        // Start Gemini session immediately with defaults (pre-warm),
+        // fetch tenant config in parallel for reconnects
+        connectGemini('sales_crm', 'the business')
+        getTenantConfig(resolvedTenantId).catch(() => undefined)
       } else if (event.event === 'media') {
-        if (event.media.track !== 'inbound') return
+        if (!isCallActive || event.media.track !== 'inbound') return
         if (firstAudioReceivedAt === null) {
           firstAudioReceivedAt = Date.now()
         }
@@ -288,9 +296,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     })
 
     function handleCallEnd(): void {
-      if (!geminiSession) return
-      geminiSession.close()
-      geminiSession = null
+      if (!isCallActive) return
+      isCallActive = false
+
+      if (geminiSession) {
+        geminiSession.close()
+        geminiSession = null
+      }
 
       const duration = callStartTime ? Math.round((Date.now() - callStartTime) / 1000) : 0
       // TODO: persist latency_ms to voice_sessions table once latency_ms column is added
