@@ -119,6 +119,13 @@ export async function createGeminiLiveSession(
       thinkingConfig: {
         thinkingBudget: 0,
       },
+      realtimeInputConfig: {
+        voiceActivityDetection: {
+          disabledByUser: false,
+          startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+          endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
+        },
+      },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
@@ -152,7 +159,12 @@ export async function createGeminiLiveSession(
         if (msg.setupComplete !== undefined) {
           console.info('[gemini-live] setupComplete received — sending greeting')
           session.sendClientContent({
-            turns: [{ role: 'user', parts: [{ text: 'Hello!' }] }],
+            turns: [
+              {
+                role: 'user',
+                parts: [{ text: 'Thank you for calling, how can I help you today?' }],
+              },
+            ],
             turnComplete: true,
           })
         }

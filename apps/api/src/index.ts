@@ -68,7 +68,7 @@ app.post('/voice/inbound', (req, res) => {
           headers,
           body: JSON.stringify({
             stream_url: streamUrl,
-            stream_track: 'both_tracks',
+            stream_track: 'inbound_track',
             codec: 'PCMU',
             stream_bidirectional_mode: 'rtp',
             stream_bidirectional_codec: 'PCMU',
