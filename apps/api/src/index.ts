@@ -39,11 +39,7 @@ app.post('/voice/inbound', (req, res) => {
 
   if (event === 'call.initiated') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
-    const webhookUrl = process.env['VOICE_WEBHOOK_URL'] ?? ''
-    const streamUrl = webhookUrl
-      .replace('/voice/inbound', '/voice/stream')
-      .replace(/^http:\/\//, 'ws://')
-      .replace(/^https:\/\//, 'wss://')
+    const streamUrl = process.env['TELNYX_STREAM_URL'] ?? 'wss://voice.nuatis.com/voice/stream'
     const apiKey = process.env['TELNYX_API_KEY'] ?? ''
 
     console.info(`[voice/inbound] answering call_control_id=${callControlId} stream=${streamUrl}`)
