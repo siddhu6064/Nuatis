@@ -147,6 +147,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     const mediaQueue: Buffer[] = []
     let firstAudioReceivedAt: number | null = null
     let firstAudioSentAt: number | null = null
+    let reconnectAttempts = 0
+    const MAX_RECONNECTS = 2
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -175,64 +177,84 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         )
 
         const resolvedTenantId = tenantId
-        getTenantConfig(resolvedTenantId)
-          .then(({ businessName, vertical }) => {
-            const safeName = businessName || 'the business'
-            const safeVertical = vertical || 'sales_crm'
-            return createGeminiLiveSession(
-              resolvedTenantId,
-              safeVertical,
-              safeName,
-              callControlId ?? undefined
-            )
-          })
-          .then((session) => {
-            geminiSession = session
-            session.onAudio((audioChunk: Buffer) => {
-              if (ws.readyState !== ws.OPEN) return
-              if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
-                firstAudioSentAt = Date.now()
-                const callId = streamId ?? 'unknown'
-                console.info(
-                  `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
-                )
-              }
-              console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
-              // Gemini → Telnyx: PCM16 16kHz → 2:1 downsample + µ-law encode → PCMU 8kHz → base64
-              const pcmu = linear16ToPcmu(audioChunk)
-              ws.send(
-                JSON.stringify({
-                  event: 'media',
-                  stream_id: streamId,
-                  media: { payload: pcmu.toString('base64'), track: 'outbound' },
-                }),
-                (err) => {
-                  if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
+        let safeName = ''
+        let safeVertical = ''
+
+        function connectGemini(): void {
+          createGeminiLiveSession(
+            resolvedTenantId,
+            safeVertical,
+            safeName,
+            callControlId ?? undefined
+          )
+            .then((session) => {
+              geminiSession = session
+              session.onAudio((audioChunk: Buffer) => {
+                if (ws.readyState !== ws.OPEN) return
+                if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
+                  firstAudioSentAt = Date.now()
+                  const callId = streamId ?? 'unknown'
+                  console.info(
+                    `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
+                  )
                 }
-              )
+                console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
+                // Gemini → Telnyx: PCM16 16kHz → 2:1 downsample + µ-law encode → PCMU 8kHz → base64
+                const pcmu = linear16ToPcmu(audioChunk)
+                ws.send(
+                  JSON.stringify({
+                    event: 'media',
+                    stream_id: streamId,
+                    media: { payload: pcmu.toString('base64'), track: 'outbound' },
+                  }),
+                  (err) => {
+                    if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
+                  }
+                )
+              })
+              session.onClose((code: number) => {
+                if (
+                  code === 1011 &&
+                  ws.readyState === ws.OPEN &&
+                  reconnectAttempts < MAX_RECONNECTS
+                ) {
+                  reconnectAttempts++
+                  console.warn(
+                    `[telnyx-handler] Gemini 1011 — reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECTS})`
+                  )
+                  geminiSession = null
+                  connectGemini()
+                }
+              })
+              // Flush any media that arrived before session was ready
+              for (const pcm16 of mediaQueue) {
+                session.send(pcm16)
+              }
+              mediaQueue.length = 0
+              sessionReady = true
             })
-            // Flush any media that arrived before session was ready
-            for (const pcm16 of mediaQueue) {
-              session.send(pcm16)
-            }
-            mediaQueue.length = 0
-            sessionReady = true
-          })
-          .catch((err: unknown) => {
-            console.error('[telnyx-handler] Failed to open Gemini session', err)
-            void publishActivityEvent({
-              tenant_id: tenantId ?? 'unknown',
-              event_id: streamId ?? 'unknown',
-              event_type: 'call.failed',
-              payload_json: {
-                severity: 'high',
-                reason: err instanceof Error ? err.message : String(err),
-                call_id: streamId ?? 'unknown',
-              },
+            .catch((err: unknown) => {
+              console.error('[telnyx-handler] Failed to open Gemini session', err)
+              void publishActivityEvent({
+                tenant_id: tenantId ?? 'unknown',
+                event_id: streamId ?? 'unknown',
+                event_type: 'call.failed',
+                payload_json: {
+                  severity: 'high',
+                  reason: err instanceof Error ? err.message : String(err),
+                  call_id: streamId ?? 'unknown',
+                },
+              })
+              sessionReady = true
+              mediaQueue.length = 0
             })
-            sessionReady = true
-            mediaQueue.length = 0
-          })
+        }
+
+        getTenantConfig(resolvedTenantId).then(({ businessName, vertical }) => {
+          safeName = businessName || 'the business'
+          safeVertical = vertical || 'sales_crm'
+          connectGemini()
+        })
       } else if (event.event === 'media') {
         if (event.media.track !== 'inbound') return
         if (firstAudioReceivedAt === null) {

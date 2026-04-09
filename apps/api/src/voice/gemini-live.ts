@@ -52,6 +52,7 @@ export interface GeminiLiveSession {
   onAudio(cb: (chunk: Buffer) => void): void
   sendText(text: string): void
   close(): void
+  onClose(cb: (code: number) => void): void
 }
 
 export async function createGeminiLiveSession(
@@ -71,6 +72,7 @@ export async function createGeminiLiveSession(
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
+  let closeCallback: ((code: number) => void) | null = null
   const pendingAudio: Buffer[] = []
 
   // Farewell / silence-fallback state
@@ -109,7 +111,7 @@ export async function createGeminiLiveSession(
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } },
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
       },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
@@ -180,11 +182,14 @@ export async function createGeminiLiveSession(
         console.error('[gemini-live] WebSocket error:', e)
       },
       onclose: (e) => {
-        console.info('[gemini-live] session closed', e)
+        const closeEvent = e as { code?: number }
+        const code = closeEvent.code ?? 1000
+        console.info(`[gemini-live] session closed code=${code}`)
         if (silenceTimer) {
           clearTimeout(silenceTimer)
           silenceTimer = null
         }
+        if (closeCallback) closeCallback(code)
       },
     },
   })
@@ -214,6 +219,10 @@ export async function createGeminiLiveSession(
 
     sendText(text: string): void {
       session.sendRealtimeInput({ text })
+    },
+
+    onClose(cb: (code: number) => void): void {
+      closeCallback = cb
     },
 
     close(): void {
