@@ -130,6 +130,68 @@ interface TelnyxStopEvent {
 
 type TelnyxEvent = TelnyxStartEvent | TelnyxMediaEvent | TelnyxStopEvent
 
+// ── Pre-warm registry ────────────────────────────────────────────────────────
+
+interface PrewarmedEntry {
+  session: Awaited<ReturnType<typeof createGeminiLiveSession>>
+  tenantId: string
+  vertical: string
+  businessName: string
+}
+
+const prewarmedSessions = new Map<string, PrewarmedEntry>()
+
+/**
+ * Pre-warm a Gemini Live session before answering the call.
+ * Resolves when setupComplete fires or after 3500ms (whichever first).
+ */
+export async function prewarmGemini(callControlId: string, toNumber: string): Promise<void> {
+  const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
+  const tenantMap = parseTenantMap(tenantMapRaw)
+  let tenantId = lookupTenant(toNumber, tenantMap) ?? null
+  if (!tenantId) {
+    tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
+  }
+
+  const { businessName, vertical } = await getTenantConfig(tenantId)
+  const safeName = businessName || 'the business'
+  const safeVertical = vertical || 'sales_crm'
+
+  const session = await createGeminiLiveSession(tenantId, safeVertical, safeName, callControlId)
+
+  return new Promise<void>((resolve) => {
+    let resolved = false
+    function done(): void {
+      if (resolved) return
+      resolved = true
+      resolve()
+    }
+    session.onSetupComplete(done)
+    setTimeout(() => {
+      if (!resolved) {
+        console.warn('[prewarm] setupComplete timeout after 3500ms — answering anyway')
+      }
+      done()
+    }, 3500)
+
+    prewarmedSessions.set(callControlId, {
+      session,
+      tenantId,
+      vertical: safeVertical,
+      businessName: safeName,
+    })
+
+    // Clean up if never claimed within 30s
+    setTimeout(() => {
+      if (prewarmedSessions.has(callControlId)) {
+        console.warn(`[prewarm] unclaimed session for ${callControlId} — closing`)
+        prewarmedSessions.delete(callControlId)
+        session.close()
+      }
+    }, 30_000)
+  })
+}
+
 // ── WebSocket handler ─────────────────────────────────────────────────────────
 
 export function registerVoiceWebSocket(wss: WebSocketServer): void {
@@ -179,85 +241,113 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         )
 
         const resolvedTenantId = tenantId
-        const prewarmStart = Date.now()
 
-        function connectGemini(vertical: string, businessName: string): void {
-          createGeminiLiveSession(
-            resolvedTenantId,
-            vertical,
-            businessName,
-            callControlId ?? undefined
-          )
-            .then((session) => {
-              if (!isCallActive) {
-                session.close()
-                return
-              }
-              geminiSession = session
-              session.onSetupComplete(() => {
-                console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
-                if (!greetingSent && isCallActive) {
-                  greetingSent = true
-                  session.sendGreeting('Thank you for calling, how can I help you today?')
+        function wireSession(
+          session: Awaited<ReturnType<typeof createGeminiLiveSession>>,
+          vertical: string,
+          businessName: string
+        ): void {
+          geminiSession = session
+          session.onAudio((audioChunk: Buffer) => {
+            if (!isCallActive || ws.readyState !== ws.OPEN) return
+            if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
+              firstAudioSentAt = Date.now()
+              const callId = streamId ?? 'unknown'
+              console.info(
+                `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
+              )
+            }
+            const pcmu = linear16ToPcmu(audioChunk)
+            const FRAME_SIZE = 160 // 20ms of 8kHz PCMU (standard RTP frame)
+            for (let offset = 0; offset < pcmu.length; offset += FRAME_SIZE) {
+              if (ws.readyState !== ws.OPEN) break
+              const frame = pcmu.subarray(offset, offset + FRAME_SIZE)
+              ws.send(
+                JSON.stringify({
+                  event: 'media',
+                  stream_id: streamId,
+                  media: { payload: frame.toString('base64'), track: 'outbound' },
+                }),
+                (err) => {
+                  if (err) console.error('[telnyx-handler] send error', err)
                 }
+              )
+            }
+          })
+          session.onClose((code: number) => {
+            if (
+              code === 1011 &&
+              isCallActive &&
+              ws.readyState === ws.OPEN &&
+              reconnectAttempts < MAX_RECONNECTS
+            ) {
+              reconnectAttempts++
+              console.warn(
+                `[telnyx-handler] Gemini 1011 — reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECTS})`
+              )
+              geminiSession = null
+              createGeminiLiveSession(
+                resolvedTenantId,
+                vertical,
+                businessName,
+                callControlId ?? undefined
+              )
+                .then((newSession) => {
+                  if (!isCallActive) {
+                    newSession.close()
+                    return
+                  }
+                  wireSession(newSession, vertical, businessName)
+                  for (const pcm16 of mediaQueue) {
+                    newSession.send(pcm16)
+                  }
+                  mediaQueue.length = 0
+                  sessionReady = true
+                })
+                .catch((err: unknown) => {
+                  console.error('[telnyx-handler] Reconnect failed', err)
+                })
+            }
+          })
+          // Flush any media that arrived before session was ready
+          for (const pcm16 of mediaQueue) {
+            session.send(pcm16)
+          }
+          mediaQueue.length = 0
+          sessionReady = true
+
+          // Send greeting now — streaming is active (start event already fired)
+          if (!greetingSent && isCallActive) {
+            greetingSent = true
+            session.sendGreeting('Thank you for calling, how can I help you today?')
+          }
+        }
+
+        // Claim pre-warmed session if available, otherwise create fresh
+        const prewarmed = callControlId ? prewarmedSessions.get(callControlId) : undefined
+        if (prewarmed && callControlId) {
+          prewarmedSessions.delete(callControlId)
+          console.info('[telnyx-handler] using pre-warmed Gemini session')
+          tenantId = prewarmed.tenantId
+          wireSession(prewarmed.session, prewarmed.vertical, prewarmed.businessName)
+        } else {
+          console.info('[telnyx-handler] no pre-warmed session — creating fresh')
+          getTenantConfig(resolvedTenantId)
+            .then(({ businessName, vertical }) => {
+              const safeName = businessName || 'the business'
+              const safeVertical = vertical || 'sales_crm'
+              return createGeminiLiveSession(
+                resolvedTenantId,
+                safeVertical,
+                safeName,
+                callControlId ?? undefined
+              ).then((session) => {
+                if (!isCallActive) {
+                  session.close()
+                  return
+                }
+                wireSession(session, safeVertical, safeName)
               })
-              // Fallback: if setupComplete doesn't arrive in 3500ms, send greeting anyway
-              setTimeout(() => {
-                if (!greetingSent && isCallActive && geminiSession) {
-                  console.warn(
-                    '[telnyx-handler] setupComplete timeout — sending greeting as fallback'
-                  )
-                  greetingSent = true
-                  geminiSession.sendGreeting('Thank you for calling, how can I help you today?')
-                }
-              }, 3500)
-              session.onAudio((audioChunk: Buffer) => {
-                if (!isCallActive || ws.readyState !== ws.OPEN) return
-                if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
-                  firstAudioSentAt = Date.now()
-                  const callId = streamId ?? 'unknown'
-                  console.info(
-                    `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
-                  )
-                }
-                const pcmu = linear16ToPcmu(audioChunk)
-                const FRAME_SIZE = 160 // 20ms of 8kHz PCMU (standard RTP frame)
-                for (let offset = 0; offset < pcmu.length; offset += FRAME_SIZE) {
-                  if (ws.readyState !== ws.OPEN) break
-                  const frame = pcmu.subarray(offset, offset + FRAME_SIZE)
-                  ws.send(
-                    JSON.stringify({
-                      event: 'media',
-                      stream_id: streamId,
-                      media: { payload: frame.toString('base64'), track: 'outbound' },
-                    }),
-                    (err) => {
-                      if (err) console.error('[telnyx-handler] send error', err)
-                    }
-                  )
-                }
-              })
-              session.onClose((code: number) => {
-                if (
-                  code === 1011 &&
-                  isCallActive &&
-                  ws.readyState === ws.OPEN &&
-                  reconnectAttempts < MAX_RECONNECTS
-                ) {
-                  reconnectAttempts++
-                  console.warn(
-                    `[telnyx-handler] Gemini 1011 — reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECTS})`
-                  )
-                  geminiSession = null
-                  connectGemini(vertical, businessName)
-                }
-              })
-              // Flush any media that arrived before session was ready
-              for (const pcm16 of mediaQueue) {
-                session.send(pcm16)
-              }
-              mediaQueue.length = 0
-              sessionReady = true
             })
             .catch((err: unknown) => {
               console.error('[telnyx-handler] Failed to open Gemini session', err)
@@ -275,11 +365,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               mediaQueue.length = 0
             })
         }
-
-        // Start Gemini session immediately with defaults (pre-warm),
-        // fetch tenant config in parallel for reconnects
-        connectGemini('sales_crm', 'the business')
-        getTenantConfig(resolvedTenantId).catch(() => undefined)
       } else if (event.event === 'media') {
         if (!isCallActive || event.media.track !== 'inbound') return
         if (firstAudioReceivedAt === null) {

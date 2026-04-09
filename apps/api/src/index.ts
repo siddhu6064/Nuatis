@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
 import appointmentsRouter from './routes/appointments.js'
-import { registerVoiceWebSocket } from './voice/telnyx-handler.js'
+import { registerVoiceWebSocket, prewarmGemini } from './voice/telnyx-handler.js'
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3001
@@ -39,17 +39,22 @@ app.post('/voice/inbound', (req, res) => {
 
   if (event === 'call.initiated') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
+    const toNumber: string = req.body?.data?.payload?.to ?? ''
     const streamUrl = process.env['TELNYX_STREAM_URL'] ?? 'wss://voice.nuatis.com/voice/stream'
     const apiKey = process.env['TELNYX_API_KEY'] ?? ''
 
-    console.info(`[voice/inbound] answering call_control_id=${callControlId} stream=${streamUrl}`)
+    console.info(`[voice/inbound] call.initiated call_control_id=${callControlId} to=${toNumber}`)
 
     // Respond immediately — Telnyx requires fast webhook response
     res.status(200).json({ received: true })
 
-    // Fire answer + streaming_start asynchronously
+    // Pre-warm Gemini, then answer + streaming_start
     void (async () => {
       try {
+        const prewarmStart = Date.now()
+        await prewarmGemini(callControlId, toNumber)
+        console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
+
         const base = `https://api.telnyx.com/v2/calls/${encodeURIComponent(callControlId)}/actions`
         const headers = {
           Authorization: `Bearer ${apiKey}`,
