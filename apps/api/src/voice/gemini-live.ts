@@ -13,6 +13,21 @@ const FAREWELL_PHRASES = [
   'thanks, bye',
   'talk to you soon',
   'take care',
+  // Telugu
+  'సెలవు',
+  'బై',
+  'ధన్యవాదాలు',
+  'వీడ్కోలు',
+  // Hindi
+  'अलविदा',
+  'बाय',
+  'धन्यवाद',
+  'नमस्ते',
+  // Spanish
+  'adiós',
+  'adios',
+  'hasta luego',
+  'hasta pronto',
 ]
 
 function containsFarewell(text: string): boolean {
@@ -236,16 +251,7 @@ export async function createGeminiLiveSession(
     sendGreeting(text: string): void {
       console.info('[gemini-live] sending greeting')
       session.sendClientContent({
-        turns: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `Please say the following greeting out loud to the caller right now, word for word: "${text}"`,
-              },
-            ],
-          },
-        ],
+        turns: [{ role: 'model', parts: [{ text }] }],
         turnComplete: true,
       })
     },
