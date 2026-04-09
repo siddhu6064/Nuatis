@@ -149,6 +149,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
+    const outboundChunks: Buffer[] = []
+    let outboundBytes = 0
+    const FLUSH_THRESHOLD = 9600 // 200ms at 24kHz 16-bit mono
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -180,6 +183,24 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         let safeName = ''
         let safeVertical = ''
 
+        function flushOutboundAudio(): void {
+          if (outboundChunks.length === 0 || ws.readyState !== ws.OPEN) return
+          const combined = Buffer.concat(outboundChunks)
+          outboundChunks.length = 0
+          outboundBytes = 0
+          const pcmu = linear16ToPcmu(combined)
+          ws.send(
+            JSON.stringify({
+              event: 'media',
+              stream_id: streamId,
+              media: { payload: pcmu.toString('base64'), track: 'outbound' },
+            }),
+            (err) => {
+              if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
+            }
+          )
+        }
+
         function connectGemini(): void {
           createGeminiLiveSession(
             resolvedTenantId,
@@ -198,19 +219,15 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                     `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
                   )
                 }
-                console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
-                // Gemini → Telnyx: PCM16 16kHz → 2:1 downsample + µ-law encode → PCMU 8kHz → base64
-                const pcmu = linear16ToPcmu(audioChunk)
-                ws.send(
-                  JSON.stringify({
-                    event: 'media',
-                    stream_id: streamId,
-                    media: { payload: pcmu.toString('base64'), track: 'outbound' },
-                  }),
-                  (err) => {
-                    if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
-                  }
-                )
+                // Buffer Gemini audio and flush in larger frames to avoid stuttering
+                outboundChunks.push(audioChunk)
+                outboundBytes += audioChunk.length
+                if (outboundBytes >= FLUSH_THRESHOLD) {
+                  flushOutboundAudio()
+                }
+              })
+              session.onTurnComplete(() => {
+                flushOutboundAudio()
               })
               session.onClose((code: number) => {
                 if (

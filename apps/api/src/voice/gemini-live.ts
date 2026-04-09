@@ -50,6 +50,7 @@ async function hangupCall(callControlId: string): Promise<void> {
 export interface GeminiLiveSession {
   send(audioChunk: Buffer): void
   onAudio(cb: (chunk: Buffer) => void): void
+  onTurnComplete(cb: () => void): void
   sendText(text: string): void
   close(): void
   onClose(cb: (code: number) => void): void
@@ -72,6 +73,7 @@ export async function createGeminiLiveSession(
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
+  let turnCompleteCallback: (() => void) | null = null
   let closeCallback: ((code: number) => void) | null = null
   const pendingAudio: Buffer[] = []
 
@@ -171,6 +173,7 @@ export async function createGeminiLiveSession(
         }
 
         if (isTurnComplete) {
+          if (turnCompleteCallback) turnCompleteCallback()
           const text = turnTextAccum.trim()
           console.info(`[gemini-live] turnComplete — accumulated text: "${text}"`)
           if (text && containsFarewell(text)) {
@@ -218,6 +221,10 @@ export async function createGeminiLiveSession(
       audioCallback = cb
       for (const chunk of pendingAudio) cb(chunk)
       pendingAudio.length = 0
+    },
+
+    onTurnComplete(cb: () => void): void {
+      turnCompleteCallback = cb
     },
 
     sendText(text: string): void {
