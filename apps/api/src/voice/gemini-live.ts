@@ -69,7 +69,7 @@ export async function createGeminiLiveSession(
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
   const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis')
 
-  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } })
+  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
   let closeCallback: ((code: number) => void) | null = null
@@ -107,11 +107,14 @@ export async function createGeminiLiveSession(
   }
 
   const session = await client.live.connect({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
+      },
+      thinkingConfig: {
+        thinkingBudget: 0,
       },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
