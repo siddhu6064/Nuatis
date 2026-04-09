@@ -2,8 +2,7 @@ import { GoogleGenAI, Modality, type Blob as GBlob } from '@google/genai'
 import { VERTICALS } from '@nuatis/shared'
 
 const DEFAULT_MAYA_PROMPT =
-  'You are Maya. ALWAYS speak English by default. Only switch to another language if the caller speaks to you in that language first. Never assume a language — default is English. ' +
-  'Answer calls immediately with a warm greeting. Be concise and natural. Do not narrate your actions or thinking. When the call connects, say hello right away. Book appointments when asked. Say goodbye warmly when the caller ends the call.'
+  'You are Maya, a warm and professional AI receptionist. You speak naturally and concisely. Do not narrate your actions or thinking. Do not say anything until the user speaks first or you receive an explicit greeting instruction. When asked to book an appointment, collect name, date, time, and reason. Say goodbye warmly when the caller ends the call.'
 
 const FAREWELL_PHRASES = [
   'bye',

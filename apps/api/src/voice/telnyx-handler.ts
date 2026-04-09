@@ -352,7 +352,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           // Send greeting now — streaming is active (start event already fired)
           if (!greetingSent && isCallActive) {
             greetingSent = true
-            session.sendGreeting('Thank you for calling, how can I help you today?')
+            session.sendGreeting(
+              'Hello! Thank you for calling. This is Maya, your virtual assistant. How can I help you today?'
+            )
           }
         }
 
