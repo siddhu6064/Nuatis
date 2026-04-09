@@ -199,16 +199,20 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                   )
                 }
                 const pcmu = linear16ToPcmu(audioChunk)
-                ws.send(
-                  JSON.stringify({
-                    event: 'media',
-                    stream_id: streamId,
-                    media: { payload: pcmu.toString('base64'), track: 'outbound' },
-                  }),
-                  (err) => {
-                    if (err) console.error('[telnyx-handler] Failed to send audio to Telnyx', err)
-                  }
-                )
+                const CHUNK_SIZE = 1600 // 100ms of 8kHz PCMU
+                for (let offset = 0; offset < pcmu.length; offset += CHUNK_SIZE) {
+                  const slice = pcmu.subarray(offset, offset + CHUNK_SIZE)
+                  ws.send(
+                    JSON.stringify({
+                      event: 'media',
+                      stream_id: streamId,
+                      media: { payload: slice.toString('base64'), track: 'outbound' },
+                    }),
+                    (err) => {
+                      if (err) console.error('[telnyx-handler] send error', err)
+                    }
+                  )
+                }
               })
               session.onClose((code: number) => {
                 if (
