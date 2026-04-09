@@ -1,6 +1,7 @@
 import alawmulaw from 'alawmulaw'
 const { mulaw } = alawmulaw
 import type { WebSocketServer, WebSocket } from 'ws'
+import { createClient } from '@supabase/supabase-js'
 import { createGeminiLiveSession } from './gemini-live.js'
 import { logCall } from './call-logger.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
@@ -79,6 +80,36 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
   return tenantMap.get(toNumber)
 }
 
+/**
+ * Fetch tenant config from Supabase. Returns safe fallback on any error
+ * so voice calls never crash due to a failed DB lookup.
+ */
+async function getTenantConfig(
+  tenantId: string
+): Promise<{ businessName: string; vertical: string }> {
+  const FALLBACK = { businessName: 'the business', vertical: 'sales_crm' }
+  try {
+    const url = process.env['SUPABASE_URL']
+    const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+    if (!url || !key) return FALLBACK
+
+    const supabase = createClient(url, key)
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('name, vertical')
+      .eq('id', tenantId)
+      .single()
+
+    if (error || !data) return FALLBACK
+    return {
+      businessName: (data as { name?: string; vertical?: string }).name || FALLBACK.businessName,
+      vertical: (data as { name?: string; vertical?: string }).vertical || FALLBACK.vertical,
+    }
+  } catch {
+    return FALLBACK
+  }
+}
+
 // ── Telnyx message types ──────────────────────────────────────────────────────
 
 interface TelnyxStartEvent {
@@ -114,6 +145,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let callStartTime: number | null = null
     let sessionReady = false
     const mediaQueue: Buffer[] = []
+    let firstAudioReceivedAt: number | null = null
+    let firstAudioSentAt: number | null = null
 
     ws.on('message', (data: Buffer) => {
       let event: TelnyxEvent
@@ -141,13 +174,29 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
 
-        createGeminiLiveSession(tenantId, 'sales_crm', undefined, callControlId ?? undefined)
+        const resolvedTenantId = tenantId
+        getTenantConfig(resolvedTenantId)
+          .then(({ businessName, vertical }) => {
+            return createGeminiLiveSession(
+              resolvedTenantId,
+              vertical,
+              businessName,
+              callControlId ?? undefined
+            )
+          })
           .then((session) => {
             geminiSession = session
             session.onAudio((audioChunk: Buffer) => {
               if (ws.readyState !== ws.OPEN) return
+              if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
+                firstAudioSentAt = Date.now()
+                const callId = streamId ?? 'unknown'
+                console.info(
+                  `[latency] tenant=${tenantId} call=${callId} first_response_ms=${firstAudioSentAt - firstAudioReceivedAt}`
+                )
+              }
               console.info(`[telnyx-handler] Gemini audio chunk: ${audioChunk.length}b`)
-              // Gemini → Telnyx: PCM16 24kHz → 3:1 downsample + µ-law encode → PCMU 8kHz → base64
+              // Gemini → Telnyx: PCM16 16kHz → 2:1 downsample + µ-law encode → PCMU 8kHz → base64
               const pcmu = linear16ToPcmu(audioChunk)
               ws.send(
                 JSON.stringify({
@@ -184,6 +233,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           })
       } else if (event.event === 'media') {
         if (event.media.track !== 'inbound') return
+        if (firstAudioReceivedAt === null) {
+          firstAudioReceivedAt = Date.now()
+        }
         // Telnyx → Gemini: base64 PCMU 8kHz → PCM16 16kHz
         const pcmuBuffer = Buffer.from(event.media.payload, 'base64')
         console.info(
@@ -215,13 +267,19 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       geminiSession = null
 
       const duration = callStartTime ? Math.round((Date.now() - callStartTime) / 1000) : 0
+      // TODO: persist latency_ms to voice_sessions table once latency_ms column is added
+      const latencyMs =
+        firstAudioReceivedAt && firstAudioSentAt ? firstAudioSentAt - firstAudioReceivedAt : null
       logCall({
         tenant_id: tenantId ?? 'unknown',
         duration_seconds: duration,
         language: 'unknown', // language detection added in future task
         timestamp: new Date(),
       })
-      console.info(`[telnyx-handler] Call ended — duration: ${duration}s`)
+      console.info(
+        `[telnyx-handler] Call ended — duration: ${duration}s` +
+          (latencyMs !== null ? `, first_response_ms: ${latencyMs}` : '')
+      )
     }
   })
 
