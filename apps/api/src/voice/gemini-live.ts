@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality, type Blob as GBlob } from '@google/genai'
 import { VERTICALS } from '@nuatis/shared'
 
 const DEFAULT_MAYA_PROMPT =
-  "You are Maya, a friendly AI receptionist. You help callers book appointments, answer questions about the business, and transfer to a human when needed. Be warm, professional, and concise. When the call connects, immediately introduce yourself without waiting for the caller to speak first. Always greet the caller in English. If the caller speaks a different language — including Spanish, Hindi, Telugu, Tamil, or Kannada — seamlessly switch to that language and continue the conversation in it. Match the caller's language automatically. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up."
+  "You are Maya, an AI receptionist. Answer calls immediately with a warm greeting. Be concise and natural. Do not narrate your actions or thinking. When the call connects, say hello right away. Detect the caller's language and respond in it. Book appointments when asked. Say goodbye warmly when the caller ends the call."
 
 const FAREWELL_PHRASES = [
   'bye',
@@ -66,11 +66,9 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  const systemPrompt =
-    template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis') +
-    ' When the call connects, immediately introduce yourself without waiting for the caller to speak first.'
+  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis')
 
-  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
+  const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
   const pendingAudio: Buffer[] = []
@@ -107,9 +105,12 @@ export async function createGeminiLiveSession(
   }
 
   const session = await client.live.connect({
-    model: 'gemini-2.5-flash-native-audio-latest',
+    model: 'gemini-3.1-flash-live-preview',
     config: {
       responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } },
+      },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
@@ -143,7 +144,7 @@ export async function createGeminiLiveSession(
         if (msg.setupComplete !== undefined) {
           console.info('[gemini-live] setupComplete received — sending greeting')
           session.sendClientContent({
-            turns: [{ role: 'user', parts: [{ text: 'Greet the caller now.' }] }],
+            turns: [{ role: 'user', parts: [{ text: 'Hello!' }] }],
             turnComplete: true,
           })
         }
