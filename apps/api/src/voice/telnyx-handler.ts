@@ -177,10 +177,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         const resolvedTenantId = tenantId
         getTenantConfig(resolvedTenantId)
           .then(({ businessName, vertical }) => {
+            const safeName = businessName || 'the business'
+            const safeVertical = vertical || 'sales_crm'
             return createGeminiLiveSession(
               resolvedTenantId,
-              vertical,
-              businessName,
+              safeVertical,
+              safeName,
               callControlId ?? undefined
             )
           })
