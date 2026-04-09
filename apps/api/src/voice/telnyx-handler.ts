@@ -246,7 +246,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
-    let greetingSent = false
 
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
@@ -351,13 +350,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           mediaQueue.length = 0
           sessionReady = true
 
-          // Send greeting now — streaming is active (start event already fired)
-          if (!greetingSent && isCallActive) {
-            greetingSent = true
-            session.sendGreeting(
-              'Hello! Thank you for calling. This is Maya, your virtual assistant. How can I help you today?'
-            )
-          }
+          // Greeting is now driven by the system prompt — no sendGreeting() call needed
         }
 
         // Claim pre-warmed session by streamId (rekeyed after streaming_start)
