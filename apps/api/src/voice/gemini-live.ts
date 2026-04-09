@@ -109,7 +109,7 @@ export async function createGeminiLiveSession(
   const session = await client.live.connect({
     model: 'gemini-2.5-flash-native-audio-latest',
     config: {
-      responseModalities: [Modality.AUDIO, Modality.TEXT],
+      responseModalities: [Modality.AUDIO],
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
