@@ -119,15 +119,6 @@ export async function createGeminiLiveSession(
       thinkingConfig: {
         thinkingBudget: 0,
       },
-      realtimeInputConfig: {
-        automaticActivityDetection: {
-          disabled: false,
-          startOfSpeechSensitivity: 'START_SENSITIVITY_LOW',
-          endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-          prefixPaddingMs: 20,
-          silenceDurationMs: 200,
-        },
-      },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
