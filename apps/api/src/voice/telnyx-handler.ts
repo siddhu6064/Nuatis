@@ -141,6 +141,7 @@ interface PrewarmedEntry {
 }
 
 const prewarmedSessions = new Map<string, PrewarmedEntry>()
+const streamWaiters = new Map<string, (entry: PrewarmedEntry) => void>()
 
 /**
  * Pre-warm a Gemini Live session before answering the call.
@@ -212,8 +213,15 @@ export function rekeyPrewarmedSession(callControlId: string, streamId: string): 
       entry.session.close()
     }
   }, 30_000)
-  prewarmedSessions.set(streamId, { ...entry, cleanupTimer: newTimer })
+  const newEntry = { ...entry, cleanupTimer: newTimer }
+  prewarmedSessions.set(streamId, newEntry)
   console.info(`[prewarm] rekeyed ${callControlId} → ${streamId}`)
+
+  const waiter = streamWaiters.get(streamId)
+  if (waiter) {
+    streamWaiters.delete(streamId)
+    waiter(newEntry)
+  }
 }
 
 // ── WebSocket handler ─────────────────────────────────────────────────────────
@@ -238,7 +246,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     const MAX_RECONNECTS = 2
     let greetingSent = false
 
-    ws.on('message', (data: Buffer) => {
+    ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
       try {
         event = JSON.parse(data.toString()) as TelnyxEvent
@@ -282,6 +290,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               )
             }
             const pcmu = linear16ToPcmu(audioChunk)
+            console.info(`[telnyx-handler] outbound audio chunk: ${pcmu.length}b`)
             const FRAME_SIZE = 160 // 20ms of 8kHz PCMU (standard RTP frame)
             for (let offset = 0; offset < pcmu.length; offset += FRAME_SIZE) {
               if (ws.readyState !== ws.OPEN) break
@@ -355,26 +364,43 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           console.info(`[telnyx-handler] using pre-warmed Gemini session (stream_id=${streamId})`)
           tenantId = prewarmed.tenantId
           wireSession(prewarmed.session, prewarmed.vertical, prewarmed.businessName)
-        } else {
-          console.info('[telnyx-handler] no pre-warmed session — creating fresh')
-          getTenantConfig(resolvedTenantId)
-            .then(({ businessName, vertical }) => {
+        } else if (streamId) {
+          // Wait up to 1000ms for rekey from streaming.started webhook
+          console.info(`[telnyx-handler] waiting for pre-warm rekey (stream_id=${streamId})`)
+          const waited = await new Promise<PrewarmedEntry | undefined>((resolve) => {
+            const timer = setTimeout(() => {
+              streamWaiters.delete(streamId!)
+              resolve(undefined)
+            }, 1000)
+            streamWaiters.set(streamId!, (entry) => {
+              clearTimeout(timer)
+              resolve(entry)
+            })
+          })
+          if (waited) {
+            prewarmedSessions.delete(streamId)
+            clearTimeout(waited.cleanupTimer)
+            console.info(`[telnyx-handler] pre-warm claimed via waiter (stream_id=${streamId})`)
+            tenantId = waited.tenantId
+            wireSession(waited.session, waited.vertical, waited.businessName)
+          } else {
+            console.info('[telnyx-handler] pre-warm wait timeout — creating fresh')
+            try {
+              const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
               const safeName = businessName || 'the business'
               const safeVertical = vertical || 'sales_crm'
-              return createGeminiLiveSession(
+              const session = await createGeminiLiveSession(
                 resolvedTenantId,
                 safeVertical,
                 safeName,
                 callControlId ?? undefined
-              ).then((session) => {
-                if (!isCallActive) {
-                  session.close()
-                  return
-                }
+              )
+              if (!isCallActive) {
+                session.close()
+              } else {
                 wireSession(session, safeVertical, safeName)
-              })
-            })
-            .catch((err: unknown) => {
+              }
+            } catch (err: unknown) {
               console.error('[telnyx-handler] Failed to open Gemini session', err)
               void publishActivityEvent({
                 tenant_id: tenantId ?? 'unknown',
@@ -388,7 +414,30 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               })
               sessionReady = true
               mediaQueue.length = 0
-            })
+            }
+          }
+        } else {
+          console.warn('[telnyx-handler] no stream_id in start event — creating fresh')
+          try {
+            const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
+            const safeName = businessName || 'the business'
+            const safeVertical = vertical || 'sales_crm'
+            const session = await createGeminiLiveSession(
+              resolvedTenantId,
+              safeVertical,
+              safeName,
+              callControlId ?? undefined
+            )
+            if (!isCallActive) {
+              session.close()
+            } else {
+              wireSession(session, safeVertical, safeName)
+            }
+          } catch (err: unknown) {
+            console.error('[telnyx-handler] Failed to open Gemini session', err)
+            sessionReady = true
+            mediaQueue.length = 0
+          }
         }
       } else if (event.event === 'media') {
         if (!isCallActive || event.media.track !== 'inbound') return
