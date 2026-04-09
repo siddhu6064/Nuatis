@@ -23,21 +23,41 @@ export function pcmuToLinear16(pcmuBuffer: Buffer): Buffer {
 }
 
 /**
- * Gemini → Telnyx
- * Converts linear PCM 16-bit (24 kHz) to µ-law PCMU (8 kHz) by
- * taking every 3rd sample (3:1 naive downsample) then µ-law encoding.
+ * µ-law encoder: converts a signed 16-bit linear PCM sample to a µ-law byte.
  */
-export function linear16ToPcmu(pcm24Buffer: Buffer): Buffer {
-  const samples24k = new Int16Array(
-    pcm24Buffer.buffer,
-    pcm24Buffer.byteOffset,
-    Math.floor(pcm24Buffer.byteLength / 2)
-  )
-  const samples8k = new Int16Array(Math.floor(samples24k.length / 3))
-  for (let i = 0; i < samples8k.length; i++) {
-    samples8k[i] = samples24k[i * 3]!
+function encodeMuLaw(sample: number): number {
+  const BIAS = 0x84
+  const CLIP = 32767
+  let sign = 0
+  if (sample < 0) {
+    sign = 0x80
+    sample = -sample
   }
-  return Buffer.from(mulaw.encode(samples8k))
+  if (sample > CLIP) sample = CLIP
+  sample += BIAS
+  let exponent = 7
+  let expMask = 0x4000
+  while ((sample & expMask) === 0 && exponent > 0) {
+    exponent--
+    expMask >>= 1
+  }
+  const mantissa = (sample >> (exponent + 3)) & 0x0f
+  return ~(sign | (exponent << 4) | mantissa) & 0xff
+}
+
+/**
+ * Gemini → Telnyx
+ * Converts linear PCM 16-bit (16 kHz) to µ-law PCMU (8 kHz) by
+ * taking every other sample (2:1 naive downsample) then µ-law encoding.
+ */
+export function linear16ToPcmu(pcm16: Buffer): Buffer {
+  const outputLen = Math.floor(pcm16.byteLength / 4)
+  const out = Buffer.allocUnsafe(outputLen)
+  for (let i = 0, j = 0; j < outputLen; i += 4, j++) {
+    const sample = pcm16.readInt16LE(i)
+    out[j] = encodeMuLaw(sample)
+  }
+  return out
 }
 
 // ── Tenant lookup ─────────────────────────────────────────────────────────────

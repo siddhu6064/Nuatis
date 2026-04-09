@@ -15,6 +15,7 @@ describe('logCall', () => {
   beforeAll(() => {
     process.env['SUPABASE_URL'] = 'https://test.supabase.co'
     process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'test-key'
+    jest.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   it('logs call details to console', () => {
