@@ -99,6 +99,7 @@ export async function createGeminiLiveSession(
   let turnTextAccum = ''
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
   let lastAudioTime = Date.now()
+  let firstInboundLogged = false
   let hungUp = false
 
   function triggerHangup(reason: string): void {
@@ -120,6 +121,7 @@ export async function createGeminiLiveSession(
     if (silenceTimer) clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
       const elapsed = Date.now() - lastAudioTime
+      console.info(`[gemini-live] silence check — elapsed=${elapsed}ms hungUp=${hungUp}`)
       if (elapsed >= 5000) {
         triggerHangup('5s silence after turnComplete')
       }
@@ -130,7 +132,7 @@ export async function createGeminiLiveSession(
     model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     config: {
       responseModalities: [Modality.AUDIO],
-      inputTranscription: {},
+      outputAudioTranscription: {},
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
       },
@@ -156,16 +158,10 @@ export async function createGeminiLiveSession(
             }
             turnComplete?: boolean
           }
-          inputTranscription?: { text?: string }
+          outputTranscription?: { text?: string }
           turnComplete?: boolean
           setupComplete?: unknown
           toolCall?: unknown
-        }
-
-        const msgKeys = Object.keys(msg)
-        if (!msg.serverContent?.modelTurn) {
-          console.info('[gemini-live] raw msg keys:', JSON.stringify(msgKeys))
-          console.info('[gemini-live] raw msg:', JSON.stringify(msg).substring(0, 300))
         }
 
         const isTurnComplete = !!(msg.turnComplete ?? msg.serverContent?.turnComplete)
@@ -209,12 +205,12 @@ export async function createGeminiLiveSession(
           turnTextAccum = ''
         }
 
-        if (msg.serverContent?.inputTranscription?.text) {
-          const callerText = msg.serverContent.inputTranscription.text.trim()
-          if (callerText) {
-            console.info(`[gemini-live] caller said: "${callerText.substring(0, 80)}"`)
-            if (containsFarewell(callerText)) {
-              triggerHangup(`caller farewell: "${callerText}"`)
+        if (msg.serverContent?.outputTranscription?.text) {
+          const mayaText = msg.serverContent.outputTranscription.text.trim()
+          if (mayaText) {
+            console.info(`[gemini-live] Maya said: "${mayaText.substring(0, 80)}"`)
+            if (containsFarewell(mayaText)) {
+              triggerHangup(`Maya farewell: "${mayaText}"`)
             }
           }
         }
@@ -240,6 +236,10 @@ export async function createGeminiLiveSession(
   return {
     send(audioChunk: Buffer): void {
       lastAudioTime = Date.now()
+      if (!firstInboundLogged) {
+        firstInboundLogged = true
+        console.info('[gemini-live] first inbound audio — lastAudioTime reset')
+      }
       // Reset silence fallback timer whenever inbound audio arrives
       if (silenceTimer) {
         clearTimeout(silenceTimer)
