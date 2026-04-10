@@ -229,11 +229,6 @@ export async function createGeminiLiveSession(
         firstInboundLogged = true
         console.info('[gemini-live] first inbound audio — lastAudioTime reset')
       }
-      // Reset silence fallback timer whenever inbound audio arrives
-      if (silenceTimer) {
-        clearTimeout(silenceTimer)
-        silenceTimer = null
-      }
       const blob: GBlob = {
         data: audioChunk.toString('base64'),
         mimeType: 'audio/pcm;rate=16000',
