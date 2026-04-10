@@ -123,8 +123,8 @@ export async function createGeminiLiveSession(
     if (silenceTimer) clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
       console.info('[gemini-live] silence fallback fired — hanging up')
-      triggerHangup('3s silence after turnComplete')
-    }, 3000)
+      triggerHangup('6s silence after turnComplete')
+    }, 6000)
   }
 
   const session = await client.live.connect({
@@ -232,6 +232,11 @@ export async function createGeminiLiveSession(
       if (!firstInboundLogged) {
         firstInboundLogged = true
         console.info('[gemini-live] first inbound audio — lastAudioTime reset')
+      }
+      // Reset silence timer only during active conversation (not during greeting)
+      if (greetingDone && silenceTimer) {
+        clearTimeout(silenceTimer)
+        silenceTimer = null
       }
       const blob: GBlob = {
         data: audioChunk.toString('base64'),
