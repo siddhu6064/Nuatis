@@ -124,10 +124,10 @@ export async function createGeminiLiveSession(
     silenceTimer = setTimeout(() => {
       const elapsed = Date.now() - lastGeminiAudioTime
       console.info(`[gemini-live] silence check — elapsed=${elapsed}ms hungUp=${hungUp}`)
-      if (elapsed >= 8000) {
-        triggerHangup('8s silence after turnComplete')
+      if (elapsed >= 3000) {
+        triggerHangup('3s silence after turnComplete')
       }
-    }, 8000)
+    }, 3000)
   }
 
   const session = await client.live.connect({
@@ -202,6 +202,7 @@ export async function createGeminiLiveSession(
             triggerHangup(`farewell detected in: "${text}"`)
           } else {
             console.info('[gemini-live] turnComplete — arming silence fallback')
+            if (hungUp) return
             armSilenceFallback()
           }
           turnTextAccum = ''
@@ -227,6 +228,7 @@ export async function createGeminiLiveSession(
 
   return {
     send(audioChunk: Buffer): void {
+      if (hungUp) return
       lastAudioTime = Date.now()
       if (!firstInboundLogged) {
         firstInboundLogged = true
