@@ -122,17 +122,16 @@ export async function createGeminiLiveSession(
     silenceTimer = setTimeout(() => {
       const elapsed = Date.now() - lastAudioTime
       console.info(`[gemini-live] silence check — elapsed=${elapsed}ms hungUp=${hungUp}`)
-      if (elapsed >= 5000) {
-        triggerHangup('5s silence after turnComplete')
+      if (elapsed >= 8000) {
+        triggerHangup('8s silence after turnComplete')
       }
-    }, 5000)
+    }, 8000)
   }
 
   const session = await client.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     config: {
       responseModalities: [Modality.AUDIO],
-      outputAudioTranscription: {},
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
       },
@@ -158,7 +157,6 @@ export async function createGeminiLiveSession(
             }
             turnComplete?: boolean
           }
-          outputTranscription?: { text?: string }
           turnComplete?: boolean
           setupComplete?: unknown
           toolCall?: unknown
@@ -200,19 +198,10 @@ export async function createGeminiLiveSession(
           if (text && containsFarewell(text)) {
             triggerHangup(`farewell detected in: "${text}"`)
           } else {
+            console.info('[gemini-live] turnComplete — arming silence fallback')
             armSilenceFallback()
           }
           turnTextAccum = ''
-        }
-
-        if (msg.serverContent?.outputTranscription?.text) {
-          const mayaText = msg.serverContent.outputTranscription.text.trim()
-          if (mayaText) {
-            console.info(`[gemini-live] Maya said: "${mayaText.substring(0, 80)}"`)
-            if (containsFarewell(mayaText)) {
-              triggerHangup(`Maya farewell: "${mayaText}"`)
-            }
-          }
         }
       },
       onerror: (e) => {
