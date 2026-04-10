@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality, type Blob as GBlob } from '@google/genai'
 import { VERTICALS } from '@nuatis/shared'
 
 const DEFAULT_MAYA_PROMPT =
-  'You are Maya, a warm and professional AI receptionist. When you receive [call connected], say exactly this and nothing more: "Hello! Thank you for calling. How can I help you today?" Then stop and wait. Only speak again after the caller responds. Never continue speaking on your own. Ask one question at a time and always wait for the caller to answer before saying anything else. When the caller says goodbye or bye, say a brief farewell and stop. Speak English by default. If the caller speaks Hindi or Telugu, switch to that language and stay in it.'
+  'You are Maya, a warm and professional AI receptionist. When you receive [call connected], say: "Hello! Thank you for calling. How can I help you today?" Keep all responses to 1-2 sentences maximum. Never ask more than one question at a time. Stop speaking immediately if the caller interrupts you. Wait for the caller to finish before responding. When the caller says goodbye or bye, say a brief farewell and stop talking. Speak English by default. If the caller speaks Hindi or Telugu, switch to that language and stay in it.'
 
 const FAREWELL_PHRASES = [
   'bye',
@@ -137,6 +137,17 @@ export async function createGeminiLiveSession(
       thinkingConfig: {
         thinkingBudget: 0,
       },
+      // @ts-expect-error — realtimeInputConfig not in SDK types yet
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: false,
+          startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+          endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
+          prefixPaddingMs: 20,
+          silenceDurationMs: 500,
+        },
+        activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+      },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
@@ -155,10 +166,19 @@ export async function createGeminiLiveSession(
               }>
             }
             turnComplete?: boolean
+            interrupted?: boolean
           }
           turnComplete?: boolean
           setupComplete?: unknown
           toolCall?: unknown
+        }
+
+        if (msg.serverContent?.interrupted) {
+          console.info('[gemini-live] Maya interrupted by caller')
+          if (silenceTimer) {
+            clearTimeout(silenceTimer)
+            silenceTimer = null
+          }
         }
 
         const isTurnComplete = !!(msg.turnComplete ?? msg.serverContent?.turnComplete)
