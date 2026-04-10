@@ -102,6 +102,7 @@ export async function createGeminiLiveSession(
   let lastAudioTime = Date.now()
   let firstInboundLogged = false
   let hungUp = false
+  let greetingDone = false
 
   function triggerHangup(reason: string): void {
     if (hungUp) return
@@ -195,6 +196,9 @@ export async function createGeminiLiveSession(
           console.info(`[gemini-live] turnComplete — accumulated text: "${text}"`)
           if (text && containsFarewell(text)) {
             triggerHangup(`farewell detected in: "${text}"`)
+          } else if (!greetingDone) {
+            greetingDone = true
+            console.info('[gemini-live] greeting turn complete — not arming silence fallback')
           } else {
             console.info('[gemini-live] turnComplete — arming silence fallback')
             if (hungUp) return
