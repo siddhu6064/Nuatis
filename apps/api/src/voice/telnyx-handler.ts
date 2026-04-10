@@ -350,7 +350,10 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           mediaQueue.length = 0
           sessionReady = true
 
-          // Greeting is now driven by the system prompt — no sendGreeting() call needed
+          // Trigger Gemini to speak the greeting from the system prompt
+          if (isCallActive) {
+            session.sendGreeting('[call connected]')
+          }
         }
 
         // Claim pre-warmed session by streamId (rekeyed after streaming_start)

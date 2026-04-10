@@ -251,7 +251,7 @@ export async function createGeminiLiveSession(
     sendGreeting(text: string): void {
       console.info('[gemini-live] sending greeting')
       session.sendClientContent({
-        turns: [{ role: 'model', parts: [{ text }] }],
+        turns: [{ role: 'user', parts: [{ text }] }],
         turnComplete: true,
       })
     },
