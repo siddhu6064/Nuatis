@@ -32,7 +32,6 @@ const FAREWELL_PHRASES = [
 
 function containsFarewell(text: string): boolean {
   const lower = text.toLowerCase()
-  console.info(`[gemini-live] transcript: "${text.substring(0, 80)}"`)
   return FAREWELL_PHRASES.some((phrase) => lower.includes(phrase))
 }
 
@@ -130,7 +129,8 @@ export async function createGeminiLiveSession(
   const session = await client.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     config: {
-      responseModalities: [Modality.AUDIO, Modality.TEXT],
+      responseModalities: [Modality.AUDIO],
+      inputTranscription: {},
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
       },
@@ -156,6 +156,7 @@ export async function createGeminiLiveSession(
             }
             turnComplete?: boolean
           }
+          inputTranscription?: { text?: string }
           turnComplete?: boolean
           setupComplete?: unknown
           toolCall?: unknown
@@ -200,6 +201,16 @@ export async function createGeminiLiveSession(
             armSilenceFallback()
           }
           turnTextAccum = ''
+        }
+
+        if (msg.serverContent?.inputTranscription?.text) {
+          const callerText = msg.serverContent.inputTranscription.text.trim()
+          if (callerText) {
+            console.info(`[gemini-live] caller said: "${callerText.substring(0, 80)}"`)
+            if (containsFarewell(callerText)) {
+              triggerHangup(`caller farewell: "${callerText}"`)
+            }
+          }
         }
       },
       onerror: (e) => {
