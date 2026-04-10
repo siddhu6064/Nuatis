@@ -100,7 +100,6 @@ export async function createGeminiLiveSession(
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let lastAudioTime = Date.now()
-  let lastGeminiAudioTime: number = Date.now()
   let firstInboundLogged = false
   let hungUp = false
 
@@ -122,11 +121,8 @@ export async function createGeminiLiveSession(
   function armSilenceFallback(): void {
     if (silenceTimer) clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
-      const elapsed = Date.now() - lastGeminiAudioTime
-      console.info(`[gemini-live] silence check — elapsed=${elapsed}ms hungUp=${hungUp}`)
-      if (elapsed >= 3000) {
-        triggerHangup('3s silence after turnComplete')
-      }
+      console.info('[gemini-live] silence fallback fired — hanging up')
+      triggerHangup('3s silence after turnComplete')
     }, 3000)
   }
 
@@ -179,7 +175,6 @@ export async function createGeminiLiveSession(
         for (const part of parts) {
           if (part.inlineData?.data) {
             const decoded = Buffer.from(part.inlineData.data, 'base64')
-            lastGeminiAudioTime = Date.now()
             console.info(
               `[gemini-live] audio part decoded: ${decoded.length}b mime=${part.inlineData.mimeType ?? 'unknown'}`
             )
