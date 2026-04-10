@@ -176,6 +176,10 @@ export async function createGeminiLiveSession(
         for (const part of parts) {
           if (part.inlineData?.data) {
             const decoded = Buffer.from(part.inlineData.data, 'base64')
+            if (greetingDone && silenceTimer) {
+              clearTimeout(silenceTimer)
+              silenceTimer = null
+            }
             console.info(
               `[gemini-live] audio part decoded: ${decoded.length}b mime=${part.inlineData.mimeType ?? 'unknown'}`
             )
@@ -232,6 +236,10 @@ export async function createGeminiLiveSession(
       if (!firstInboundLogged) {
         firstInboundLogged = true
         console.info('[gemini-live] first inbound audio — lastAudioTime reset')
+      }
+      if (greetingDone && silenceTimer) {
+        clearTimeout(silenceTimer)
+        silenceTimer = null
       }
       const blob: GBlob = {
         data: audioChunk.toString('base64'),
