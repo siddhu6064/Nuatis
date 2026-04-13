@@ -246,6 +246,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let firstAudioSentAt: number | null = null
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
+    let mayaSpeakingUntil = 0
 
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
@@ -307,6 +308,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 }
               )
             }
+            // Echo suppression: mute inbound forwarding while Maya's audio is playing
+            const chunkDurationMs = (pcmu.length / FRAME_SIZE) * 20
+            mayaSpeakingUntil = Date.now() + chunkDurationMs + 200
           })
           session.onClose((code: number) => {
             if (
@@ -453,6 +457,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
       } else if (event.event === 'media') {
         if (!isCallActive || event.media.track !== 'inbound') return
+        // Echo suppression: skip inbound audio while Maya's outbound is playing
+        if (Date.now() < mayaSpeakingUntil) return
         if (firstAudioReceivedAt === null) {
           firstAudioReceivedAt = Date.now()
         }
