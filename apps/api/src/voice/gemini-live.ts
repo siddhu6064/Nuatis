@@ -130,7 +130,7 @@ export async function createGeminiLiveSession(
   const session = await client.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     config: {
-      responseModalities: [Modality.AUDIO],
+      responseModalities: [Modality.AUDIO, Modality.TEXT],
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
       },
