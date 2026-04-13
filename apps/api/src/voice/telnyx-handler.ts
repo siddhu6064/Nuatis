@@ -84,7 +84,7 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
  * Fetch tenant config from Supabase. Returns safe fallback on any error
  * so voice calls never crash due to a failed DB lookup.
  */
-async function getTenantConfig(
+export async function getTenantConfig(
   tenantId: string
 ): Promise<{ businessName: string; vertical: string }> {
   const FALLBACK = { businessName: 'the business', vertical: 'sales_crm' }
@@ -141,7 +141,7 @@ interface PrewarmedEntry {
   cleanupTimer: ReturnType<typeof setTimeout>
 }
 
-const prewarmedSessions = new Map<string, PrewarmedEntry>()
+export const prewarmedSessions = new Map<string, PrewarmedEntry>()
 const streamWaiters = new Map<string, (entry: PrewarmedEntry) => void>()
 
 /**

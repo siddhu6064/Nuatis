@@ -30,7 +30,7 @@ const FAREWELL_PHRASES = [
   'hasta pronto',
 ]
 
-function containsFarewell(text: string): boolean {
+export function containsFarewell(text: string): boolean {
   const lower = text.toLowerCase()
   return FAREWELL_PHRASES.some((phrase) => lower.includes(phrase))
 }
@@ -85,7 +85,7 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'Nuatis')
+  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'our office')
 
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
