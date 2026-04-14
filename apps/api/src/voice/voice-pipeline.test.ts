@@ -122,6 +122,7 @@ describe('Tenant Config Resolution', () => {
     expect(config).toEqual({
       businessName: 'Acme Dental',
       vertical: 'dental',
+      product: 'suite',
     })
   })
 
@@ -136,6 +137,7 @@ describe('Tenant Config Resolution', () => {
     expect(config).toEqual({
       businessName: 'the business',
       vertical: 'sales_crm',
+      product: 'suite',
     })
   })
 })

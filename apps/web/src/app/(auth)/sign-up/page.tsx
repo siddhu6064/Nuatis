@@ -13,6 +13,7 @@ interface FormData {
   owner_email: string
   owner_password: string
   timezone: string
+  product: 'maya_only' | 'suite'
 }
 
 const INITIAL: FormData = {
@@ -22,6 +23,7 @@ const INITIAL: FormData = {
   owner_email: '',
   owner_password: '',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  product: 'suite',
 }
 
 export default function SignUpPage() {
@@ -87,7 +89,7 @@ export default function SignUpPage() {
         redirect: false,
       })
       if (signInRes?.ok) {
-        router.push('/onboarding')
+        router.push(form.product === 'maya_only' ? '/onboarding/maya' : '/onboarding')
       } else {
         router.push('/sign-in?registered=1')
       }
@@ -142,16 +144,34 @@ export default function SignUpPage() {
           </span>
         </div>
 
-        {/* ── Step 1: Business name ── */}
+        {/* ── Step 1: Business name + product ── */}
         {step === 1 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">
-              What is your business called?
-            </h1>
-            <p className="text-sm text-gray-500 mb-6">
-              This will appear across your dashboard and in AI greetings.
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">Get started with Nuatis</h1>
+            <p className="text-sm text-gray-500 mb-4">
+              Choose your plan and enter your business name.
             </p>
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, product: 'maya_only' }))}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'maya_only' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <p className="text-sm font-semibold text-gray-900">Maya AI</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Voice receptionist + calendar booking
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, product: 'suite' }))}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'suite' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <p className="text-sm font-semibold text-gray-900">Nuatis Suite</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Full CRM + voice AI + automation</p>
+                </button>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Business name

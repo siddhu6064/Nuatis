@@ -18,6 +18,7 @@ const CreateTenantSchema = z.object({
   owner_password: z.string().min(8),
   owner_name: z.string().min(2).max(100),
   timezone: z.string().default('America/Chicago'),
+  product: z.enum(['maya_only', 'suite']).default('suite'),
 })
 
 // ── POST /api/tenants ─────────────────────────────────────────
@@ -32,8 +33,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const { business_name, vertical_slug, owner_email, owner_password, owner_name, timezone } =
-    parsed.data
+  const {
+    business_name,
+    vertical_slug,
+    owner_email,
+    owner_password,
+    owner_name,
+    timezone,
+    product,
+  } = parsed.data
 
   // 2. Create Supabase auth user
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -78,6 +86,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       timezone,
       subscription_status: 'active',
       subscription_plan: 'starter',
+      product,
+      modules:
+        product === 'maya_only'
+          ? { maya: true, crm: false, revenue_ops: false, cpq: false, insights: false }
+          : { maya: true, crm: true, revenue_ops: true, cpq: true, insights: true },
     })
     .select('id')
     .single()

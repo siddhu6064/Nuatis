@@ -10,6 +10,7 @@ export interface ToolCallContext {
   callerId: string
   streamId: string
   callControlId: string
+  product: 'maya_only' | 'suite'
 }
 
 export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
@@ -226,6 +227,10 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   lookup_contact: async (args, context) => {
+    if (context.product === 'maya_only') {
+      return { found: false, message: 'Contact lookup not available in Maya standalone' }
+    }
+
     const rawPhone = String(args['phone_number'] ?? '')
     const phone = normalizePhone(rawPhone)
     const digitsOnly = phone.replace(/\+/, '')
@@ -550,7 +555,26 @@ const handlers: Record<string, ToolHandler> = {
       const googleEventId = event.data.id ?? ''
       console.info(`[tool-handlers] book_appointment: gcal event created id=${googleEventId}`)
 
-      // 4. Upsert contact (best-effort)
+      // Maya-only: skip CRM operations, return calendar-only result
+      if (context.product === 'maya_only') {
+        if (context.callControlId) {
+          callSessionState.set(context.callControlId, {
+            bookedAppointment: true,
+            contactId: null,
+            appointmentId: null,
+          })
+        }
+        return {
+          booked: true,
+          google_event_id: googleEventId,
+          start: startIso,
+          end: endIso,
+          appointment_id: null,
+          contact_id: null,
+        }
+      }
+
+      // 4. Upsert contact (best-effort) — Suite only
       let contactId: string | null = null
 
       if (callerPhone) {

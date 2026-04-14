@@ -33,6 +33,7 @@ export interface PostCallParams {
   duration: number
   vertical: string
   businessName: string
+  product: 'maya_only' | 'suite'
 }
 
 function getSupabase() {
@@ -43,7 +44,8 @@ function getSupabase() {
 }
 
 export async function handlePostCall(params: PostCallParams): Promise<void> {
-  const { tenantId, callerId, streamId, callControlId, duration, vertical, businessName } = params
+  const { tenantId, callerId, streamId, callControlId, duration, vertical, businessName, product } =
+    params
 
   // Read and clean up session state
   const booking = callSessionState.get(callControlId)
@@ -59,9 +61,11 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
     `[post-call] handling: tenant=${tenantId} caller=${callerId} duration=${duration}s booked=${bookedAppointment} escalated=${escalated}`
   )
 
-  // ── Feature 1: Contact auto-upsert ──────────────────────────────────────
+  // ── Feature 1: Contact auto-upsert (Suite only) ─────────────────────────
 
-  if (!contactId && callerId) {
+  if (product === 'maya_only') {
+    console.info('[post-call] skipping contact upsert — maya_only mode')
+  } else if (!contactId && callerId) {
     try {
       const supabase = getSupabase()
       const phone = normalizePhone(callerId)
@@ -207,7 +211,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
   // ── Feature 2b: Auto-generate draft quote from call ─────────────────────
 
-  if (contactId && bookedAppointment && booking?.toolCalls) {
+  if (product !== 'maya_only' && contactId && bookedAppointment && booking?.toolCalls) {
     try {
       const bookCall = booking.toolCalls.find((tc) => tc.name === 'book_appointment')
       if (bookCall) {
@@ -246,17 +250,18 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
     console.error('[post-call] ops-copilot webhook error:', err)
   }
 
-  // ── Feature 4: Tenant webhook dispatch ─────────────────────────────────
+  // ── Feature 4: Tenant webhook dispatch (Suite only) ─────────────────────
 
-  void dispatchWebhook(tenantId, 'call.completed', {
-    caller_phone: callerId,
-    duration_seconds: duration,
-    booked_appointment: bookedAppointment,
-    appointment_id: appointmentId,
-    contact_id: contactId,
-    escalated,
-    vertical,
-  })
+  if (product !== 'maya_only')
+    void dispatchWebhook(tenantId, 'call.completed', {
+      caller_phone: callerId,
+      duration_seconds: duration,
+      booked_appointment: bookedAppointment,
+      appointment_id: appointmentId,
+      contact_id: contactId,
+      escalated,
+      vertical,
+    })
 
   // Push notification for notable outcomes
   if (bookedAppointment) {

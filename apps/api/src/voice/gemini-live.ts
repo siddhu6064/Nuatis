@@ -87,7 +87,8 @@ export async function createGeminiLiveSession(
   tenantId: string,
   vertical: string,
   businessName?: string,
-  callControlId?: string
+  callControlId?: string,
+  product?: 'maya_only' | 'suite'
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -171,6 +172,7 @@ export async function createGeminiLiveSession(
     callerId: '',
     streamId: '',
     callControlId: callControlId ?? '',
+    product: product ?? 'suite',
   }
 
   function armSilenceFallback(): void {

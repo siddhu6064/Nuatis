@@ -4,41 +4,60 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const NAV = [
+interface NavItem {
+  href: string
+  label: string
+  icon: string
+  onboardingOnly?: boolean
+  suiteOnly?: boolean
+}
+
+const NAV: NavItem[] = [
   { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/contacts', label: 'Contacts', icon: '◎' },
-  { href: '/pipeline', label: 'Pipeline', icon: '◈' },
-  { href: '/appointments', label: 'Appointments', icon: '◷' },
+  { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true },
+  { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true },
+  { href: '/appointments', label: 'Appointments', icon: '◷', suiteOnly: true },
   { href: '/calls', label: 'Call Log', icon: '◉' },
-  { href: '/automation', label: 'Automation', icon: '⚡' },
-  { href: '/insights', label: 'Insights', icon: '▤' },
-  { href: '/quotes', label: 'Quotes', icon: '◫' },
+  { href: '/automation', label: 'Automation', icon: '⚡', suiteOnly: true },
+  { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true },
+  { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true },
   { href: '/settings/voice', label: 'Voice AI', icon: '◇' },
-  { href: '/settings/follow-ups', label: 'Follow-ups', icon: '↻' },
-  { href: '/settings/audit', label: 'Audit Log', icon: '▧' },
+  { href: '/settings/follow-ups', label: 'Follow-ups', icon: '↻', suiteOnly: true },
+  { href: '/settings/audit', label: 'Audit Log', icon: '▧', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 
 export default function Sidebar() {
   const path = usePathname()
   const [onboardingDone, setOnboardingDone] = useState(true)
+  const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
 
   useEffect(() => {
     fetch('/api/auth/session')
       .then((r) => r.json())
       .then((s: { user?: { tenantId?: string } }) => {
         if (!s?.user?.tenantId) return
-        // Check onboarding status by fetching from API
         fetch('/api/provisioning/onboarding-status')
           .then((r) => (r.ok ? r.json() : null))
-          .then((data: { onboarding_completed?: boolean } | null) => {
-            if (data) setOnboardingDone(data.onboarding_completed ?? true)
+          .then((data: { onboarding_completed?: boolean; product?: string } | null) => {
+            if (data) {
+              setOnboardingDone(data.onboarding_completed ?? true)
+              if (data.product === 'maya_only') setProduct('maya_only')
+            }
           })
           .catch(() => {})
       })
       .catch(() => {})
   }, [])
+
+  const isMayaOnly = product === 'maya_only'
+
+  const visibleNav = NAV.filter((item) => {
+    if (item.onboardingOnly && onboardingDone) return false
+    if (item.suiteOnly && isMayaOnly) return false
+    return true
+  })
 
   return (
     <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0">
@@ -50,14 +69,16 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 leading-none">Nuatis</p>
-            <p className="text-[10px] text-gray-400 mt-0.5 leading-none">Front Office AI</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 leading-none">
+              {isMayaOnly ? 'Maya AI' : 'Front Office AI'}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV.filter((item) => !item.onboardingOnly || !onboardingDone).map((item) => {
+        {visibleNav.map((item) => {
           const active =
             path === item.href || (item.href !== '/settings' && path.startsWith(item.href + '/'))
           return (
@@ -83,6 +104,17 @@ export default function Sidebar() {
             </Link>
           )
         })}
+
+        {/* Upgrade CTA for maya_only */}
+        {isMayaOnly && (
+          <Link
+            href="/upgrade"
+            className="flex items-center gap-3 px-3 py-2.5 mt-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+          >
+            <span className="text-base leading-none">⬆</span>
+            <span>Upgrade to Suite</span>
+          </Link>
+        )}
       </nav>
 
       {/* User footer */}

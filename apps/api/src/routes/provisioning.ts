@@ -119,7 +119,7 @@ router.get(
       const [tenantRes, locationRes, callRes] = await Promise.all([
         supabase
           .from('tenants')
-          .select('vertical, onboarding_completed, onboarding_step')
+          .select('vertical, onboarding_completed, onboarding_step, product')
           .eq('id', authed.tenantId)
           .single(),
         supabase
@@ -147,6 +147,7 @@ router.get(
         plan_selected: false,
         onboarding_completed: tenant?.onboarding_completed ?? false,
         onboarding_step: tenant?.onboarding_step ?? 1,
+        product: (tenant?.product as string) ?? 'suite',
       })
     } catch (err) {
       console.error('[provisioning] onboarding-status error:', err)
@@ -178,5 +179,31 @@ router.post('/complete-step', requireAuth, async (req: Request, res: Response): 
     res.status(500).json({ error: 'Failed to update step' })
   }
 })
+
+// ── POST /api/provisioning/upgrade-to-suite ───────────────────────────────────
+router.post(
+  '/upgrade-to-suite',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+
+    try {
+      const supabase = getSupabase()
+      await supabase
+        .from('tenants')
+        .update({
+          product: 'suite',
+          modules: { maya: true, crm: true, revenue_ops: true, cpq: true, insights: true },
+        })
+        .eq('id', authed.tenantId)
+
+      console.info(`[provisioning] tenant upgraded to suite: ${authed.tenantId}`)
+      res.json({ upgraded: true, product: 'suite' })
+    } catch (err) {
+      console.error('[provisioning] upgrade error:', err)
+      res.status(500).json({ error: 'Failed to upgrade' })
+    }
+  }
+)
 
 export default router

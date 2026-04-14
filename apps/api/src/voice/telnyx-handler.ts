@@ -100,8 +100,12 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
  */
 export async function getTenantConfig(
   tenantId: string
-): Promise<{ businessName: string; vertical: string }> {
-  const FALLBACK = { businessName: 'the business', vertical: 'sales_crm' }
+): Promise<{ businessName: string; vertical: string; product: 'maya_only' | 'suite' }> {
+  const FALLBACK = {
+    businessName: 'the business',
+    vertical: 'sales_crm',
+    product: 'suite' as const,
+  }
   try {
     const url = process.env['SUPABASE_URL']
     const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -110,14 +114,16 @@ export async function getTenantConfig(
     const supabase = createClient(url, key)
     const { data, error } = await supabase
       .from('tenants')
-      .select('name, vertical')
+      .select('name, vertical, product')
       .eq('id', tenantId)
       .single()
 
     if (error || !data) return FALLBACK
+    const d = data as { name?: string; vertical?: string; product?: string }
     return {
-      businessName: (data as { name?: string; vertical?: string }).name || FALLBACK.businessName,
-      vertical: (data as { name?: string; vertical?: string }).vertical || FALLBACK.vertical,
+      businessName: d.name || FALLBACK.businessName,
+      vertical: d.vertical || FALLBACK.vertical,
+      product: (d.product === 'maya_only' ? 'maya_only' : 'suite') as 'maya_only' | 'suite',
     }
   } catch {
     return FALLBACK
@@ -151,6 +157,7 @@ interface PrewarmedEntry {
   tenantId: string
   vertical: string
   businessName: string
+  product: 'maya_only' | 'suite'
   callControlId: string
   cleanupTimer: ReturnType<typeof setTimeout>
 }
@@ -170,11 +177,17 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
     tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
   }
 
-  const { businessName, vertical } = await getTenantConfig(tenantId)
+  const { businessName, vertical, product } = await getTenantConfig(tenantId)
   const safeName = businessName || 'the business'
   const safeVertical = vertical || 'sales_crm'
 
-  const session = await createGeminiLiveSession(tenantId, safeVertical, safeName, callControlId)
+  const session = await createGeminiLiveSession(
+    tenantId,
+    safeVertical,
+    safeName,
+    callControlId,
+    product
+  )
 
   return new Promise<void>((resolve) => {
     let resolved = false
@@ -204,6 +217,7 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
       tenantId,
       vertical: safeVertical,
       businessName: safeName,
+      product,
       callControlId,
       cleanupTimer,
     })
@@ -265,6 +279,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let callerId: string | null = null
     let sessionVertical: string | null = null
     let sessionBusinessName: string | null = null
+    let sessionProduct: 'maya_only' | 'suite' = 'suite'
 
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
@@ -298,11 +313,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         function wireSession(
           session: Awaited<ReturnType<typeof createGeminiLiveSession>>,
           vertical: string,
-          businessName: string
+          businessName: string,
+          product?: 'maya_only' | 'suite'
         ): void {
           geminiSession = session
           sessionVertical = vertical
           sessionBusinessName = businessName
+          if (product) sessionProduct = product
           session.onAudio((audioChunk: Buffer) => {
             if (!isCallActive || ws.readyState !== ws.OPEN) return
             if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
@@ -389,7 +406,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           console.info(`[telnyx-handler] using pre-warmed Gemini session (stream_id=${streamId})`)
           tenantId = prewarmed.tenantId
           callControlId = prewarmed.callControlId
-          wireSession(prewarmed.session, prewarmed.vertical, prewarmed.businessName)
+          wireSession(
+            prewarmed.session,
+            prewarmed.vertical,
+            prewarmed.businessName,
+            prewarmed.product
+          )
         } else if (streamId) {
           // Wait up to 1000ms for rekey from streaming.started webhook
           console.info(`[telnyx-handler] waiting for pre-warm rekey (stream_id=${streamId})`)
@@ -409,7 +431,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             console.info(`[telnyx-handler] pre-warm claimed via waiter (stream_id=${streamId})`)
             tenantId = waited.tenantId
             callControlId = waited.callControlId
-            wireSession(waited.session, waited.vertical, waited.businessName)
+            wireSession(waited.session, waited.vertical, waited.businessName, waited.product)
           } else {
             console.info('[telnyx-handler] pre-warm wait timeout — creating fresh')
             if (!callControlId) {
@@ -543,6 +565,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           duration,
           vertical: sessionVertical ?? 'sales_crm',
           businessName: sessionBusinessName ?? 'the business',
+          product: sessionProduct,
         }).catch((err) => console.error('[post-call] error:', err))
 
         // Persist voice session to database (best-effort, fire-and-forget)
