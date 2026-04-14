@@ -1,4 +1,4 @@
-/* eslint-env serviceworker */
+/* global self, clients */
 // Minimal service worker for PWA installability + push notifications
 self.addEventListener('install', () => {
   self.skipWaiting()
