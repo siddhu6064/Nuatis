@@ -3,6 +3,7 @@
 import Sidebar from './Sidebar'
 import DemoBanner from './DemoBanner'
 import { PushNotificationPrompt } from '@/components/PushNotificationPrompt'
+import { NPSSurvey } from '@/components/NPSSurvey'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DemoBanner />
         <PushNotificationPrompt />
         {children}
+        <NPSSurvey />
       </main>
     </div>
   )

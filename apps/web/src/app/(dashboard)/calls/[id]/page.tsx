@@ -34,6 +34,8 @@ interface VoiceSession {
   call_quality_mos: number | null
   hangup_source: string | null
   hangup_cause: string | null
+  recording_url: string | null
+  recording_duration_seconds: number | null
   metadata: Record<string, unknown> | null
   created_at: string
 }
@@ -250,10 +252,38 @@ export default async function CallDetailPage({ params }: Props) {
         )}
       </div>
 
-      {/* Transcript placeholder */}
+      {/* Call Recording */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
+        <h2 className="text-sm font-semibold text-gray-900 mb-2">Call Recording</h2>
+        {call.recording_url ? (
+          <div>
+            <audio controls src={call.recording_url} className="w-full" />
+            {call.recording_duration_seconds != null && (
+              <p className="text-xs text-gray-400 mt-1">
+                Duration: {Math.floor(call.recording_duration_seconds / 60)}m{' '}
+                {call.recording_duration_seconds % 60}s
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Recording not available</p>
+        )}
+      </div>
+
+      {/* Transcript */}
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
         <h2 className="text-sm font-semibold text-gray-900 mb-2">Transcript</h2>
-        <p className="text-sm text-gray-400">Transcript not available &mdash; audio-only mode</p>
+        {call.transcript ? (
+          <pre className="text-sm text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">
+            {call.transcript}
+          </pre>
+        ) : call.recording_url ? (
+          <p className="text-sm text-gray-400">Transcript processing&hellip;</p>
+        ) : (
+          <p className="text-sm text-gray-400">
+            No recording or transcript available &mdash; audio-only mode
+          </p>
+        )}
       </div>
 
       {/* Call metadata */}

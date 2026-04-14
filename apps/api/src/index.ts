@@ -19,6 +19,8 @@ import pushRouter from './routes/push.js'
 import servicesRouter from './routes/services.js'
 import quotesRouter from './routes/quotes.js'
 import analyticsEventsRouter from './routes/analytics-events.js'
+import locationsRouter from './routes/locations.js'
+import npsRouter from './routes/nps.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -70,12 +72,14 @@ app.use('/api/push', pushRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/analytics', analyticsEventsRouter)
+app.use('/api/locations', locationsRouter)
+app.use('/api/nps', npsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })
 })
 
-app.post('/voice/inbound', (req, res) => {
+app.post('/voice/inbound', async (req, res) => {
   const event = req.body?.data?.event_type ?? req.body?.event_type ?? 'unknown'
   console.info(`[voice/inbound] event: ${event}`, JSON.stringify(req.body?.data ?? req.body))
 
@@ -136,6 +140,21 @@ app.post('/voice/inbound', (req, res) => {
           body: JSON.stringify({ preferred_codecs: 'PCMU' }),
         })
         console.info(`[voice/inbound] answer status=${answerRes.status}`)
+
+        // Start recording (fire-and-forget)
+        void fetch(`${base}/record_start`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ format: 'mp3', channels: 'dual' }),
+        })
+          .then((r) => {
+            console.info(
+              `[voice/recording] started recording for call_control_id=${callControlId} status=${r.status}`
+            )
+          })
+          .catch((err) => {
+            console.warn('[voice/recording] record_start failed:', err)
+          })
 
         const streamRes = await fetch(`${base}/streaming_start`, {
           method: 'POST',
@@ -199,6 +218,65 @@ app.post('/voice/inbound', (req, res) => {
       console.info(
         `[call-logger] hangup data captured: call_control_id=${hangupCallControlId} source=${hangupSource} cause=${hangupCause} mos=${mos}`
       )
+    }
+
+    res.sendStatus(200)
+    return
+  }
+
+  if (event === 'call.recording.saved') {
+    const payload = req.body?.data?.payload ?? {}
+    const recCallControlId: string = payload.call_control_id ?? ''
+    const recordingUrl: string =
+      payload.recording_urls?.mp3 ?? payload.public_recording_urls?.mp3 ?? ''
+    const recDuration: number | null =
+      payload.duration_secs != null ? Math.round(Number(payload.duration_secs)) : null
+
+    if (recCallControlId && recordingUrl) {
+      // Update voice_session with recording URL
+      const sbUrl = process.env['SUPABASE_URL']
+      const sbKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
+      if (sbUrl && sbKey) {
+        const sb = createClient(sbUrl, sbKey)
+        const { data: session } = await sb
+          .from('voice_sessions')
+          .select('id, language_detected')
+          .eq('call_control_id', recCallControlId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (session) {
+          await sb
+            .from('voice_sessions')
+            .update({
+              recording_url: recordingUrl,
+              recording_duration_seconds: recDuration,
+            })
+            .eq('id', session.id)
+
+          console.info(
+            `[voice/recording] saved recording for session=${session.id} url=${recordingUrl.slice(0, 60)}...`
+          )
+
+          // Fire-and-forget transcription
+          void (async () => {
+            try {
+              const { transcribeRecording } = await import('./services/transcription.js')
+              const transcript = await transcribeRecording(
+                recordingUrl,
+                session.language_detected ?? undefined
+              )
+              if (transcript) {
+                await sb.from('voice_sessions').update({ transcript }).eq('id', session.id)
+                console.info(`[transcription] saved transcript for session ${session.id}`)
+              }
+            } catch (err) {
+              console.error('[transcription] error:', err)
+            }
+          })()
+        }
+      }
     }
 
     res.sendStatus(200)
