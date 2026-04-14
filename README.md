@@ -2,6 +2,8 @@
 
 AI-powered front-office SaaS for SMBs. Voice AI receptionist (Maya) + vertical-aware CRM + automated scheduling + lead pipeline + follow-up automation + CPQ.
 
+> Built by [Sid Yennamaneni](https://github.com/siddhu6064) | Phases 1-5 complete | 52 tests passing
+
 ## Architecture
 
 | Layer      | Technology                                                |
