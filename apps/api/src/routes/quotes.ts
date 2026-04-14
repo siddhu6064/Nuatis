@@ -19,7 +19,8 @@ function getSupabase() {
 }
 
 async function nextQuoteNumber(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   tenantId: string
 ): Promise<string> {
   const year = new Date().getFullYear()
@@ -438,7 +439,8 @@ router.post('/:id/duplicate', requireAuth, async (req: Request, res: Response): 
 // ── PDF helper ───────────────────────────────────────────────────────────────
 
 async function buildPdfForQuote(
-  supabase: ReturnType<typeof getSupabase>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   quoteId: string
 ): Promise<{ buffer: Buffer; filename: string } | null> {
   const { data: quote } = await supabase
@@ -483,12 +485,14 @@ async function buildPdfForQuote(
     taxAmount: Number(quote.tax_amount),
     total: Number(quote.total),
     notes: quote.notes,
-    lineItems: (items ?? []).map((i) => ({
-      description: i.description,
-      quantity: Number(i.quantity),
-      unit_price: Number(i.unit_price),
-      total: Number(i.total),
-    })),
+    lineItems: (items ?? []).map(
+      (i: { description: string; quantity: number; unit_price: number; total: number }) => ({
+        description: i.description,
+        quantity: Number(i.quantity),
+        unit_price: Number(i.unit_price),
+        total: Number(i.total),
+      })
+    ),
   })
 
   return { buffer, filename: `Quote-${quote.quote_number}.pdf` }

@@ -73,7 +73,7 @@ export function auditLoggerMiddleware(req: Request, res: Response, next: NextFun
 
     void logAuditEvent({
       tenantId,
-      userId: (req as Record<string, unknown>)['userId'] as string | undefined,
+      userId: (req as unknown as Record<string, unknown>)['userId'] as string | undefined,
       action,
       resourceType: extractResourceType(req.path),
       details: { method: req.method, path: req.path, status: res.statusCode },

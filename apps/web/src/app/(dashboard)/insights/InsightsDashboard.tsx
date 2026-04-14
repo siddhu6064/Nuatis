@@ -454,7 +454,7 @@ export default function InsightsDashboard({
                   innerRadius={50}
                   outerRadius={80}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   {stats.outcomeData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
@@ -622,7 +622,7 @@ export default function InsightsDashboard({
                   cy="50%"
                   outerRadius={70}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   {stats.langData.map((_, i) => (
                     <Cell key={i} fill={LANG_COLORS[i % LANG_COLORS.length]} />
@@ -647,7 +647,7 @@ export default function InsightsDashboard({
                   cy="50%"
                   outerRadius={70}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   {stats.sourceData.map((_, i) => (
                     <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />

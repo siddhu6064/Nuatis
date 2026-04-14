@@ -135,7 +135,8 @@ async function scan(): Promise<void> {
 }
 
 async function getContactPhone(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   contactId: string
 ): Promise<{ phone: string } | null> {
   const { data } = await supabase.from('contacts').select('phone').eq('id', contactId).single()
@@ -144,7 +145,8 @@ async function getContactPhone(
 }
 
 async function getTelnyxNumber(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   tenantId: string
 ): Promise<{ telnyx_number: string } | null> {
   const { data } = await supabase
@@ -158,7 +160,8 @@ async function getTelnyxNumber(
 }
 
 async function getBusinessName(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   tenantId: string
 ): Promise<string> {
   const { data } = await supabase.from('tenants').select('name').eq('id', tenantId).single()

@@ -53,7 +53,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     }
 
     const { error } = await client.emails.send(
-      sendParams as Parameters<typeof client.emails.send>[0]
+      sendParams as unknown as Parameters<typeof client.emails.send>[0]
     )
 
     if (error) {
