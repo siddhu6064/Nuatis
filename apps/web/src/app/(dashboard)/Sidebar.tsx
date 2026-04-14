@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { trackEvent } from '@/lib/analytics'
 
 interface NavItem {
   href: string
@@ -109,6 +110,7 @@ export default function Sidebar() {
         {isMayaOnly && (
           <Link
             href="/upgrade"
+            onClick={() => void trackEvent('upgrade_cta_clicked', { source: 'sidebar' })}
             className="flex items-center gap-3 px-3 py-2.5 mt-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
           >
             <span className="text-base leading-none">⬆</span>

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { trackEvent } from '@/lib/analytics'
 
 const FEATURES = [
   { name: 'Voice AI receptionist', maya: true, suite: true },
@@ -21,11 +22,17 @@ export default function UpgradePage() {
   const router = useRouter()
   const [upgrading, setUpgrading] = useState(false)
 
+  useEffect(() => {
+    void trackEvent('upgrade_page_viewed')
+  }, [])
+
   async function handleUpgrade() {
     setUpgrading(true)
+    void trackEvent('upgrade_cta_clicked')
     try {
       const res = await fetch('/api/provisioning/upgrade-to-suite', { method: 'POST' })
       if (res.ok) {
+        void trackEvent('upgrade_completed')
         router.push('/onboarding')
       }
     } catch {

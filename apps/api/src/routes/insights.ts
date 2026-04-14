@@ -430,4 +430,52 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
   }
 })
 
+// ── GET /api/insights/plg ─────────────────────────────────────────────────────
+router.get('/plg', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  const supabase = getSupabase()
+
+  try {
+    const [mayaRes, suiteRes, eventsRes] = await Promise.all([
+      supabase
+        .from('tenants')
+        .select('id', { count: 'exact', head: true })
+        .eq('product', 'maya_only'),
+      supabase.from('tenants').select('id', { count: 'exact', head: true }).eq('product', 'suite'),
+      supabase
+        .from('analytics_events')
+        .select('event_name, created_at')
+        .in('event_name', [
+          'upgrade_completed',
+          'upgrade_page_viewed',
+          'upgrade_cta_clicked',
+          'signup_started',
+        ]),
+    ])
+
+    const mayaOnly = mayaRes.count ?? 0
+    const suite = suiteRes.count ?? 0
+    const events = eventsRes.data ?? []
+
+    const upgrades = events.filter((e) => e.event_name === 'upgrade_completed').length
+    const upgradeViews = events.filter((e) => e.event_name === 'upgrade_page_viewed').length
+    const upgradeRate = mayaOnly > 0 ? Number(((upgrades / mayaOnly) * 100).toFixed(1)) : 0
+
+    res.json({
+      maya_only_signups: mayaOnly,
+      suite_signups: suite,
+      upgrades,
+      upgrade_rate: upgradeRate,
+      upgrade_page_views: upgradeViews,
+      funnel: [
+        { step: 'maya_signup', count: mayaOnly },
+        { step: 'upgrade_viewed', count: upgradeViews },
+        { step: 'upgraded', count: upgrades },
+      ],
+    })
+  } catch (err) {
+    console.error('[insights] plg error:', err)
+    res.status(500).json({ error: 'Failed to fetch PLG insights' })
+  }
+})
+
 export default router

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { VerticalSelector } from '@/components/crm'
 
 type Step = 1 | 2 | 3
@@ -28,10 +28,18 @@ const INITIAL: FormData = {
 
 export default function SignUpPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<FormData>(INITIAL)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const p = searchParams.get('product')
+    if (p === 'maya_only' || p === 'suite') {
+      setForm((prev) => ({ ...prev, product: p }))
+    }
+  }, [searchParams])
 
   function set(key: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))

@@ -18,6 +18,7 @@ import provisioningRouter from './routes/provisioning.js'
 import pushRouter from './routes/push.js'
 import servicesRouter from './routes/services.js'
 import quotesRouter from './routes/quotes.js'
+import analyticsEventsRouter from './routes/analytics-events.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -68,6 +69,7 @@ app.use('/api/provisioning', provisioningRouter)
 app.use('/api/push', pushRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
+app.use('/api/analytics', analyticsEventsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })
