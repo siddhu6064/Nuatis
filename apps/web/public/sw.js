@@ -1,4 +1,4 @@
-/* global self, clients */
+/* global self */
 // Minimal service worker for PWA installability + push notifications
 self.addEventListener('install', () => {
   self.skipWaiting()
