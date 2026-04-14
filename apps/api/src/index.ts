@@ -4,18 +4,43 @@ import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
+import { initSentry, Sentry } from './lib/sentry.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
 import appointmentsRouter from './routes/appointments.js'
+import knowledgeRouter from './routes/knowledge.js'
+import callsRouter from './routes/calls.js'
+import mayaSettingsRouter from './routes/maya-settings.js'
+import webhooksRouter from './routes/webhooks.js'
+import demoRouter from './routes/demo.js'
+import insightsRouter from './routes/insights.js'
+import provisioningRouter from './routes/provisioning.js'
+import pushRouter from './routes/push.js'
+import servicesRouter from './routes/services.js'
+import quotesRouter from './routes/quotes.js'
+import { securityHeaders } from './middleware/security-headers.js'
+import { auditLoggerMiddleware } from './middleware/audit-logger.js'
+import healthRouter from './routes/health.js'
+import adminRouter from './routes/admin.js'
+import { createClient } from '@supabase/supabase-js'
+import { VOICE_WS_URL } from './config/urls.js'
 import {
   registerVoiceWebSocket,
   prewarmGemini,
   rekeyPrewarmedSession,
+  hangupDataStore,
+  parseTenantMap,
+  lookupTenant,
+  setWssRef,
 } from './voice/telnyx-handler.js'
+
+// Initialize Sentry before Express
+initSentry()
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3001
 
+app.use(securityHeaders)
 app.use(helmet())
 app.use(
   cors({
@@ -24,14 +49,25 @@ app.use(
   })
 )
 app.use(express.json())
+app.use(auditLoggerMiddleware)
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'nuatis-api', timestamp: new Date().toISOString() })
-})
+// Health + admin (no auth required — admin uses its own key)
+app.use('/health', healthRouter)
+app.use('/admin', adminRouter)
 
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/knowledge', knowledgeRouter)
+app.use('/api/calls', callsRouter)
+app.use('/api/maya-settings', mayaSettingsRouter)
+app.use('/api/webhooks', webhooksRouter)
+app.use('/api/demo', demoRouter)
+app.use('/api/insights', insightsRouter)
+app.use('/api/provisioning', provisioningRouter)
+app.use('/api/push', pushRouter)
+app.use('/api/services', servicesRouter)
+app.use('/api/quotes', quotesRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })
@@ -44,7 +80,7 @@ app.post('/voice/inbound', (req, res) => {
   if (event === 'call.initiated') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
     const toNumber: string = req.body?.data?.payload?.to ?? ''
-    const streamUrl = process.env['TELNYX_STREAM_URL'] ?? 'wss://voice.nuatis.com/voice/stream'
+    const streamUrl = process.env['TELNYX_STREAM_URL'] ?? VOICE_WS_URL
     const apiKey = process.env['TELNYX_API_KEY'] ?? ''
 
     console.info(`[voice/inbound] call.initiated call_control_id=${callControlId} to=${toNumber}`)
@@ -55,6 +91,33 @@ app.post('/voice/inbound', (req, res) => {
     // Pre-warm Gemini, then answer + streaming_start
     void (async () => {
       try {
+        // Check if Maya is enabled for this tenant before answering
+        const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
+        const tenantMap = parseTenantMap(tenantMapRaw)
+        const resolvedTenantId =
+          lookupTenant(toNumber, tenantMap) ?? process.env['VOICE_DEV_TENANT_ID'] ?? null
+
+        if (resolvedTenantId) {
+          const sbUrl = process.env['SUPABASE_URL']
+          const sbKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
+          if (sbUrl && sbKey) {
+            const sb = createClient(sbUrl, sbKey)
+            const { data: loc } = await sb
+              .from('locations')
+              .select('maya_enabled')
+              .eq('tenant_id', resolvedTenantId)
+              .eq('is_primary', true)
+              .maybeSingle()
+
+            if (loc && loc.maya_enabled === false) {
+              console.info(
+                `[voice/inbound] Maya disabled for tenant=${resolvedTenantId} — skipping`
+              )
+              return
+            }
+          }
+        }
+
         const prewarmStart = Date.now()
         await prewarmGemini(callControlId, toNumber)
         console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
@@ -116,7 +179,26 @@ app.post('/voice/inbound', (req, res) => {
   }
 
   if (event === 'call.hangup') {
-    console.info('[voice/inbound] call hung up')
+    const payload = req.body?.data?.payload ?? {}
+    const hangupCallControlId: string = payload.call_control_id ?? ''
+    const hangupSource: string = payload.hangup_source ?? null
+    const hangupCause: string = payload.hangup_cause ?? null
+    const mos: number | null =
+      payload.call_quality_stats?.inbound?.mos != null
+        ? Number(payload.call_quality_stats.inbound.mos)
+        : null
+
+    if (hangupCallControlId) {
+      hangupDataStore.set(hangupCallControlId, {
+        hangupSource,
+        hangupCause,
+        callQualityMos: mos,
+      })
+      console.info(
+        `[call-logger] hangup data captured: call_control_id=${hangupCallControlId} source=${hangupSource} cause=${hangupCause} mos=${mos}`
+      )
+    }
+
     res.sendStatus(200)
     return
   }
@@ -140,14 +222,43 @@ app.post('/voice/inbound', (req, res) => {
   res.sendStatus(200)
 })
 
+// Sentry error handler — must be after all routes
+Sentry.setupExpressErrorHandler(app)
+
 const server = createServer(app)
 
 const wss = new WebSocketServer({ server, path: '/voice/stream' })
 registerVoiceWebSocket(wss)
+setWssRef(wss)
+
+// ── Background workers ──────────────────────────────────────────────────────
+import { startWorkers, stopWorkers } from './workers/index.js'
 
 server.listen(PORT, () => {
   console.info(`Nuatis API running on http://localhost:${PORT}`)
   console.info(`Voice WebSocket listening at ws://localhost:${PORT}/voice/stream`)
+
+  // Start BullMQ scanners (best-effort — don't block server start)
+  startWorkers().catch((err) => console.error('[workers] failed to start:', err))
 })
+
+// Graceful shutdown
+function gracefulShutdown(signal: string): void {
+  console.info(`[shutdown] ${signal} received — closing workers and server`)
+  void stopWorkers()
+    .then(() => Sentry.close(2000))
+    .then(() => {
+      server.close(() => {
+        console.info('[shutdown] server closed')
+        process.exit(0)
+      })
+    })
+    .catch(() => {
+      process.exit(1)
+    })
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 export default app

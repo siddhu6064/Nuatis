@@ -5,6 +5,20 @@ import { createClient } from '@supabase/supabase-js'
 import { createGeminiLiveSession } from './gemini-live.js'
 import { logCall } from './call-logger.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
+import { handlePostCall, callSessionState } from './post-call.js'
+import { persistVoiceSession } from './call-session-logger.js'
+import { Sentry } from '../lib/sentry.js'
+
+// ── Hangup data registry ─────────────────────────────────────────────────────
+// Populated by the call.hangup webhook, consumed by handleCallEnd.
+
+export interface HangupData {
+  hangupSource: string | null
+  hangupCause: string | null
+  callQualityMos: number | null
+}
+
+export const hangupDataStore = new Map<string, HangupData>()
 
 // ── Audio transcoding ─────────────────────────────────────────────────────────
 
@@ -247,6 +261,10 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let reconnectAttempts = 0
     const MAX_RECONNECTS = 2
     let mayaSpeakingUntil = 0
+    let callControlId: string | null = null
+    let callerId: string | null = null
+    let sessionVertical: string | null = null
+    let sessionBusinessName: string | null = null
 
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
@@ -269,9 +287,10 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
 
         callStartTime = Date.now()
-        let callControlId: string | null = event.start.call_sid ?? null
+        callControlId = event.start.call_sid ?? null
+        callerId = event.start.from ?? null
         console.info(
-          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, stream_id: ${streamId}, call_control_id: ${callControlId}`
+          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, from: ${callerId}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
 
         const resolvedTenantId = tenantId
@@ -282,6 +301,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           businessName: string
         ): void {
           geminiSession = session
+          sessionVertical = vertical
+          sessionBusinessName = businessName
           session.onAudio((audioChunk: Buffer) => {
             if (!isCallActive || ws.readyState !== ws.OPEN) return
             if (firstAudioSentAt === null && firstAudioReceivedAt !== null) {
@@ -484,6 +505,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
 
     ws.on('error', (err: Error) => {
       console.error('[telnyx-handler] WebSocket error', err)
+      Sentry.captureException(err)
       handleCallEnd()
     })
 
@@ -510,8 +532,59 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         `[telnyx-handler] Call ended — duration: ${duration}s` +
           (latencyMs !== null ? `, first_response_ms: ${latencyMs}` : '')
       )
+
+      // Fire-and-forget post-call automation
+      if (tenantId && tenantId !== 'unknown') {
+        handlePostCall({
+          tenantId,
+          callerId: callerId ?? '',
+          streamId: streamId ?? '',
+          callControlId: callControlId ?? '',
+          duration,
+          vertical: sessionVertical ?? 'sales_crm',
+          businessName: sessionBusinessName ?? 'the business',
+        }).catch((err) => console.error('[post-call] error:', err))
+
+        // Persist voice session to database (best-effort, fire-and-forget)
+        const ccId = callControlId ?? ''
+        const booking = ccId ? callSessionState.get(ccId) : undefined
+        const hangup = ccId ? hangupDataStore.get(ccId) : undefined
+        if (hangup) hangupDataStore.delete(ccId)
+
+        persistVoiceSession({
+          tenantId,
+          streamId: streamId ?? '',
+          callControlId: ccId,
+          callerPhone: callerId ?? '',
+          duration,
+          firstResponseMs: latencyMs,
+          bookedAppointment: booking?.bookedAppointment ?? false,
+          appointmentId: booking?.appointmentId ?? null,
+          contactId: booking?.contactId ?? null,
+          escalated: booking?.escalated ?? false,
+          escalationReason: booking?.escalationReason ?? null,
+          vertical: sessionVertical ?? 'sales_crm',
+          toolCallsMade: booking?.toolCalls ?? [],
+          hangupSource: hangup?.hangupSource ?? null,
+          hangupCause: hangup?.hangupCause ?? null,
+          callQualityMos: hangup?.callQualityMos ?? null,
+          startedAt: callStartTime ? new Date(callStartTime) : new Date(),
+        }).catch((err) => console.error('[call-logger] error:', err))
+      }
     }
   })
 
   console.info('[telnyx-handler] WebSocket server registered at /voice/stream')
+}
+
+// ── Active connection tracking ───────────────────────────────────────────────
+
+let wssRef: WebSocketServer | null = null
+
+export function setWssRef(wss: WebSocketServer): void {
+  wssRef = wss
+}
+
+export function getActiveConnectionCount(): number {
+  return wssRef?.clients?.size ?? 0
 }

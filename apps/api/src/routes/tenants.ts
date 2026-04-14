@@ -109,6 +109,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
+  // 6b. Create tenant_users record (RBAC foundation)
+  await supabase.from('tenant_users').insert({
+    tenant_id: tenantId,
+    user_id: supabaseUserId,
+    role: 'owner',
+    email: owner_email,
+    name: owner_name,
+  })
+
+  // Also set owner_user_id on tenant
+  await supabase.from('tenants').update({ owner_user_id: supabaseUserId }).eq('id', tenantId)
+
   // 7. Seed vertical config
   const { error: configError } = await supabase.from('vertical_configs').insert({
     tenant_id: tenantId,

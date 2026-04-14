@@ -1,0 +1,24 @@
+# Cloudflare Tunnel configuration — alternative to Azure deployment.
+# Use this for tunneling local dev server to a stable public URL.
+#
+# Setup:
+#   1. Install cloudflared: brew install cloudflared
+#   2. Login: cloudflared tunnel login
+#   3. Create tunnel: cloudflared tunnel create nuatis-voice
+#   4. Route DNS: cloudflared tunnel route dns nuatis-voice api.nuatis.com
+#   5. Copy credentials to /etc/cloudflared/credentials.json
+#   6. Run: cloudflared tunnel --config cloudflared.yml run
+#
+# This replaces ngrok for local development with a stable hostname.
+
+tunnel: nuatis-voice
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: api.nuatis.com
+    service: http://localhost:3001
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      # WebSocket support is automatic — no special config needed
+  - service: http_status:404

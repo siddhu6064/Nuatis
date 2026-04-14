@@ -1,8 +1,18 @@
-import { GoogleGenAI, Modality, type Blob as GBlob } from '@google/genai'
+import {
+  GoogleGenAI,
+  Modality,
+  StartSensitivity,
+  EndSensitivity,
+  ActivityHandling,
+  type Blob as GBlob,
+} from '@google/genai'
 import { VERTICALS } from '@nuatis/shared'
+import { FUNCTION_DECLARATIONS, executeToolCall, type ToolCallContext } from './tool-handlers.js'
+import { Sentry } from '../lib/sentry.js'
+import { getAllKnowledgeEntries } from '../services/embeddings.js'
 
 const DEFAULT_MAYA_PROMPT =
-  'You are Maya, a warm and professional AI receptionist. When you receive [call connected], say: "Hello! Thank you for calling. How can I help you today?" Keep all responses to 1-2 sentences maximum. Never ask more than one question at a time. Stop speaking immediately if the caller interrupts you. Wait for the caller to finish before responding. When the caller says goodbye or bye, say a brief farewell and stop talking. Speak English by default. If the caller speaks Hindi or Telugu, switch to that language and stay in it.'
+  'You are Maya, a warm and professional AI receptionist. When you receive [call connected], say: "Hello! Thank you for calling. How can I help you today?" Keep all responses to 1-2 sentences maximum. Never ask more than one question at a time. Stop speaking immediately if the caller interrupts you. Wait for the caller to finish before responding. When the caller says goodbye or bye, say a brief farewell and stop talking. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person.'
 
 const FAREWELL_PHRASES = [
   'bye',
@@ -74,7 +84,7 @@ export interface GeminiLiveSession {
 }
 
 export async function createGeminiLiveSession(
-  _tenantId: string,
+  tenantId: string,
   vertical: string,
   businessName?: string,
   callControlId?: string
@@ -85,7 +95,43 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  const systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'our office')
+  let systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'our office')
+
+  // ── Inject knowledge base entries into system prompt (2s timeout) ────────
+  try {
+    const knowledgeEntries = await Promise.race([
+      getAllKnowledgeEntries(tenantId),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+    ])
+
+    if (knowledgeEntries.length > 0) {
+      // Group entries by category
+      const grouped = new Map<string, Array<{ title: string; content: string }>>()
+      for (const entry of knowledgeEntries) {
+        const cat = entry.category || 'general'
+        if (!grouped.has(cat)) grouped.set(cat, [])
+        grouped.get(cat)!.push({ title: entry.title, content: entry.content })
+      }
+
+      let section =
+        '\n\nKNOWLEDGE BASE — Use the following information to answer caller questions about this business:\n'
+      for (const [category, entries] of grouped) {
+        section += `\n[${category.charAt(0).toUpperCase() + category.slice(1)}]\n`
+        for (const e of entries) {
+          section += `- ${e.title}: ${e.content}\n`
+        }
+      }
+
+      systemPrompt += section
+      console.info(
+        `[gemini-live] injected ${knowledgeEntries.length} knowledge entries into system prompt for tenant=${tenantId}`
+      )
+    }
+  } catch (err) {
+    // Knowledge injection is best-effort — never delay call pickup
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn(`[gemini-live] knowledge injection skipped: ${msg}`)
+  }
 
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
@@ -119,6 +165,14 @@ export async function createGeminiLiveSession(
     }
   }
 
+  const toolContext: ToolCallContext = {
+    tenantId,
+    vertical,
+    callerId: '',
+    streamId: '',
+    callControlId: callControlId ?? '',
+  }
+
   function armSilenceFallback(): void {
     if (silenceTimer) clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
@@ -137,20 +191,20 @@ export async function createGeminiLiveSession(
       thinkingConfig: {
         thinkingBudget: 0,
       },
-      // @ts-expect-error — realtimeInputConfig not in SDK types yet
       realtimeInputConfig: {
         automaticActivityDetection: {
           disabled: false,
-          startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
-          endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
+          startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+          endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
           prefixPaddingMs: 20,
           silenceDurationMs: 500,
         },
-        activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+        activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
       },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
+      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     },
     callbacks: {
       onopen: () => {
@@ -170,7 +224,14 @@ export async function createGeminiLiveSession(
           }
           turnComplete?: boolean
           setupComplete?: unknown
-          toolCall?: unknown
+          toolCall?: {
+            functionCalls?: Array<{
+              id?: string
+              name?: string
+              args?: Record<string, unknown>
+            }>
+          }
+          toolCallCancellation?: { ids?: string[] }
         }
 
         if (msg.serverContent?.interrupted) {
@@ -190,6 +251,27 @@ export async function createGeminiLiveSession(
         if (msg.setupComplete !== undefined) {
           console.info('[gemini-live] setupComplete received')
           if (setupCompleteCallback) setupCompleteCallback()
+        }
+
+        if (msg.toolCallCancellation) {
+          console.info(
+            `[gemini-live] toolCallCancellation: ${JSON.stringify(msg.toolCallCancellation)}`
+          )
+        }
+
+        if (msg.toolCall?.functionCalls) {
+          console.info(
+            `[gemini-live] toolCall received: ${JSON.stringify(msg.toolCall.functionCalls)}`
+          )
+          for (const fc of msg.toolCall.functionCalls) {
+            void (async () => {
+              const result = await executeToolCall(fc.name ?? 'unknown', fc.args ?? {}, toolContext)
+              session.sendToolResponse({
+                functionResponses: [{ id: fc.id, name: fc.name, response: result }],
+              })
+              console.info(`[gemini-live] toolResponse sent for ${fc.name}`)
+            })()
+          }
         }
 
         const parts = msg.serverContent?.modelTurn?.parts ?? []
@@ -233,6 +315,7 @@ export async function createGeminiLiveSession(
       },
       onerror: (e) => {
         console.error('[gemini-live] WebSocket error:', e)
+        if (e instanceof Error) Sentry.captureException(e)
       },
       onclose: (e) => {
         const closeEvent = e as { code?: number }

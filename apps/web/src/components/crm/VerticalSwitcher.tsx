@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { VERTICALS } from '@nuatis/shared'
+const VERTICALS_LIST = [
+  { slug: 'sales_crm', label: 'Sales CRM' },
+  { slug: 'dental', label: 'Dental practice' },
+  { slug: 'salon', label: 'Hair salon' },
+  { slug: 'restaurant', label: 'Restaurant' },
+  { slug: 'contractor', label: 'Contractor' },
+  { slug: 'law_firm', label: 'Law firm' },
+  { slug: 'real_estate', label: 'Real estate' },
+]
 
 const VERTICAL_ICONS: Record<string, string> = {
   sales_crm: '📊',
@@ -20,7 +28,7 @@ interface VerticalSwitcherProps {
 
 export function VerticalSwitcher({ currentSlug, onSwitch }: VerticalSwitcherProps) {
   const [open, setOpen] = useState(false)
-  const current = VERTICALS[currentSlug]
+  const current = VERTICALS_LIST.find((v) => v.slug === currentSlug)
 
   return (
     <div className="relative">
@@ -60,7 +68,7 @@ export function VerticalSwitcher({ currentSlug, onSwitch }: VerticalSwitcherProp
                 Switch vertical
               </p>
             </div>
-            {Object.values(VERTICALS).map((v) => (
+            {VERTICALS_LIST.map((v) => (
               <button
                 key={v.slug}
                 onClick={() => {

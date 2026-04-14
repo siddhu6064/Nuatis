@@ -58,7 +58,9 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Redirect back to dashboard with success
-    res.redirect('http://localhost:3000/settings?google=connected')
+    const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
+    const returnTo = (req.query['return_to'] as string) || '/settings'
+    res.redirect(`${webUrl}${returnTo}?google=connected`)
   } catch (err) {
     console.error('Google OAuth error:', err)
     res.status(500).json({ error: 'Google OAuth failed' })

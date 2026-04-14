@@ -79,8 +79,18 @@ export default function SignUpPage() {
         return
       }
 
-      // Success — redirect to sign-in with success message
-      router.push('/sign-in?registered=1')
+      // Success — sign in automatically and redirect to onboarding
+      const { signIn } = await import('next-auth/react')
+      const signInRes = await signIn('credentials', {
+        email: form.owner_email,
+        password: form.owner_password,
+        redirect: false,
+      })
+      if (signInRes?.ok) {
+        router.push('/onboarding')
+      } else {
+        router.push('/sign-in?registered=1')
+      }
     } catch {
       setError('Could not connect to server. Please try again.')
     } finally {

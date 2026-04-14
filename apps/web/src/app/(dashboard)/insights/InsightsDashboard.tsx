@@ -1,0 +1,831 @@
+'use client'
+
+import { useMemo } from 'react'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts'
+import { VERTICAL_AVG_APPOINTMENT_VALUE } from '@/lib/verticals'
+
+interface Session {
+  id: string
+  started_at: string
+  duration_seconds: number | null
+  first_response_ms: number | null
+  call_quality_mos: number | null
+  outcome: string | null
+  language_detected: string | null
+  tool_calls_made: Array<{ name: string }> | null
+  booked_appointment: boolean
+}
+
+interface Appointment {
+  id: string
+  created_at: string
+  created_by_call: string | null
+  status: string
+}
+
+interface Contact {
+  id: string
+  source: string | null
+  follow_up_step: number | null
+  created_at: string
+}
+
+interface PipelineEntry {
+  status: string
+  pipeline_stages: { name: string } | { name: string }[] | null
+}
+
+interface Quote {
+  id: string
+  status: string
+  total: number
+  created_by: string | null
+  created_at: string
+  sent_at: string | null
+  accepted_at: string | null
+  declined_at: string | null
+}
+
+interface Props {
+  sessions: Session[]
+  appointments: Appointment[]
+  contacts: Contact[]
+  pipelineEntries: PipelineEntry[]
+  quotes: Quote[]
+  vertical: string
+}
+
+const OUTCOME_COLORS: Record<string, string> = {
+  booking_made: '#10b981',
+  inquiry_answered: '#3b82f6',
+  escalated: '#f59e0b',
+  abandoned: '#ef4444',
+  general: '#9ca3af',
+}
+
+const OUTCOME_LABELS: Record<string, string> = {
+  booking_made: 'Booking',
+  inquiry_answered: 'Inquiry',
+  escalated: 'Escalated',
+  abandoned: 'Abandoned',
+  general: 'General',
+}
+
+const LANG_LABELS: Record<string, string> = {
+  en: 'English',
+  es: 'Spanish',
+  hi: 'Hindi',
+  te: 'Telugu',
+  unknown: 'Unknown',
+}
+
+const LANG_COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ef4444', '#9ca3af']
+const SOURCE_COLORS = ['#0d9488', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#9ca3af']
+
+function StatCard({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string
+  value: string
+  sub?: string
+  color?: string
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <p className="text-xs text-gray-400 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color ?? 'text-gray-900'}`}>{value}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-1">{sub}</p>}
+    </div>
+  )
+}
+
+const FUNNEL_COLORS = ['#3b82f6', '#0d9488', '#f59e0b', '#10b981']
+
+export default function InsightsDashboard({
+  sessions,
+  appointments,
+  contacts,
+  pipelineEntries,
+  quotes,
+  vertical,
+}: Props) {
+  const stats = useMemo(() => {
+    const totalCalls = sessions.length
+    let totalLatency = 0
+    let latencyCount = 0
+    let totalMos = 0
+    let mosCount = 0
+
+    const outcomeMap: Record<string, number> = {}
+    const langMap: Record<string, number> = {}
+    const dailyMap = new Map<string, { calls: number; bookings: number }>()
+    const hourMap = new Map<number, number>()
+    const toolMap: Record<string, number> = {}
+
+    for (const s of sessions) {
+      if (s.first_response_ms != null) {
+        totalLatency += s.first_response_ms
+        latencyCount++
+      }
+      if (s.call_quality_mos != null) {
+        totalMos += Number(s.call_quality_mos)
+        mosCount++
+      }
+      const outcome = s.outcome ?? 'general'
+      outcomeMap[outcome] = (outcomeMap[outcome] ?? 0) + 1
+
+      const lang = s.language_detected ?? 'unknown'
+      langMap[lang] = (langMap[lang] ?? 0) + 1
+
+      const date = s.started_at.slice(0, 10)
+      const day = dailyMap.get(date) ?? { calls: 0, bookings: 0 }
+      day.calls++
+      if (outcome === 'booking_made') day.bookings++
+      dailyMap.set(date, day)
+
+      const hour = new Date(s.started_at).getHours()
+      hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1)
+
+      if (Array.isArray(s.tool_calls_made)) {
+        for (const tc of s.tool_calls_made) {
+          if (tc.name) toolMap[tc.name] = (toolMap[tc.name] ?? 0) + 1
+        }
+      }
+    }
+
+    const bookings = outcomeMap['booking_made'] ?? 0
+    const avgLatency = latencyCount > 0 ? Math.round(totalLatency / latencyCount) : null
+    const avgMos = mosCount > 0 ? Number((totalMos / mosCount).toFixed(2)) : null
+
+    const dailyVolume = Array.from(dailyMap.entries())
+      .map(([date, v]) => ({ date: date.slice(5), ...v }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    const peakHours = Array.from({ length: 24 }, (_, h) => ({
+      hour: `${h}:00`,
+      calls: hourMap.get(h) ?? 0,
+    }))
+
+    const outcomeData = Object.entries(outcomeMap).map(([name, value]) => ({
+      name: OUTCOME_LABELS[name] ?? name,
+      value,
+      color: OUTCOME_COLORS[name] ?? '#9ca3af',
+    }))
+
+    const langData = Object.entries(langMap).map(([name, value]) => ({
+      name: LANG_LABELS[name] ?? name,
+      value,
+    }))
+
+    // AI vs human bookings
+    const aiBookings = appointments.filter((a) => a.created_by_call != null).length
+    const humanBookings = appointments.length - aiBookings
+
+    // Booking trend
+    const bookingDailyMap = new Map<string, { ai: number; human: number }>()
+    for (const a of appointments) {
+      const date = a.created_at.slice(0, 10)
+      const day = bookingDailyMap.get(date) ?? { ai: 0, human: 0 }
+      if (a.created_by_call) day.ai++
+      else day.human++
+      bookingDailyMap.set(date, day)
+    }
+    const bookingTrend = Array.from(bookingDailyMap.entries())
+      .map(([date, v]) => ({ date: date.slice(5), ...v }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    // Pipeline
+    const stageMap = new Map<string, number>()
+    let wonCount = 0
+    for (const e of pipelineEntries) {
+      const stages = e.pipeline_stages
+      const stageName =
+        stages && typeof stages === 'object' && 'name' in stages
+          ? String((stages as { name: string }).name)
+          : 'Unknown'
+      stageMap.set(stageName, (stageMap.get(stageName) ?? 0) + 1)
+      if (e.status === 'won') wonCount++
+    }
+    const stageDistribution = Array.from(stageMap.entries()).map(([stage, count]) => ({
+      stage,
+      count,
+    }))
+
+    // Source breakdown
+    const sourceMap = new Map<string, number>()
+    for (const c of contacts) {
+      const src = c.source ?? 'unknown'
+      sourceMap.set(src, (sourceMap.get(src) ?? 0) + 1)
+    }
+    const sourceData = Array.from(sourceMap.entries()).map(([name, value]) => ({ name, value }))
+
+    // Follow-up stats
+    let activeSeq = 0
+    let completedSeq = 0
+    const stepDist: Record<string, number> = { step_1: 0, step_2: 0, completed: 0 }
+    for (const c of contacts) {
+      const step = c.follow_up_step ?? 0
+      if (step > 0 && step < 3) activeSeq++
+      else if (step >= 3) completedSeq++
+      if (step === 1) stepDist['step_1']!++
+      else if (step === 2) stepDist['step_2']!++
+      else if (step >= 3) stepDist['completed']!++
+    }
+
+    // ROI
+    const costPerCall = 0.008
+    const totalMayaCost = Number((totalCalls * costPerCall).toFixed(2))
+    const receptionistCost = 2500
+    const monthlySavings = receptionistCost - totalMayaCost
+    const roiMultiplier = totalMayaCost > 0 ? Math.round(receptionistCost / totalMayaCost) : 0
+
+    // Revenue forecast
+    const avgApptValue = VERTICAL_AVG_APPOINTMENT_VALUE[vertical] ?? 200
+    const weeksInRange = Math.max(
+      1,
+      sessions.length > 0
+        ? Math.ceil((Date.now() - new Date(sessions[0]!.started_at).getTime()) / (7 * 86400000))
+        : 1
+    )
+    const weeklyBookings = bookings / weeksInRange
+    const projectedMonthlyBookings = Math.round(weeklyBookings * 4.3)
+    const projectedRevenue = projectedMonthlyBookings * avgApptValue
+
+    // CPQ stats
+    const totalQuotes = quotes.length
+    const quoteStatusMap: Record<string, number> = {}
+    let qAccepted = 0
+    let qDeclined = 0
+    let totalRevWon = 0
+    let aiQuotes = 0
+    let aiAccepted = 0
+    const quoteDailyMap = new Map<string, { created: number; accepted: number }>()
+
+    for (const q of quotes) {
+      const s = q.status ?? 'draft'
+      quoteStatusMap[s] = (quoteStatusMap[s] ?? 0) + 1
+      if (s === 'accepted') {
+        qAccepted++
+        totalRevWon += Number(q.total) || 0
+      }
+      if (s === 'declined') qDeclined++
+      if (q.created_by === 'ai') {
+        aiQuotes++
+        if (s === 'accepted') aiAccepted++
+      }
+      const date = q.created_at.slice(5, 10)
+      const day = quoteDailyMap.get(date) ?? { created: 0, accepted: 0 }
+      day.created++
+      if (s === 'accepted') day.accepted++
+      quoteDailyMap.set(date, day)
+    }
+
+    const qDecided = qAccepted + qDeclined
+    const winRate = qDecided > 0 ? Number(((qAccepted / qDecided) * 100).toFixed(1)) : 0
+    const avgDealSize = qAccepted > 0 ? Number((totalRevWon / qAccepted).toFixed(2)) : 0
+    const quoteTrend = Array.from(quoteDailyMap.entries())
+      .map(([date, v]) => ({ date, ...v }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    const funnelData = [
+      { stage: 'Draft', count: quoteStatusMap['draft'] ?? 0 },
+      { stage: 'Sent', count: quoteStatusMap['sent'] ?? 0 },
+      { stage: 'Viewed', count: quoteStatusMap['viewed'] ?? 0 },
+      { stage: 'Accepted', count: quoteStatusMap['accepted'] ?? 0 },
+    ]
+
+    return {
+      totalCalls,
+      bookings,
+      avgLatency,
+      avgMos,
+      dailyVolume,
+      peakHours,
+      outcomeData,
+      langData,
+      aiBookings,
+      humanBookings,
+      bookingTrend,
+      stageDistribution,
+      sourceData,
+      activeSeq,
+      completedSeq,
+      stepDist,
+      totalMayaCost,
+      monthlySavings,
+      roiMultiplier,
+      projectedMonthlyBookings,
+      projectedRevenue,
+      avgApptValue,
+      pipelineTotal: pipelineEntries.length,
+      wonCount,
+      totalQuotes,
+      winRate,
+      avgDealSize,
+      totalRevWon,
+      quoteTrend,
+      funnelData,
+      aiQuotes,
+      aiAccepted,
+    }
+  }, [sessions, appointments, contacts, pipelineEntries, quotes, vertical])
+
+  const bookingRate =
+    stats.totalCalls > 0 ? ((stats.bookings / stats.totalCalls) * 100).toFixed(1) : '0'
+  const latencyColor =
+    stats.avgLatency != null
+      ? stats.avgLatency < 1500
+        ? 'text-green-600'
+        : stats.avgLatency < 2000
+          ? 'text-amber-600'
+          : 'text-red-600'
+      : 'text-gray-400'
+  const mosLabel =
+    stats.avgMos != null
+      ? stats.avgMos >= 4.0
+        ? 'Excellent'
+        : stats.avgMos >= 3.5
+          ? 'Good'
+          : stats.avgMos >= 3.0
+            ? 'Fair'
+            : 'Poor'
+      : '--'
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Insights</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Last 30 days performance</p>
+      </div>
+
+      {/* Section 1: Call Performance Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Calls"
+          value={String(stats.totalCalls)}
+          sub={`${stats.bookings} bookings`}
+        />
+        <StatCard
+          label="Avg Response Time"
+          value={stats.avgLatency != null ? `${(stats.avgLatency / 1000).toFixed(1)}s` : '--'}
+          color={latencyColor}
+          sub="first response"
+        />
+        <StatCard
+          label="Booking Rate"
+          value={`${bookingRate}%`}
+          sub={`${stats.bookings} of ${stats.totalCalls} calls`}
+          color="text-teal-600"
+        />
+        <StatCard
+          label="Call Quality"
+          value={stats.avgMos != null ? stats.avgMos.toFixed(2) : '--'}
+          sub={mosLabel}
+        />
+      </div>
+
+      {/* Section 2: Call Volume Chart */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Call Volume</h2>
+        {stats.dailyVolume.length === 0 ? (
+          <p className="text-sm text-gray-400 py-8 text-center">No call data yet</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={stats.dailyVolume}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="calls"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={false}
+                name="Calls"
+              />
+              <Line
+                type="monotone"
+                dataKey="bookings"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={false}
+                name="Bookings"
+              />
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Section 3: Outcomes + Peak Hours */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Call Outcomes</h2>
+          {stats.outcomeData.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={stats.outcomeData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {stats.outcomeData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Peak Hours</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={stats.peakHours}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
+              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="calls" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Section 4: Pipeline Funnel */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Pipeline Distribution</h2>
+        {stats.stageDistribution.length === 0 ? (
+          <p className="text-sm text-gray-400 py-8 text-center">No pipeline data</p>
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={stats.stageDistribution} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="stage"
+                  type="category"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  width={120}
+                />
+                <Tooltip />
+                <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+              <span>
+                Conversion rate:{' '}
+                <strong className="text-teal-600">
+                  {stats.pipelineTotal > 0
+                    ? ((stats.wonCount / stats.pipelineTotal) * 100).toFixed(1)
+                    : 0}
+                  %
+                </strong>
+              </span>
+              <span>
+                Total: <strong>{stats.pipelineTotal}</strong> contacts in pipeline
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Section 5: ROI Summary */}
+      <div className="bg-gradient-to-r from-teal-600 to-teal-700 rounded-xl p-6 text-white">
+        <h2 className="text-sm font-semibold opacity-80 mb-4">ROI Summary</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div>
+            <p className="text-xs opacity-70">Maya Cost</p>
+            <p className="text-xl font-bold">${stats.totalMayaCost.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-xs opacity-70">Receptionist Cost</p>
+            <p className="text-xl font-bold">$2,500/mo</p>
+          </div>
+          <div>
+            <p className="text-xs opacity-70">You Saved</p>
+            <p className="text-2xl font-bold">${stats.monthlySavings.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs opacity-70">ROI</p>
+            <p className="text-2xl font-bold">{stats.roiMultiplier}x</p>
+          </div>
+        </div>
+        {stats.bookingTrend.length > 0 && (
+          <ResponsiveContainer width="100%" height={150}>
+            <AreaChart data={stats.bookingTrend}>
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: '#fff' }}
+                stroke="rgba(255,255,255,0.3)"
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#fff' }}
+                stroke="rgba(255,255,255,0.3)"
+                allowDecimals={false}
+              />
+              <Tooltip />
+              <Area
+                type="monotone"
+                dataKey="ai"
+                stackId="1"
+                fill="rgba(255,255,255,0.4)"
+                stroke="#fff"
+                name="AI Bookings"
+              />
+              <Area
+                type="monotone"
+                dataKey="human"
+                stackId="1"
+                fill="rgba(255,255,255,0.15)"
+                stroke="rgba(255,255,255,0.5)"
+                name="Human Bookings"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Section 5b: Revenue Forecast */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-2">Revenue Forecast</h2>
+        <p className="text-xs text-gray-400 mb-4">Based on current booking trends</p>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-xs text-gray-400">Projected Monthly Bookings</p>
+            <p className="text-xl font-bold text-gray-900">{stats.projectedMonthlyBookings}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Avg Appointment Value</p>
+            <p className="text-xl font-bold text-gray-900">${stats.avgApptValue}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Projected Monthly Revenue</p>
+            <p className="text-xl font-bold text-teal-600">
+              ${stats.projectedRevenue.toLocaleString()}
+            </p>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-300 mt-3">
+          Estimate based on current booking rate and average appointment value for your vertical.
+          Not a guarantee of future revenue.
+        </p>
+      </div>
+
+      {/* Section 6: Language + Source */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Languages</h2>
+          {stats.langData.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={stats.langData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {stats.langData.map((_, i) => (
+                    <Cell key={i} fill={LANG_COLORS[i % LANG_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Contact Sources</h2>
+          {stats.sourceData.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={stats.sourceData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {stats.sourceData.map((_, i) => (
+                    <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Section 7: Follow-up Performance */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Follow-up Performance</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <p className="text-xs text-gray-400">Active Sequences</p>
+            <p className="text-lg font-bold text-gray-900">{stats.activeSeq}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Completed</p>
+            <p className="text-lg font-bold text-gray-900">{stats.completedSeq}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Step 1</p>
+            <p className="text-lg font-bold text-gray-900">{stats.stepDist['step_1']}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Step 2</p>
+            <p className="text-lg font-bold text-gray-900">{stats.stepDist['step_2']}</p>
+          </div>
+        </div>
+        {/* Horizontal stacked bar */}
+        <div className="h-4 rounded-full bg-gray-100 overflow-hidden flex">
+          {stats.stepDist['step_1']! > 0 && (
+            <div
+              className="bg-blue-400 h-full"
+              style={{
+                width: `${(stats.stepDist['step_1']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+              }}
+              title={`Step 1: ${stats.stepDist['step_1']}`}
+            />
+          )}
+          {stats.stepDist['step_2']! > 0 && (
+            <div
+              className="bg-teal-400 h-full"
+              style={{
+                width: `${(stats.stepDist['step_2']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+              }}
+              title={`Step 2: ${stats.stepDist['step_2']}`}
+            />
+          )}
+          {stats.stepDist['completed']! > 0 && (
+            <div
+              className="bg-green-400 h-full"
+              style={{
+                width: `${(stats.stepDist['completed']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+              }}
+              title={`Completed: ${stats.stepDist['completed']}`}
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Step 1
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-teal-400 inline-block" /> Step 2
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Completed
+          </span>
+        </div>
+      </div>
+
+      {/* Section 8: Quote Performance */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Quote Performance</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div>
+            <p className="text-xs text-gray-400">Total Quotes</p>
+            <p className="text-lg font-bold text-gray-900">{stats.totalQuotes}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Win Rate</p>
+            <p
+              className={`text-lg font-bold ${stats.winRate > 50 ? 'text-green-600' : stats.winRate < 30 ? 'text-red-600' : 'text-gray-900'}`}
+            >
+              {stats.winRate}%
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Avg Deal Size</p>
+            <p className="text-lg font-bold text-gray-900">${stats.avgDealSize.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Revenue Won</p>
+            <p className="text-lg font-bold text-teal-600">${stats.totalRevWon.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Quote funnel */}
+        {stats.totalQuotes > 0 && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 mb-2">Quote Funnel</p>
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={stats.funnelData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="stage"
+                  type="category"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  width={70}
+                />
+                <Tooltip />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {stats.funnelData.map((_, i) => (
+                    <Cell key={i} fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Quote volume trend */}
+        {stats.quoteTrend.length > 0 && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 mb-2">Quote Volume</p>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={stats.quoteTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="created"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Created"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="accepted"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Accepted"
+                />
+                <Legend />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* AI quote stats */}
+        {stats.aiQuotes > 0 && (
+          <div className="bg-teal-50 rounded-lg p-4">
+            <p className="text-xs text-teal-600 font-medium">AI-Generated Quotes</p>
+            <p className="text-sm text-teal-800 mt-1">
+              Maya auto-generated {stats.aiQuotes} quote{stats.aiQuotes !== 1 ? 's' : ''},{' '}
+              {stats.aiQuotes > 0
+                ? `${((stats.aiAccepted / stats.aiQuotes) * 100).toFixed(0)}% accepted`
+                : '0% accepted'}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

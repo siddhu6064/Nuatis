@@ -1,6 +1,14 @@
 'use client'
 
-import { VERTICALS } from '@nuatis/shared'
+const VERTICALS_LIST = [
+  { slug: 'sales_crm', label: 'Sales CRM' },
+  { slug: 'dental', label: 'Dental practice' },
+  { slug: 'salon', label: 'Hair salon' },
+  { slug: 'restaurant', label: 'Restaurant' },
+  { slug: 'contractor', label: 'Contractor' },
+  { slug: 'law_firm', label: 'Law firm' },
+  { slug: 'real_estate', label: 'Real estate' },
+]
 
 const VERTICAL_ICONS: Record<string, string> = {
   sales_crm: '📊',
@@ -20,7 +28,7 @@ interface VerticalSelectorProps {
 export function VerticalSelector({ value, onChange }: VerticalSelectorProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {Object.values(VERTICALS).map((vertical) => {
+      {VERTICALS_LIST.map((vertical) => {
         const selected = value === vertical.slug
         return (
           <button

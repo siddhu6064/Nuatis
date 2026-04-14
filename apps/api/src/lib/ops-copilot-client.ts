@@ -1,11 +1,26 @@
 import { randomUUID } from 'crypto'
 
+/**
+ * Lazy retry enqueue — uses dynamic import to avoid circular deps and to
+ * skip enqueue when REDIS_URL is not configured (dev without Redis).
+ */
+async function enqueueRetryIfAvailable(payload: OpsActivityEvent): Promise<void> {
+  if (!process.env['REDIS_URL']) return
+  try {
+    const { enqueueRetry } = await import('../workers/webhook-retry-worker.js')
+    await enqueueRetry(payload)
+  } catch {
+    // Redis not available or worker not initialized — silently skip
+  }
+}
+
 export interface OpsActivityEvent {
   tenant_id: string
   event_id: string
   event_type:
     | 'booking.failed'
     | 'call.failed'
+    | 'call.completed'
     | 'lead.stalled'
     | 'appointment.no_show'
     | 'follow_up.missed'
@@ -41,9 +56,11 @@ export async function publishActivityEvent(payload: OpsActivityEvent): Promise<v
       console.warn(
         `[ops-copilot] Non-201 response: ${res.status} (event_type=${payload.event_type}, event_id=${payload.event_id})`
       )
+      void enqueueRetryIfAvailable(payload)
     }
   } catch (err: unknown) {
     console.warn('[ops-copilot] Failed to publish activity event:', err)
+    void enqueueRetryIfAvailable(payload)
   } finally {
     clearTimeout(timeoutHandle)
   }

@@ -1,6 +1,12 @@
 'use client'
 
-import type { VerticalField } from '@nuatis/shared'
+interface VerticalField {
+  key: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'boolean'
+  required: boolean
+  options?: string[]
+}
 
 interface VerticalFieldRendererProps {
   fields: VerticalField[]
