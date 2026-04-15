@@ -9,6 +9,7 @@ import { createDataRetentionWorker } from './data-retention-worker.js'
 import { createQuoteExpiryWorker } from './quote-expiry-worker.js'
 import { createQuoteFollowupWorker } from './quote-followup-worker.js'
 import { createTaskReminderWorker } from './task-reminder-worker.js'
+import { createCsvImportWorker } from './csv-import-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -109,6 +110,11 @@ export async function startWorkers(): Promise<void> {
   const taskReminder = createTaskReminderWorker()
   managed.push({ name: 'task-reminder', ...taskReminder })
   console.info('[workers] task-reminder worker started')
+
+  // 11. CSV import — processes large import jobs async
+  const csvImport = createCsvImportWorker()
+  managed.push({ name: 'csv-import', ...csvImport })
+  console.info('[workers] csv-import worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

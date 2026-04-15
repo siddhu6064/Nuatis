@@ -29,6 +29,7 @@ import tasksRouter from './routes/tasks.js'
 import contactsRouter from './routes/contacts.js'
 import searchRouter from './routes/search.js'
 import savedViewsRouter from './routes/saved-views.js'
+import importRouter from './routes/import.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -90,6 +91,7 @@ app.use('/api/tasks', tasksRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/views', savedViewsRouter)
+app.use('/api/import', importRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
