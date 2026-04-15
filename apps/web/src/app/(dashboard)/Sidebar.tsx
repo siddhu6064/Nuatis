@@ -26,6 +26,7 @@ const NAV: NavItem[] = [
   { href: '/settings/voice', label: 'Voice AI', icon: '◇' },
   { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
   { href: '/settings/follow-ups', label: 'Follow-ups', icon: '↻', suiteOnly: true },
+  { href: '/settings/cpq', label: 'Quote Settings', icon: '⚙', suiteOnly: true },
   { href: '/settings/audit', label: 'Audit Log', icon: '▧', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]

@@ -62,12 +62,18 @@ interface Quote {
   declined_at: string | null
 }
 
+interface QuoteView {
+  quote_id: string
+  viewed_at: string
+}
+
 interface Props {
   sessions: Session[]
   appointments: Appointment[]
   contacts: Contact[]
   pipelineEntries: PipelineEntry[]
   quotes: Quote[]
+  quoteViews: QuoteView[]
   vertical: string
 }
 
@@ -118,7 +124,7 @@ function StatCard({
   )
 }
 
-const FUNNEL_COLORS = ['#3b82f6', '#0d9488', '#f59e0b', '#10b981']
+const FUNNEL_COLORS = ['#9ca3af', '#3b82f6', '#f59e0b', '#10b981']
 
 export default function InsightsDashboard({
   sessions,
@@ -126,6 +132,7 @@ export default function InsightsDashboard({
   contacts,
   pipelineEntries,
   quotes,
+  quoteViews,
   vertical,
 }: Props) {
   const stats = useMemo(() => {
@@ -313,6 +320,40 @@ export default function InsightsDashboard({
       { stage: 'Accepted', count: quoteStatusMap['accepted'] ?? 0 },
     ]
 
+    // Open rate from quote views
+    const sentStatuses = ['sent', 'viewed', 'accepted', 'declined', 'expired', 'deposit_paid']
+    const sentQuotes = quotes.filter((q) => sentStatuses.includes(q.status))
+    const firstViewMap = new Map<string, string>()
+    for (const v of quoteViews) {
+      const existing = firstViewMap.get(v.quote_id)
+      if (!existing || v.viewed_at < existing) {
+        firstViewMap.set(v.quote_id, v.viewed_at)
+      }
+    }
+    const openedQuoteIds = new Set(
+      sentQuotes.filter((q) => firstViewMap.has(q.id)).map((q) => q.id)
+    )
+    const quoteOpenRate =
+      sentQuotes.length > 0
+        ? Number(((openedQuoteIds.size / sentQuotes.length) * 100).toFixed(1))
+        : 0
+
+    // Avg time to first view
+    let totalViewTimeMs = 0
+    let viewTimeCount = 0
+    for (const q of sentQuotes) {
+      const firstView = firstViewMap.get(q.id)
+      if (firstView && q.sent_at) {
+        const diff = new Date(firstView).getTime() - new Date(q.sent_at).getTime()
+        if (diff > 0) {
+          totalViewTimeMs += diff
+          viewTimeCount++
+        }
+      }
+    }
+    const avgTimeToFirstViewHours =
+      viewTimeCount > 0 ? Number((totalViewTimeMs / viewTimeCount / 3600000).toFixed(1)) : null
+
     return {
       totalCalls,
       bookings,
@@ -346,8 +387,10 @@ export default function InsightsDashboard({
       funnelData,
       aiQuotes,
       aiAccepted,
+      quoteOpenRate,
+      avgTimeToFirstViewHours,
     }
-  }, [sessions, appointments, contacts, pipelineEntries, quotes, vertical])
+  }, [sessions, appointments, contacts, pipelineEntries, quotes, quoteViews, vertical])
 
   const bookingRate =
     stats.totalCalls > 0 ? ((stats.bookings / stats.totalCalls) * 100).toFixed(1) : '0'
@@ -727,7 +770,7 @@ export default function InsightsDashboard({
       {/* Section 8: Quote Performance */}
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Quote Performance</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div>
             <p className="text-xs text-gray-400">Total Quotes</p>
             <p className="text-lg font-bold text-gray-900">{stats.totalQuotes}</p>
@@ -739,6 +782,19 @@ export default function InsightsDashboard({
             >
               {stats.winRate}%
             </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Open Rate</p>
+            <p
+              className={`text-lg font-bold ${stats.quoteOpenRate > 70 ? 'text-green-600' : stats.quoteOpenRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}
+            >
+              {stats.quoteOpenRate}%
+            </p>
+            {stats.avgTimeToFirstViewHours != null && (
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Avg time to open: {stats.avgTimeToFirstViewHours}h
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs text-gray-400">Avg Deal Size</p>
@@ -754,7 +810,7 @@ export default function InsightsDashboard({
         {stats.totalQuotes > 0 && (
           <div className="mb-6">
             <p className="text-xs text-gray-400 mb-2">Quote Funnel</p>
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={160}>
               <BarChart data={stats.funnelData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
@@ -768,7 +824,7 @@ export default function InsightsDashboard({
                   type="category"
                   tick={{ fontSize: 11 }}
                   stroke="#9ca3af"
-                  width={70}
+                  width={80}
                 />
                 <Tooltip />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
@@ -778,6 +834,17 @@ export default function InsightsDashboard({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400">
+              {stats.funnelData.slice(1).map((stage, i) => {
+                const prev = stats.funnelData[i]!.count
+                const pct = prev > 0 ? ((stage.count / prev) * 100).toFixed(0) : '0'
+                return (
+                  <span key={stage.stage}>
+                    {stats.funnelData[i]!.stage} → {stage.stage}: {pct}%
+                  </span>
+                )
+              })}
+            </div>
           </div>
         )}
 

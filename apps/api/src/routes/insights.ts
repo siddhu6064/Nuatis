@@ -410,6 +410,64 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
         .slice(0, 10)
     }
 
+    // Quote open rate + avg time to first view
+    const sentStatuses = ['sent', 'viewed', 'accepted', 'declined', 'expired', 'deposit_paid']
+    const sentQuotes = allQuotes.filter((q) => sentStatuses.includes(q.status))
+    const sentQuoteIds = sentQuotes.map((q) => q.id)
+
+    let quoteOpenRate = 0
+    let avgTimeToFirstViewHours: number | null = null
+
+    if (sentQuoteIds.length > 0) {
+      // Get first view per quote from quote_views
+      const { data: viewRows } = await supabase
+        .from('quote_views')
+        .select('quote_id, viewed_at')
+        .in('quote_id', sentQuoteIds.slice(0, 200))
+        .order('viewed_at', { ascending: true })
+
+      // Compute per-quote first views
+      const firstViews = new Map<string, string>()
+      for (const v of viewRows ?? []) {
+        if (!firstViews.has(v.quote_id)) {
+          firstViews.set(v.quote_id, v.viewed_at)
+        }
+      }
+
+      const openedCount = firstViews.size
+      quoteOpenRate =
+        sentQuoteIds.length > 0 ? Number(((openedCount / sentQuoteIds.length) * 100).toFixed(1)) : 0
+
+      // Avg time from sent_at to first view
+      const sentAtMap = new Map<string, string>()
+      for (const q of sentQuotes) {
+        if (q.sent_at) sentAtMap.set(q.id, q.sent_at)
+      }
+
+      let totalTimeMs = 0
+      let timeCount = 0
+      for (const [qId, firstViewAt] of firstViews) {
+        const sentAt = sentAtMap.get(qId)
+        if (sentAt) {
+          const diff = new Date(firstViewAt).getTime() - new Date(sentAt).getTime()
+          if (diff > 0) {
+            totalTimeMs += diff
+            timeCount++
+          }
+        }
+      }
+      avgTimeToFirstViewHours =
+        timeCount > 0 ? Number((totalTimeMs / timeCount / 3600000).toFixed(1)) : null
+    }
+
+    // Updated 4-stage funnel counts
+    const funnelDraft = statusMap['draft'] ?? 0
+    const funnelSent = sentQuotes.length
+    const funnelViewed = allQuotes.filter((q) =>
+      ['viewed', 'accepted', 'declined', 'expired', 'deposit_paid'].includes(q.status)
+    ).length
+    const funnelAccepted = acceptedCount
+
     res.json({
       total_quotes: totalQuotes,
       quotes_by_status: statusMap,
@@ -417,8 +475,16 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
       avg_deal_size: avgDealSize,
       total_revenue_won: Number(totalRevWon.toFixed(2)),
       avg_time_to_accept_hours: avgTimeToAcceptHours,
+      quote_open_rate: quoteOpenRate,
+      avg_time_to_first_view_hours: avgTimeToFirstViewHours,
       quote_volume_trend: quoteVolumeTrend,
       top_services: topServices,
+      funnel: [
+        { stage: 'Draft', count: funnelDraft },
+        { stage: 'Sent', count: funnelSent },
+        { stage: 'Viewed', count: funnelViewed },
+        { stage: 'Accepted', count: funnelAccepted },
+      ],
       ai_generated_stats: {
         total_ai_quotes: aiTotal,
         ai_acceptance_rate: aiTotal > 0 ? Number(((aiAccepted / aiTotal) * 100).toFixed(1)) : 0,

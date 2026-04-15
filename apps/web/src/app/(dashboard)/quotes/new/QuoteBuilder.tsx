@@ -51,6 +51,31 @@ export default function QuoteBuilder({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Discount state
+  const [discountEnabled, setDiscountEnabled] = useState(false)
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage')
+  const [discountValue, setDiscountValue] = useState(0)
+
+  // CPQ settings
+  const [cpqSettings, setCpqSettings] = useState({
+    max_discount_pct: 20,
+    require_approval_above: 15,
+  })
+
+  useState(() => {
+    fetch('/api/cpq/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { max_discount_pct?: number; require_approval_above?: number } | null) => {
+        if (data) {
+          setCpqSettings({
+            max_discount_pct: data.max_discount_pct ?? 20,
+            require_approval_above: data.require_approval_above ?? 15,
+          })
+        }
+      })
+      .catch(() => {})
+  })
+
   function addFromCatalog(svc: Service) {
     setItems((prev) => [
       ...prev,
@@ -80,8 +105,25 @@ export default function QuoteBuilder({
   }
 
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0)
-  const taxAmount = subtotal * (taxRate / 100)
-  const total = subtotal + taxAmount
+
+  // Discount calculation
+  const discountPct = discountEnabled && discountType === 'percentage' ? discountValue : 0
+  const discountAmount = discountEnabled
+    ? discountType === 'percentage'
+      ? Number(((subtotal * discountValue) / 100).toFixed(2))
+      : discountValue
+    : 0
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount)
+  const taxAmount = discountedSubtotal * (taxRate / 100)
+  const total = discountedSubtotal + taxAmount
+
+  const discountExceedsMax =
+    discountEnabled && discountType === 'percentage' && discountValue > cpqSettings.max_discount_pct
+  const needsApproval =
+    discountEnabled &&
+    discountType === 'percentage' &&
+    discountValue > cpqSettings.require_approval_above &&
+    !discountExceedsMax
 
   async function save(andSend: boolean) {
     if (!title.trim()) {
@@ -90,6 +132,10 @@ export default function QuoteBuilder({
     }
     if (items.length === 0) {
       setError('Add at least one line item')
+      return
+    }
+    if (discountExceedsMax) {
+      setError(`Discount exceeds maximum allowed (${cpqSettings.max_discount_pct}%)`)
       return
     }
 
@@ -112,6 +158,8 @@ export default function QuoteBuilder({
           tax_rate: taxRate,
           notes: notes || null,
           valid_days: validDays,
+          discount_pct: discountPct,
+          discount_amount: discountAmount,
         }),
       })
 
@@ -123,7 +171,8 @@ export default function QuoteBuilder({
 
       const quote = await res.json()
 
-      if (andSend && quote.id) {
+      // If needs approval, skip auto-send (the API will set approval_status='pending')
+      if (andSend && quote.id && !needsApproval) {
         await fetch(`/api/quotes/${quote.id}/send`, { method: 'POST' })
       }
 
@@ -271,6 +320,83 @@ export default function QuoteBuilder({
           )}
         </div>
 
+        {/* Discount */}
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-900 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={discountEnabled}
+              onChange={(e) => {
+                setDiscountEnabled(e.target.checked)
+                if (!e.target.checked) setDiscountValue(0)
+              }}
+              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+            />
+            Apply discount
+          </label>
+
+          {discountEnabled && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="discountType"
+                    checked={discountType === 'percentage'}
+                    onChange={() => {
+                      setDiscountType('percentage')
+                      setDiscountValue(0)
+                    }}
+                    className="text-teal-600 focus:ring-teal-500"
+                  />
+                  Percentage
+                </label>
+                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="discountType"
+                    checked={discountType === 'fixed'}
+                    onChange={() => {
+                      setDiscountType('fixed')
+                      setDiscountValue(0)
+                    }}
+                    className="text-teal-600 focus:ring-teal-500"
+                  />
+                  Fixed Amount
+                </label>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  {discountType === 'fixed' && <span className="text-sm text-gray-500">$</span>}
+                  <input
+                    type="number"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className={`w-32 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-teal-500'}`}
+                    min="0"
+                    max={discountType === 'percentage' ? 100 : undefined}
+                    step={discountType === 'percentage' ? 1 : 0.01}
+                  />
+                  {discountType === 'percentage' && (
+                    <span className="text-sm text-gray-500">%</span>
+                  )}
+                </div>
+                {discountExceedsMax && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Maximum discount is {cpqSettings.max_discount_pct}%
+                  </p>
+                )}
+                {needsApproval && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    This discount exceeds {cpqSettings.require_approval_above}% and requires owner
+                    approval before the quote can be sent
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Totals + Options */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <div className="flex justify-end">
@@ -279,6 +405,14 @@ export default function QuoteBuilder({
                 <span className="text-gray-500">Subtotal</span>
                 <span className="text-gray-900">${subtotal.toFixed(2)}</span>
               </div>
+              {discountEnabled && discountAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-600">
+                    Discount{discountType === 'percentage' ? ` (${discountValue}%)` : ''}
+                  </span>
+                  <span className="text-amber-600">-${discountAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm items-center gap-2">
                 <span className="text-gray-500">Tax (%)</span>
                 <input
@@ -342,10 +476,10 @@ export default function QuoteBuilder({
           </button>
           <button
             onClick={() => save(true)}
-            disabled={saving}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+            disabled={saving || discountExceedsMax}
+            className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors ${needsApproval ? 'bg-amber-500 hover:bg-amber-600' : 'bg-teal-600 hover:bg-teal-700'}`}
           >
-            {saving ? 'Saving...' : 'Save & Send'}
+            {saving ? 'Saving...' : needsApproval ? 'Save & Submit for Approval' : 'Save & Send'}
           </button>
         </div>
       </div>

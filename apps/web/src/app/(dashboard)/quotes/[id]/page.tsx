@@ -29,6 +29,12 @@ interface Quote {
   created_by: string | null
   share_token: string
   created_at: string
+  discount_pct: number | null
+  discount_amount: number | null
+  approval_status: string | null
+  approval_note: string | null
+  approved_by: string | null
+  approved_at: string | null
   contacts: { full_name: string; phone: string | null; email: string | null } | null
 }
 
@@ -67,6 +73,28 @@ export default async function QuoteDetailPage({ params }: Props) {
     .order('sort_order', { ascending: true })
     .returns<LineItem[]>()
 
+  // Fetch view stats (only relevant for sent/viewed/accepted/declined quotes)
+  let viewCount = 0
+  let lastViewedAt: string | null = null
+  if (quote.status !== 'draft') {
+    const { count } = await supabase
+      .from('quote_views')
+      .select('id', { count: 'exact', head: true })
+      .eq('quote_id', id)
+    viewCount = count ?? 0
+
+    if (viewCount > 0) {
+      const { data: latestView } = await supabase
+        .from('quote_views')
+        .select('viewed_at')
+        .eq('quote_id', id)
+        .order('viewed_at', { ascending: false })
+        .limit(1)
+        .single()
+      lastViewedAt = latestView?.viewed_at ?? null
+    }
+  }
+
   const badge = STATUS_BADGE[quote.status] ?? STATUS_BADGE['draft']!
   const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001'
   const shareUrl = `${apiUrl}/quotes/view/${quote.share_token}`
@@ -97,9 +125,80 @@ export default async function QuoteDetailPage({ params }: Props) {
             )}
           </div>
           <p className="text-sm text-gray-500 mt-1">{quote.title}</p>
+          {quote.status !== 'draft' && (
+            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3.5 w-3.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path
+                  fillRule="evenodd"
+                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              {viewCount > 0 ? (
+                <span>
+                  Viewed {viewCount} time{viewCount !== 1 ? 's' : ''}
+                  {lastViewedAt && (
+                    <span className="ml-1">
+                      · Last viewed{' '}
+                      {(() => {
+                        const diffMs = Date.now() - new Date(lastViewedAt).getTime()
+                        const diffH = Math.floor(diffMs / 3600000)
+                        if (diffH < 1) return 'just now'
+                        if (diffH < 24) return `${diffH}h ago`
+                        return `${Math.floor(diffH / 24)}d ago`
+                      })()}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-gray-300">Not yet viewed</span>
+              )}
+            </p>
+          )}
         </div>
-        <QuoteActions quoteId={quote.id} status={quote.status} shareUrl={shareUrl} />
+        <QuoteActions
+          quoteId={quote.id}
+          status={quote.status}
+          shareUrl={shareUrl}
+          approvalStatus={quote.approval_status}
+          discountPct={Number(quote.discount_pct ?? 0)}
+        />
       </div>
+
+      {/* Approval banners */}
+      {quote.approval_status === 'pending' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <p className="text-sm font-medium text-amber-800">
+            Awaiting Approval — This quote has a {Number(quote.discount_pct)}% discount that
+            requires owner approval before sending.
+          </p>
+        </div>
+      )}
+      {quote.approval_status === 'approved' && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+          <p className="text-sm font-medium text-green-800">
+            Approved
+            {quote.approved_at &&
+              ` on ${new Date(quote.approved_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
+          </p>
+          {quote.approval_note && (
+            <p className="text-xs text-green-600 mt-1">{quote.approval_note}</p>
+          )}
+        </div>
+      )}
+      {quote.approval_status === 'rejected' && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <p className="text-sm font-medium text-red-800">
+            Rejected — {quote.approval_note || 'No reason given'}. Revise the discount and resubmit.
+          </p>
+        </div>
+      )}
 
       {/* Contact */}
       {quote.contacts && (
@@ -139,11 +238,19 @@ export default async function QuoteDetailPage({ params }: Props) {
         </table>
         <div className="border-t border-gray-100 px-6 py-4">
           <div className="flex justify-end">
-            <div className="w-48 space-y-1">
+            <div className="w-56 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
                 <span>${Number(quote.subtotal).toFixed(2)}</span>
               </div>
+              {Number(quote.discount_pct ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-600">Discount ({Number(quote.discount_pct)}%)</span>
+                  <span className="text-amber-600">
+                    -${Number(quote.discount_amount ?? 0).toFixed(2)}
+                  </span>
+                </div>
+              )}
               {Number(quote.tax_rate) > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Tax ({quote.tax_rate}%)</span>

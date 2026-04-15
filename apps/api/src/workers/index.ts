@@ -7,6 +7,7 @@ import { createAppointmentReminderWorker } from './appointment-reminder-worker.j
 import { createFollowUpCadenceWorker } from './follow-up-cadence-worker.js'
 import { createDataRetentionWorker } from './data-retention-worker.js'
 import { createQuoteExpiryWorker } from './quote-expiry-worker.js'
+import { createQuoteFollowupWorker } from './quote-followup-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -97,6 +98,11 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'data-retention', ...retentionWorker })
   console.info('[workers] data-retention started, repeating weekly')
+
+  // 9. Quote follow-up — processes one-shot delayed jobs (48h after send)
+  const quoteFollowup = createQuoteFollowupWorker()
+  managed.push({ name: 'quote-followup', ...quoteFollowup })
+  console.info('[workers] quote-followup worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

@@ -21,6 +21,7 @@ import quotesRouter from './routes/quotes.js'
 import analyticsEventsRouter from './routes/analytics-events.js'
 import locationsRouter from './routes/locations.js'
 import npsRouter from './routes/nps.js'
+import cpqSettingsRouter from './routes/cpq-settings.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -74,6 +75,7 @@ app.use('/api/quotes', quotesRouter)
 app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/nps', npsRouter)
+app.use('/api/cpq', cpqSettingsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Phase 1 build in progress' })

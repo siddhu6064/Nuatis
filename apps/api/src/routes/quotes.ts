@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
@@ -8,6 +8,7 @@ import { sendPushNotification } from '../lib/push-client.js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
 import { generateQuotePdf } from '../services/pdf-generator.js'
 import { API_BASE_URL } from '../config/urls.js'
+import { getFollowupQueue } from '../workers/quote-followup-worker.js'
 
 const router = Router()
 
@@ -49,11 +50,32 @@ interface LineItemInput {
   unit_price: number
 }
 
-function calcTotals(items: LineItemInput[], taxRate: number) {
+function calcTotals(items: LineItemInput[], taxRate: number, discountAmount = 0) {
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0)
-  const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2))
-  const total = Number((subtotal + taxAmount).toFixed(2))
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount)
+  const taxAmount = Number(((discountedSubtotal * taxRate) / 100).toFixed(2))
+  const total = Number((discountedSubtotal + taxAmount).toFixed(2))
   return { subtotal: Number(subtotal.toFixed(2)), taxAmount, total }
+}
+
+interface CpqSettings {
+  max_discount_pct: number
+  require_approval_above: number
+  deposit_pct: number
+}
+
+const DEFAULT_CPQ: CpqSettings = {
+  max_discount_pct: 20,
+  require_approval_above: 15,
+  deposit_pct: 50,
+}
+
+async function getCpqSettings(
+  supabase: ReturnType<typeof getSupabase>,
+  tenantId: string
+): Promise<CpqSettings> {
+  const { data } = await supabase.from('tenants').select('cpq_settings').eq('id', tenantId).single()
+  return { ...DEFAULT_CPQ, ...(data?.cpq_settings as Partial<CpqSettings> | null) }
 }
 
 // ── GET /api/quotes ──────────────────────────────────────────────────────────
@@ -135,7 +157,24 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
   const taxRate = typeof b['tax_rate'] === 'number' ? b['tax_rate'] : 0
   const validDays = typeof b['valid_days'] === 'number' ? b['valid_days'] : 30
-  const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate)
+
+  // Discount validation
+  const discountPct = typeof b['discount_pct'] === 'number' ? b['discount_pct'] : 0
+  const discountAmountRaw = typeof b['discount_amount'] === 'number' ? b['discount_amount'] : 0
+
+  let approvalStatus: string | null = null
+  if (discountPct > 0) {
+    const cpq = await getCpqSettings(supabase, authed.tenantId)
+    if (discountPct > cpq.max_discount_pct) {
+      res.status(400).json({ error: `Discount exceeds maximum allowed (${cpq.max_discount_pct}%)` })
+      return
+    }
+    if (discountPct > cpq.require_approval_above) {
+      approvalStatus = 'pending'
+    }
+  }
+
+  const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate, discountAmountRaw)
 
   const quoteNumber = await nextQuoteNumber(supabase, authed.tenantId)
   const shareToken = randomUUID()
@@ -152,6 +191,9 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       tax_rate: taxRate,
       tax_amount: taxAmount,
       total,
+      discount_pct: discountPct,
+      discount_amount: discountAmountRaw,
+      approval_status: approvalStatus,
       notes: (b['notes'] as string) || null,
       valid_until: new Date(Date.now() + validDays * 86400000).toISOString(),
       share_token: shareToken,
@@ -176,6 +218,51 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   }))
 
   const { data: items } = await supabase.from('quote_line_items').insert(itemRows).select('*')
+
+  // Notify if approval is needed
+  if (approvalStatus === 'pending') {
+    void sendPushNotification(authed.tenantId, {
+      title: 'Quote Approval Needed',
+      body: `Quote ${quoteNumber} has a ${discountPct}% discount ($${Number(total).toFixed(2)}). Tap to review.`,
+      url: `/quotes/${quote.id}`,
+    })
+
+    // Send approval email to owner
+    void (async () => {
+      try {
+        const { data: ownerUser } = await supabase
+          .from('users')
+          .select('email')
+          .eq('tenant_id', authed.tenantId)
+          .eq('role', 'owner')
+          .maybeSingle()
+        if (ownerUser?.email) {
+          const { data: tn } = await supabase
+            .from('tenants')
+            .select('name')
+            .eq('id', authed.tenantId)
+            .single()
+          await sendEmail({
+            to: ownerUser.email,
+            subject: `Quote Approval Required — ${quoteNumber}`,
+            html: quoteApprovalEmailHtml({
+              quoteNumber,
+              title,
+              contactName: '',
+              subtotal: `$${Number(subtotal).toFixed(2)}`,
+              discountPct: String(discountPct),
+              discountAmount: `$${Number(discountAmountRaw).toFixed(2)}`,
+              total: `$${Number(total).toFixed(2)}`,
+              quoteUrl: `${process.env['WEB_URL'] ?? 'http://localhost:3000'}/quotes/${quote.id}`,
+              businessName: tn?.name ?? '',
+            }),
+          })
+        }
+      } catch (err) {
+        console.error('[quotes] approval email error:', err)
+      }
+    })()
+  }
 
   res.status(201).json({ ...quote, line_items: items ?? [] })
 })
@@ -209,12 +296,40 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (typeof b['tax_rate'] === 'number') updates['tax_rate'] = b['tax_rate']
   if (typeof b['valid_until'] === 'string') updates['valid_until'] = b['valid_until']
 
+  // Discount validation on update
+  const discountPct = typeof b['discount_pct'] === 'number' ? b['discount_pct'] : undefined
+  const discountAmountVal =
+    typeof b['discount_amount'] === 'number' ? b['discount_amount'] : undefined
+
+  if (discountPct !== undefined) {
+    updates['discount_pct'] = discountPct
+    if (discountPct > 0) {
+      const cpq = await getCpqSettings(supabase, authed.tenantId)
+      if (discountPct > cpq.max_discount_pct) {
+        res
+          .status(400)
+          .json({ error: `Discount exceeds maximum allowed (${cpq.max_discount_pct}%)` })
+        return
+      }
+      // Reset approval if discount increases above threshold
+      if (discountPct > cpq.require_approval_above) {
+        updates['approval_status'] = 'pending'
+      } else {
+        updates['approval_status'] = null
+      }
+    } else {
+      updates['approval_status'] = null
+    }
+  }
+  if (discountAmountVal !== undefined) updates['discount_amount'] = discountAmountVal
+
   // Replace line items if provided
   if (Array.isArray(b['line_items'])) {
     const lineItems = b['line_items'] as LineItemInput[]
     const taxRate =
       (updates['tax_rate'] as number) ?? (typeof b['tax_rate'] === 'number' ? b['tax_rate'] : 0)
-    const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate)
+    const da = (discountAmountVal ?? 0) as number
+    const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate, da)
     updates['subtotal'] = subtotal
     updates['tax_amount'] = taxAmount
     updates['total'] = total
@@ -280,6 +395,19 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
 
   if (!quote) {
     res.status(404).json({ error: 'Quote not found' })
+    return
+  }
+
+  // Block sending if approval is pending or rejected
+  if (quote.approval_status === 'pending') {
+    const cpq = await getCpqSettings(supabase, authed.tenantId)
+    res.status(403).json({
+      error: `Quote requires approval before sending. Discount of ${quote.discount_pct}% exceeds the ${cpq.require_approval_above}% approval threshold.`,
+    })
+    return
+  }
+  if (quote.approval_status === 'rejected') {
+    res.status(403).json({ error: 'Quote was rejected. Revise the discount and resubmit.' })
     return
   }
 
@@ -366,6 +494,33 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
     quote_number: quote.quote_number,
     contact_id: quote.contact_id,
   })
+
+  // Enqueue 48h follow-up job for unopened quotes
+  if (contact?.phone) {
+    try {
+      const queue = getFollowupQueue()
+      const job = await queue.add(
+        'unopened-followup',
+        {
+          quoteId: quote.id,
+          tenantId: authed.tenantId,
+          contactPhone: contact.phone,
+          contactName: contactName,
+          quoteNumber: quote.quote_number,
+          shareToken: quote.share_token,
+        },
+        {
+          delay: 48 * 60 * 60 * 1000, // 48 hours
+          removeOnComplete: true,
+          removeOnFail: true,
+        }
+      )
+      await supabase.from('quotes').update({ followup_job_id: job.id }).eq('id', quote.id)
+      console.info(`[quotes] enqueued 48h follow-up job=${job.id} for quote=${quote.quote_number}`)
+    } catch (err) {
+      console.error('[quotes] failed to enqueue follow-up job:', err)
+    }
+  }
 
   res.json({ sent: true, share_url: shareUrl })
 })
@@ -543,9 +698,51 @@ router.get('/view/:token', async (req: Request, res: Response): Promise<void> =>
     return
   }
 
-  // Mark as viewed
+  // Mark as viewed on first view + cancel follow-up job
   if (quote.status === 'sent') {
     await supabase.from('quotes').update({ status: 'viewed' }).eq('id', quote.id)
+
+    // Cancel 48h follow-up job if it exists
+    if (quote.followup_job_id) {
+      try {
+        const queue = getFollowupQueue()
+        const job = await queue.getJob(quote.followup_job_id)
+        if (job) await job.remove()
+        console.info(`[quotes] cancelled follow-up job — quote viewed`)
+      } catch (err) {
+        console.error('[quotes] failed to cancel follow-up job:', err)
+      }
+    }
+  }
+
+  // Track view (fire-and-forget)
+  try {
+    const rawIp = req.ip || req.socket.remoteAddress || ''
+    const ipHash = createHash('sha256').update(rawIp).digest('hex')
+    const userAgent = req.headers['user-agent'] || null
+
+    // Dedup: skip if same ip_hash viewed same quote within 10 minutes
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const { data: existing } = await supabase
+      .from('quote_views')
+      .select('id')
+      .eq('quote_id', quote.id)
+      .eq('ip_hash', ipHash)
+      .gte('viewed_at', tenMinAgo)
+      .limit(1)
+      .maybeSingle()
+
+    if (!existing) {
+      await supabase.from('quote_views').insert({
+        quote_id: quote.id,
+        tenant_id: quote.tenant_id,
+        ip_hash: ipHash,
+        user_agent: userAgent,
+      })
+      console.info(`[quotes] view tracked for quote=${quote.id}`)
+    }
+  } catch (err) {
+    console.error('[quotes] view tracking error:', err)
   }
 
   const { data: items } = await supabase
@@ -593,7 +790,7 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
 
   const { data: quote } = await supabase
     .from('quotes')
-    .select('id, tenant_id, contact_id, quote_number, total')
+    .select('id, tenant_id, contact_id, quote_number, total, followup_job_id')
     .eq('share_token', req.params['token'])
     .single()
 
@@ -606,6 +803,18 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
     .from('quotes')
     .update({ status: 'accepted', accepted_at: new Date().toISOString() })
     .eq('id', quote.id)
+
+  // Cancel 48h follow-up job if it exists
+  if (quote.followup_job_id) {
+    try {
+      const queue = getFollowupQueue()
+      const job = await queue.getJob(quote.followup_job_id)
+      if (job) await job.remove()
+      console.info(`[quotes] cancelled follow-up job — quote accepted`)
+    } catch (err) {
+      console.error('[quotes] failed to cancel follow-up job:', err)
+    }
+  }
 
   // Look up contact name
   let contactName = 'Customer'
@@ -673,7 +882,7 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
 
   const { data: quote } = await supabase
     .from('quotes')
-    .select('id, tenant_id, quote_number, contact_id')
+    .select('id, tenant_id, quote_number, contact_id, followup_job_id')
     .eq('share_token', req.params['token'])
     .single()
 
@@ -686,6 +895,18 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
     .from('quotes')
     .update({ status: 'declined', declined_at: new Date().toISOString() })
     .eq('id', quote.id)
+
+  // Cancel 48h follow-up job if it exists
+  if (quote.followup_job_id) {
+    try {
+      const queue = getFollowupQueue()
+      const job = await queue.getJob(quote.followup_job_id)
+      if (job) await job.remove()
+      console.info(`[quotes] cancelled follow-up job — quote declined`)
+    } catch (err) {
+      console.error('[quotes] failed to cancel follow-up job:', err)
+    }
+  }
 
   let contactName = 'Customer'
   if (quote.contact_id) {
@@ -720,6 +941,101 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
   res.json({ declined: true })
 })
 
+// ── POST /api/quotes/:id/approve ─────────────────────────────────────────────
+router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('id, quote_number, approval_status, discount_pct, created_by')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single()
+
+  if (!quote) {
+    res.status(404).json({ error: 'Quote not found' })
+    return
+  }
+  if (quote.approval_status !== 'pending') {
+    res.status(400).json({ error: 'Quote is not pending approval' })
+    return
+  }
+
+  const note = typeof req.body?.note === 'string' ? req.body.note : null
+
+  await supabase
+    .from('quotes')
+    .update({
+      approval_status: 'approved',
+      approved_by: authed.userId,
+      approved_at: new Date().toISOString(),
+      approval_note: note,
+    })
+    .eq('id', quote.id)
+
+  void sendPushNotification(authed.tenantId, {
+    title: 'Quote Approved',
+    body: `Quote ${quote.quote_number} has been approved. You can now send it.`,
+    url: `/quotes/${quote.id}`,
+  })
+
+  void logAuditEvent({
+    tenantId: authed.tenantId,
+    action: 'quote_approved',
+    resourceType: 'quotes',
+    resourceId: quote.id,
+    details: { discount_pct: quote.discount_pct, note },
+  })
+
+  res.json({ approved: true, quote_number: quote.quote_number })
+})
+
+// ── POST /api/quotes/:id/reject ─────────────────────────────────────────────
+router.post('/:id/reject', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('id, quote_number, approval_status, discount_pct')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single()
+
+  if (!quote) {
+    res.status(404).json({ error: 'Quote not found' })
+    return
+  }
+  if (quote.approval_status !== 'pending') {
+    res.status(400).json({ error: 'Quote is not pending approval' })
+    return
+  }
+
+  const note = typeof req.body?.note === 'string' ? req.body.note : null
+
+  await supabase
+    .from('quotes')
+    .update({ approval_status: 'rejected', approval_note: note })
+    .eq('id', quote.id)
+
+  void sendPushNotification(authed.tenantId, {
+    title: 'Quote Rejected',
+    body: `Quote ${quote.quote_number} was rejected: ${note || 'No reason given'}`,
+    url: `/quotes/${quote.id}`,
+  })
+
+  void logAuditEvent({
+    tenantId: authed.tenantId,
+    action: 'quote_rejected',
+    resourceType: 'quotes',
+    resourceId: quote.id,
+    details: { discount_pct: quote.discount_pct, note },
+  })
+
+  res.json({ rejected: true, quote_number: quote.quote_number })
+})
+
 // ── Quote email HTML helper ──────────────────────────────────────────────────
 function quoteEmailHtml(vars: {
   contactName: string
@@ -744,6 +1060,47 @@ h1{font-size:20px;color:#111;margin:0 0 16px}p{font-size:15px;color:#444;line-he
 <div class="total">${vars.quoteTotal}</div>
 ${vars.validUntil ? `<p style="font-size:13px;color:#999">Valid until ${vars.validUntil}</p>` : ''}
 <p style="margin-top:24px"><a class="btn" href="${vars.quoteUrl}">View Quote</a></p>
+</div><div class="footer">${vars.businessName}</div></div></body></html>`
+}
+
+// ── Quote approval email HTML helper ────────────────────────────────────────
+function quoteApprovalEmailHtml(vars: {
+  quoteNumber: string
+  title: string
+  contactName: string
+  subtotal: string
+  discountPct: string
+  discountAmount: string
+  total: string
+  quoteUrl: string
+  businessName: string
+}): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;background:#f5f5f5}
+.c{max-width:560px;margin:0 auto;padding:32px 24px}.card{background:#fff;border-radius:12px;padding:32px;border:1px solid #e5e5e5}
+h1{font-size:20px;color:#111;margin:0 0 16px}p{font-size:15px;color:#444;line-height:1.6;margin:0 0 12px}
+.discount{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin:16px 0}
+.discount strong{color:#d97706}
+.total{font-size:24px;font-weight:700;color:#0d9488;margin:12px 0}
+.btn{display:inline-block;padding:14px 28px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px}
+.footer{text-align:center;padding:16px;font-size:12px;color:#999}
+table{width:100%;border-collapse:collapse;margin:12px 0}td{padding:6px 0;font-size:14px;color:#444}
+td:last-child{text-align:right}</style>
+</head><body><div class="c"><div class="card">
+<h1>Quote Approval Required</h1>
+<p>A quote needs your approval before it can be sent.</p>
+<table>
+<tr><td style="color:#999">Quote</td><td><strong>${vars.quoteNumber}</strong></td></tr>
+<tr><td style="color:#999">Title</td><td>${vars.title}</td></tr>
+${vars.contactName ? `<tr><td style="color:#999">Contact</td><td>${vars.contactName}</td></tr>` : ''}
+<tr><td style="color:#999">Subtotal</td><td>${vars.subtotal}</td></tr>
+</table>
+<div class="discount">
+<strong>${vars.discountPct}% discount applied</strong> &mdash; ${vars.discountAmount} off
+</div>
+<div class="total">${vars.total}</div>
+<p style="margin-top:24px"><a class="btn" href="${vars.quoteUrl}">Review This Quote</a></p>
 </div><div class="footer">${vars.businessName}</div></div></body></html>`
 }
 
