@@ -19,7 +19,15 @@ const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
   { href: '/inbox', label: 'Inbox', icon: '◻', suiteOnly: true },
   { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true, requireModule: 'crm' },
+  {
+    href: '/companies',
+    label: 'Companies',
+    icon: '◧',
+    suiteOnly: true,
+    requireModule: 'companies',
+  },
   { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true, requireModule: 'pipeline' },
+  { href: '/deals', label: 'Deals', icon: '◆', suiteOnly: true, requireModule: 'deals' },
   {
     href: '/appointments',
     label: 'Appointments',

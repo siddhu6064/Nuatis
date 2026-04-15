@@ -7,6 +7,7 @@ import ContactTasks from '@/components/contacts/ContactTasks'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
 import FileAttachments from '@/components/contacts/FileAttachments'
 import SmsThread from '@/components/contacts/SmsThread'
+import ContactDeals from '@/components/contacts/ContactDeals'
 
 type Tab = 'activity' | 'messages' | 'files'
 
@@ -185,6 +186,11 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       {/* Tasks */}
       <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
         <ContactTasks contactId={contactId} />
+      </div>
+
+      {/* Deals */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+        <ContactDeals contactId={contactId} />
       </div>
 
       {/* Tabs */}

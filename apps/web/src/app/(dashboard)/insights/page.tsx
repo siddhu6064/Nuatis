@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import InsightsDashboard from './InsightsDashboard'
 import ReferralInsights from '@/components/insights/ReferralInsights'
+import DealsForecast from '@/components/insights/DealsForecast'
 
 export default async function InsightsPage() {
   const session = await auth()
@@ -78,6 +79,7 @@ export default async function InsightsPage() {
         vertical={vertical}
       />
       <ReferralInsights />
+      <DealsForecast />
     </div>
   )
 }

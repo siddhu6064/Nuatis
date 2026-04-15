@@ -714,4 +714,82 @@ router.get('/referrals', requireAuth, async (req: Request, res: Response): Promi
   }
 })
 
+// ── GET /api/insights/deals ───────────────────────────────────────────────────
+router.get('/deals', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Safe to call even if deals module disabled — return zeros
+    const { data: allDeals } = await supabase
+      .from('deals')
+      .select(
+        'id, value, probability, pipeline_stage_id, is_closed_won, is_closed_lost, is_archived, created_at, pipeline_stages(name, color)'
+      )
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+
+    const deals = allDeals ?? []
+    const openDeals = deals.filter((d) => !d.is_closed_won && !d.is_closed_lost)
+
+    const totalPipelineValue = openDeals.reduce((s, d) => s + Number(d.value ?? 0), 0)
+    const weightedPipelineValue = openDeals.reduce(
+      (s, d) => s + (Number(d.value ?? 0) * Number(d.probability ?? 50)) / 100,
+      0
+    )
+
+    // Deals by stage
+    const stageMap = new Map<
+      string,
+      { stage_name: string; stage_color: string; count: number; total_value: number }
+    >()
+    for (const d of openDeals) {
+      const rawStage = d.pipeline_stages
+      const stage = (Array.isArray(rawStage) ? rawStage[0] : rawStage) as {
+        name: string
+        color: string
+      } | null
+      const name = stage?.name ?? 'Unknown'
+      const color = stage?.color ?? '#9ca3af'
+      const existing = stageMap.get(name) ?? {
+        stage_name: name,
+        stage_color: color,
+        count: 0,
+        total_value: 0,
+      }
+      existing.count++
+      existing.total_value += Number(d.value ?? 0)
+      stageMap.set(name, existing)
+    }
+
+    // Won/lost this month
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const wonThisMonth = deals.filter((d) => d.is_closed_won && d.created_at >= monthStart)
+    const lostThisMonth = deals.filter((d) => d.is_closed_lost && d.created_at >= monthStart)
+
+    const avgDealValue = openDeals.length > 0 ? totalPipelineValue / openDeals.length : 0
+    const avgProbability =
+      openDeals.length > 0
+        ? openDeals.reduce((s, d) => s + Number(d.probability ?? 50), 0) / openDeals.length
+        : 0
+
+    res.json({
+      total_pipeline_value: Math.round(totalPipelineValue * 100) / 100,
+      weighted_pipeline_value: Math.round(weightedPipelineValue * 100) / 100,
+      deals_by_stage: [...stageMap.values()],
+      won_this_month: {
+        count: wonThisMonth.length,
+        value: wonThisMonth.reduce((s, d) => s + Number(d.value ?? 0), 0),
+      },
+      lost_this_month: { count: lostThisMonth.length },
+      avg_deal_value: Math.round(avgDealValue * 100) / 100,
+      avg_close_probability: Math.round(avgProbability),
+    })
+  } catch (err) {
+    console.error('[insights] deals error:', err)
+    res.status(500).json({ error: 'Failed to fetch deal insights' })
+  }
+})
+
 export default router

@@ -32,6 +32,8 @@ import savedViewsRouter from './routes/saved-views.js'
 import importRouter from './routes/import.js'
 import attachmentsRouter from './routes/attachments.js'
 import smsRouter from './routes/sms.js'
+import companiesRouter from './routes/companies.js'
+import dealsRouter from './routes/deals.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -96,6 +98,8 @@ app.use('/api/views', savedViewsRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', attachmentsRouter)
 app.use('/api', smsRouter)
+app.use('/api/companies', companiesRouter)
+app.use('/api/deals', dealsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
