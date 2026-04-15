@@ -1,0 +1,265 @@
+import { createClient } from '@supabase/supabase-js'
+import { getCalendarClient } from '../services/google.js'
+
+// ── Exported interfaces ───────────────────────────────────────────────────────
+
+export interface TimeSlot {
+  start: string
+  end: string
+}
+
+export interface CalendarCredentials {
+  refreshToken: string
+  calendarId: string
+  timezone: string
+}
+
+// ── Supabase helper ───────────────────────────────────────────────────────────
+
+function getSupabase() {
+  const url = process.env['SUPABASE_URL']
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+  if (!url || !key) throw new Error('Supabase env vars not set')
+  return createClient(url, key)
+}
+
+// ── Business hours defaults ───────────────────────────────────────────────────
+
+const DEFAULT_HOURS: Record<string, string> = {
+  mon: '9am-5pm',
+  tue: '9am-5pm',
+  wed: '9am-5pm',
+  thu: '9am-5pm',
+  fri: '9am-5pm',
+  sat: 'closed',
+  sun: 'closed',
+}
+
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+/** Parse a range string like "9am-5pm" → { open: 9, close: 17 }, or null if "closed" */
+function parseHoursRange(range: string): { open: number; close: number } | null {
+  const s = range.trim().toLowerCase()
+  if (s === 'closed') return null
+  const m = s.match(/^(\d{1,2})(am|pm)-(\d{1,2})(am|pm)$/)
+  if (!m) return null
+  let open = parseInt(m[1]!, 10)
+  if (m[2]! === 'pm' && open !== 12) open += 12
+  if (m[2]! === 'am' && open === 12) open = 0
+  let close = parseInt(m[3]!, 10)
+  if (m[4]! === 'pm' && close !== 12) close += 12
+  if (m[4]! === 'am' && close === 12) close = 0
+  return { open, close }
+}
+
+/** Return business hours for a YYYY-MM-DD date string using DEFAULT_HOURS */
+function getHoursForDateStr(dateStr: string): { open: number; close: number } | null {
+  // Use noon UTC so day-of-week is unambiguous
+  const d = new Date(`${dateStr}T12:00:00Z`)
+  const dayKey = DAY_KEYS[d.getUTCDay()]!
+  return parseHoursRange(DEFAULT_HOURS[dayKey] ?? 'closed')
+}
+
+// ── Time conversion helpers ───────────────────────────────────────────────────
+
+/**
+ * Build the UTC ISO instant where the wall-clock time in `tz` equals `hour:minute` on `dateStr`.
+ */
+function dateAtHour(dateStr: string, hour: number, minute: number, tz: string): string {
+  // Start with an UTC guess treating the local wall-clock time as if it were UTC
+  const utcGuess = new Date(
+    `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`
+  )
+  // Find what local time that UTC instant maps to in `tz`
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(utcGuess)
+  const getPart = (t: string) => parts.find((p) => p.type === t)?.value ?? '0'
+  const localHour = parseInt(getPart('hour'), 10)
+  const localMinute = parseInt(getPart('minute'), 10)
+  // offsetMinutes = local - utc (so we can back-solve for the correct UTC instant)
+  const offsetMinutes =
+    localHour * 60 + localMinute - (utcGuess.getUTCHours() * 60 + utcGuess.getUTCMinutes())
+  return new Date(utcGuess.getTime() - offsetMinutes * 60_000).toISOString()
+}
+
+/** Format a Date as "HH:MM" in the given IANA timezone */
+function formatHHMM(d: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
+  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
+  return `${h}:${m}`
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch Google Calendar credentials and tenant timezone.
+ * Returns null when no calendar is connected for this tenant.
+ */
+export async function getTenantCalendarCredentials(
+  tenantId: string
+): Promise<CalendarCredentials | null> {
+  const supabase = getSupabase()
+
+  const [locationResult, tenantResult] = await Promise.all([
+    supabase
+      .from('locations')
+      .select('google_refresh_token, google_calendar_id')
+      .eq('tenant_id', tenantId)
+      .eq('is_primary', true)
+      .maybeSingle(),
+    supabase.from('tenants').select('timezone').eq('id', tenantId).maybeSingle(),
+  ])
+
+  const location = locationResult.data
+  if (!location?.google_refresh_token) return null
+
+  const timezone: string =
+    (tenantResult.data as { timezone?: string } | null)?.timezone ?? 'America/Chicago'
+
+  return {
+    refreshToken: location.google_refresh_token as string,
+    calendarId: (location.google_calendar_id as string | null) ?? 'primary',
+    timezone,
+  }
+}
+
+/**
+ * Return all available time slots for a given date.
+ *
+ * Business hours default to Mon-Fri 9am-5pm, Sat-Sun closed.
+ * Slots are generated by stepping through the business-hours window in increments
+ * of (durationMinutes + bufferMinutes), then filtered against Google Calendar FreeBusy.
+ */
+export async function getAvailableSlotsForDate(
+  creds: CalendarCredentials,
+  date: string,
+  durationMinutes: number,
+  bufferMinutes = 0
+): Promise<{ slots: TimeSlot[]; closed: boolean }> {
+  const hoursWindow = getHoursForDateStr(date)
+
+  if (!hoursWindow) {
+    return { slots: [], closed: true }
+  }
+
+  const { refreshToken, calendarId, timezone } = creds
+  const timeMin = dateAtHour(date, hoursWindow.open, 0, timezone)
+  const timeMax = dateAtHour(date, hoursWindow.close, 0, timezone)
+
+  // Query FreeBusy
+  const calendar = getCalendarClient(refreshToken)
+  const freeBusy = await calendar.freebusy.query({
+    requestBody: {
+      timeMin,
+      timeMax,
+      items: [{ id: calendarId }],
+    },
+  })
+
+  const busy = freeBusy.data.calendars?.[calendarId]?.busy ?? []
+  const busyPeriods = busy.map((b) => ({
+    start: new Date(b.start ?? ''),
+    end: new Date(b.end ?? ''),
+  }))
+
+  // Generate slots
+  const slots: TimeSlot[] = []
+  const windowStart = new Date(timeMin)
+  const windowEnd = new Date(timeMax)
+  const stepMs = (durationMinutes + bufferMinutes) * 60_000
+  const slotMs = durationMinutes * 60_000
+
+  let cursor = windowStart.getTime()
+  while (cursor + slotMs <= windowEnd.getTime()) {
+    const slotStart = new Date(cursor)
+    const slotEnd = new Date(cursor + slotMs)
+
+    const conflict = busyPeriods.some((b) => slotStart < b.end && slotEnd > b.start)
+    if (!conflict) {
+      slots.push({
+        start: formatHHMM(slotStart, timezone),
+        end: formatHHMM(slotEnd, timezone),
+      })
+    }
+
+    cursor += stepMs
+  }
+
+  return { slots, closed: false }
+}
+
+/**
+ * Check whether a specific time slot is free (no Google Calendar conflicts).
+ * Useful for double-booking prevention immediately before creating an event.
+ */
+export async function isSlotAvailable(
+  creds: CalendarCredentials,
+  date: string,
+  startTime: string,
+  durationMinutes: number
+): Promise<boolean> {
+  const { refreshToken, calendarId, timezone } = creds
+
+  const [hStr, mStr] = startTime.split(':')
+  const startIso = dateAtHour(date, parseInt(hStr!, 10), parseInt(mStr ?? '0', 10), timezone)
+  const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
+
+  const calendar = getCalendarClient(refreshToken)
+  const freeBusy = await calendar.freebusy.query({
+    requestBody: {
+      timeMin: startIso,
+      timeMax: endIso,
+      items: [{ id: calendarId }],
+    },
+  })
+
+  const busy = freeBusy.data.calendars?.[calendarId]?.busy ?? []
+  return busy.length === 0
+}
+
+/**
+ * Create a Google Calendar event and return the event ID plus computed ISO timestamps.
+ */
+export async function createCalendarEvent(
+  creds: CalendarCredentials,
+  date: string,
+  startTime: string,
+  durationMinutes: number,
+  title: string,
+  description: string
+): Promise<{ googleEventId: string; startIso: string; endIso: string }> {
+  const { refreshToken, calendarId, timezone } = creds
+
+  const [hStr, mStr] = startTime.split(':')
+  const startIso = dateAtHour(date, parseInt(hStr!, 10), parseInt(mStr ?? '0', 10), timezone)
+  const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
+
+  const calendar = getCalendarClient(refreshToken)
+  const event = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary: title,
+      description,
+      start: { dateTime: startIso, timeZone: timezone },
+      end: { dateTime: endIso, timeZone: timezone },
+    },
+  })
+
+  const googleEventId = event.data.id ?? ''
+  return { googleEventId, startIso, endIso }
+}
