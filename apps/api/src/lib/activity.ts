@@ -10,6 +10,8 @@ type ActivityType =
   | 'stage_change'
   | 'task'
   | 'system'
+  | 'lead_score'
+  | 'lifecycle_change'
 
 type ActorType = 'ai' | 'user' | 'system' | 'contact'
 
