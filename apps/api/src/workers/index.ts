@@ -10,6 +10,11 @@ import { createQuoteExpiryWorker } from './quote-expiry-worker.js'
 import { createQuoteFollowupWorker } from './quote-followup-worker.js'
 import { createTaskReminderWorker } from './task-reminder-worker.js'
 import { createCsvImportWorker } from './csv-import-worker.js'
+import {
+  createLeadScoreComputeWorker,
+  createLeadScoreBulkWorker,
+  createLeadScoreDecayWorker,
+} from './lead-score-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -115,6 +120,38 @@ export async function startWorkers(): Promise<void> {
   const csvImport = createCsvImportWorker()
   managed.push({ name: 'csv-import', ...csvImport })
   console.info('[workers] csv-import worker started')
+
+  // 12. Lead score compute — processes individual contact score jobs (on-demand)
+  const leadScoreCompute = createLeadScoreComputeWorker()
+  managed.push({
+    name: 'lead-score-compute',
+    queue: leadScoreCompute.queues[0],
+    worker: leadScoreCompute.workers[0],
+  })
+  console.info('[workers] lead-score-compute worker started')
+
+  // 13. Lead score bulk — processes per-tenant bulk recompute jobs (on-demand)
+  const leadScoreBulk = createLeadScoreBulkWorker()
+  managed.push({
+    name: 'lead-score-bulk',
+    queue: leadScoreBulk.queues[0],
+    worker: leadScoreBulk.workers[0],
+  })
+  console.info('[workers] lead-score-bulk worker started')
+
+  // 14. Lead score decay — every 24 hours
+  const leadScoreDecay = createLeadScoreDecayWorker()
+  await leadScoreDecay.queues[0].add(
+    'decay',
+    {},
+    { repeat: { every: 86400000 }, jobId: 'lead-score-decay-repeat' }
+  )
+  managed.push({
+    name: 'lead-score-decay',
+    queue: leadScoreDecay.queues[0],
+    worker: leadScoreDecay.workers[0],
+  })
+  console.info('[workers] lead-score-decay started, repeating every 24h')
 }
 
 export async function stopWorkers(): Promise<void> {

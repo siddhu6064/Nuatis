@@ -10,6 +10,7 @@ import {
   sendViaOutlook,
 } from '../lib/email-send.js'
 import { logActivity } from '../lib/activity.js'
+import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 
 const router = Router()
 
@@ -489,6 +490,8 @@ router.post('/send/:contactId', requireAuth, async (req: Request, res: Response)
       actorType: 'user',
       actorId: authed.userId,
     })
+
+    enqueueScoreCompute(authed.tenantId, contactId, 'email_sent')
 
     res.json({ success: true, messageId: inserted?.id ?? null })
   } catch (err) {

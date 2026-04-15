@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { logActivity } from '../lib/activity.js'
+import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 
 const router = Router()
 
@@ -73,6 +74,8 @@ router.get('/:token', async (req: Request, res: Response): Promise<void> => {
         },
         actorType: 'contact',
       })
+      if (message.contact_id)
+        enqueueScoreCompute(message.tenant_id, message.contact_id, 'email_opened')
     }
   } catch (err) {
     console.error('[email-tracking] error:', err)

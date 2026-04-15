@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
+import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 
 const router = Router()
 
@@ -25,7 +26,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   let query = supabase
     .from('contacts')
     .select(
-      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at',
+      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at',
       { count: 'exact' }
     )
     .eq('tenant_id', authed.tenantId)
@@ -100,6 +101,35 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const hasReferralSource = req.query['has_referral_source'] === 'true'
   if (hasReferralSource) {
     query = query.not('referral_source_detail', 'is', null)
+  }
+
+  // ── Lifecycle stage filter (multi-select) ──
+  const lifecycleStage =
+    typeof req.query['lifecycle_stage'] === 'string' ? req.query['lifecycle_stage'].trim() : null
+  if (lifecycleStage) {
+    const stages = lifecycleStage.split(',').filter(Boolean)
+    if (stages.length > 0) {
+      query = query.in('lifecycle_stage', stages)
+    }
+  }
+
+  // ── Lead score range filters ──
+  const minScore = typeof req.query['min_score'] === 'string' ? req.query['min_score'] : null
+  const maxScore = typeof req.query['max_score'] === 'string' ? req.query['max_score'] : null
+  if (minScore !== null) {
+    query = query.gte('lead_score', parseInt(minScore, 10))
+  }
+  if (maxScore !== null) {
+    query = query.lte('lead_score', parseInt(maxScore, 10))
+  }
+
+  // ── Lead grade filter (multi-select) ──
+  const gradeParam = typeof req.query['grade'] === 'string' ? req.query['grade'].trim() : null
+  if (gradeParam) {
+    const grades = gradeParam.split(',').filter(Boolean)
+    if (grades.length > 0) {
+      query = query.in('lead_grade', grades)
+    }
   }
 
   // ── Sort ──
@@ -310,6 +340,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     contact.id
   )
 
+  enqueueScoreCompute(authed.tenantId, contact.id, 'contact_created')
+
   res.status(201).json({ ...contact, possible_duplicates: possibleDuplicates })
 })
 
@@ -372,6 +404,8 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (phone || email) {
     possibleDuplicates = await findDuplicates(supabase, authed.tenantId, phone, email, id)
   }
+
+  enqueueScoreCompute(authed.tenantId, req.params['id'], 'contact_updated')
 
   res.json({ ...updated, possible_duplicates: possibleDuplicates })
 })
@@ -915,6 +949,140 @@ router.get('/referral-sources', requireAuth, async (req: Request, res: Response)
 
   const sources = [...new Set((data ?? []).map((r) => r.referral_source_detail as string))].sort()
   res.json({ sources })
+})
+
+const VALID_LIFECYCLE_STAGES = [
+  'subscriber',
+  'lead',
+  'marketing_qualified',
+  'sales_qualified',
+  'opportunity',
+  'customer',
+  'evangelist',
+  'other',
+] as const
+
+// ── PATCH /api/contacts/:id/lifecycle ────────────────────────────────────────
+router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { id } = req.params
+  const b = req.body as Record<string, unknown>
+
+  const newStage = typeof b['lifecycle_stage'] === 'string' ? b['lifecycle_stage'] : null
+  if (
+    !newStage ||
+    !VALID_LIFECYCLE_STAGES.includes(newStage as (typeof VALID_LIFECYCLE_STAGES)[number])
+  ) {
+    res.status(400).json({
+      error: `lifecycle_stage must be one of: ${VALID_LIFECYCLE_STAGES.join(', ')}`,
+    })
+    return
+  }
+
+  // Fetch current lifecycle_stage
+  const { data: existing } = await supabase
+    .from('contacts')
+    .select('id, lifecycle_stage')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .single()
+
+  if (!existing) {
+    res.status(404).json({ error: 'Contact not found' })
+    return
+  }
+
+  const oldStage = existing.lifecycle_stage as string | null
+
+  const { data: updated, error } = await supabase
+    .from('contacts')
+    .update({ lifecycle_stage: newStage, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .select()
+    .single()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: id,
+    type: 'lifecycle_change',
+    body: `Lifecycle stage changed: ${oldStage ?? 'none'} → ${newStage}`,
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
+  res.json(updated)
+})
+
+// ── PATCH /api/contacts/bulk/lifecycle ───────────────────────────────────────
+router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const b = req.body as Record<string, unknown>
+
+  const newStage = typeof b['lifecycle_stage'] === 'string' ? b['lifecycle_stage'] : null
+  if (
+    !newStage ||
+    !VALID_LIFECYCLE_STAGES.includes(newStage as (typeof VALID_LIFECYCLE_STAGES)[number])
+  ) {
+    res.status(400).json({
+      error: `lifecycle_stage must be one of: ${VALID_LIFECYCLE_STAGES.join(', ')}`,
+    })
+    return
+  }
+
+  const contactIds = Array.isArray(b['contactIds']) ? (b['contactIds'] as string[]) : []
+  if (contactIds.length === 0) {
+    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+    return
+  }
+  if (contactIds.length > 500) {
+    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+    return
+  }
+
+  // Fetch current lifecycle stages for all contacts (for activity log)
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, lifecycle_stage')
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  if (!contacts || contacts.length === 0) {
+    res.status(404).json({ error: 'No matching contacts found' })
+    return
+  }
+
+  const { count, error } = await supabase
+    .from('contacts')
+    .update({ lifecycle_stage: newStage, updated_at: new Date().toISOString() })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  for (const c of contacts) {
+    const oldStage = c.lifecycle_stage as string | null
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: c.id,
+      type: 'lifecycle_change',
+      body: `Lifecycle stage changed: ${oldStage ?? 'none'} → ${newStage}`,
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+  }
+
+  res.json({ updated: count ?? contacts.length })
 })
 
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────

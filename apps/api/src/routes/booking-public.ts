@@ -7,6 +7,7 @@ import {
   createCalendarEvent,
 } from '../lib/booking-availability.js'
 import { logActivity } from '../lib/activity.js'
+import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { sendSms } from '../lib/sms.js'
 import { sendPushNotification } from '../lib/push-client.js'
 
@@ -446,6 +447,8 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
     metadata: { appointment_id: appointmentId, service_id: serviceId },
     actorType: 'system',
   })
+
+  if (contactId) enqueueScoreCompute(tenant.id, contactId, 'appointment_booked')
 
   // Send SMS confirmation
   if (telnyxNumber && phone) {

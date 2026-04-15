@@ -1,5 +1,6 @@
 import { createServer } from 'http'
 import express from 'express'
+import { enqueueScoreCompute } from './lib/lead-score-queue.js'
 import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
@@ -41,6 +42,7 @@ import bccLoggingRouter, { emailInboundWebhookRouter } from './routes/email-inbo
 import bookingPublicRouter from './routes/booking-public.js'
 import bookingSettingsRouter from './routes/booking-settings.js'
 import intakeFormsRouter from './routes/intake-forms.js'
+import leadScoringRouter from './routes/lead-scoring.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -115,6 +117,7 @@ app.use('/api/webhooks/email-inbound', emailInboundWebhookRouter)
 app.use('/api/booking', bookingPublicRouter)
 app.use('/api/settings/booking', bookingSettingsRouter)
 app.use('/api/intake-forms', intakeFormsRouter)
+app.use('/api/lead-scoring', leadScoringRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
@@ -450,6 +453,7 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
       body: `SMS received: "${body.slice(0, 80)}${body.length > 80 ? '...' : ''}"`,
       actorType: 'contact',
     })
+    enqueueScoreCompute(tenantId, contactId, 'sms_inbound')
   }
 
   // Push notification

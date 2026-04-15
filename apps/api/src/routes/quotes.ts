@@ -11,6 +11,8 @@ import { API_BASE_URL } from '../config/urls.js'
 import { getFollowupQueue } from '../workers/quote-followup-worker.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
+import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
+import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -938,6 +940,11 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
     actorType: 'contact',
   })
 
+  if (quote.contact_id) {
+    enqueueScoreCompute(quote.tenant_id, quote.contact_id, 'quote_accepted')
+    maybeAdvanceLifecycle(quote.tenant_id, quote.contact_id, 'opportunity')
+  }
+
   res.json({ accepted: true })
 })
 
@@ -1012,6 +1019,8 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
     metadata: { quote_id: quote.id, status: 'declined', reason },
     actorType: 'contact',
   })
+
+  if (quote.contact_id) enqueueScoreCompute(quote.tenant_id, quote.contact_id, 'quote_declined')
 
   res.json({ declined: true })
 })
