@@ -16,6 +16,7 @@ export interface FilterState {
   has_referral_source: boolean
   lifecycle_stage: string[]
   grade: string[]
+  assigned_to: string
   sort_by: string
   sort_dir: string
 }
@@ -34,6 +35,7 @@ export const EMPTY_FILTERS: FilterState = {
   has_referral_source: false,
   lifecycle_stage: [],
   grade: [],
+  assigned_to: '',
   sort_by: 'created_at',
   sort_dir: 'desc',
 }
@@ -84,6 +86,16 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
   const [tagInput, setTagInput] = useState('')
   const [referralSources, setReferralSources] = useState<string[]>([])
   const [referralInput, setReferralInput] = useState(filters.referral_source)
+  const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
+
+  useEffect(() => {
+    void fetch('/api/users')
+      .then((r) => r.json())
+      .then((d: { users: { id: string; full_name: string }[] }) => {
+        if (d.users) setTenantUsers(d.users)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     void fetch('/api/contacts/stages')
@@ -126,7 +138,8 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     (filters.referral_source ? 1 : 0) +
     (filters.has_referral_source ? 1 : 0) +
     (filters.lifecycle_stage.length > 0 ? 1 : 0) +
-    (filters.grade.length > 0 ? 1 : 0)
+    (filters.grade.length > 0 ? 1 : 0) +
+    (filters.assigned_to ? 1 : 0)
 
   const tagSuggestions = allTags.filter(
     (t) => !filters.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase())
@@ -405,6 +418,24 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
             </label>
           ))}
         </div>
+      </div>
+
+      {/* Assigned To */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Assigned To</p>
+        <select
+          value={filters.assigned_to}
+          onChange={(e) => update({ assigned_to: e.target.value })}
+          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+        >
+          <option value="">Any</option>
+          <option value="unassigned">Unassigned</option>
+          {tenantUsers.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.full_name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Sort */}

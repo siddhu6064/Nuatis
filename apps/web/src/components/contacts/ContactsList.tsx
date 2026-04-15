@@ -19,6 +19,8 @@ interface Contact {
   lead_score: number | null
   lead_grade: string | null
   lead_score_updated_at: string | null
+  assigned_to_user_id: string | null
+  assigned_user_name: string | null
 }
 
 interface SavedView {
@@ -47,6 +49,7 @@ function filtersFromParams(params: URLSearchParams): FilterState {
     has_referral_source: params.get('has_referral_source') === 'true',
     lifecycle_stage: params.get('lifecycle_stage')?.split(',').filter(Boolean) ?? [],
     grade: params.get('grade')?.split(',').filter(Boolean) ?? [],
+    assigned_to: params.get('assigned_to') ?? '',
     sort_by: params.get('sort_by') ?? 'created_at',
     sort_dir: params.get('sort_dir') ?? 'desc',
   }
@@ -69,6 +72,7 @@ function filtersToParams(filters: FilterState): URLSearchParams {
   if (filters.lifecycle_stage.length > 0)
     params.set('lifecycle_stage', filters.lifecycle_stage.join(','))
   if (filters.grade.length > 0) params.set('grade', filters.grade.join(','))
+  if (filters.assigned_to) params.set('assigned_to', filters.assigned_to)
   if (filters.sort_by !== 'created_at') params.set('sort_by', filters.sort_by)
   if (filters.sort_dir !== 'desc') params.set('sort_dir', filters.sort_dir)
   return params
@@ -88,7 +92,8 @@ function hasActiveFilters(f: FilterState): boolean {
     !!f.referral_source ||
     f.has_referral_source ||
     f.lifecycle_stage.length > 0 ||
-    f.grade.length > 0
+    f.grade.length > 0 ||
+    !!f.assigned_to
   )
 }
 
@@ -105,6 +110,7 @@ function activeFilterCount(f: FilterState): number {
   if (f.has_referral_source) count++
   if (f.lifecycle_stage.length > 0) count++
   if (f.grade.length > 0) count++
+  if (f.assigned_to) count++
   return count
 }
 
@@ -118,6 +124,7 @@ export default function ContactsList() {
   const [showFilters, setShowFilters] = useState(false)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -141,6 +148,7 @@ export default function ContactsList() {
     if (f.has_referral_source) params.set('has_referral_source', 'true')
     if (f.lifecycle_stage.length > 0) params.set('lifecycle_stage', f.lifecycle_stage.join(','))
     if (f.grade.length > 0) params.set('grade', f.grade.join(','))
+    if (f.assigned_to) params.set('assigned_to', f.assigned_to)
     params.set('sort_by', f.sort_by)
     params.set('sort_dir', f.sort_dir)
 
@@ -177,6 +185,15 @@ export default function ContactsList() {
     }
   }, [filters, fetchContacts])
 
+  useEffect(() => {
+    void fetch('/api/users')
+      .then((r) => r.json())
+      .then((d: { users: { id: string; full_name: string }[] }) => {
+        if (d.users) setTenantUsers(d.users)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleSelectView = (view: SavedView) => {
     const f: FilterState = {
       ...EMPTY_FILTERS,
@@ -197,6 +214,7 @@ export default function ContactsList() {
         .split(',')
         .filter(Boolean),
       grade: ((view.filters['grade'] as string) ?? '').split(',').filter(Boolean),
+      assigned_to: (view.filters['assigned_to'] as string) ?? '',
       sort_by: view.sort_by ?? 'created_at',
       sort_dir: view.sort_dir ?? 'desc',
     }
@@ -303,6 +321,16 @@ export default function ContactsList() {
       label: `Grade: ${filters.grade.join(', ')}`,
       onRemove: () => updateFilters({ ...filters, grade: [] }),
     })
+  if (filters.assigned_to) {
+    const assignedLabel =
+      filters.assigned_to === 'unassigned'
+        ? 'Unassigned'
+        : (tenantUsers.find((u) => u.id === filters.assigned_to)?.full_name ?? filters.assigned_to)
+    chips.push({
+      label: `Assigned: ${assignedLabel}`,
+      onRemove: () => updateFilters({ ...filters, assigned_to: '' }),
+    })
+  }
 
   return (
     <div className="flex h-full">
@@ -458,6 +486,9 @@ export default function ContactsList() {
                     Lifecycle
                   </th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Score</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
+                    Assigned
+                  </th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Added</th>
                 </tr>
               </thead>
@@ -549,6 +580,40 @@ export default function ContactsList() {
                               {contact.lead_grade}
                             </span>
                           )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-300">{'\u2014'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {contact.assigned_user_name ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                            <span className="text-teal-700 text-[10px] font-bold">
+                              {contact.assigned_user_name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            {contact.assigned_user_name}
+                          </span>
+                        </div>
+                      ) : contact.assigned_to_user_id &&
+                        tenantUsers.find((u) => u.id === contact.assigned_to_user_id) ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                            <span className="text-teal-700 text-[10px] font-bold">
+                              {tenantUsers
+                                .find((u) => u.id === contact.assigned_to_user_id)!
+                                .full_name.charAt(0)
+                                .toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            {
+                              tenantUsers.find((u) => u.id === contact.assigned_to_user_id)!
+                                .full_name
+                            }
+                          </span>
                         </div>
                       ) : (
                         <span className="text-sm text-gray-300">{'\u2014'}</span>

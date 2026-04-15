@@ -35,6 +35,10 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   const [referredById, setReferredById] = useState<string | null>(null)
   const [editingReferral, setEditingReferral] = useState(false)
 
+  // Assigned To fields
+  const [assignedUserId, setAssignedUserId] = useState<string | null>(null)
+  const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
+
   // Lifecycle & lead score fields
   type LifecycleStage =
     | 'subscriber'
@@ -63,9 +67,11 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           lead_score?: number
           lead_grade?: string
           lead_score_updated_at?: string
+          assigned_to_user_id?: string | null
         }) => {
           if (c.email) setContactEmail(c.email)
           if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
+          setAssignedUserId(c.assigned_to_user_id ?? null)
           if (c.referred_by_contact_id) {
             setReferredById(c.referred_by_contact_id)
             void fetch(`/api/contacts/${c.referred_by_contact_id}`)
@@ -104,6 +110,24 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       .then((d: { attachments: unknown[] }) => setFileCount(d.attachments.length))
       .catch(() => {})
   }, [contactId])
+
+  useEffect(() => {
+    void fetch('/api/users')
+      .then((r) => r.json())
+      .then((d: { users: { id: string; full_name: string }[] }) => {
+        if (d.users) setTenantUsers(d.users)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleAssigneeChange = async (userId: string | null) => {
+    setAssignedUserId(userId)
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assigned_to_user_id: userId }),
+    }).catch(() => {})
+  }
 
   const handleNoteAdded = useCallback(() => {
     setRefreshKey((k) => k + 1)
@@ -370,6 +394,41 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
         >
           {recalculating ? 'Recalculating…' : 'Recalculate'}
         </button>
+      </div>
+
+      {/* Assigned To */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Assigned To</h2>
+        <div className="flex items-center gap-3">
+          {assignedUserId ? (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                <span className="text-teal-700 text-xs font-bold">
+                  {(tenantUsers.find((u) => u.id === assignedUserId)?.full_name ?? '?')
+                    .charAt(0)
+                    .toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm text-gray-700">
+                {tenantUsers.find((u) => u.id === assignedUserId)?.full_name ?? assignedUserId}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400">Unassigned</span>
+          )}
+          <select
+            value={assignedUserId ?? ''}
+            onChange={(e) => void handleAssigneeChange(e.target.value || null)}
+            className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="">Unassigned</option>
+            {tenantUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Add Note (always visible) */}
