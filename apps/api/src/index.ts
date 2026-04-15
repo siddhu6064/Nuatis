@@ -38,6 +38,7 @@ import emailIntegrationsRouter from './routes/email-integrations.js'
 import emailTemplatesRouter from './routes/email-templates.js'
 import emailTrackingRouter from './routes/email-tracking.js'
 import bccLoggingRouter, { emailInboundWebhookRouter } from './routes/email-inbound.js'
+import bookingPublicRouter from './routes/booking-public.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -109,6 +110,7 @@ app.use('/api/email-templates', emailTemplatesRouter)
 app.use('/api/email-tracking', emailTrackingRouter)
 app.use('/api/settings/bcc-logging', bccLoggingRouter)
 app.use('/api/webhooks/email-inbound', emailInboundWebhookRouter)
+app.use('/api/booking', bookingPublicRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
