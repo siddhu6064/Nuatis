@@ -46,6 +46,19 @@ router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): 
       : null
   if (stageIds && stageIds.length > 0) query = query.in('pipeline_stage_id', stageIds)
 
+  // ── Pipeline ID filter (fetch stage IDs for the given pipeline) ──
+  const pipelineId = req.query['pipeline_id'] as string | undefined
+  if (pipelineId) {
+    const { data: stageData } = await supabase
+      .from('pipeline_stages')
+      .select('id')
+      .eq('pipeline_id', pipelineId)
+    const pipelineStageIds = (stageData || []).map((s) => s.id)
+    if (pipelineStageIds.length > 0) {
+      query = query.in('pipeline_stage_id', pipelineStageIds)
+    }
+  }
+
   const contactId = typeof req.query['contact_id'] === 'string' ? req.query['contact_id'] : null
   if (contactId) query = query.eq('contact_id', contactId)
 

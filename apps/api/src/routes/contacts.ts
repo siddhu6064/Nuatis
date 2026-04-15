@@ -56,6 +56,19 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     query = query.in('pipeline_stage', stageIds)
   }
 
+  // ── Pipeline ID filter (fetch stage names for the given pipeline) ──
+  const pipelineId = req.query['pipeline_id'] as string | undefined
+  if (pipelineId) {
+    const { data: stageData } = await supabase
+      .from('pipeline_stages')
+      .select('name')
+      .eq('pipeline_id', pipelineId)
+    const stageNames = (stageData || []).map((s) => s.name)
+    if (stageNames.length > 0) {
+      query = query.in('pipeline_stage', stageNames)
+    }
+  }
+
   // ── Source filter (multi-select) ──
   const sources =
     typeof req.query['source'] === 'string' ? req.query['source'].split(',').filter(Boolean) : null
@@ -253,11 +266,34 @@ router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
 
-  const { data, error } = await supabase
+  // Determine the pipeline_id to filter by
+  let filterPipelineId = req.query['pipeline_id'] as string | undefined
+
+  if (!filterPipelineId) {
+    // Find the default contacts pipeline for this tenant
+    const { data: defaultPipeline } = await supabase
+      .from('pipelines')
+      .select('id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_default', true)
+      .eq('pipeline_type', 'contacts')
+      .maybeSingle()
+    if (defaultPipeline) {
+      filterPipelineId = defaultPipeline.id as string
+    }
+  }
+
+  let stagesQuery = supabase
     .from('pipeline_stages')
     .select('id, name, position, color')
     .eq('tenant_id', authed.tenantId)
     .order('position', { ascending: true })
+
+  if (filterPipelineId) {
+    stagesQuery = stagesQuery.eq('pipeline_id', filterPipelineId)
+  }
+
+  const { data, error } = await stagesQuery
 
   if (error) {
     res.status(500).json({ error: error.message })

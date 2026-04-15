@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -67,6 +67,18 @@ interface QuoteView {
   viewed_at: string
 }
 
+interface PackageLineItem {
+  quote_id: string
+  package_id: string
+  total: number
+}
+
+interface PackageRecord {
+  id: string
+  name: string
+  vertical: string
+}
+
 interface Props {
   sessions: Session[]
   appointments: Appointment[]
@@ -74,7 +86,52 @@ interface Props {
   pipelineEntries: PipelineEntry[]
   quotes: Quote[]
   quoteViews: QuoteView[]
+  packageLineItems: PackageLineItem[]
+  packageRecords: PackageRecord[]
   vertical: string
+}
+
+interface Pipeline {
+  id: string
+  name: string
+}
+
+interface ForecastStage {
+  id: string
+  name: string
+  probability: number
+  deal_count: number
+  total_value: number
+  weighted_value: number
+}
+
+interface MonthlyForecast {
+  month: string
+  expected_value: number
+  deal_count: number
+}
+
+interface ForecastSummary {
+  total_pipeline_value: number
+  total_weighted_value: number
+  deal_count: number
+  avg_deal_value: number
+  monthly_forecast: MonthlyForecast[]
+  win_rate: number
+  avg_days_to_close: number
+}
+
+interface PipelineForecastData {
+  pipeline: { id: string; name: string }
+  stages: ForecastStage[]
+  summary: ForecastSummary
+}
+
+interface FunnelStage {
+  stage: string
+  count: number
+  total_value: number
+  drop_off_pct: number
 }
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -125,6 +182,22 @@ function StatCard({
 }
 
 const FUNNEL_COLORS = ['#9ca3af', '#3b82f6', '#f59e0b', '#10b981']
+const STAGE_COLORS = [
+  '#6366f1',
+  '#3b82f6',
+  '#0d9488',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+]
+
+function formatCurrency(value: number): string {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
+  return `$${value.toFixed(0)}`
+}
 
 export default function InsightsDashboard({
   sessions,
@@ -133,6 +206,8 @@ export default function InsightsDashboard({
   pipelineEntries,
   quotes,
   quoteViews,
+  packageLineItems,
+  packageRecords,
   vertical,
 }: Props) {
   const stats = useMemo(() => {
@@ -389,8 +464,54 @@ export default function InsightsDashboard({
       aiAccepted,
       quoteOpenRate,
       avgTimeToFirstViewHours,
+      topPackages: (() => {
+        if (packageLineItems.length === 0) return []
+        const pkgMap = new Map(packageRecords.map((p) => [p.id, p]))
+        const wonQuoteIds = new Set(quotes.filter((q) => q.status === 'accepted').map((q) => q.id))
+        const stats = new Map<
+          string,
+          { quoteIds: Set<string>; revenue: number; wonCount: number }
+        >()
+
+        for (const li of packageLineItems) {
+          const s = stats.get(li.package_id) ?? { quoteIds: new Set(), revenue: 0, wonCount: 0 }
+          s.quoteIds.add(li.quote_id)
+          if (wonQuoteIds.has(li.quote_id)) s.revenue += Number(li.total) || 0
+          stats.set(li.package_id, s)
+        }
+        for (const [, s] of stats) {
+          let won = 0
+          for (const qid of s.quoteIds) if (wonQuoteIds.has(qid)) won++
+          s.wonCount = won
+        }
+
+        return Array.from(stats.entries())
+          .map(([pid, s]) => {
+            const pkg = pkgMap.get(pid)
+            return {
+              package_name: pkg?.name ?? 'Unknown',
+              vertical: pkg?.vertical ?? '',
+              quote_count: s.quoteIds.size,
+              total_revenue: Number(s.revenue.toFixed(2)),
+              win_rate:
+                s.quoteIds.size > 0 ? Number(((s.wonCount / s.quoteIds.size) * 100).toFixed(1)) : 0,
+            }
+          })
+          .sort((a, b) => b.quote_count - a.quote_count)
+          .slice(0, 5)
+      })(),
     }
-  }, [sessions, appointments, contacts, pipelineEntries, quotes, quoteViews, vertical])
+  }, [
+    sessions,
+    appointments,
+    contacts,
+    pipelineEntries,
+    quotes,
+    quoteViews,
+    packageLineItems,
+    packageRecords,
+    vertical,
+  ])
 
   const bookingRate =
     stats.totalCalls > 0 ? ((stats.bookings / stats.totalCalls) * 100).toFixed(1) : '0'
@@ -412,6 +533,65 @@ export default function InsightsDashboard({
             ? 'Fair'
             : 'Poor'
       : '--'
+
+  // Pipeline Forecast state
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>('')
+  const [forecastData, setForecastData] = useState<PipelineForecastData | null>(null)
+  const [funnelData, setFunnelData] = useState<FunnelStage[]>([])
+  const [forecastLoading, setForecastLoading] = useState(false)
+
+  // Fetch available deal pipelines on mount
+  useEffect(() => {
+    fetch('/api/pipelines?type=deals')
+      .then((r) => r.json())
+      .then((data: Pipeline[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPipelines(data)
+          setSelectedPipelineId(data[0]!.id)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch forecast + funnel when selected pipeline changes
+  useEffect(() => {
+    if (!selectedPipelineId) return
+    setForecastLoading(true)
+    Promise.all([
+      fetch(`/api/insights/pipeline-forecast?pipeline_id=${selectedPipelineId}`).then((r) =>
+        r.json()
+      ),
+      fetch(`/api/insights/pipeline-funnel?pipeline_id=${selectedPipelineId}`).then((r) =>
+        r.json()
+      ),
+    ])
+      .then(([forecast, funnel]: [PipelineForecastData, FunnelStage[]]) => {
+        setForecastData(forecast)
+        setFunnelData(Array.isArray(funnel) ? funnel : [])
+      })
+      .catch(() => {})
+      .finally(() => setForecastLoading(false))
+  }, [selectedPipelineId])
+
+  // Compute "Expected This Month" and MoM comparison from forecast data
+  const currentMonth = new Date().toISOString().slice(0, 7) // e.g. "2026-04"
+  const monthlyForecast = forecastData?.summary?.monthly_forecast ?? []
+  const currentMonthEntry = monthlyForecast.find((m) => m.month === currentMonth)
+  const prevMonthStr = (() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 1)
+    return d.toISOString().slice(0, 7)
+  })()
+  const prevMonthEntry = monthlyForecast.find((m) => m.month === prevMonthStr)
+  const expectedThisMonth = currentMonthEntry?.expected_value ?? 0
+  const momPct =
+    prevMonthEntry && prevMonthEntry.expected_value > 0
+      ? (
+          ((expectedThisMonth - prevMonthEntry.expected_value) / prevMonthEntry.expected_value) *
+          100
+        ).toFixed(0)
+      : null
 
   return (
     <div className="space-y-6">
@@ -880,6 +1060,40 @@ export default function InsightsDashboard({
           </div>
         )}
 
+        {/* Top Packages */}
+        <div className="mb-6">
+          <p className="text-xs text-gray-400 mb-2">Top Packages</p>
+          {stats.topPackages.length === 0 ? (
+            <p className="text-sm text-gray-300 text-center py-4">
+              No packages added to quotes yet
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {stats.topPackages.map((pkg, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-4">{i + 1}.</span>
+                    <span className="text-sm text-gray-900">{pkg.package_name}</span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
+                      {pkg.vertical}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span>{pkg.quote_count} quotes</span>
+                    <span>${pkg.total_revenue.toLocaleString()}</span>
+                    <span className={pkg.win_rate > 50 ? 'text-green-600' : ''}>
+                      {pkg.win_rate}% win
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* AI quote stats */}
         {stats.aiQuotes > 0 && (
           <div className="bg-teal-50 rounded-lg p-4">
@@ -893,6 +1107,167 @@ export default function InsightsDashboard({
           </div>
         )}
       </div>
+
+      {/* Section 9: Pipeline Forecast */}
+      {pipelines.length > 0 && (
+        <div className="space-y-4">
+          {/* Header + pipeline selector */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Pipeline Forecast</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Deal pipeline revenue projections</p>
+            </div>
+            <select
+              value={selectedPipelineId}
+              onChange={(e) => setSelectedPipelineId(e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {forecastLoading ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+              <p className="text-sm text-gray-400">Loading forecast...</p>
+            </div>
+          ) : forecastData ? (
+            <>
+              {/* Stat cards row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard
+                  label="Total Pipeline Value"
+                  value={formatCurrency(forecastData.summary.total_pipeline_value)}
+                  sub={`${forecastData.summary.deal_count} deals`}
+                />
+                <StatCard
+                  label="Weighted Forecast"
+                  value={formatCurrency(forecastData.summary.total_weighted_value)}
+                  sub="probability-adjusted"
+                  color="text-teal-600"
+                />
+                <StatCard
+                  label="Win Rate"
+                  value={`${forecastData.summary.win_rate.toFixed(1)}%`}
+                  color={
+                    forecastData.summary.win_rate > 50
+                      ? 'text-green-600'
+                      : forecastData.summary.win_rate < 30
+                        ? 'text-red-600'
+                        : 'text-gray-900'
+                  }
+                />
+                <StatCard
+                  label="Avg Days to Close"
+                  value={
+                    forecastData.summary.avg_days_to_close > 0
+                      ? `${Math.round(forecastData.summary.avg_days_to_close)}d`
+                      : '--'
+                  }
+                  sub="average sales cycle"
+                />
+              </div>
+
+              {/* Expected This Month card */}
+              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl p-6 text-white">
+                <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">
+                  Expected This Month
+                </p>
+                <p className="text-4xl font-bold">{formatCurrency(expectedThisMonth)}</p>
+                {momPct !== null && (
+                  <p className="text-sm mt-2 opacity-90">
+                    {Number(momPct) >= 0 ? '↑' : '↓'} {Math.abs(Number(momPct))}% vs last month
+                  </p>
+                )}
+                {currentMonthEntry && (
+                  <p className="text-xs mt-1 opacity-60">
+                    {currentMonthEntry.deal_count} deals closing this month
+                  </p>
+                )}
+              </div>
+
+              {/* Monthly Forecast Bar Chart */}
+              {monthlyForecast.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">
+                    Monthly Forecast (next 3 months)
+                  </h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={monthlyForecast.slice(0, 3)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        stroke="#9ca3af"
+                        tickFormatter={(v: number) => formatCurrency(v)}
+                      />
+                      <Tooltip
+                        formatter={(value, _name, item) => [
+                          `${formatCurrency(Number(value))} (${(item?.payload as MonthlyForecast | undefined)?.deal_count ?? 0} deals)`,
+                          'Expected Revenue',
+                        ]}
+                      />
+                      <Bar
+                        dataKey="expected_value"
+                        fill="#6366f1"
+                        radius={[4, 4, 0, 0]}
+                        name="Expected Revenue"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Pipeline Funnel */}
+              {funnelData.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Pipeline Funnel</h3>
+                  <ResponsiveContainer width="100%" height={Math.max(160, funnelData.length * 44)}>
+                    <BarChart data={funnelData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11 }}
+                        stroke="#9ca3af"
+                        allowDecimals={false}
+                      />
+                      <YAxis
+                        dataKey="stage"
+                        type="category"
+                        tick={{ fontSize: 11 }}
+                        stroke="#9ca3af"
+                        width={120}
+                      />
+                      <Tooltip formatter={(value) => [value, 'Deals']} />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                        {funnelData.map((_, i) => (
+                          <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  {/* Drop-off annotations */}
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-gray-400">
+                    {funnelData.slice(1).map((stage, i) => (
+                      <span key={stage.stage}>
+                        {funnelData[i]!.stage} → {stage.stage}:{' '}
+                        <span className="text-red-400">-{stage.drop_off_pct.toFixed(0)}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+              <p className="text-sm text-gray-400">No forecast data available</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -72,6 +72,7 @@ const NAV: NavItem[] = [
   { href: '/settings/lead-scoring', label: 'Lead Scoring', icon: '📊', suiteOnly: true },
   { href: '/settings/automation', label: 'Review Auto', icon: '⭐', suiteOnly: true },
   { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
+  { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 

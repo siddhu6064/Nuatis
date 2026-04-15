@@ -1,7 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+
+const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
+
+interface Pipeline {
+  id: string
+  name: string
+  description: string | null
+  is_default: boolean
+  pipeline_type: string
+  stage_count: number
+}
 
 interface Stage {
   id: string
@@ -40,6 +52,12 @@ function closeDateStatus(d: string | null): 'overdue' | 'soon' | 'ok' | null {
 
 export default function DealsKanban() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [activePipelineId, setActivePipelineId] = useState<string | null>(
+    searchParams.get('pipeline')
+  )
   const [stages, setStages] = useState<Stage[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,33 +70,86 @@ export default function DealsKanban() {
   const [newProbability, setNewProbability] = useState('50')
   const [saving, setSaving] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    const [stagesRes, dealsRes] = await Promise.all([
-      fetch('/api/contacts/stages'),
-      fetch('/api/deals'),
-    ])
-    if (stagesRes.ok) {
-      const sd = (await stagesRes.json()) as { stages: Stage[] }
-      setStages(sd.stages.sort((a, b) => a.position - b.position))
-    }
-    if (dealsRes.ok) {
-      const dd = (await dealsRes.json()) as { deals: Deal[] }
-      setDeals(dd.deals)
+  // Fetch pipelines on mount
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/pipelines?type=deals`, { credentials: 'include' })
+        if (res.ok) {
+          const data = (await res.json()) as Pipeline[]
+          setPipelines(data)
+          const paramId = searchParams.get('pipeline')
+          if (paramId && data.find((p) => p.id === paramId)) {
+            setActivePipelineId(paramId)
+          } else {
+            const def = data.find((p) => p.is_default) ?? data[0]
+            if (def) setActivePipelineId(def.id)
+          }
+        }
+      } catch {
+        // silently fail — fallback to old behaviour below
+        setActivePipelineId('__legacy__')
+      }
+    })()
+  }, [])
+
+  const fetchBoardData = useCallback(async (pipelineId: string) => {
+    setLoading(true)
+    try {
+      let stagesUrl: string
+      let dealsUrl: string
+
+      if (pipelineId === '__legacy__') {
+        // Fallback: use old stages endpoint when no pipelines API available
+        stagesUrl = `/api/contacts/stages`
+        dealsUrl = `/api/deals`
+      } else {
+        stagesUrl = `${API_URL}/api/pipelines/${pipelineId}`
+        dealsUrl = `${API_URL}/api/deals?pipeline_id=${pipelineId}`
+      }
+
+      const [stagesRes, dealsRes] = await Promise.all([
+        fetch(stagesUrl, { credentials: 'include' }),
+        fetch(dealsUrl, { credentials: 'include' }),
+      ])
+
+      if (stagesRes.ok) {
+        const data = (await stagesRes.json()) as
+          | { stages: Stage[] }
+          | { id: string; name: string; stages: Stage[] }
+        const list = 'stages' in data ? data.stages : []
+        setStages(list.sort((a, b) => a.position - b.position))
+      }
+
+      if (dealsRes.ok) {
+        const data = (await dealsRes.json()) as { deals: Deal[] }
+        setDeals(data.deals ?? [])
+      }
+    } finally {
+      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    setLoading(true)
-    void fetchData().finally(() => setLoading(false))
-  }, [fetchData])
+    if (!activePipelineId) return
+    void fetchBoardData(activePipelineId)
+  }, [activePipelineId, fetchBoardData])
+
+  const switchPipeline = (id: string) => {
+    setActivePipelineId(id)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('pipeline', id)
+    router.replace(`/deals?${params.toString()}`)
+  }
 
   const moveDeal = async (dealId: string, stageId: string) => {
     // Optimistic update
     setDeals((prev) =>
       prev.map((d) => (d.id === dealId ? { ...d, pipeline_stage_id: stageId } : d))
     )
-    await fetch(`/api/deals/${dealId}`, {
+    await fetch(`${API_URL}/api/deals/${dealId}`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pipeline_stage_id: stageId }),
     })
@@ -88,8 +159,9 @@ export default function DealsKanban() {
     if (!newTitle.trim()) return
     setSaving(true)
     try {
-      const res = await fetch('/api/deals', {
+      const res = await fetch(`${API_URL}/api/deals`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTitle.trim(),
@@ -97,6 +169,7 @@ export default function DealsKanban() {
           close_date: newCloseDate || undefined,
           probability: parseInt(newProbability) || 50,
           pipeline_stage_id: stages[0]?.id,
+          pipeline_id: activePipelineId !== '__legacy__' ? activePipelineId : undefined,
         }),
       })
       if (res.ok) {
@@ -105,7 +178,7 @@ export default function DealsKanban() {
         setNewCloseDate('')
         setNewProbability('50')
         setShowCreate(false)
-        void fetchData()
+        if (activePipelineId) void fetchBoardData(activePipelineId)
       }
     } finally {
       setSaving(false)
@@ -127,7 +200,7 @@ export default function DealsKanban() {
 
   return (
     <div className="px-8 py-8 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6 shrink-0">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Deals</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -141,14 +214,41 @@ export default function DealsKanban() {
             pipeline
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          New Deal
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/settings/pipelines"
+            className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+          >
+            Manage Pipelines
+          </Link>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            <span className="text-base leading-none">+</span>
+            New Deal
+          </button>
+        </div>
       </div>
+
+      {/* Pipeline tab bar */}
+      {pipelines.length > 0 && (
+        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-gray-100 pb-0">
+          {pipelines.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => switchPipeline(p.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
+                activePipelineId === p.id
+                  ? 'border-teal-600 text-teal-700 bg-teal-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Create modal */}
       {showCreate && (
