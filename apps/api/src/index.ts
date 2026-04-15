@@ -30,6 +30,8 @@ import contactsRouter from './routes/contacts.js'
 import searchRouter from './routes/search.js'
 import savedViewsRouter from './routes/saved-views.js'
 import importRouter from './routes/import.js'
+import attachmentsRouter from './routes/attachments.js'
+import smsRouter from './routes/sms.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -92,6 +94,8 @@ app.use('/api/contacts', contactsRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/views', savedViewsRouter)
 app.use('/api/import', importRouter)
+app.use('/api/contacts', attachmentsRouter)
+app.use('/api', smsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
@@ -317,6 +321,126 @@ app.post('/voice/inbound', async (req, res) => {
   }
 
   console.info(`[voice/inbound] unhandled event type: ${event}`)
+  res.sendStatus(200)
+})
+
+// ── Telnyx inbound SMS webhook ──────────────────────────────────────────────
+app.post('/webhooks/telnyx/sms', async (req, res) => {
+  const eventType = req.body?.data?.event_type ?? ''
+  if (eventType !== 'message.received') {
+    res.sendStatus(200)
+    return
+  }
+
+  const payload = req.body?.data?.payload ?? {}
+  const fromNumber: string = payload.from?.phone_number ?? ''
+  const toNumber: string = payload.to?.[0]?.phone_number ?? payload.to ?? ''
+  const body: string = payload.text ?? ''
+  const telnyxMessageId: string = payload.id ?? ''
+
+  console.info(`[sms-webhook] message.received from=${fromNumber} to=${toNumber}`)
+
+  const sb = createClient(
+    process.env['SUPABASE_URL'] ?? '',
+    process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? ''
+  )
+
+  // Dedup check
+  if (telnyxMessageId) {
+    const { data: existing } = await sb
+      .from('inbound_sms')
+      .select('id')
+      .eq('telnyx_message_id', telnyxMessageId)
+      .maybeSingle()
+    if (existing) {
+      res.sendStatus(200)
+      return
+    }
+  }
+
+  // Find tenant by to_number
+  const normalizedTo = toNumber.replace(/\D/g, '').slice(-10)
+  const { data: location } = await sb
+    .from('locations')
+    .select('tenant_id')
+    .ilike('telnyx_number', `%${normalizedTo}%`)
+    .limit(1)
+    .maybeSingle()
+
+  if (!location) {
+    console.warn(`[sms-webhook] no tenant found for number ${toNumber}`)
+    res.sendStatus(200)
+    return
+  }
+
+  const tenantId = location.tenant_id
+
+  // Find contact by from_number
+  const normalizedFrom = fromNumber.replace(/\D/g, '').slice(-10)
+  let contactId: string | null = null
+  let contactName: string | null = null
+
+  const { data: matchedContact } = await sb
+    .from('contacts')
+    .select('id, full_name')
+    .eq('tenant_id', tenantId)
+    .ilike('phone', `%${normalizedFrom}%`)
+    .limit(1)
+    .maybeSingle()
+
+  if (matchedContact) {
+    contactId = matchedContact.id
+    contactName = matchedContact.full_name
+  } else {
+    // Create new contact
+    const { data: newContact } = await sb
+      .from('contacts')
+      .insert({
+        tenant_id: tenantId,
+        full_name: `Unknown - ${fromNumber}`,
+        phone: fromNumber,
+        source: 'sms',
+      })
+      .select('id, full_name')
+      .single()
+    if (newContact) {
+      contactId = newContact.id
+      contactName = newContact.full_name
+    }
+  }
+
+  // Insert SMS record
+  await sb.from('inbound_sms').insert({
+    tenant_id: tenantId,
+    contact_id: contactId,
+    from_number: fromNumber,
+    to_number: toNumber,
+    body,
+    direction: 'inbound',
+    telnyx_message_id: telnyxMessageId || null,
+    status: 'received',
+  })
+
+  // Log activity
+  if (contactId) {
+    const { logActivity: logAct } = await import('./lib/activity.js')
+    void logAct({
+      tenantId,
+      contactId,
+      type: 'sms',
+      body: `SMS received: "${body.slice(0, 80)}${body.length > 80 ? '...' : ''}"`,
+      actorType: 'contact',
+    })
+  }
+
+  // Push notification
+  const { sendPushNotification: pushNotif } = await import('./lib/push-client.js')
+  void pushNotif(tenantId, {
+    title: `New SMS from ${contactName || fromNumber}`,
+    body: body.slice(0, 60),
+    url: contactId ? `/contacts/${contactId}?tab=messages` : '/inbox',
+  })
+
   res.sendStatus(200)
 })
 

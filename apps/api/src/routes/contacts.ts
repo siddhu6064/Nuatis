@@ -135,12 +135,31 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     }
   }
 
+  // ── Post-filter: has_unread_sms ──
+  const hasUnreadSms = req.query['has_unread_sms'] === 'true'
+  if (hasUnreadSms && contacts.length > 0) {
+    const contactIds = contacts.map((c) => c.id)
+    const { data: unreadSms } = await supabase
+      .from('inbound_sms')
+      .select('contact_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('direction', 'inbound')
+      .eq('status', 'received')
+      .in('contact_id', contactIds)
+
+    if (unreadSms) {
+      const idsWithUnread = new Set(unreadSms.map((s) => s.contact_id))
+      contacts = contacts.filter((c) => idsWithUnread.has(c.id))
+    }
+  }
+
   const total = count ?? 0
+  const postFiltered = hasOpenQuote || hasUnreadSms
   res.json({
     contacts,
-    total: hasOpenQuote ? contacts.length : total,
+    total: postFiltered ? contacts.length : total,
     page,
-    pages: Math.ceil((hasOpenQuote ? contacts.length : total) / limit),
+    pages: Math.ceil((postFiltered ? contacts.length : total) / limit),
   })
 })
 

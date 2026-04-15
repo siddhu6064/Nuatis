@@ -17,6 +17,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
+  { href: '/inbox', label: 'Inbox', icon: '◻', suiteOnly: true },
   { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true, requireModule: 'crm' },
   { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true, requireModule: 'pipeline' },
   {
@@ -64,6 +65,14 @@ export default function Sidebar() {
   const [onboardingDone, setOnboardingDone] = useState(true)
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
   const [modules, setModules] = useState<Record<string, boolean>>({})
+  const [unreadSms, setUnreadSms] = useState(0)
+
+  useEffect(() => {
+    void fetch('/api/sms/unread-count')
+      .then((r) => r.json())
+      .then((d: { count: number }) => setUnreadSms(d.count))
+      .catch(() => {})
+  }, [path]) // re-fetch when navigating
 
   useEffect(() => {
     fetch('/api/auth/session')
@@ -142,6 +151,11 @@ export default function Sidebar() {
               {item.onboardingOnly && (
                 <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
                   NEW
+                </span>
+              )}
+              {item.href === '/inbox' && unreadSms > 0 && (
+                <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
+                  {unreadSms > 99 ? '99+' : unreadSms}
                 </span>
               )}
             </Link>

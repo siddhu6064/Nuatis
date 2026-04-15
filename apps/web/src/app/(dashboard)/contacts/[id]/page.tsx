@@ -115,7 +115,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Client-side interactive sections */}
-      <ContactDetailClient contactId={contact.id} />
+      <ContactDetailClient contactId={contact.id} contactName={contact.full_name} />
     </div>
   )
 }

@@ -1,16 +1,27 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AddNoteForm from '@/components/contacts/AddNoteForm'
 import ContactTasks from '@/components/contacts/ContactTasks'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
+import FileAttachments from '@/components/contacts/FileAttachments'
+import SmsThread from '@/components/contacts/SmsThread'
+
+type Tab = 'activity' | 'messages' | 'files'
 
 interface Props {
   contactId: string
+  contactName: string
 }
 
-export default function ContactDetailClient({ contactId }: Props) {
+export default function ContactDetailClient({ contactId, contactName }: Props) {
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get('tab') as Tab) ?? 'activity'
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [smsUnread, setSmsUnread] = useState(0)
+  const [fileCount, setFileCount] = useState(0)
 
   // Referral fields
   const [referralSource, setReferralSource] = useState('')
@@ -20,7 +31,6 @@ export default function ContactDetailClient({ contactId }: Props) {
   const [referredById, setReferredById] = useState<string | null>(null)
   const [editingReferral, setEditingReferral] = useState(false)
 
-  // Load contact referral data
   useEffect(() => {
     void fetch(`/api/contacts/${contactId}`)
       .then((r) => r.json())
@@ -28,7 +38,6 @@ export default function ContactDetailClient({ contactId }: Props) {
         if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
         if (c.referred_by_contact_id) {
           setReferredById(c.referred_by_contact_id)
-          // Fetch referred-by contact name
           void fetch(`/api/contacts/${c.referred_by_contact_id}`)
             .then((r2) => r2.json())
             .then((ref: { full_name?: string }) => {
@@ -38,15 +47,24 @@ export default function ContactDetailClient({ contactId }: Props) {
         }
       })
       .catch(() => {})
-  }, [contactId])
 
-  // Fetch referral source autocomplete
-  useEffect(() => {
     void fetch('/api/contacts/referral-sources')
       .then((r) => r.json())
       .then((d: { sources: string[] }) => setReferralSuggestions(d.sources))
       .catch(() => {})
-  }, [])
+
+    // Fetch unread SMS count
+    void fetch(`/api/contacts/${contactId}/sms`)
+      .then((r) => r.json())
+      .then((d: { unread_count: number }) => setSmsUnread(d.unread_count))
+      .catch(() => {})
+
+    // Fetch file count
+    void fetch(`/api/contacts/${contactId}/attachments`)
+      .then((r) => r.json())
+      .then((d: { attachments: unknown[] }) => setFileCount(d.attachments.length))
+      .catch(() => {})
+  }, [contactId])
 
   const handleNoteAdded = useCallback(() => {
     setRefreshKey((k) => k + 1)
@@ -76,6 +94,12 @@ export default function ContactDetailClient({ contactId }: Props) {
   const filteredSuggestions = referralSuggestions.filter(
     (s) => s.toLowerCase().includes(referralSource.toLowerCase()) && s !== referralSource
   )
+
+  const tabs: Array<{ key: Tab; label: string; badge?: number }> = [
+    { key: 'activity', label: 'Activity' },
+    { key: 'messages', label: 'Messages', badge: smsUnread > 0 ? smsUnread : undefined },
+    { key: 'files', label: 'Files', badge: fileCount > 0 ? fileCount : undefined },
+  ]
 
   return (
     <>
@@ -153,7 +177,7 @@ export default function ContactDetailClient({ contactId }: Props) {
         </div>
       </div>
 
-      {/* Add Note */}
+      {/* Add Note (always visible) */}
       <div className="mb-6">
         <AddNoteForm contactId={contactId} onNoteAdded={handleNoteAdded} />
       </div>
@@ -163,12 +187,45 @@ export default function ContactDetailClient({ contactId }: Props) {
         <ContactTasks contactId={contactId} />
       </div>
 
-      {/* Activity Timeline */}
+      {/* Tabs */}
       <div className="bg-white rounded-xl border border-gray-100">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">Activity</h2>
+        <div className="flex border-b border-gray-100">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key)
+                if (tab.key === 'messages') setSmsUnread(0)
+              }}
+              className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === tab.key
+                  ? 'text-teal-700 border-b-2 border-teal-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span
+                  className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    tab.key === 'messages' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {tab.badge > 99 ? '99+' : tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
-        <ActivityTimeline contactId={contactId} refreshKey={refreshKey} />
+
+        <div>
+          {activeTab === 'activity' && (
+            <ActivityTimeline contactId={contactId} refreshKey={refreshKey} />
+          )}
+          {activeTab === 'messages' && (
+            <SmsThread contactId={contactId} contactName={contactName} />
+          )}
+          {activeTab === 'files' && <FileAttachments contactId={contactId} />}
+        </div>
       </div>
     </>
   )
