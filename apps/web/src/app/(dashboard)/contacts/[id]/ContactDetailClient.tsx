@@ -8,6 +8,7 @@ import ActivityTimeline from '@/components/contacts/ActivityTimeline'
 import FileAttachments from '@/components/contacts/FileAttachments'
 import SmsThread from '@/components/contacts/SmsThread'
 import ContactDeals from '@/components/contacts/ContactDeals'
+import EmailComposeModal from '../../../../components/contacts/EmailComposeModal'
 
 type Tab = 'activity' | 'messages' | 'files'
 
@@ -23,6 +24,8 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [smsUnread, setSmsUnread] = useState(0)
   const [fileCount, setFileCount] = useState(0)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [contactEmail, setContactEmail] = useState('')
 
   // Referral fields
   const [referralSource, setReferralSource] = useState('')
@@ -35,18 +38,25 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   useEffect(() => {
     void fetch(`/api/contacts/${contactId}`)
       .then((r) => r.json())
-      .then((c: { referral_source_detail?: string; referred_by_contact_id?: string }) => {
-        if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
-        if (c.referred_by_contact_id) {
-          setReferredById(c.referred_by_contact_id)
-          void fetch(`/api/contacts/${c.referred_by_contact_id}`)
-            .then((r2) => r2.json())
-            .then((ref: { full_name?: string }) => {
-              if (ref.full_name) setReferredByName(ref.full_name)
-            })
-            .catch(() => {})
+      .then(
+        (c: {
+          referral_source_detail?: string
+          referred_by_contact_id?: string
+          email?: string
+        }) => {
+          if (c.email) setContactEmail(c.email)
+          if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
+          if (c.referred_by_contact_id) {
+            setReferredById(c.referred_by_contact_id)
+            void fetch(`/api/contacts/${c.referred_by_contact_id}`)
+              .then((r2) => r2.json())
+              .then((ref: { full_name?: string }) => {
+                if (ref.full_name) setReferredByName(ref.full_name)
+              })
+              .catch(() => {})
+          }
         }
-      })
+      )
       .catch(() => {})
 
     void fetch('/api/contacts/referral-sources')
@@ -104,6 +114,16 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
 
   return (
     <>
+      {/* Send Email button */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowEmailModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Send Email
+        </button>
+      </div>
+
       {/* Referral info */}
       <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Referral Info</h2>
@@ -233,6 +253,17 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           {activeTab === 'files' && <FileAttachments contactId={contactId} />}
         </div>
       </div>
+
+      {/* Email compose modal */}
+      {showEmailModal && (
+        <EmailComposeModal
+          contactId={contactId}
+          contactEmail={contactEmail}
+          contactName={contactName}
+          onClose={() => setShowEmailModal(false)}
+          onSent={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
     </>
   )
 }

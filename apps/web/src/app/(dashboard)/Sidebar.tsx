@@ -65,6 +65,8 @@ const NAV: NavItem[] = [
   { href: '/settings/import', label: 'Import', icon: '↑', suiteOnly: true },
   { href: '/settings/audit', label: 'Audit Log', icon: '▧', suiteOnly: true },
   { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
+  { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },
+  { href: '/settings/email-templates', label: 'Email Templates', icon: '📧', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 

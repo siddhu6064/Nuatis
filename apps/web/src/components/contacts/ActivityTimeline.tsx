@@ -138,6 +138,19 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
           {item.body && (
             <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{item.body}</p>
           )}
+          {item.type === 'email' && item.metadata && (
+            <span className="text-xs text-gray-400">
+              {item.metadata.direction === 'outbound' &&
+                item.metadata.source !== 'bcc' &&
+                !item.body?.startsWith('Opened') &&
+                '📤 Sent'}
+              {item.body?.startsWith('Opened') &&
+                (item.metadata.open_count as number) > 1 &&
+                ` — Opened ${item.metadata.open_count as number} times`}
+              {item.metadata.source === 'bcc' &&
+                `📋 ${item.metadata.direction === 'inbound' ? 'Received' : 'Sent'} (via BCC)`}
+            </span>
+          )}
         </div>
       </div>
     )
