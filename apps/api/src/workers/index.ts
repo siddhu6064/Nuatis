@@ -15,6 +15,7 @@ import {
   createLeadScoreBulkWorker,
   createLeadScoreDecayWorker,
 } from './lead-score-worker.js'
+import { createReviewRequestWorker } from './review-request-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -152,6 +153,11 @@ export async function startWorkers(): Promise<void> {
     worker: leadScoreDecay.workers[0],
   })
   console.info('[workers] lead-score-decay started, repeating every 24h')
+
+  // 15. Review request — processes one-shot delayed jobs (on appointment completion)
+  const reviewRequest = createReviewRequestWorker()
+  managed.push({ name: 'review-request', ...reviewRequest })
+  console.info('[workers] review-request worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

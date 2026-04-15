@@ -1,10 +1,12 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { Queue } from 'bullmq'
 import { z } from 'zod'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { createEvent, updateEvent, deleteEvent } from '../services/scheduling.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { logActivity } from '../lib/activity.js'
+import { createBullMQConnection } from '../lib/bullmq-connection.js'
 
 const router = Router()
 
@@ -177,7 +179,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   // Verify appointment belongs to this tenant
   const { data: existing } = await supabase
     .from('appointments')
-    .select('google_event_id, tenant_id')
+    .select('google_event_id, tenant_id, contact_id')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -250,6 +252,31 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       metadata: { appointment_id: id },
       actorType: 'system',
     })
+    // Trigger review automation
+    void (async () => {
+      try {
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('review_automation_enabled, review_delay_minutes')
+          .eq('id', authed.tenantId)
+          .single()
+        if (tenantData?.review_automation_enabled && existing.contact_id) {
+          const reviewQueue = new Queue('review-request', { connection: createBullMQConnection() })
+          await reviewQueue.add(
+            'send-review',
+            {
+              tenantId: authed.tenantId,
+              contactId: existing.contact_id,
+              appointmentId: req.params['id'],
+            },
+            { delay: (tenantData.review_delay_minutes || 120) * 60 * 1000 }
+          )
+          await reviewQueue.close()
+        }
+      } catch (err) {
+        console.error('[appointments] Failed to enqueue review request:', err)
+      }
+    })()
   } else if (parsed.data.start_time) {
     const newStart = new Date(parsed.data.start_time).toLocaleDateString('en-US', {
       month: 'short',

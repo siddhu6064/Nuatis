@@ -31,9 +31,10 @@ router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): 
 
   let query = supabase
     .from('deals')
-    .select('*, pipeline_stages(id, name, color), contacts(id, full_name), companies(id, name)', {
-      count: 'exact',
-    })
+    .select(
+      '*, pipeline_stages(id, name, color), contacts(id, full_name), companies(id, name), assigned_to_user_id',
+      { count: 'exact' }
+    )
     .eq('tenant_id', authed.tenantId)
 
   const archived = req.query['archived'] === 'true'
@@ -60,6 +61,14 @@ router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): 
     typeof req.query['close_date_to'] === 'string' ? req.query['close_date_to'] : null
   if (closeDateFrom) query = query.gte('close_date', closeDateFrom)
   if (closeDateTo) query = query.lte('close_date', closeDateTo)
+
+  // ── Assigned-to filter ──
+  const assignedTo =
+    typeof req.query['assigned_to'] === 'string' ? req.query['assigned_to'].trim() : null
+  if (assignedTo) {
+    const assignedUserId = assignedTo === 'me' ? authed.userId : assignedTo
+    query = query.eq('assigned_to_user_id', assignedUserId)
+  }
 
   const sortBy = req.query['sort_by'] === 'close_date' ? 'close_date' : 'updated_at'
   query = query.order(sortBy, { ascending: false, nullsFirst: false })
@@ -211,6 +220,9 @@ router.put(
     if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
     if (typeof b['is_closed_won'] === 'boolean') updates['is_closed_won'] = b['is_closed_won']
     if (typeof b['is_closed_lost'] === 'boolean') updates['is_closed_lost'] = b['is_closed_lost']
+    if (typeof b['assigned_to_user_id'] === 'string')
+      updates['assigned_to_user_id'] = b['assigned_to_user_id']
+    if (b['assigned_to_user_id'] === null) updates['assigned_to_user_id'] = null
 
     const { data: updated, error } = await supabase
       .from('deals')
@@ -266,6 +278,44 @@ router.put(
         actorType: 'user',
         actorId: authed.userId,
       })
+    }
+
+    // Activity logging for assignment changes
+    const newAssignedUserId =
+      'assigned_to_user_id' in updates
+        ? (updates['assigned_to_user_id'] as string | null)
+        : undefined
+    if (
+      newAssignedUserId !== undefined &&
+      newAssignedUserId !== (existing.assigned_to_user_id as string | null)
+    ) {
+      if (newAssignedUserId) {
+        const { data: assignee } = await supabase
+          .from('users')
+          .select('full_name')
+          .eq('id', newAssignedUserId)
+          .single()
+        const userName = (assignee?.full_name as string | null) ?? newAssignedUserId
+        void logActivity({
+          tenantId: authed.tenantId,
+          contactId: contactId ?? undefined,
+          type: 'system',
+          body: `Deal assigned to ${userName}`,
+          metadata: { deal_id: req.params['id'], assigned_to_user_id: newAssignedUserId },
+          actorType: 'user',
+          actorId: authed.userId,
+        })
+      } else {
+        void logActivity({
+          tenantId: authed.tenantId,
+          contactId: contactId ?? undefined,
+          type: 'system',
+          body: `Deal unassigned`,
+          metadata: { deal_id: req.params['id'], assigned_to_user_id: null },
+          actorType: 'user',
+          actorId: authed.userId,
+        })
+      }
     }
 
     res.json({

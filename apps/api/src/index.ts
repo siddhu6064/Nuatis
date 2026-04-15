@@ -35,6 +35,7 @@ import attachmentsRouter from './routes/attachments.js'
 import smsRouter from './routes/sms.js'
 import companiesRouter from './routes/companies.js'
 import dealsRouter from './routes/deals.js'
+import usersRouter from './routes/users.js'
 import emailIntegrationsRouter from './routes/email-integrations.js'
 import emailTemplatesRouter from './routes/email-templates.js'
 import emailTrackingRouter from './routes/email-tracking.js'
@@ -43,6 +44,8 @@ import bookingPublicRouter from './routes/booking-public.js'
 import bookingSettingsRouter from './routes/booking-settings.js'
 import intakeFormsRouter from './routes/intake-forms.js'
 import leadScoringRouter from './routes/lead-scoring.js'
+import reviewSettingsRouter, { reviewTrackingRouter } from './routes/review-settings.js'
+import notificationSettingsRouter from './routes/notification-settings.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -109,6 +112,7 @@ app.use('/api/contacts', attachmentsRouter)
 app.use('/api', smsRouter)
 app.use('/api/companies', companiesRouter)
 app.use('/api/deals', dealsRouter)
+app.use('/api/users', usersRouter)
 app.use('/api/email-integrations', emailIntegrationsRouter)
 app.use('/api/email-templates', emailTemplatesRouter)
 app.use('/api/email-tracking', emailTrackingRouter)
@@ -118,6 +122,9 @@ app.use('/api/booking', bookingPublicRouter)
 app.use('/api/settings/booking', bookingSettingsRouter)
 app.use('/api/intake-forms', intakeFormsRouter)
 app.use('/api/lead-scoring', leadScoringRouter)
+app.use('/api/settings/review-automation', reviewSettingsRouter)
+app.use('/api/review-tracking', reviewTrackingRouter)
+app.use('/api/settings/notifications', notificationSettingsRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

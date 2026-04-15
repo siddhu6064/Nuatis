@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
+import { notifyOwner } from '../lib/notifications.js'
 
 const router = Router()
 
@@ -26,7 +27,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   let query = supabase
     .from('contacts')
     .select(
-      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at',
+      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at, assigned_to_user_id',
       { count: 'exact' }
     )
     .eq('tenant_id', authed.tenantId)
@@ -130,6 +131,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     if (grades.length > 0) {
       query = query.in('lead_grade', grades)
     }
+  }
+
+  // ── Assigned-to filter ──
+  const assignedTo =
+    typeof req.query['assigned_to'] === 'string' ? req.query['assigned_to'].trim() : null
+  if (assignedTo) {
+    const assignedUserId = assignedTo === 'me' ? authed.userId : assignedTo
+    query = query.eq('assigned_to_user_id', assignedUserId)
   }
 
   // ── Sort ──
@@ -354,7 +363,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 
   const { data: existing } = await supabase
     .from('contacts')
-    .select('id')
+    .select('id, assigned_to_user_id')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -378,6 +387,9 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (typeof b['referral_source_detail'] === 'string')
     updates['referral_source_detail'] = b['referral_source_detail'].slice(0, 200)
   if (b['referral_source_detail'] === null) updates['referral_source_detail'] = null
+  if (typeof b['assigned_to_user_id'] === 'string')
+    updates['assigned_to_user_id'] = b['assigned_to_user_id']
+  if (b['assigned_to_user_id'] === null) updates['assigned_to_user_id'] = null
 
   const { data: updated, error } = await supabase
     .from('contacts')
@@ -390,6 +402,46 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Log assignment change if assigned_to_user_id changed
+  const newAssignedUserId =
+    'assigned_to_user_id' in updates ? (updates['assigned_to_user_id'] as string | null) : undefined
+  if (
+    newAssignedUserId !== undefined &&
+    newAssignedUserId !== (existing.assigned_to_user_id as string | null)
+  ) {
+    if (newAssignedUserId) {
+      const { data: assignee } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', newAssignedUserId)
+        .single()
+      const userName = (assignee?.full_name as string | null) ?? newAssignedUserId
+      void logActivity({
+        tenantId: authed.tenantId,
+        contactId: id,
+        type: 'system',
+        body: `Contact assigned to ${userName}`,
+        metadata: { assigned_to_user_id: newAssignedUserId },
+        actorType: 'user',
+        actorId: authed.userId,
+      })
+      void notifyOwner(authed.tenantId, 'contact_assigned', {
+        pushTitle: 'Contact Assigned',
+        pushBody: `A contact has been assigned to ${userName}`,
+      })
+    } else {
+      void logActivity({
+        tenantId: authed.tenantId,
+        contactId: id,
+        type: 'system',
+        body: 'Contact unassigned',
+        metadata: { assigned_to_user_id: null },
+        actorType: 'user',
+        actorId: authed.userId,
+      })
+    }
   }
 
   // Check for duplicates if phone/email changed
@@ -1083,6 +1135,74 @@ router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response)
   }
 
   res.json({ updated: count ?? contacts.length })
+})
+
+// ── PATCH /api/contacts/bulk/assign ──────────────────────────────────────────
+router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const b = req.body as Record<string, unknown>
+
+  const contactIds = Array.isArray(b['contactIds']) ? (b['contactIds'] as string[]) : []
+  if (contactIds.length === 0) {
+    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+    return
+  }
+  if (contactIds.length > 500) {
+    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+    return
+  }
+
+  const assignedToUserId = typeof b['assignedToUserId'] === 'string' ? b['assignedToUserId'] : null
+
+  // Validate all contact IDs belong to tenant
+  const { count: tenantCount } = await supabase
+    .from('contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+  if ((tenantCount ?? 0) !== contactIds.length) {
+    res.status(400).json({ error: 'Some contact IDs do not belong to this tenant' })
+    return
+  }
+
+  // Resolve assignee name if assigning (not clearing)
+  let assigneeName: string | null = null
+  if (assignedToUserId) {
+    const { data: assignee } = await supabase
+      .from('users')
+      .select('full_name')
+      .eq('id', assignedToUserId)
+      .single()
+    assigneeName = (assignee?.full_name as string | null) ?? assignedToUserId
+  }
+
+  const { count, error } = await supabase
+    .from('contacts')
+    .update({ assigned_to_user_id: assignedToUserId, updated_at: new Date().toISOString() })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  for (const cid of contactIds) {
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: cid,
+      type: 'system',
+      body: assigneeName
+        ? `Contact assigned to ${assigneeName} (bulk)`
+        : 'Contact unassigned (bulk)',
+      metadata: { assigned_to_user_id: assignedToUserId },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+  }
+
+  res.json({ updated: count ?? contactIds.length })
 })
 
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────
