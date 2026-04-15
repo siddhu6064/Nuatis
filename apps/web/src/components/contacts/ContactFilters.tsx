@@ -14,6 +14,8 @@ export interface FilterState {
   has_open_quote: boolean
   referral_source: string
   has_referral_source: boolean
+  lifecycle_stage: string[]
+  grade: string[]
   sort_by: string
   sort_dir: string
 }
@@ -30,6 +32,8 @@ export const EMPTY_FILTERS: FilterState = {
   has_open_quote: false,
   referral_source: '',
   has_referral_source: false,
+  lifecycle_stage: [],
+  grade: [],
   sort_by: 'created_at',
   sort_dir: 'desc',
 }
@@ -102,7 +106,10 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     onChange({ ...filters, ...patch })
   }
 
-  const toggleArrayItem = (field: 'pipeline_stage_id' | 'source' | 'tags', value: string) => {
+  const toggleArrayItem = (
+    field: 'pipeline_stage_id' | 'source' | 'tags' | 'lifecycle_stage' | 'grade',
+    value: string
+  ) => {
     const arr = filters[field]
     const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]
     update({ [field]: next })
@@ -117,7 +124,9 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     (filters.created_from || filters.created_to ? 1 : 0) +
     (filters.has_open_quote ? 1 : 0) +
     (filters.referral_source ? 1 : 0) +
-    (filters.has_referral_source ? 1 : 0)
+    (filters.has_referral_source ? 1 : 0) +
+    (filters.lifecycle_stage.length > 0 ? 1 : 0) +
+    (filters.grade.length > 0 ? 1 : 0)
 
   const tagSuggestions = allTags.filter(
     (t) => !filters.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase())
@@ -348,6 +357,101 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
           />
           Has referral source
         </label>
+      </div>
+
+      {/* Lifecycle Stage */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Lifecycle Stage</p>
+        <div className="space-y-1">
+          {[
+            { value: 'subscriber', label: 'Subscriber' },
+            { value: 'lead', label: 'Lead' },
+            { value: 'marketing_qualified', label: 'Marketing Qualified' },
+            { value: 'sales_qualified', label: 'Sales Qualified' },
+            { value: 'opportunity', label: 'Opportunity' },
+            { value: 'customer', label: 'Customer' },
+            { value: 'evangelist', label: 'Evangelist' },
+            { value: 'other', label: 'Other' },
+          ].map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={filters.lifecycle_stage.includes(opt.value)}
+                onChange={() => toggleArrayItem('lifecycle_stage', opt.value)}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Grade */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Lead Grade</p>
+        <div className="space-y-1">
+          {['A', 'B', 'C', 'D', 'F'].map((g) => (
+            <label key={g} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.grade.includes(g)}
+                onChange={() => toggleArrayItem('grade', g)}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+              />
+              {g}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Sort */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Sort By</p>
+        <div className="space-y-1">
+          {[
+            { value: 'created_at', label: 'Date Added' },
+            { value: 'full_name', label: 'Name' },
+            { value: 'last_contacted_at', label: 'Last Contacted' },
+            { value: 'lead_score', label: 'Lead Score' },
+          ].map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+            >
+              <input
+                type="radio"
+                name="sort_by"
+                checked={filters.sort_by === opt.value}
+                onChange={() =>
+                  update({
+                    sort_by: opt.value,
+                    sort_dir: opt.value === 'lead_score' ? 'desc' : filters.sort_dir,
+                  })
+                }
+                className="border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          {['asc', 'desc'].map((dir) => (
+            <button
+              key={dir}
+              onClick={() => update({ sort_dir: dir })}
+              className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
+                filters.sort_dir === dir
+                  ? 'border-teal-500 bg-teal-50 text-teal-700 font-medium'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {dir === 'asc' ? 'Ascending' : 'Descending'}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

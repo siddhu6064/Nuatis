@@ -69,6 +69,7 @@ const NAV: NavItem[] = [
   { href: '/settings/email-templates', label: 'Email Templates', icon: '📧', suiteOnly: true },
   { href: '/settings/booking', label: 'Online Booking', icon: '📅', suiteOnly: true },
   { href: '/settings/intake-forms', label: 'Intake Forms', icon: '📋', suiteOnly: true },
+  { href: '/settings/lead-scoring', label: 'Lead Scoring', icon: '📊', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 

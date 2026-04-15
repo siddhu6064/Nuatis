@@ -10,6 +10,9 @@ interface Contact {
   full_name: string
   email: string | null
   pipeline_stage: string | null
+  lifecycle_stage: string | null
+  lead_score: number | null
+  lead_grade: string | null
 }
 
 export default async function PipelinePage() {
@@ -32,7 +35,7 @@ export default async function PipelinePage() {
   const supabase = createAdminClient()
   const { data: contacts } = await supabase
     .from('contacts')
-    .select('id, full_name, email, pipeline_stage')
+    .select('id, full_name, email, pipeline_stage, lifecycle_stage, lead_score, lead_grade')
     .eq('tenant_id', tenantId)
     .returns<Contact[]>()
 
@@ -50,6 +53,36 @@ export default async function PipelinePage() {
   }
 
   const totalContacts = contacts?.length ?? 0
+
+  const gradeColors: Record<string, string> = {
+    A: 'bg-green-100 text-green-700',
+    B: 'bg-blue-100 text-blue-700',
+    C: 'bg-yellow-100 text-yellow-700',
+    D: 'bg-orange-100 text-orange-700',
+    F: 'bg-red-100 text-red-700',
+  }
+
+  const lifecycleColors: Record<string, string> = {
+    subscriber: 'bg-gray-100 text-gray-600',
+    lead: 'bg-blue-100 text-blue-700',
+    marketing_qualified: 'bg-purple-100 text-purple-700',
+    sales_qualified: 'bg-orange-100 text-orange-700',
+    opportunity: 'bg-yellow-100 text-yellow-700',
+    customer: 'bg-green-100 text-green-700',
+    evangelist: 'bg-emerald-100 text-emerald-700',
+    other: 'bg-gray-100 text-gray-600',
+  }
+
+  const lifecycleLabel: Record<string, string> = {
+    subscriber: 'Subscriber',
+    lead: 'Lead',
+    marketing_qualified: 'MQL',
+    sales_qualified: 'SQL',
+    opportunity: 'Opportunity',
+    customer: 'Customer',
+    evangelist: 'Evangelist',
+    other: 'Other',
+  }
 
   return (
     <div className="px-8 py-8 h-full flex flex-col">
@@ -115,7 +148,34 @@ export default async function PipelinePage() {
 
                         {/* Email */}
                         {contact.email && (
-                          <p className="text-xs text-gray-400 truncate mb-2">{contact.email}</p>
+                          <p className="text-xs text-gray-400 truncate mb-1.5">{contact.email}</p>
+                        )}
+
+                        {/* Lead score + lifecycle badges */}
+                        {(contact.lead_score != null || contact.lifecycle_stage) && (
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                            {contact.lead_score != null && (
+                              <span className="inline-flex items-center gap-0.5">
+                                <span className="text-[10px] text-gray-400 font-medium">
+                                  {contact.lead_score}
+                                </span>
+                                {contact.lead_grade && (
+                                  <span
+                                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${gradeColors[contact.lead_grade] ?? 'bg-gray-100 text-gray-600'}`}
+                                  >
+                                    {contact.lead_grade}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                            {contact.lifecycle_stage && (
+                              <span
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${lifecycleColors[contact.lifecycle_stage] ?? 'bg-gray-100 text-gray-600'}`}
+                              >
+                                {lifecycleLabel[contact.lifecycle_stage] ?? contact.lifecycle_stage}
+                              </span>
+                            )}
+                          </div>
                         )}
 
                         {/* Stage badge */}

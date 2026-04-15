@@ -15,6 +15,10 @@ interface Contact {
   pipeline_stage: string | null
   source: string | null
   created_at: string
+  lifecycle_stage: string | null
+  lead_score: number | null
+  lead_grade: string | null
+  lead_score_updated_at: string | null
 }
 
 interface SavedView {
@@ -41,6 +45,8 @@ function filtersFromParams(params: URLSearchParams): FilterState {
     has_open_quote: params.get('has_open_quote') === 'true',
     referral_source: params.get('referral_source') ?? '',
     has_referral_source: params.get('has_referral_source') === 'true',
+    lifecycle_stage: params.get('lifecycle_stage')?.split(',').filter(Boolean) ?? [],
+    grade: params.get('grade')?.split(',').filter(Boolean) ?? [],
     sort_by: params.get('sort_by') ?? 'created_at',
     sort_dir: params.get('sort_dir') ?? 'desc',
   }
@@ -60,6 +66,9 @@ function filtersToParams(filters: FilterState): URLSearchParams {
   if (filters.has_open_quote) params.set('has_open_quote', 'true')
   if (filters.referral_source) params.set('referral_source', filters.referral_source)
   if (filters.has_referral_source) params.set('has_referral_source', 'true')
+  if (filters.lifecycle_stage.length > 0)
+    params.set('lifecycle_stage', filters.lifecycle_stage.join(','))
+  if (filters.grade.length > 0) params.set('grade', filters.grade.join(','))
   if (filters.sort_by !== 'created_at') params.set('sort_by', filters.sort_by)
   if (filters.sort_dir !== 'desc') params.set('sort_dir', filters.sort_dir)
   return params
@@ -77,7 +86,9 @@ function hasActiveFilters(f: FilterState): boolean {
     !!f.created_to ||
     f.has_open_quote ||
     !!f.referral_source ||
-    f.has_referral_source
+    f.has_referral_source ||
+    f.lifecycle_stage.length > 0 ||
+    f.grade.length > 0
   )
 }
 
@@ -92,6 +103,8 @@ function activeFilterCount(f: FilterState): number {
   if (f.has_open_quote) count++
   if (f.referral_source) count++
   if (f.has_referral_source) count++
+  if (f.lifecycle_stage.length > 0) count++
+  if (f.grade.length > 0) count++
   return count
 }
 
@@ -126,6 +139,8 @@ export default function ContactsList() {
     if (f.has_open_quote) params.set('has_open_quote', 'true')
     if (f.referral_source) params.set('referral_source', f.referral_source)
     if (f.has_referral_source) params.set('has_referral_source', 'true')
+    if (f.lifecycle_stage.length > 0) params.set('lifecycle_stage', f.lifecycle_stage.join(','))
+    if (f.grade.length > 0) params.set('grade', f.grade.join(','))
     params.set('sort_by', f.sort_by)
     params.set('sort_dir', f.sort_dir)
 
@@ -178,6 +193,10 @@ export default function ContactsList() {
       has_open_quote: view.filters['has_open_quote'] === 'true',
       referral_source: (view.filters['referral_source'] as string) ?? '',
       has_referral_source: view.filters['has_referral_source'] === 'true',
+      lifecycle_stage: ((view.filters['lifecycle_stage'] as string) ?? '')
+        .split(',')
+        .filter(Boolean),
+      grade: ((view.filters['grade'] as string) ?? '').split(',').filter(Boolean),
       sort_by: view.sort_by ?? 'created_at',
       sort_dir: view.sort_dir ?? 'desc',
     }
@@ -273,6 +292,16 @@ export default function ContactsList() {
     chips.push({
       label: 'Has referral source',
       onRemove: () => updateFilters({ ...filters, has_referral_source: false }),
+    })
+  if (filters.lifecycle_stage.length > 0)
+    chips.push({
+      label: `Lifecycle (${filters.lifecycle_stage.length})`,
+      onRemove: () => updateFilters({ ...filters, lifecycle_stage: [] }),
+    })
+  if (filters.grade.length > 0)
+    chips.push({
+      label: `Grade: ${filters.grade.join(', ')}`,
+      onRemove: () => updateFilters({ ...filters, grade: [] }),
     })
 
   return (
@@ -425,6 +454,10 @@ export default function ContactsList() {
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Email</th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Phone</th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Stage</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
+                    Lifecycle
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Score</th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Added</th>
                 </tr>
               </thead>
@@ -466,6 +499,57 @@ export default function ContactsList() {
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
                           {contact.pipeline_stage}
                         </span>
+                      ) : (
+                        <span className="text-sm text-gray-300">{'\u2014'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {contact.lifecycle_stage ? (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            {
+                              subscriber: 'bg-gray-100 text-gray-600',
+                              lead: 'bg-blue-50 text-blue-700',
+                              marketing_qualified: 'bg-purple-50 text-purple-700',
+                              sales_qualified: 'bg-orange-50 text-orange-700',
+                              opportunity: 'bg-yellow-50 text-yellow-700',
+                              customer: 'bg-green-50 text-green-700',
+                              evangelist: 'bg-emerald-50 text-emerald-700',
+                              other: 'bg-gray-100 text-gray-600',
+                            }[contact.lifecycle_stage] ?? 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {contact.lifecycle_stage
+                            .split('_')
+                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(' ')}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-300">{'\u2014'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {contact.lead_score != null || contact.lead_grade ? (
+                        <div className="flex items-center gap-1.5">
+                          {contact.lead_score != null && (
+                            <span className="text-sm text-gray-700">{contact.lead_score}</span>
+                          )}
+                          {contact.lead_grade && (
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                {
+                                  A: 'bg-green-50 text-green-700',
+                                  B: 'bg-blue-50 text-blue-700',
+                                  C: 'bg-yellow-50 text-yellow-700',
+                                  D: 'bg-orange-50 text-orange-700',
+                                  F: 'bg-red-50 text-red-700',
+                                }[contact.lead_grade] ?? 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {contact.lead_grade}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-300">{'\u2014'}</span>
                       )}
