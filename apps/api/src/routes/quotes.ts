@@ -9,8 +9,24 @@ import { logAuditEvent } from '../middleware/audit-logger.js'
 import { generateQuotePdf } from '../services/pdf-generator.js'
 import { API_BASE_URL } from '../config/urls.js'
 import { getFollowupQueue } from '../workers/quote-followup-worker.js'
+import { isModuleEnabled } from '../lib/modules.js'
+import { logActivity } from '../lib/activity.js'
+import type { NextFunction } from 'express'
 
 const router = Router()
+
+// CPQ module gate — applied after requireAuth on authenticated routes
+async function requireCpq(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authed = req as AuthenticatedRequest
+  const enabled = await isModuleEnabled(authed.tenantId, 'cpq')
+  if (!enabled) {
+    res.status(403).json({
+      error: 'CPQ module is not enabled for your workspace. Enable it in Settings → Modules.',
+    })
+    return
+  }
+  next()
+}
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -79,7 +95,7 @@ async function getCpqSettings(
 }
 
 // ── GET /api/quotes ──────────────────────────────────────────────────────────
-router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
@@ -138,7 +154,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 })
 
 // ── POST /api/quotes ─────────────────────────────────────────────────────────
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
   const b = req.body as Record<string, unknown>
@@ -411,10 +427,22 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
     return
   }
 
-  await supabase
-    .from('quotes')
-    .update({ status: 'sent', sent_at: new Date().toISOString() })
-    .eq('id', quote.id)
+  // Snapshot deposit settings
+  const cpqForDeposit = await getCpqSettings(supabase, authed.tenantId)
+  const sendUpdate: Record<string, unknown> = {
+    status: 'sent',
+    sent_at: new Date().toISOString(),
+  }
+  if (cpqForDeposit.deposit_pct > 0) {
+    const quoteTotal = Number(quote.total)
+    const depAmount = Math.round(((quoteTotal * cpqForDeposit.deposit_pct) / 100) * 100) / 100
+    const remaining = Math.round((quoteTotal - depAmount) * 100) / 100
+    sendUpdate['deposit_pct'] = cpqForDeposit.deposit_pct
+    sendUpdate['deposit_amount'] = depAmount
+    sendUpdate['remaining_balance'] = remaining
+  }
+
+  await supabase.from('quotes').update(sendUpdate).eq('id', quote.id)
 
   const shareUrl = `${API_BASE_URL}/quotes/view/${quote.share_token}`
   const contact = quote.contacts as { full_name?: string; phone?: string; email?: string } | null
@@ -522,6 +550,16 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
     }
   }
 
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: quote.contact_id ?? undefined,
+    type: 'quote',
+    body: `Quote sent: "${quote.title}" — $${Number(quote.total).toFixed(2)}`,
+    metadata: { quote_id: quote.id, status: 'sent' },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
   res.json({ sent: true, share_url: shareUrl })
 })
 
@@ -607,7 +645,7 @@ async function buildPdfForQuote(
 
   const { data: items } = await supabase
     .from('quote_line_items')
-    .select('description, quantity, unit_price, total')
+    .select('description, quantity, unit_price, total, package_id')
     .eq('quote_id', quoteId)
     .order('sort_order')
 
@@ -639,13 +677,23 @@ async function buildPdfForQuote(
     taxRate: Number(quote.tax_rate),
     taxAmount: Number(quote.tax_amount),
     total: Number(quote.total),
+    depositPct: quote.deposit_pct != null ? Number(quote.deposit_pct) : null,
+    depositAmount: quote.deposit_amount != null ? Number(quote.deposit_amount) : null,
+    remainingBalance: quote.remaining_balance != null ? Number(quote.remaining_balance) : null,
     notes: quote.notes,
     lineItems: (items ?? []).map(
-      (i: { description: string; quantity: number; unit_price: number; total: number }) => ({
+      (i: {
+        description: string
+        quantity: number
+        unit_price: number
+        total: number
+        package_id?: string | null
+      }) => ({
         description: i.description,
         quantity: Number(i.quantity),
         unit_price: Number(i.unit_price),
         total: Number(i.total),
+        package_id: i.package_id ?? null,
       })
     ),
   })
@@ -740,6 +788,15 @@ router.get('/view/:token', async (req: Request, res: Response): Promise<void> =>
         user_agent: userAgent,
       })
       console.info(`[quotes] view tracked for quote=${quote.id}`)
+
+      void logActivity({
+        tenantId: quote.tenant_id,
+        contactId: quote.contact_id ?? undefined,
+        type: 'quote',
+        body: 'Quote viewed by client',
+        metadata: { quote_id: quote.id, status: 'viewed' },
+        actorType: 'contact',
+      })
     }
   } catch (err) {
     console.error('[quotes] view tracking error:', err)
@@ -872,6 +929,15 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
     }).catch((err) => console.error('[quotes] owner SMS error:', err))
   }
 
+  void logActivity({
+    tenantId: quote.tenant_id,
+    contactId: quote.contact_id ?? undefined,
+    type: 'quote',
+    body: `Quote accepted: "${quote.quote_number}" — ${totalFormatted}`,
+    metadata: { quote_id: quote.id, status: 'accepted' },
+    actorType: 'contact',
+  })
+
   res.json({ accepted: true })
 })
 
@@ -938,6 +1004,15 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
     details: { contact_name: contactName, reason },
   })
 
+  void logActivity({
+    tenantId: quote.tenant_id,
+    contactId: quote.contact_id ?? undefined,
+    type: 'quote',
+    body: `Quote declined: "${quote.quote_number}"${reason ? ` — ${reason}` : ''}`,
+    metadata: { quote_id: quote.id, status: 'declined', reason },
+    actorType: 'contact',
+  })
+
   res.json({ declined: true })
 })
 
@@ -988,6 +1063,16 @@ router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Pr
     details: { discount_pct: quote.discount_pct, note },
   })
 
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: undefined,
+    type: 'quote',
+    body: 'Quote approved by owner',
+    metadata: { quote_id: quote.id, status: 'approved', note },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
   res.json({ approved: true, quote_number: quote.quote_number })
 })
 
@@ -1033,8 +1118,192 @@ router.post('/:id/reject', requireAuth, async (req: Request, res: Response): Pro
     details: { discount_pct: quote.discount_pct, note },
   })
 
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: undefined,
+    type: 'quote',
+    body: `Quote rejected: "${quote.quote_number}"${note ? ` — ${note}` : ''}`,
+    metadata: { quote_id: quote.id, status: 'rejected', note },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
   res.json({ rejected: true, quote_number: quote.quote_number })
 })
+
+// ── POST /api/quotes/:id/add-package ────────────────────────────────────────
+router.post('/:id/add-package', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const packageId = typeof req.body?.package_id === 'string' ? req.body.package_id : null
+
+  if (!packageId) {
+    res.status(400).json({ error: 'package_id is required' })
+    return
+  }
+
+  // Verify quote belongs to tenant
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('id, tenant_id')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single()
+
+  if (!quote) {
+    res.status(404).json({ error: 'Quote not found' })
+    return
+  }
+
+  // Verify package belongs to same tenant
+  const { data: pkg } = await supabase
+    .from('service_packages')
+    .select('id, name, items, bundle_price')
+    .eq('id', packageId)
+    .eq('tenant_id', authed.tenantId)
+    .eq('is_active', true)
+    .single()
+
+  if (!pkg) {
+    res.status(404).json({ error: 'Package not found' })
+    return
+  }
+
+  const pkgItems = pkg.items as Array<{ service_id: string; qty: number }>
+
+  // Resolve service records
+  const serviceIds = pkgItems.map((i) => i.service_id)
+  const { data: services } = await supabase
+    .from('services')
+    .select('id, name, unit_price')
+    .in('id', serviceIds)
+
+  const serviceMap = new Map(
+    (services ?? []).map((s) => [
+      s.id,
+      { name: s.name as string, unit_price: Number(s.unit_price) },
+    ])
+  )
+
+  // Get current max sort_order
+  const { data: existingItems } = await supabase
+    .from('quote_line_items')
+    .select('sort_order')
+    .eq('quote_id', quote.id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const maxSort = existingItems?.[0]?.sort_order ?? -1
+
+  // Build line item rows for each package service
+  let listPriceTotal = 0
+  const rows: Array<Record<string, unknown>> = []
+  let sortIdx = maxSort + 1
+
+  for (const item of pkgItems) {
+    const svc = serviceMap.get(item.service_id)
+    if (!svc) continue
+    const lineTotal = Number((item.qty * svc.unit_price).toFixed(2))
+    listPriceTotal += lineTotal
+    rows.push({
+      quote_id: quote.id,
+      service_id: item.service_id,
+      package_id: packageId,
+      description: svc.name,
+      quantity: item.qty,
+      unit_price: svc.unit_price,
+      total: lineTotal,
+      sort_order: sortIdx++,
+    })
+  }
+
+  // Add the discount row (negative amount)
+  const savings = Number((listPriceTotal - Number(pkg.bundle_price)).toFixed(2))
+  if (savings > 0) {
+    rows.push({
+      quote_id: quote.id,
+      service_id: null,
+      package_id: packageId,
+      description: `${pkg.name} — Bundle Savings`,
+      quantity: 1,
+      unit_price: -savings,
+      total: -savings,
+      sort_order: sortIdx,
+    })
+  }
+
+  const { error: insertErr } = await supabase.from('quote_line_items').insert(rows)
+  if (insertErr) {
+    res.status(500).json({ error: insertErr.message })
+    return
+  }
+
+  // Return updated quote with all line items
+  const { data: updatedQuote } = await supabase
+    .from('quotes')
+    .select('*, contacts(full_name, phone, email)')
+    .eq('id', quote.id)
+    .single()
+  const { data: allItems } = await supabase
+    .from('quote_line_items')
+    .select('*')
+    .eq('quote_id', quote.id)
+    .order('sort_order', { ascending: true })
+
+  res.json({ ...updatedQuote, line_items: allItems ?? [] })
+})
+
+// ── DELETE /api/quotes/:quoteId/items/:itemId ───────────────────────────────
+router.delete(
+  '/:quoteId/items/:itemId',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    // Verify quote belongs to tenant
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id')
+      .eq('id', req.params['quoteId'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    // Check if item has a package_id
+    const { data: item } = await supabase
+      .from('quote_line_items')
+      .select('id, package_id')
+      .eq('id', req.params['itemId'])
+      .eq('quote_id', quote.id)
+      .single()
+
+    if (!item) {
+      res.status(404).json({ error: 'Line item not found' })
+      return
+    }
+
+    let warning: string | null = null
+
+    if (item.package_id) {
+      // Delete entire package group
+      await supabase
+        .from('quote_line_items')
+        .delete()
+        .eq('quote_id', quote.id)
+        .eq('package_id', item.package_id)
+      warning = 'Entire package group removed.'
+    } else {
+      // Delete single item
+      await supabase.from('quote_line_items').delete().eq('id', item.id)
+    }
+
+    res.json({ deleted: true, ...(warning ? { warning } : {}) })
+  }
+)
 
 // ── Quote email HTML helper ──────────────────────────────────────────────────
 function quoteEmailHtml(vars: {

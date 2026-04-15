@@ -22,6 +22,10 @@ import analyticsEventsRouter from './routes/analytics-events.js'
 import locationsRouter from './routes/locations.js'
 import npsRouter from './routes/nps.js'
 import cpqSettingsRouter from './routes/cpq-settings.js'
+import packagesRouter from './routes/packages.js'
+import settingsModulesRouter from './routes/settings-modules.js'
+import activityRouter from './routes/activity.js'
+import tasksRouter from './routes/tasks.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -76,9 +80,13 @@ app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/nps', npsRouter)
 app.use('/api/cpq', cpqSettingsRouter)
+app.use('/api/packages', packagesRouter)
+app.use('/api/settings/modules', settingsModulesRouter)
+app.use('/api', activityRouter)
+app.use('/api/tasks', tasksRouter)
 
 app.get('/', (_req, res) => {
-  res.json({ message: 'Nuatis API — Phase 1 build in progress' })
+  res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
 })
 
 app.post('/voice/inbound', async (req, res) => {

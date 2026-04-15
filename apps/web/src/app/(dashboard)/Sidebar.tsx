@@ -11,23 +11,50 @@ interface NavItem {
   icon: string
   onboardingOnly?: boolean
   suiteOnly?: boolean
+  requireModule?: string
 }
 
 const NAV: NavItem[] = [
   { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true },
-  { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true },
-  { href: '/appointments', label: 'Appointments', icon: '◷', suiteOnly: true },
-  { href: '/calls', label: 'Call Log', icon: '◉' },
-  { href: '/automation', label: 'Automation', icon: '⚡', suiteOnly: true },
-  { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true },
-  { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true },
-  { href: '/settings/voice', label: 'Voice AI', icon: '◇' },
+  { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true, requireModule: 'crm' },
+  { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true, requireModule: 'pipeline' },
+  {
+    href: '/appointments',
+    label: 'Appointments',
+    icon: '◷',
+    suiteOnly: true,
+    requireModule: 'appointments',
+  },
+  { href: '/calls', label: 'Call Log', icon: '◉', requireModule: 'maya' },
+  {
+    href: '/automation',
+    label: 'Automation',
+    icon: '⚡',
+    suiteOnly: true,
+    requireModule: 'automation',
+  },
+  { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true, requireModule: 'insights' },
+  { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
+  { href: '/tasks', label: 'Tasks', icon: '☑', suiteOnly: true },
+  { href: '/settings/voice', label: 'Voice AI', icon: '◇', requireModule: 'maya' },
   { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
-  { href: '/settings/follow-ups', label: 'Follow-ups', icon: '↻', suiteOnly: true },
-  { href: '/settings/cpq', label: 'Quote Settings', icon: '⚙', suiteOnly: true },
+  {
+    href: '/settings/follow-ups',
+    label: 'Follow-ups',
+    icon: '↻',
+    suiteOnly: true,
+    requireModule: 'automation',
+  },
+  {
+    href: '/settings/cpq',
+    label: 'Quote Settings',
+    icon: '⚙',
+    suiteOnly: true,
+    requireModule: 'cpq',
+  },
   { href: '/settings/audit', label: 'Audit Log', icon: '▧', suiteOnly: true },
+  { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 
@@ -35,30 +62,42 @@ export default function Sidebar() {
   const path = usePathname()
   const [onboardingDone, setOnboardingDone] = useState(true)
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
+  const [modules, setModules] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     fetch('/api/auth/session')
       .then((r) => r.json())
-      .then((s: { user?: { tenantId?: string } }) => {
-        if (!s?.user?.tenantId) return
-        fetch('/api/provisioning/onboarding-status')
-          .then((r) => (r.ok ? r.json() : null))
-          .then((data: { onboarding_completed?: boolean; product?: string } | null) => {
-            if (data) {
-              setOnboardingDone(data.onboarding_completed ?? true)
-              if (data.product === 'maya_only') setProduct('maya_only')
-            }
-          })
-          .catch(() => {})
-      })
+      .then(
+        (s: {
+          user?: {
+            tenantId?: string
+            modules?: Record<string, boolean>
+          }
+        }) => {
+          if (!s?.user?.tenantId) return
+          if (s.user.modules) setModules(s.user.modules)
+          fetch('/api/provisioning/onboarding-status')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data: { onboarding_completed?: boolean; product?: string } | null) => {
+              if (data) {
+                setOnboardingDone(data.onboarding_completed ?? true)
+                if (data.product === 'maya_only') setProduct('maya_only')
+              }
+            })
+            .catch(() => {})
+        }
+      )
       .catch(() => {})
   }, [])
 
   const isMayaOnly = product === 'maya_only'
+  // If modules is empty (not loaded or missing), treat all as enabled — never lock user out
+  const moduleEnabled = (m: string) => modules[m] !== false
 
   const visibleNav = NAV.filter((item) => {
     if (item.onboardingOnly && onboardingDone) return false
     if (item.suiteOnly && isMayaOnly) return false
+    if (item.requireModule && !moduleEnabled(item.requireModule)) return false
     return true
   })
 

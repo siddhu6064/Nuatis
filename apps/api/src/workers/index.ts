@@ -8,6 +8,7 @@ import { createFollowUpCadenceWorker } from './follow-up-cadence-worker.js'
 import { createDataRetentionWorker } from './data-retention-worker.js'
 import { createQuoteExpiryWorker } from './quote-expiry-worker.js'
 import { createQuoteFollowupWorker } from './quote-followup-worker.js'
+import { createTaskReminderWorker } from './task-reminder-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -103,6 +104,11 @@ export async function startWorkers(): Promise<void> {
   const quoteFollowup = createQuoteFollowupWorker()
   managed.push({ name: 'quote-followup', ...quoteFollowup })
   console.info('[workers] quote-followup worker started')
+
+  // 10. Task reminder — processes one-shot delayed jobs (at task due date)
+  const taskReminder = createTaskReminderWorker()
+  managed.push({ name: 'task-reminder', ...taskReminder })
+  console.info('[workers] task-reminder worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

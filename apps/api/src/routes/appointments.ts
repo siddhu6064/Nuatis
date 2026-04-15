@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { createEvent, updateEvent, deleteEvent } from '../services/scheduling.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
+import { logActivity } from '../lib/activity.js'
 
 const router = Router()
 
@@ -139,6 +140,22 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
+  const startFormatted = new Date(start_time).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: contact_id,
+    type: 'appointment',
+    body: `Appointment booked: "${title}" on ${startFormatted}`,
+    metadata: { appointment_id: appointment.id },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
   res.status(201).json({ data: appointment })
 })
 
@@ -209,6 +226,46 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Activity logging for status changes
+  const appointmentContactId = (appointment as Record<string, unknown>)['contact_id'] as
+    | string
+    | undefined
+  if (parsed.data.status === 'no_show') {
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: appointmentContactId ?? undefined,
+      type: 'appointment',
+      body: `No-show: "${(appointment as Record<string, unknown>)['title'] ?? 'Appointment'}"`,
+      metadata: { appointment_id: id },
+      actorType: 'system',
+    })
+  } else if (parsed.data.status === 'completed') {
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: appointmentContactId ?? undefined,
+      type: 'appointment',
+      body: `Appointment completed: "${(appointment as Record<string, unknown>)['title'] ?? 'Appointment'}"`,
+      metadata: { appointment_id: id },
+      actorType: 'system',
+    })
+  } else if (parsed.data.start_time) {
+    const newStart = new Date(parsed.data.start_time).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: appointmentContactId ?? undefined,
+      type: 'appointment',
+      body: `Appointment rescheduled to ${newStart}`,
+      metadata: { appointment_id: id },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
   }
 
   if (parsed.data.status === 'no_show') {
