@@ -12,6 +12,8 @@ export interface FilterState {
   created_from: string
   created_to: string
   has_open_quote: boolean
+  referral_source: string
+  has_referral_source: boolean
   sort_by: string
   sort_dir: string
 }
@@ -26,6 +28,8 @@ export const EMPTY_FILTERS: FilterState = {
   created_from: '',
   created_to: '',
   has_open_quote: false,
+  referral_source: '',
+  has_referral_source: false,
   sort_by: 'created_at',
   sort_dir: 'desc',
 }
@@ -74,6 +78,8 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
   const [stages, setStages] = useState<Stage[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
+  const [referralSources, setReferralSources] = useState<string[]>([])
+  const [referralInput, setReferralInput] = useState(filters.referral_source)
 
   useEffect(() => {
     void fetch('/api/contacts/stages')
@@ -84,6 +90,11 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     void fetch('/api/contacts/tags')
       .then((r) => r.json())
       .then((d: { tags: string[] }) => setAllTags(d.tags))
+      .catch(() => {})
+
+    void fetch('/api/contacts/referral-sources')
+      .then((r) => r.json())
+      .then((d: { sources: string[] }) => setReferralSources(d.sources))
       .catch(() => {})
   }, [])
 
@@ -104,7 +115,9 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     (filters.tags.length > 0 ? 1 : 0) +
     (filters.last_contacted_from || filters.last_contacted_to ? 1 : 0) +
     (filters.created_from || filters.created_to ? 1 : 0) +
-    (filters.has_open_quote ? 1 : 0)
+    (filters.has_open_quote ? 1 : 0) +
+    (filters.referral_source ? 1 : 0) +
+    (filters.has_referral_source ? 1 : 0)
 
   const tagSuggestions = allTags.filter(
     (t) => !filters.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase())
@@ -279,6 +292,61 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
             className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
           />
           Has open quote
+        </label>
+      </div>
+
+      {/* Referral Source */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Referral Source</p>
+        <div className="relative">
+          <input
+            type="text"
+            value={referralInput}
+            onChange={(e) => {
+              setReferralInput(e.target.value)
+              update({ referral_source: e.target.value })
+            }}
+            placeholder="e.g. Google, Instagram..."
+            className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 placeholder-gray-300"
+          />
+          {referralInput &&
+            referralSources.filter(
+              (s) => s.toLowerCase().includes(referralInput.toLowerCase()) && s !== referralInput
+            ).length > 0 && (
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-24 overflow-y-auto">
+                {referralSources
+                  .filter(
+                    (s) =>
+                      s.toLowerCase().includes(referralInput.toLowerCase()) && s !== referralInput
+                  )
+                  .slice(0, 5)
+                  .map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setReferralInput(s)
+                        update({ referral_source: s })
+                      }}
+                      className="block w-full text-left text-xs px-2 py-1 hover:bg-gray-50 text-gray-600"
+                    >
+                      {s}
+                    </button>
+                  ))}
+              </div>
+            )}
+        </div>
+      </div>
+
+      {/* Has Referral Source */}
+      <div className="mb-4">
+        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.has_referral_source}
+            onChange={(e) => update({ has_referral_source: e.target.checked })}
+            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+          />
+          Has referral source
         </label>
       </div>
     </div>

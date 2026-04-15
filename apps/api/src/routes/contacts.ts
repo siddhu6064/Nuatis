@@ -91,6 +91,17 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     query = query.lte('created_at', createdTo)
   }
 
+  // ── Referral source filter ──
+  const referralSource =
+    typeof req.query['referral_source'] === 'string' ? req.query['referral_source'].trim() : null
+  if (referralSource) {
+    query = query.ilike('referral_source_detail', `%${referralSource}%`)
+  }
+  const hasReferralSource = req.query['has_referral_source'] === 'true'
+  if (hasReferralSource) {
+    query = query.not('referral_source_detail', 'is', null)
+  }
+
   // ── Sort ──
   const sortBy = typeof req.query['sort_by'] === 'string' ? req.query['sort_by'] : 'created_at'
   const sortDir = req.query['sort_dir'] === 'asc'
@@ -256,6 +267,12 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       source: typeof b['source'] === 'string' ? b['source'] : 'manual',
       tags: Array.isArray(b['tags']) ? b['tags'] : [],
       notes: typeof b['notes'] === 'string' ? b['notes'] : null,
+      referred_by_contact_id:
+        typeof b['referred_by_contact_id'] === 'string' ? b['referred_by_contact_id'] : null,
+      referral_source_detail:
+        typeof b['referral_source_detail'] === 'string'
+          ? b['referral_source_detail'].slice(0, 200)
+          : null,
     })
     .select()
     .single()
@@ -304,6 +321,12 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (Array.isArray(b['tags'])) updates['tags'] = b['tags']
   if (typeof b['pipeline_stage'] === 'string') updates['pipeline_stage'] = b['pipeline_stage']
   if (typeof b['is_archived'] === 'boolean') updates['is_archived'] = b['is_archived']
+  if (typeof b['referred_by_contact_id'] === 'string')
+    updates['referred_by_contact_id'] = b['referred_by_contact_id']
+  if (b['referred_by_contact_id'] === null) updates['referred_by_contact_id'] = null
+  if (typeof b['referral_source_detail'] === 'string')
+    updates['referral_source_detail'] = b['referral_source_detail'].slice(0, 200)
+  if (b['referral_source_detail'] === null) updates['referral_source_detail'] = null
 
   const { data: updated, error } = await supabase
     .from('contacts')
@@ -545,6 +568,334 @@ router.post('/merge', requireAuth, async (req: Request, res: Response): Promise<
   const { data: result } = await supabase.from('contacts').select('*').eq('id', primaryId).single()
 
   res.json(result)
+})
+
+// ── Bulk helper: validate contact_ids belong to tenant ───────────────────────
+async function validateBulkIds(
+  supabase: ReturnType<typeof getSupabase>,
+  tenantId: string,
+  contactIds: string[]
+): Promise<{ valid: boolean; error?: string }> {
+  if (!contactIds || contactIds.length === 0)
+    return { valid: false, error: 'contact_ids is required' }
+  if (contactIds.length > 500)
+    return { valid: false, error: 'Maximum 500 contacts per bulk operation' }
+  const { count } = await supabase
+    .from('contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .in('id', contactIds)
+  if ((count ?? 0) !== contactIds.length)
+    return { valid: false, error: 'Some contact IDs do not belong to this tenant' }
+  return { valid: true }
+}
+
+// ── POST /api/contacts/bulk/stage ────────────────────────────────────────────
+router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contact_ids, pipeline_stage_id } = req.body as {
+    contact_ids: string[]
+    pipeline_stage_id: string
+  }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  // Verify stage belongs to tenant
+  const { data: stage } = await supabase
+    .from('pipeline_stages')
+    .select('id, name')
+    .eq('id', pipeline_stage_id)
+    .eq('tenant_id', authed.tenantId)
+    .single()
+  if (!stage) {
+    res.status(400).json({ error: 'Invalid pipeline stage' })
+    return
+  }
+
+  const { count } = await supabase
+    .from('contacts')
+    .update({ pipeline_stage: stage.name })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contact_ids)
+
+  for (const cid of contact_ids) {
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: cid,
+      type: 'stage_change',
+      body: `Moved to "${stage.name}" (bulk)`,
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+  }
+
+  res.json({ updated: count ?? contact_ids.length })
+})
+
+// ── POST /api/contacts/bulk/tag ──────────────────────────────────────────────
+router.post('/bulk/tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contact_ids, tags_to_add, tags_to_remove } = req.body as {
+    contact_ids: string[]
+    tags_to_add?: string[]
+    tags_to_remove?: string[]
+  }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  const addTags = tags_to_add?.filter(Boolean) ?? []
+  const removeTags = tags_to_remove?.filter(Boolean) ?? []
+  if (addTags.length === 0 && removeTags.length === 0) {
+    res.status(400).json({ error: 'At least one of tags_to_add or tags_to_remove is required' })
+    return
+  }
+
+  // Fetch current tags for each contact and update
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, tags')
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contact_ids)
+
+  let updated = 0
+  for (const c of contacts ?? []) {
+    const currentTags = Array.isArray(c.tags) ? (c.tags as string[]) : []
+    const combined = new Set([...currentTags, ...addTags])
+    for (const t of removeTags) combined.delete(t)
+    await supabase
+      .from('contacts')
+      .update({ tags: [...combined] })
+      .eq('id', c.id)
+    updated++
+
+    const parts: string[] = []
+    if (addTags.length > 0) parts.push(`added [${addTags.join(', ')}]`)
+    if (removeTags.length > 0) parts.push(`removed [${removeTags.join(', ')}]`)
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: c.id,
+      type: 'system',
+      body: `Tags updated (bulk): ${parts.join(', ')}`,
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+  }
+
+  res.json({ updated })
+})
+
+// ── POST /api/contacts/bulk/sms ──────────────────────────────────────────────
+router.post('/bulk/sms', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contact_ids, message } = req.body as { contact_ids: string[]; message: string }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  if (!message || message.length === 0) {
+    res.status(400).json({ error: 'message is required' })
+    return
+  }
+  if (message.length > 320) {
+    res.status(400).json({ error: 'message must be 320 chars or less' })
+    return
+  }
+
+  const { data: location } = await supabase
+    .from('locations')
+    .select('telnyx_number')
+    .eq('tenant_id', authed.tenantId)
+    .eq('is_primary', true)
+    .maybeSingle()
+
+  const apiKey = process.env['TELNYX_API_KEY']
+  if (!location?.telnyx_number || !apiKey) {
+    res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
+    return
+  }
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, full_name, phone')
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contact_ids)
+
+  let sent = 0
+  const skippedReasons: Array<{ contact_id: string; reason: string }> = []
+
+  for (const c of contacts ?? []) {
+    if (!c.phone) {
+      skippedReasons.push({ contact_id: c.id, reason: 'No phone number' })
+      continue
+    }
+
+    const firstName = (c.full_name ?? '').split(' ')[0] ?? ''
+    const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
+
+    try {
+      await fetch('https://api.telnyx.com/v2/messages', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: location.telnyx_number,
+          to: c.phone,
+          text: substituted,
+        }),
+      })
+      sent++
+
+      void logActivity({
+        tenantId: authed.tenantId,
+        contactId: c.id,
+        type: 'sms',
+        body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
+        actorType: 'user',
+        actorId: authed.userId,
+      })
+
+      // Rate limit: 50ms between sends
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    } catch (err) {
+      skippedReasons.push({
+        contact_id: c.id,
+        reason: err instanceof Error ? err.message : 'Send failed',
+      })
+    }
+  }
+
+  res.json({ sent, skipped: skippedReasons.length, skipped_reasons: skippedReasons })
+})
+
+// ── POST /api/contacts/bulk/archive ──────────────────────────────────────────
+router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contact_ids } = req.body as { contact_ids: string[] }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  const { count } = await supabase
+    .from('contacts')
+    .update({ is_archived: true })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contact_ids)
+
+  for (const cid of contact_ids) {
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: cid,
+      type: 'system',
+      body: 'Contact archived (bulk)',
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+  }
+
+  res.json({ updated: count ?? contact_ids.length })
+})
+
+// ── POST /api/contacts/bulk/export ───────────────────────────────────────────
+router.post('/bulk/export', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contact_ids } = req.body as { contact_ids?: string[] }
+
+  let contacts: Array<Record<string, unknown>>
+
+  if (contact_ids && contact_ids.length > 0) {
+    if (contact_ids.length > 5000) {
+      res.status(400).json({ error: 'Maximum 5000 contacts per export' })
+      return
+    }
+    const { data } = await supabase
+      .from('contacts')
+      .select(
+        'full_name, phone, email, source, tags, pipeline_stage, created_at, referral_source_detail, vertical_data'
+      )
+      .eq('tenant_id', authed.tenantId)
+      .in('id', contact_ids)
+    contacts = data ?? []
+  } else {
+    const { data } = await supabase
+      .from('contacts')
+      .select(
+        'full_name, phone, email, source, tags, pipeline_stage, created_at, referral_source_detail, vertical_data'
+      )
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false })
+      .limit(5000)
+    contacts = data ?? []
+  }
+
+  // Build CSV
+  const headers = [
+    'name',
+    'phone',
+    'email',
+    'source',
+    'tags',
+    'pipeline_stage',
+    'created_at',
+    'referral_source',
+  ]
+  const rows = contacts.map((c) => [
+    csvEscape(String(c['full_name'] ?? '')),
+    csvEscape(String(c['phone'] ?? '')),
+    csvEscape(String(c['email'] ?? '')),
+    csvEscape(String(c['source'] ?? '')),
+    csvEscape(Array.isArray(c['tags']) ? (c['tags'] as string[]).join(';') : ''),
+    csvEscape(String(c['pipeline_stage'] ?? '')),
+    csvEscape(String(c['created_at'] ?? '')),
+    csvEscape(String(c['referral_source_detail'] ?? '')),
+  ])
+
+  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+  const date = new Date().toISOString().split('T')[0]
+
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', `attachment; filename="contacts-export-${date}.csv"`)
+  res.send(csv)
+})
+
+function csvEscape(val: string): string {
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return `"${val.replace(/"/g, '""')}"`
+  }
+  return val
+}
+
+// ── GET /api/contacts/referral-sources ────────────────────────────────────────
+router.get('/referral-sources', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { data } = await supabase
+    .from('contacts')
+    .select('referral_source_detail')
+    .eq('tenant_id', authed.tenantId)
+    .not('referral_source_detail', 'is', null)
+
+  const sources = [...new Set((data ?? []).map((r) => r.referral_source_detail as string))].sort()
+  res.json({ sources })
 })
 
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────

@@ -468,6 +468,87 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
     ).length
     const funnelAccepted = acceptedCount
 
+    // Top packages analytics
+    interface TopPackage {
+      package_id: string
+      package_name: string
+      vertical: string
+      quote_count: number
+      total_revenue: number
+      win_rate: number
+    }
+    let topPackages: TopPackage[] = []
+
+    const allQuoteIds = allQuotes.map((q) => q.id)
+    if (allQuoteIds.length > 0) {
+      const { data: pkgLineItems } = await supabase
+        .from('quote_line_items')
+        .select('quote_id, package_id, total')
+        .in('quote_id', allQuoteIds.slice(0, 200))
+        .not('package_id', 'is', null)
+
+      if (pkgLineItems && pkgLineItems.length > 0) {
+        // Get unique package_ids
+        const pkgIds = [...new Set(pkgLineItems.map((li) => li.package_id as string))]
+        const { data: pkgRecords } = await supabase
+          .from('service_packages')
+          .select('id, name, vertical')
+          .in('id', pkgIds)
+
+        const pkgMap = new Map(
+          (pkgRecords ?? []).map((p) => [
+            p.id,
+            { name: p.name as string, vertical: p.vertical as string },
+          ])
+        )
+
+        // Group by package_id: distinct quotes + revenue from won quotes
+        const wonIds = new Set(acceptedIds)
+        const pkgStats = new Map<
+          string,
+          { quoteIds: Set<string>; revenue: number; wonCount: number }
+        >()
+
+        for (const li of pkgLineItems) {
+          const pid = li.package_id as string
+          const stat = pkgStats.get(pid) ?? { quoteIds: new Set(), revenue: 0, wonCount: 0 }
+          stat.quoteIds.add(li.quote_id)
+          if (wonIds.has(li.quote_id)) {
+            stat.revenue += Number(li.total) || 0
+          }
+          pkgStats.set(pid, stat)
+        }
+
+        // Count won quotes per package
+        for (const [pid, stat] of pkgStats) {
+          let won = 0
+          for (const qid of stat.quoteIds) {
+            if (wonIds.has(qid)) won++
+          }
+          stat.wonCount = won
+          pkgStats.set(pid, stat)
+        }
+
+        topPackages = Array.from(pkgStats.entries())
+          .map(([pid, stat]) => {
+            const pkg = pkgMap.get(pid)
+            return {
+              package_id: pid,
+              package_name: pkg?.name ?? 'Unknown',
+              vertical: pkg?.vertical ?? '',
+              quote_count: stat.quoteIds.size,
+              total_revenue: Number(stat.revenue.toFixed(2)),
+              win_rate:
+                stat.quoteIds.size > 0
+                  ? Number(((stat.wonCount / stat.quoteIds.size) * 100).toFixed(1))
+                  : 0,
+            }
+          })
+          .sort((a, b) => b.quote_count - a.quote_count)
+          .slice(0, 5)
+      }
+    }
+
     res.json({
       total_quotes: totalQuotes,
       quotes_by_status: statusMap,
@@ -479,6 +560,7 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
       avg_time_to_first_view_hours: avgTimeToFirstViewHours,
       quote_volume_trend: quoteVolumeTrend,
       top_services: topServices,
+      top_packages: topPackages,
       funnel: [
         { stage: 'Draft', count: funnelDraft },
         { stage: 'Sent', count: funnelSent },
@@ -541,6 +623,94 @@ router.get('/plg', requireAuth, async (_req: Request, res: Response): Promise<vo
   } catch (err) {
     console.error('[insights] plg error:', err)
     res.status(500).json({ error: 'Failed to fetch PLG insights' })
+  }
+})
+
+// ── GET /api/insights/referrals ───────────────────────────────────────────────
+router.get('/referrals', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Contacts with referral sources
+    const { data: referred } = await supabase
+      .from('contacts')
+      .select('id, referral_source_detail, referred_by_contact_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+      .not('referral_source_detail', 'is', null)
+
+    const referredContacts = referred ?? []
+    const totalReferred = referredContacts.length
+
+    // Top sources by count
+    const sourceCounts = new Map<string, number>()
+    for (const c of referredContacts) {
+      const src = c.referral_source_detail as string
+      sourceCounts.set(src, (sourceCounts.get(src) ?? 0) + 1)
+    }
+
+    const topSources = [...sourceCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([source, count]) => ({ source, count, revenue: 0 }))
+
+    // Top referrers (contacts who referred others)
+    const referrerCounts = new Map<string, number>()
+    for (const c of referredContacts) {
+      const refId = c.referred_by_contact_id as string | null
+      if (refId) referrerCounts.set(refId, (referrerCounts.get(refId) ?? 0) + 1)
+    }
+
+    const topReferrerIds = [...referrerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
+
+    let topReferrers: Array<{
+      contact_id: string
+      contact_name: string
+      referral_count: number
+      revenue_generated: number
+    }> = []
+
+    if (topReferrerIds.length > 0) {
+      const { data: referrerContacts } = await supabase
+        .from('contacts')
+        .select('id, full_name')
+        .in(
+          'id',
+          topReferrerIds.map(([id]) => id)
+        )
+
+      const nameMap = new Map((referrerContacts ?? []).map((c) => [c.id, c.full_name]))
+      topReferrers = topReferrerIds.map(([id, count]) => ({
+        contact_id: id,
+        contact_name: nameMap.get(id) ?? 'Unknown',
+        referral_count: count,
+        revenue_generated: 0,
+      }))
+    }
+
+    // Conversion rate: referred contacts with >= 1 appointment
+    let conversionRate = 0
+    if (totalReferred > 0) {
+      const referredIds = referredContacts.map((c) => c.id)
+      const { count: withAppointments } = await supabase
+        .from('appointments')
+        .select('contact_id', { count: 'exact', head: true })
+        .eq('tenant_id', authed.tenantId)
+        .in('contact_id', referredIds)
+
+      conversionRate = Math.round(((withAppointments ?? 0) / totalReferred) * 100)
+    }
+
+    res.json({
+      top_sources: topSources,
+      top_referrers: topReferrers,
+      total_referred: totalReferred,
+      referral_conversion_rate: conversionRate,
+    })
+  } catch (err) {
+    console.error('[insights] referrals error:', err)
+    res.status(500).json({ error: 'Failed to fetch referral insights' })
   }
 })
 

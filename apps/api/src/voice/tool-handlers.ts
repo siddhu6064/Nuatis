@@ -113,6 +113,22 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'capture_referral_source',
+    description:
+      'Record how the caller heard about the business. Call this after a successful appointment booking when the caller is a new contact. Ask: "Before we finish — how did you hear about us?" and pass their answer to this tool. This is optional — if the caller hangs up before answering, skip it.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          description:
+            'How the caller heard about the business, e.g. "Google", "Instagram", "friend referral", "walk-in", "Yelp"',
+        },
+      },
+      required: ['source'],
+    },
+  },
+  {
     name: 'end_call',
     description:
       'End the current phone call. Call this ONLY after you have said goodbye to the caller and the conversation is naturally complete. Do not call this while the caller is still speaking or mid-conversation.',
@@ -836,6 +852,45 @@ const handlers: Record<string, ToolHandler> = {
     } catch (err) {
       console.error('[tool-handlers] escalate_to_human error:', err)
       return { transferred: false, error: 'Unable to transfer call' }
+    }
+  },
+
+  capture_referral_source: async (args, context) => {
+    const source = typeof args['source'] === 'string' ? args['source'].trim() : ''
+    if (!source) return { captured: false, error: 'No source provided' }
+
+    const ccId = context.callControlId
+    const session = ccId ? callSessionState.get(ccId) : null
+    const contactId = session?.contactId
+
+    if (!contactId) {
+      console.info('[tool-handlers] capture_referral_source: no contactId in session — skipping')
+      return { captured: false, reason: 'No contact linked to this call' }
+    }
+
+    try {
+      const supabase = getSupabase()
+      await supabase
+        .from('contacts')
+        .update({ referral_source_detail: source.slice(0, 200) })
+        .eq('id', contactId)
+
+      const { logActivity } = await import('../lib/activity.js')
+      void logActivity({
+        tenantId: context.tenantId,
+        contactId,
+        type: 'system',
+        body: `Referral source captured by Maya: "${source}"`,
+        actorType: 'ai',
+      })
+
+      console.info(
+        `[tool-handlers] capture_referral_source: saved "${source}" for contact=${contactId}`
+      )
+      return { captured: true, source }
+    } catch (err) {
+      console.error('[tool-handlers] capture_referral_source error:', err)
+      return { captured: false, error: 'Failed to save referral source' }
     }
   },
 

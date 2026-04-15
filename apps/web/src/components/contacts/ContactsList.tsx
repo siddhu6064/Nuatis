@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ContactFilters, { type FilterState, EMPTY_FILTERS } from './ContactFilters'
 import SavedViews from './SavedViews'
+import BulkActionBar from './BulkActionBar'
 
 interface Contact {
   id: string
@@ -38,6 +39,8 @@ function filtersFromParams(params: URLSearchParams): FilterState {
     created_from: params.get('created_from') ?? '',
     created_to: params.get('created_to') ?? '',
     has_open_quote: params.get('has_open_quote') === 'true',
+    referral_source: params.get('referral_source') ?? '',
+    has_referral_source: params.get('has_referral_source') === 'true',
     sort_by: params.get('sort_by') ?? 'created_at',
     sort_dir: params.get('sort_dir') ?? 'desc',
   }
@@ -55,6 +58,8 @@ function filtersToParams(filters: FilterState): URLSearchParams {
   if (filters.created_from) params.set('created_from', filters.created_from)
   if (filters.created_to) params.set('created_to', filters.created_to)
   if (filters.has_open_quote) params.set('has_open_quote', 'true')
+  if (filters.referral_source) params.set('referral_source', filters.referral_source)
+  if (filters.has_referral_source) params.set('has_referral_source', 'true')
   if (filters.sort_by !== 'created_at') params.set('sort_by', filters.sort_by)
   if (filters.sort_dir !== 'desc') params.set('sort_dir', filters.sort_dir)
   return params
@@ -70,7 +75,9 @@ function hasActiveFilters(f: FilterState): boolean {
     !!f.last_contacted_to ||
     !!f.created_from ||
     !!f.created_to ||
-    f.has_open_quote
+    f.has_open_quote ||
+    !!f.referral_source ||
+    f.has_referral_source
   )
 }
 
@@ -83,6 +90,8 @@ function activeFilterCount(f: FilterState): number {
   if (f.last_contacted_from || f.last_contacted_to) count++
   if (f.created_from || f.created_to) count++
   if (f.has_open_quote) count++
+  if (f.referral_source) count++
+  if (f.has_referral_source) count++
   return count
 }
 
@@ -96,6 +105,10 @@ export default function ContactsList() {
   const [showFilters, setShowFilters] = useState(false)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [allMatchingSelected, setAllMatchingSelected] = useState(false)
 
   const fetchContacts = useCallback(async (f: FilterState) => {
     setLoading(true)
@@ -111,6 +124,8 @@ export default function ContactsList() {
     if (f.created_from) params.set('created_from', f.created_from)
     if (f.created_to) params.set('created_to', f.created_to)
     if (f.has_open_quote) params.set('has_open_quote', 'true')
+    if (f.referral_source) params.set('referral_source', f.referral_source)
+    if (f.has_referral_source) params.set('has_referral_source', 'true')
     params.set('sort_by', f.sort_by)
     params.set('sort_dir', f.sort_dir)
 
@@ -126,11 +141,12 @@ export default function ContactsList() {
     }
   }, [])
 
-  // Sync filters to URL
   const updateFilters = useCallback(
     (newFilters: FilterState) => {
       setFilters(newFilters)
-      setActiveViewId(null) // Deselect view when filters change manually
+      setActiveViewId(null)
+      setSelectedIds(new Set())
+      setAllMatchingSelected(false)
       const params = filtersToParams(newFilters)
       const qs = params.toString()
       router.push(qs ? `/contacts?${qs}` : '/contacts', { scroll: false })
@@ -138,7 +154,6 @@ export default function ContactsList() {
     [router]
   )
 
-  // Debounced fetch
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => void fetchContacts(filters), 150)
@@ -161,19 +176,58 @@ export default function ContactsList() {
       created_from: (view.filters['created_from'] as string) ?? '',
       created_to: (view.filters['created_to'] as string) ?? '',
       has_open_quote: view.filters['has_open_quote'] === 'true',
+      referral_source: (view.filters['referral_source'] as string) ?? '',
+      has_referral_source: view.filters['has_referral_source'] === 'true',
       sort_by: view.sort_by ?? 'created_at',
       sort_dir: view.sort_dir ?? 'desc',
     }
     setFilters(f)
     setActiveViewId(view.id)
+    setSelectedIds(new Set())
+    setAllMatchingSelected(false)
     const params = filtersToParams(f)
     const qs = params.toString()
     router.push(qs ? `/contacts?${qs}` : '/contacts', { scroll: false })
   }
 
-  const filterCount = activeFilterCount(filters)
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setAllMatchingSelected(false)
+  }
 
-  // Active filter chips
+  const toggleSelectAll = () => {
+    if (selectedIds.size === contacts.length) {
+      setSelectedIds(new Set())
+      setAllMatchingSelected(false)
+    } else {
+      setSelectedIds(new Set(contacts.map((c) => c.id)))
+    }
+  }
+
+  const selectAllMatching = () => {
+    setSelectedIds(new Set(contacts.map((c) => c.id)))
+    setAllMatchingSelected(true)
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setAllMatchingSelected(false)
+  }
+
+  const handleBulkComplete = () => {
+    clearSelection()
+    void fetchContacts(filters)
+  }
+
+  const filterCount = activeFilterCount(filters)
+  const allPageSelected = contacts.length > 0 && selectedIds.size === contacts.length
+
   const chips: Array<{ label: string; onRemove: () => void }> = []
   if (filters.q)
     chips.push({
@@ -210,6 +264,16 @@ export default function ContactsList() {
       label: 'Has open quote',
       onRemove: () => updateFilters({ ...filters, has_open_quote: false }),
     })
+  if (filters.referral_source)
+    chips.push({
+      label: `Referral: ${filters.referral_source}`,
+      onRemove: () => updateFilters({ ...filters, referral_source: '' }),
+    })
+  if (filters.has_referral_source)
+    chips.push({
+      label: 'Has referral source',
+      onRemove: () => updateFilters({ ...filters, has_referral_source: false }),
+    })
 
   return (
     <div className="flex h-full">
@@ -223,6 +287,12 @@ export default function ContactsList() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/contacts/duplicates"
+              className="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Duplicates
+            </Link>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
@@ -291,6 +361,16 @@ export default function ContactsList() {
           </div>
         )}
 
+        {/* Select all matching banner */}
+        {allPageSelected && !allMatchingSelected && total > contacts.length && (
+          <div className="mb-3 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+            All {contacts.length} on this page selected.{' '}
+            <button onClick={selectAllMatching} className="font-medium underline">
+              Select all {total} contacts matching current filters &rarr;
+            </button>
+          </div>
+        )}
+
         {/* Contacts table */}
         <div className="bg-white rounded-xl border border-gray-100">
           {loading ? (
@@ -333,21 +413,41 @@ export default function ContactsList() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Name</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Email</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Phone</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Stage</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Added</th>
+                  <th className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                    />
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Name</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Email</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Phone</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Stage</th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Added</th>
                 </tr>
               </thead>
               <tbody>
                 {contacts.map((contact) => (
                   <tr
                     key={contact.id}
-                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/contacts/${contact.id}`)}
+                    className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors ${
+                      selectedIds.has(contact.id) ? 'bg-teal-50/40' : ''
+                    }`}
                   >
-                    <td className="px-6 py-4">
+                    <td className="w-10 px-3 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(contact.id)}
+                        onChange={() => toggleSelect(contact.id)}
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                      />
+                    </td>
+                    <td
+                      className="px-4 py-4 cursor-pointer"
+                      onClick={() => router.push(`/contacts/${contact.id}`)}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                           <span className="text-teal-700 text-xs font-bold">
@@ -359,18 +459,18 @@ export default function ContactsList() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{contact.email ?? '\u2014'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{contact.phone ?? '\u2014'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 text-sm text-gray-500">{contact.email ?? '\u2014'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-500">{contact.phone ?? '\u2014'}</td>
+                    <td className="px-4 py-4">
                       {contact.pipeline_stage ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
                           {contact.pipeline_stage}
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-300">\u2014</span>
+                        <span className="text-sm text-gray-300">{'\u2014'}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-400">
+                    <td className="px-4 py-4 text-sm text-gray-400">
                       {new Date(contact.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -391,6 +491,19 @@ export default function ContactsList() {
           filters={filters}
           onChange={updateFilters}
           onClose={() => setShowFilters(false)}
+        />
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          selectedIds={selectedIds}
+          allMatchingSelected={allMatchingSelected}
+          total={total}
+          filters={filters}
+          contacts={contacts}
+          onClear={clearSelection}
+          onComplete={handleBulkComplete}
         />
       )}
     </div>
