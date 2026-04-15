@@ -792,4 +792,294 @@ router.get('/deals', requireAuth, async (req: Request, res: Response): Promise<v
   }
 })
 
+// ── GET /api/insights/pipeline-forecast ──────────────────────────────────────
+router.get(
+  '/pipeline-forecast',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const months = Math.max(1, parseInt((req.query['months'] as string) || '3', 10))
+
+    try {
+      // 1. Resolve pipeline_id
+      let pipelineId = req.query['pipeline_id'] as string | undefined
+      let pipelineName = ''
+
+      if (!pipelineId) {
+        const { data: defaultPipeline } = await supabase
+          .from('pipelines')
+          .select('id, name')
+          .eq('tenant_id', authed.tenantId)
+          .eq('is_default', true)
+          .eq('pipeline_type', 'deals')
+          .maybeSingle()
+
+        if (!defaultPipeline) {
+          res.json({
+            pipeline: null,
+            stages: [],
+            summary: {
+              total_pipeline_value: 0,
+              total_weighted_value: 0,
+              deal_count: 0,
+              avg_deal_value: 0,
+              monthly_forecast: [],
+              win_rate: 0,
+              avg_days_to_close: 0,
+            },
+          })
+          return
+        }
+        pipelineId = defaultPipeline.id
+        pipelineName = defaultPipeline.name
+      } else {
+        const { data: pipeline } = await supabase
+          .from('pipelines')
+          .select('id, name')
+          .eq('id', pipelineId)
+          .eq('tenant_id', authed.tenantId)
+          .maybeSingle()
+        pipelineName = pipeline?.name ?? ''
+      }
+
+      // 2. Get all stages for the pipeline ordered by position
+      const { data: stagesData } = await supabase
+        .from('pipeline_stages')
+        .select('id, name, position, probability')
+        .eq('pipeline_id', pipelineId)
+        .order('position', { ascending: true })
+
+      const stages = stagesData ?? []
+      const stageIds = stages.map((s) => s.id)
+
+      // 3. Get all open deals for those stages
+      const { data: dealsData } = await supabase
+        .from('deals')
+        .select(
+          'id, value, close_date, is_closed_won, is_closed_lost, is_archived, pipeline_stage_id, created_at'
+        )
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_archived', false)
+        .eq('is_closed_won', false)
+        .eq('is_closed_lost', false)
+        .in('pipeline_stage_id', stageIds.length > 0 ? stageIds : ['__none__'])
+
+      const deals = dealsData ?? []
+
+      // 4. Per-stage aggregation
+      const stageResultMap = new Map<
+        string,
+        {
+          id: string
+          name: string
+          probability: number
+          deal_count: number
+          total_value: number
+          weighted_value: number
+        }
+      >()
+      for (const stage of stages) {
+        stageResultMap.set(stage.id, {
+          id: stage.id,
+          name: stage.name,
+          probability: stage.probability ?? 0,
+          deal_count: 0,
+          total_value: 0,
+          weighted_value: 0,
+        })
+      }
+      for (const deal of deals) {
+        const entry = stageResultMap.get(deal.pipeline_stage_id)
+        if (!entry) continue
+        const val = Number(deal.value ?? 0)
+        entry.deal_count++
+        entry.total_value += val
+        entry.weighted_value += (val * entry.probability) / 100
+      }
+
+      // 5. Monthly forecast for next N months
+      const now = new Date()
+      const monthlyMap = new Map<string, { expected_value: number; deal_count: number }>()
+      for (let i = 0; i < months; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        monthlyMap.set(key, { expected_value: 0, deal_count: 0 })
+      }
+
+      const forecastCutoff = new Date(now.getFullYear(), now.getMonth() + months, 1).toISOString()
+      for (const deal of deals) {
+        if (!deal.close_date) continue
+        if (deal.close_date < now.toISOString().slice(0, 7)) continue
+        if (deal.close_date >= forecastCutoff.slice(0, 7)) continue
+        const monthKey = deal.close_date.slice(0, 7)
+        const entry = monthlyMap.get(monthKey)
+        if (!entry) continue
+        const stage = stageResultMap.get(deal.pipeline_stage_id)
+        const prob = stage ? stage.probability : 0
+        entry.expected_value += (Number(deal.value ?? 0) * prob) / 100
+        entry.deal_count++
+      }
+
+      const monthly_forecast = [...monthlyMap.entries()].map(([month, v]) => ({
+        month,
+        expected_value: Math.round(v.expected_value * 100) / 100,
+        deal_count: v.deal_count,
+      }))
+
+      // 6. Win rate: last 90 days
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000).toISOString()
+      const { data: closedDeals } = await supabase
+        .from('deals')
+        .select('is_closed_won, is_closed_lost')
+        .eq('tenant_id', authed.tenantId)
+        .gte('updated_at', ninetyDaysAgo)
+        .or('is_closed_won.eq.true,is_closed_lost.eq.true')
+
+      const closedArr = closedDeals ?? []
+      const wonCount = closedArr.filter((d) => d.is_closed_won).length
+      const lostCount = closedArr.filter((d) => d.is_closed_lost).length
+      const win_rate =
+        wonCount + lostCount > 0 ? Math.round((wonCount / (wonCount + lostCount)) * 10000) / 100 : 0
+
+      // 7. avg_days_to_close for won deals
+      const { data: wonDeals } = await supabase
+        .from('deals')
+        .select('created_at, close_date, updated_at')
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_closed_won', true)
+        .gte('updated_at', ninetyDaysAgo)
+
+      const wonArr = wonDeals ?? []
+      let avg_days_to_close = 0
+      if (wonArr.length > 0) {
+        const totalDays = wonArr.reduce((s, d) => {
+          const end = d.close_date ? new Date(d.close_date) : new Date(d.updated_at)
+          const start = new Date(d.created_at)
+          return s + (end.getTime() - start.getTime()) / 86400000
+        }, 0)
+        avg_days_to_close = Math.round((totalDays / wonArr.length) * 10) / 10
+      }
+
+      // Summary totals
+      const total_pipeline_value = deals.reduce((s, d) => s + Number(d.value ?? 0), 0)
+      const stageResults = [...stageResultMap.values()]
+      const total_weighted_value = stageResults.reduce((s, st) => s + st.weighted_value, 0)
+      const deal_count = deals.length
+      const avg_deal_value = deal_count > 0 ? total_pipeline_value / deal_count : 0
+
+      res.json({
+        pipeline: { id: pipelineId, name: pipelineName },
+        stages: stageResults.map((s) => ({
+          id: s.id,
+          name: s.name,
+          probability: s.probability,
+          deal_count: s.deal_count,
+          total_value: Math.round(s.total_value * 100) / 100,
+          weighted_value: Math.round(s.weighted_value * 100) / 100,
+        })),
+        summary: {
+          total_pipeline_value: Math.round(total_pipeline_value * 100) / 100,
+          total_weighted_value: Math.round(total_weighted_value * 100) / 100,
+          deal_count,
+          avg_deal_value: Math.round(avg_deal_value * 100) / 100,
+          monthly_forecast,
+          win_rate,
+          avg_days_to_close,
+        },
+      })
+    } catch (err) {
+      console.error('[insights] pipeline-forecast error:', err)
+      res.status(500).json({ error: 'Failed to fetch pipeline forecast' })
+    }
+  }
+)
+
+// ── GET /api/insights/pipeline-funnel ────────────────────────────────────────
+router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Resolve pipeline_id
+    let pipelineId = req.query['pipeline_id'] as string | undefined
+
+    if (!pipelineId) {
+      const { data: defaultPipeline } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_default', true)
+        .eq('pipeline_type', 'deals')
+        .maybeSingle()
+
+      if (!defaultPipeline) {
+        res.json([])
+        return
+      }
+      pipelineId = defaultPipeline.id
+    }
+
+    // Get stages ordered by position
+    const { data: stagesData } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, position, probability')
+      .eq('pipeline_id', pipelineId)
+      .order('position', { ascending: true })
+
+    const stages = stagesData ?? []
+    const stageIds = stages.map((s) => s.id)
+
+    // Get all non-archived deals in these stages
+    const { data: dealsData } = await supabase
+      .from('deals')
+      .select('id, value, pipeline_stage_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+      .in('pipeline_stage_id', stageIds.length > 0 ? stageIds : ['__none__'])
+
+    const deals = dealsData ?? []
+
+    // Aggregate per stage
+    const stageCountMap = new Map<string, { count: number; total_value: number }>()
+    for (const stage of stages) {
+      stageCountMap.set(stage.id, { count: 0, total_value: 0 })
+    }
+    for (const deal of deals) {
+      const entry = stageCountMap.get(deal.pipeline_stage_id)
+      if (!entry) continue
+      entry.count++
+      entry.total_value += Number(deal.value ?? 0)
+    }
+
+    // Build funnel with drop_off_pct
+    const funnel = stages.map((stage, idx) => {
+      const { count, total_value } = stageCountMap.get(stage.id) ?? { count: 0, total_value: 0 }
+      let drop_off_pct: number | null = null
+      if (idx > 0) {
+        const prevEntry = stageCountMap.get(stages[idx - 1].id) ?? { count: 0, total_value: 0 }
+        const prevCount = prevEntry.count
+        drop_off_pct =
+          prevCount > 0 ? Math.round(((prevCount - count) / prevCount) * 10000) / 100 : 0
+      }
+      return {
+        stage: {
+          id: stage.id,
+          name: stage.name,
+          position: stage.position,
+          probability: stage.probability ?? 0,
+        },
+        count,
+        total_value: Math.round(total_value * 100) / 100,
+        drop_off_pct,
+      }
+    })
+
+    res.json(funnel)
+  } catch (err) {
+    console.error('[insights] pipeline-funnel error:', err)
+    res.status(500).json({ error: 'Failed to fetch pipeline funnel' })
+  }
+})
+
 export default router
