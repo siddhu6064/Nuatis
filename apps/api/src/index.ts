@@ -17,6 +17,7 @@ import demoRouter from './routes/demo.js'
 import insightsRouter from './routes/insights.js'
 import provisioningRouter from './routes/provisioning.js'
 import pushRouter from './routes/push.js'
+import pushMobileRouter from './routes/push-mobile.js'
 import servicesRouter from './routes/services.js'
 import quotesRouter from './routes/quotes.js'
 import analyticsEventsRouter from './routes/analytics-events.js'
@@ -53,6 +54,7 @@ import chatAgentRouter from './routes/chat-agent.js'
 import chatSettingsRouter from './routes/chat-settings.js'
 import dataExportRouter from './routes/data-export.js'
 import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
+import mobileAuthRouter from './routes/mobile-auth.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -92,6 +94,7 @@ app.use('/admin', adminRouter)
 
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
+app.use('/api/auth/mobile', mobileAuthRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/knowledge', knowledgeRouter)
 app.use('/api/calls', callsRouter)
@@ -101,6 +104,7 @@ app.use('/api/demo', demoRouter)
 app.use('/api/insights', insightsRouter)
 app.use('/api/provisioning', provisioningRouter)
 app.use('/api/push', pushRouter)
+app.use('/api/push/mobile', pushMobileRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/analytics', analyticsEventsRouter)

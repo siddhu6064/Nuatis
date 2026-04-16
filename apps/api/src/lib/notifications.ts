@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { sendPushNotification } from './push-client.js'
+import { sendExpoPushToTenant } from './expo-push.js'
 // sendSms import reserved for future: owner SMS requires personal phone field on users table
 // import { sendSms } from './sms.js'
 
@@ -74,6 +75,14 @@ export async function notifyOwner(
         body: payload.pushBody ?? '',
         url: payload.pushUrl,
       })
+
+      // Also send to mobile devices
+      await sendExpoPushToTenant(
+        tenantId,
+        payload.pushTitle || '',
+        payload.pushBody || '',
+        payload.pushUrl ? { url: payload.pushUrl } : undefined
+      )
     }
 
     // 4. SMS to owner

@@ -1082,6 +1082,80 @@ router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response):
   }
 })
 
+// ── GET /api/insights/dashboard — aggregated data for mobile dashboard ────────
+router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    const [todayAppts, overdueTasks, recentActivity, contactsCount, apptsThisWeek, openDeals] =
+      await Promise.all([
+        supabase
+          .from('appointments')
+          .select('id, contact_id, title, start_time, end_time, status, contacts(full_name)')
+          .eq('tenant_id', authed.tenantId)
+          .gte('start_time', startOfToday)
+          .lt('start_time', endOfToday)
+          .order('start_time'),
+        supabase
+          .from('tasks')
+          .select('id, contact_id, title, due_date, priority, contacts(full_name)')
+          .eq('tenant_id', authed.tenantId)
+          .lt('due_date', now.toISOString())
+          .is('completed_at', null)
+          .order('due_date')
+          .limit(20),
+        supabase
+          .from('activity_log')
+          .select('id, contact_id, type, body, created_at, contacts(full_name)')
+          .eq('tenant_id', authed.tenantId)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('contacts')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', authed.tenantId)
+          .eq('is_archived', false),
+        supabase
+          .from('appointments')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', authed.tenantId)
+          .gte('start_time', startOfWeek),
+        supabase
+          .from('deals')
+          .select('value')
+          .eq('tenant_id', authed.tenantId)
+          .eq('is_archived', false)
+          .eq('is_closed_won', false)
+          .eq('is_closed_lost', false),
+      ])
+
+    const openDealsValue = (openDeals.data ?? []).reduce(
+      (sum, d) => sum + (Number(d.value) || 0),
+      0
+    )
+
+    res.json({
+      todayAppointments: todayAppts.data ?? [],
+      overdueTasks: overdueTasks.data ?? [],
+      recentActivity: recentActivity.data ?? [],
+      stats: {
+        contactsCount: contactsCount.count ?? 0,
+        appointmentsThisWeek: apptsThisWeek.count ?? 0,
+        openDealsValue,
+      },
+    })
+  } catch (err) {
+    console.error('[insights] dashboard error:', err)
+    res.status(500).json({ error: 'Failed to load dashboard' })
+  }
+})
+
 // ── GET /api/insights/territory ──────────────────────────────────────────────
 router.get('/territory', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
