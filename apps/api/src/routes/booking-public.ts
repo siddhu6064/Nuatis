@@ -10,6 +10,7 @@ import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { sendSms } from '../lib/sms.js'
 import { sendPushNotification } from '../lib/push-client.js'
+import { autoEnrichContact } from '../lib/contact-enrichment.js'
 
 const router = Router()
 
@@ -357,6 +358,25 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
       }
 
       contactId = newContact.id as string
+
+      // Auto-enrich new contact
+      try {
+        const enrichResult = autoEnrichContact({ phone: phone!, email: email! })
+        const enrichUpdates: Record<string, unknown> = {}
+        if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
+        if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
+        if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
+        if (enrichResult.suggestedCompany) {
+          enrichUpdates['custom_fields'] = {
+            enrichment_suggested_company: enrichResult.suggestedCompany,
+          }
+        }
+        if (Object.keys(enrichUpdates).length > 0) {
+          await supabase.from('contacts').update(enrichUpdates).eq('id', contactId)
+        }
+      } catch (err) {
+        console.error('[enrichment] Failed:', err)
+      }
     }
   }
 

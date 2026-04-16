@@ -4,6 +4,7 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { notifyOwner } from '../lib/notifications.js'
+import { autoEnrichContact } from '../lib/contact-enrichment.js'
 
 const router = Router()
 
@@ -387,6 +388,33 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
   enqueueScoreCompute(authed.tenantId, contact.id, 'contact_created')
 
+  // Auto-enrich new contact
+  try {
+    const enrichResult = autoEnrichContact({
+      phone: contact.phone,
+      email: contact.email,
+      city: contact.city,
+      state: contact.state,
+      timezone: contact.timezone,
+    })
+    const enrichUpdates: Record<string, unknown> = {}
+    if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
+    if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
+    if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
+    if (enrichResult.suggestedCompany) {
+      const existingCustom = contact.custom_fields || {}
+      enrichUpdates['custom_fields'] = {
+        ...existingCustom,
+        enrichment_suggested_company: enrichResult.suggestedCompany,
+      }
+    }
+    if (Object.keys(enrichUpdates).length > 0) {
+      await supabase.from('contacts').update(enrichUpdates).eq('id', contact.id)
+    }
+  } catch (err) {
+    console.error('[enrichment] Failed:', err)
+  }
+
   res.status(201).json({ ...contact, possible_duplicates: possibleDuplicates })
 })
 
@@ -494,6 +522,35 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   }
 
   enqueueScoreCompute(authed.tenantId, req.params['id'], 'contact_updated')
+
+  // Auto-enrich if phone or email changed
+  if (phone || email) {
+    try {
+      const enrichResult = autoEnrichContact({
+        phone: updated.phone,
+        email: updated.email,
+        city: updated.city,
+        state: updated.state,
+        timezone: updated.timezone,
+      })
+      const enrichUpdates: Record<string, unknown> = {}
+      if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
+      if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
+      if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
+      if (enrichResult.suggestedCompany) {
+        const existingCustom = updated.custom_fields || {}
+        enrichUpdates['custom_fields'] = {
+          ...existingCustom,
+          enrichment_suggested_company: enrichResult.suggestedCompany,
+        }
+      }
+      if (Object.keys(enrichUpdates).length > 0) {
+        await supabase.from('contacts').update(enrichUpdates).eq('id', id)
+      }
+    } catch (err) {
+      console.error('[enrichment] Failed:', err)
+    }
+  }
 
   res.json({ ...updated, possible_duplicates: possibleDuplicates })
 })
