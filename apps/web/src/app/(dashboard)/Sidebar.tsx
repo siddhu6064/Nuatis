@@ -73,6 +73,8 @@ const NAV: NavItem[] = [
   { href: '/settings/automation', label: 'Review Auto', icon: '⭐', suiteOnly: true },
   { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
   { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
+  { href: '/settings/chat-widget', label: 'Chat Widget', icon: '💬', suiteOnly: true },
+  { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
 ]
 

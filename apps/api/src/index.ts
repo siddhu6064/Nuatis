@@ -47,6 +47,10 @@ import leadScoringRouter from './routes/lead-scoring.js'
 import reviewSettingsRouter, { reviewTrackingRouter } from './routes/review-settings.js'
 import notificationSettingsRouter from './routes/notification-settings.js'
 import pipelinesRouter from './routes/pipelines.js'
+import chatPublicRouter from './routes/chat-public.js'
+import chatAgentRouter from './routes/chat-agent.js'
+import chatSettingsRouter from './routes/chat-settings.js'
+import dataExportRouter from './routes/data-export.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -127,6 +131,10 @@ app.use('/api/settings/review-automation', reviewSettingsRouter)
 app.use('/api/review-tracking', reviewTrackingRouter)
 app.use('/api/settings/notifications', notificationSettingsRouter)
 app.use('/api/pipelines', pipelinesRouter)
+app.use('/api/chat', cors({ origin: '*' }), chatPublicRouter)
+app.use('/api/chat/sessions', chatAgentRouter)
+app.use('/api/settings/chat-widget', chatSettingsRouter)
+app.use('/api/settings/data-export', dataExportRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

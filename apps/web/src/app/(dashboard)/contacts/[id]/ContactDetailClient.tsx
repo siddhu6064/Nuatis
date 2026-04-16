@@ -35,6 +35,9 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   const [referredById, setReferredById] = useState<string | null>(null)
   const [editingReferral, setEditingReferral] = useState(false)
 
+  // Enrichment suggestion
+  const [enrichmentSuggestion, setEnrichmentSuggestion] = useState<string | null>(null)
+
   // Assigned To fields
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null)
   const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
@@ -68,10 +71,18 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           lead_grade?: string
           lead_score_updated_at?: string
           assigned_to_user_id?: string | null
+          custom_fields?: Record<string, unknown>
+          enrichment_suggested_company?: string | null
         }) => {
           if (c.email) setContactEmail(c.email)
           if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
           setAssignedUserId(c.assigned_to_user_id ?? null)
+          // Enrichment suggestion — check dedicated field first, then custom_fields
+          const suggestion =
+            c.enrichment_suggested_company ??
+            (c.custom_fields?.enrichment_suggested_company as string | undefined) ??
+            null
+          setEnrichmentSuggestion(suggestion || null)
           if (c.referred_by_contact_id) {
             setReferredById(c.referred_by_contact_id)
             void fetch(`/api/contacts/${c.referred_by_contact_id}`)
@@ -127,6 +138,29 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assigned_to_user_id: userId }),
     }).catch(() => {})
+  }
+
+  const handleLinkCompany = async () => {
+    if (!enrichmentSuggestion) return
+    // Update contact with the suggested company name and clear the suggestion
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company: enrichmentSuggestion,
+        custom_fields: { enrichment_suggested_company: null },
+      }),
+    }).catch(() => {})
+    setEnrichmentSuggestion(null)
+  }
+
+  const handleDismissEnrichment = async () => {
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: { enrichment_suggested_company: null } }),
+    }).catch(() => {})
+    setEnrichmentSuggestion(null)
   }
 
   const handleNoteAdded = useCallback(() => {
@@ -257,6 +291,31 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
 
   return (
     <>
+      {/* Enrichment suggestion banner */}
+      {enrichmentSuggestion && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 flex items-center justify-between mb-4">
+          <div>
+            <span className="text-sm text-blue-800">Suggested company: </span>
+            <span className="text-sm font-medium text-blue-900">{enrichmentSuggestion}</span>
+            <span className="text-xs text-blue-600 ml-1">(from email domain)</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void handleLinkCompany()}
+              className="text-xs text-blue-700 hover:underline"
+            >
+              Link
+            </button>
+            <button
+              onClick={() => void handleDismissEnrichment()}
+              className="text-xs text-gray-500 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Send Email button */}
       <div className="mb-4">
         <button

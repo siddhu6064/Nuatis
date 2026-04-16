@@ -16,6 +16,7 @@ import {
   createLeadScoreDecayWorker,
 } from './lead-score-worker.js'
 import { createReviewRequestWorker } from './review-request-worker.js'
+import { createExportWorker } from './export-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -158,6 +159,11 @@ export async function startWorkers(): Promise<void> {
   const reviewRequest = createReviewRequestWorker()
   managed.push({ name: 'review-request', ...reviewRequest })
   console.info('[workers] review-request worker started')
+
+  // 16. Data export — processes on-demand CSV/JSON export jobs
+  const exportWorker = createExportWorker()
+  managed.push({ name: 'data-export', queue: exportWorker.queue, worker: exportWorker.worker })
+  console.info('[workers] data-export worker started')
 }
 
 export async function stopWorkers(): Promise<void> {
