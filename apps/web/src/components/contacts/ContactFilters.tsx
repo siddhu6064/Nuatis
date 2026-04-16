@@ -17,6 +17,7 @@ export interface FilterState {
   lifecycle_stage: string[]
   grade: string[]
   assigned_to: string
+  territory: string
   sort_by: string
   sort_dir: string
 }
@@ -36,6 +37,7 @@ export const EMPTY_FILTERS: FilterState = {
   lifecycle_stage: [],
   grade: [],
   assigned_to: '',
+  territory: '',
   sort_by: 'created_at',
   sort_dir: 'desc',
 }
@@ -139,7 +141,8 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
     (filters.has_referral_source ? 1 : 0) +
     (filters.lifecycle_stage.length > 0 ? 1 : 0) +
     (filters.grade.length > 0 ? 1 : 0) +
-    (filters.assigned_to ? 1 : 0)
+    (filters.assigned_to ? 1 : 0) +
+    (filters.territory ? 1 : 0)
 
   const tagSuggestions = allTags.filter(
     (t) => !filters.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase())
@@ -436,6 +439,18 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Territory */}
+      <div className="mb-4">
+        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Territory</p>
+        <input
+          type="text"
+          value={filters.territory}
+          onChange={(e) => update({ territory: e.target.value })}
+          placeholder="e.g. North, South..."
+          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 placeholder-gray-300"
+        />
       </div>
 
       {/* Sort */}

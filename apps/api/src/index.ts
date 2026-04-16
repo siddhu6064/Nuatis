@@ -51,6 +51,7 @@ import chatPublicRouter from './routes/chat-public.js'
 import chatAgentRouter from './routes/chat-agent.js'
 import chatSettingsRouter from './routes/chat-settings.js'
 import dataExportRouter from './routes/data-export.js'
+import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -135,6 +136,8 @@ app.use('/api/chat', cors({ origin: '*' }), chatPublicRouter)
 app.use('/api/chat/sessions', chatAgentRouter)
 app.use('/api/settings/chat-widget', chatSettingsRouter)
 app.use('/api/settings/data-export', dataExportRouter)
+app.use('/api/settings/calendar', calendarSettingsRouter)
+app.use('/api/calendar', calendarCallbackRouter) // PUBLIC callback
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

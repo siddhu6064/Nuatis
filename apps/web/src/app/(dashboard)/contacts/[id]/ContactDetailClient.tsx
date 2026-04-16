@@ -42,6 +42,17 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null)
   const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
 
+  // Compliance fields
+  interface ComplianceFieldDef {
+    key: string
+    label: string
+    type: 'boolean' | 'boolean_with_date' | 'boolean_with_notes'
+    required?: boolean
+  }
+  const [complianceFields, setComplianceFields] = useState<ComplianceFieldDef[]>([])
+  const [complianceValues, setComplianceValues] = useState<Record<string, unknown>>({})
+  const [complianceSaving, setComplianceSaving] = useState(false)
+
   // Lifecycle & lead score fields
   type LifecycleStage =
     | 'subscriber'
@@ -73,6 +84,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           assigned_to_user_id?: string | null
           custom_fields?: Record<string, unknown>
           enrichment_suggested_company?: string | null
+          compliance_fields?: Record<string, unknown>
         }) => {
           if (c.email) setContactEmail(c.email)
           if (c.referral_source_detail) setReferralSource(c.referral_source_detail)
@@ -96,6 +108,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           if (c.lead_score !== undefined && c.lead_score !== null) setLeadScore(c.lead_score)
           if (c.lead_grade) setLeadGrade(c.lead_grade)
           if (c.lead_score_updated_at) setLeadScoreUpdatedAt(c.lead_score_updated_at)
+          if (c.compliance_fields) setComplianceValues(c.compliance_fields)
         }
       )
       .catch(() => {})
@@ -127,6 +140,15 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       .then((r) => r.json())
       .then((d: { users: { id: string; full_name: string }[] }) => {
         if (d.users) setTenantUsers(d.users)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    void fetch('/api/settings/calendar/compliance-fields')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { fields?: ComplianceFieldDef[] } | null) => {
+        if (d?.fields && d.fields.length > 0) setComplianceFields(d.fields)
       })
       .catch(() => {})
   }, [])
@@ -278,6 +300,31 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       setRecalculating(false)
     }, 3000)
   }
+
+  const handleComplianceChange = (key: string, value: unknown) => {
+    setComplianceValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const saveComplianceFields = async () => {
+    setComplianceSaving(true)
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ compliance_fields: complianceValues }),
+    }).catch(() => {})
+    setComplianceSaving(false)
+  }
+
+  const complianceRequiredFields = complianceFields.filter((f) => f.required)
+  const complianceCompleteCount = complianceRequiredFields.filter((f) => {
+    const val = complianceValues[f.key]
+    if (typeof val === 'boolean') return val
+    if (val && typeof val === 'object') return !!(val as Record<string, unknown>)['checked']
+    return false
+  }).length
+  const allComplianceComplete =
+    complianceRequiredFields.length > 0 &&
+    complianceCompleteCount === complianceRequiredFields.length
 
   const filteredSuggestions = referralSuggestions.filter(
     (s) => s.toLowerCase().includes(referralSource.toLowerCase()) && s !== referralSource
@@ -454,6 +501,100 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           {recalculating ? 'Recalculating…' : 'Recalculate'}
         </button>
       </div>
+
+      {/* Compliance */}
+      {complianceFields.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-700">Compliance</h2>
+            {allComplianceComplete ? (
+              <span className="text-xs text-green-600 font-medium">All complete</span>
+            ) : (
+              <span className="text-xs text-gray-400">
+                {complianceCompleteCount}/{complianceRequiredFields.length} required complete
+              </span>
+            )}
+          </div>
+          <div className="space-y-4">
+            {complianceFields.map((field) => {
+              const raw = complianceValues[field.key]
+              const isObj = raw && typeof raw === 'object'
+              const checked = isObj
+                ? !!(raw as Record<string, unknown>)['checked']
+                : typeof raw === 'boolean'
+                  ? raw
+                  : false
+              const extra = isObj ? (raw as Record<string, unknown>) : {}
+
+              return (
+                <div key={field.key}>
+                  <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        if (field.type === 'boolean') {
+                          handleComplianceChange(field.key, e.target.checked)
+                        } else {
+                          handleComplianceChange(field.key, {
+                            ...extra,
+                            checked: e.target.checked,
+                          })
+                        }
+                      }}
+                      className="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
+                    />
+                    <span>
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </span>
+                  </label>
+                  {field.type === 'boolean_with_date' && checked && (
+                    <div className="ml-6 mt-1.5">
+                      <input
+                        type="date"
+                        value={(extra['date'] as string | undefined) ?? ''}
+                        onChange={(e) =>
+                          handleComplianceChange(field.key, {
+                            ...extra,
+                            checked,
+                            date: e.target.value,
+                          })
+                        }
+                        className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                  )}
+                  {field.type === 'boolean_with_notes' && checked && (
+                    <div className="ml-6 mt-1.5">
+                      <input
+                        type="text"
+                        value={(extra['notes'] as string | undefined) ?? ''}
+                        onChange={(e) =>
+                          handleComplianceChange(field.key, {
+                            ...extra,
+                            checked,
+                            notes: e.target.value,
+                          })
+                        }
+                        placeholder="Notes..."
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => void saveComplianceFields()}
+            disabled={complianceSaving}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {complianceSaving ? 'Saving…' : 'Save Compliance'}
+          </button>
+        </div>
+      )}
 
       {/* Assigned To */}
       <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">

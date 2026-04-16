@@ -21,6 +21,7 @@ interface Contact {
   lead_score_updated_at: string | null
   assigned_to_user_id: string | null
   assigned_user_name: string | null
+  territory: string | null
 }
 
 interface SavedView {
@@ -50,6 +51,7 @@ function filtersFromParams(params: URLSearchParams): FilterState {
     lifecycle_stage: params.get('lifecycle_stage')?.split(',').filter(Boolean) ?? [],
     grade: params.get('grade')?.split(',').filter(Boolean) ?? [],
     assigned_to: params.get('assigned_to') ?? '',
+    territory: params.get('territory') ?? '',
     sort_by: params.get('sort_by') ?? 'created_at',
     sort_dir: params.get('sort_dir') ?? 'desc',
   }
@@ -73,6 +75,7 @@ function filtersToParams(filters: FilterState): URLSearchParams {
     params.set('lifecycle_stage', filters.lifecycle_stage.join(','))
   if (filters.grade.length > 0) params.set('grade', filters.grade.join(','))
   if (filters.assigned_to) params.set('assigned_to', filters.assigned_to)
+  if (filters.territory) params.set('territory', filters.territory)
   if (filters.sort_by !== 'created_at') params.set('sort_by', filters.sort_by)
   if (filters.sort_dir !== 'desc') params.set('sort_dir', filters.sort_dir)
   return params
@@ -93,7 +96,8 @@ function hasActiveFilters(f: FilterState): boolean {
     f.has_referral_source ||
     f.lifecycle_stage.length > 0 ||
     f.grade.length > 0 ||
-    !!f.assigned_to
+    !!f.assigned_to ||
+    !!f.territory
   )
 }
 
@@ -111,6 +115,7 @@ function activeFilterCount(f: FilterState): number {
   if (f.lifecycle_stage.length > 0) count++
   if (f.grade.length > 0) count++
   if (f.assigned_to) count++
+  if (f.territory) count++
   return count
 }
 
@@ -149,6 +154,7 @@ export default function ContactsList() {
     if (f.lifecycle_stage.length > 0) params.set('lifecycle_stage', f.lifecycle_stage.join(','))
     if (f.grade.length > 0) params.set('grade', f.grade.join(','))
     if (f.assigned_to) params.set('assigned_to', f.assigned_to)
+    if (f.territory) params.set('territory', f.territory)
     params.set('sort_by', f.sort_by)
     params.set('sort_dir', f.sort_dir)
 
@@ -215,6 +221,7 @@ export default function ContactsList() {
         .filter(Boolean),
       grade: ((view.filters['grade'] as string) ?? '').split(',').filter(Boolean),
       assigned_to: (view.filters['assigned_to'] as string) ?? '',
+      territory: (view.filters['territory'] as string) ?? '',
       sort_by: view.sort_by ?? 'created_at',
       sort_dir: view.sort_dir ?? 'desc',
     }
@@ -331,6 +338,11 @@ export default function ContactsList() {
       onRemove: () => updateFilters({ ...filters, assigned_to: '' }),
     })
   }
+  if (filters.territory)
+    chips.push({
+      label: `Territory: ${filters.territory}`,
+      onRemove: () => updateFilters({ ...filters, territory: '' }),
+    })
 
   return (
     <div className="flex h-full">
@@ -489,6 +501,9 @@ export default function ContactsList() {
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
                     Assigned
                   </th>
+                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
+                    Territory
+                  </th>
                   <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Added</th>
                 </tr>
               </thead>
@@ -618,6 +633,9 @@ export default function ContactsList() {
                       ) : (
                         <span className="text-sm text-gray-300">{'\u2014'}</span>
                       )}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-500">
+                      {contact.territory ?? <span className="text-gray-300">{'\u2014'}</span>}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-400">
                       {new Date(contact.created_at).toLocaleDateString('en-US', {

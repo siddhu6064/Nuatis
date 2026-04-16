@@ -28,7 +28,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   let query = supabase
     .from('contacts')
     .select(
-      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at, assigned_to_user_id',
+      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at, assigned_to_user_id, compliance_fields, territory',
       { count: 'exact' }
     )
     .eq('tenant_id', authed.tenantId)
@@ -153,6 +153,13 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   if (assignedTo) {
     const assignedUserId = assignedTo === 'me' ? authed.userId : assignedTo
     query = query.eq('assigned_to_user_id', assignedUserId)
+  }
+
+  // ── Territory filter ──
+  const territory =
+    typeof req.query['territory'] === 'string' ? req.query['territory'].trim() : null
+  if (territory) {
+    query = query.ilike('territory', `%${territory}%`)
   }
 
   // ── Sort ──
@@ -454,6 +461,9 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (typeof b['assigned_to_user_id'] === 'string')
     updates['assigned_to_user_id'] = b['assigned_to_user_id']
   if (b['assigned_to_user_id'] === null) updates['assigned_to_user_id'] = null
+  if (b['compliance_fields'] !== undefined) updates['compliance_fields'] = b['compliance_fields']
+  if (typeof b['territory'] === 'string') updates['territory'] = b['territory'].trim() || null
+  if (b['territory'] === null) updates['territory'] = null
 
   const { data: updated, error } = await supabase
     .from('contacts')

@@ -19,7 +19,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const { data, error } = await supabase
     .from('locations')
     .select(
-      'id, name, address, city, state, zip, phone, telnyx_number, maya_enabled, is_primary, google_calendar_id, google_refresh_token, created_at'
+      'id, name, address, city, state, zip, phone, telnyx_number, maya_enabled, is_primary, google_calendar_id, google_refresh_token, territory, created_at'
     )
     .eq('tenant_id', authed.tenantId)
     .order('is_primary', { ascending: false })
@@ -62,6 +62,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       phone: (b['phone'] as string) || null,
       telnyx_number: (b['telnyx_number'] as string) || null,
       maya_enabled: typeof b['maya_enabled'] === 'boolean' ? b['maya_enabled'] : true,
+      territory: (b['territory'] as string) || null,
       is_primary: false,
     })
     .select('id, name, address, is_primary, maya_enabled, created_at')
@@ -89,6 +90,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (b['phone'] !== undefined) updates['phone'] = b['phone'] || null
   if (typeof b['maya_enabled'] === 'boolean') updates['maya_enabled'] = b['maya_enabled']
   if (typeof b['escalation_phone'] === 'string') updates['escalation_phone'] = b['escalation_phone']
+  if (b['territory'] !== undefined) updates['territory'] = (b['territory'] as string) || null
 
   const { data, error } = await supabase
     .from('locations')

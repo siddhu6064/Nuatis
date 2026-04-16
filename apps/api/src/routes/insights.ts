@@ -1082,4 +1082,101 @@ router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response):
   }
 })
 
+// ── GET /api/insights/territory ──────────────────────────────────────────────
+router.get('/territory', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // 1. Contacts grouped by territory
+    const { data: allContacts } = await supabase
+      .from('contacts')
+      .select('id, territory, lifecycle_stage')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+
+    const contacts = allContacts ?? []
+    const totalContacts = contacts.length
+
+    const territoryCountMap = new Map<string, number>()
+    const customerCountMap = new Map<string, number>()
+
+    for (const c of contacts) {
+      const terr = (c.territory as string | null) ?? 'Unassigned'
+      territoryCountMap.set(terr, (territoryCountMap.get(terr) ?? 0) + 1)
+      if (c.lifecycle_stage === 'customer') {
+        customerCountMap.set(terr, (customerCountMap.get(terr) ?? 0) + 1)
+      }
+    }
+
+    const contacts_by_territory = Array.from(territoryCountMap.entries()).map(
+      ([territory, count]) => ({
+        territory,
+        count,
+        pct: totalContacts > 0 ? Number(((count / totalContacts) * 100).toFixed(1)) : 0,
+      })
+    )
+
+    // 2. Revenue grouped by territory (deals joined with contacts)
+    const { data: allDeals } = await supabase
+      .from('deals')
+      .select('value, is_closed_won, contact_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+
+    const contactTerritoryMap = new Map<string, string>()
+    for (const c of contacts) {
+      if (c.id) {
+        contactTerritoryMap.set(c.id as string, (c.territory as string | null) ?? 'Unassigned')
+      }
+    }
+
+    const revenueMap = new Map<
+      string,
+      { total_value: number; won_value: number; deal_count: number }
+    >()
+    for (const d of allDeals ?? []) {
+      const terr = d.contact_id
+        ? (contactTerritoryMap.get(d.contact_id) ?? 'Unassigned')
+        : 'Unassigned'
+      const existing = revenueMap.get(terr) ?? { total_value: 0, won_value: 0, deal_count: 0 }
+      existing.total_value += Number(d.value ?? 0)
+      existing.deal_count++
+      if (d.is_closed_won) {
+        existing.won_value += Number(d.value ?? 0)
+      }
+      revenueMap.set(terr, existing)
+    }
+
+    const revenue_by_territory = Array.from(revenueMap.entries()).map(([territory, stats]) => ({
+      territory,
+      total_value: Math.round(stats.total_value * 100) / 100,
+      won_value: Math.round(stats.won_value * 100) / 100,
+      deal_count: stats.deal_count,
+    }))
+
+    // 3. Conversion by territory (contacts vs customers)
+    const conversion_by_territory = Array.from(territoryCountMap.entries()).map(
+      ([territory, total]) => {
+        const customers = customerCountMap.get(territory) ?? 0
+        return {
+          territory,
+          contacts: total,
+          customers,
+          rate: total > 0 ? Number(((customers / total) * 100).toFixed(1)) : 0,
+        }
+      }
+    )
+
+    res.json({
+      contacts_by_territory,
+      revenue_by_territory,
+      conversion_by_territory,
+    })
+  } catch (err) {
+    console.error('[insights] territory error:', err)
+    res.status(500).json({ error: 'Failed to fetch territory insights' })
+  }
+})
+
 export default router

@@ -534,6 +534,29 @@ export default function InsightsDashboard({
             : 'Poor'
       : '--'
 
+  // Territory analytics state
+  interface TerritoryRow {
+    territory: string
+    contacts_count: number
+    customers_count: number
+    conversion_rate: number
+  }
+  const [territoryData, setTerritoryData] = useState<TerritoryRow[]>([])
+  const [territoryLoading, setTerritoryLoading] = useState(false)
+
+  useEffect(() => {
+    setTerritoryLoading(true)
+    fetch('/api/insights/territory')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: TerritoryRow[] | null) => {
+        if (Array.isArray(data)) setTerritoryData(data)
+      })
+      .catch(() => {})
+      .finally(() => setTerritoryLoading(false))
+  }, [])
+
+  const hasTerritoryData = territoryData.some((r) => r.territory && r.territory !== '')
+
   // Pipeline Forecast state
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('')
@@ -1266,6 +1289,79 @@ export default function InsightsDashboard({
               <p className="text-sm text-gray-400">No forecast data available</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Section 10: Territory Performance */}
+      {!territoryLoading && hasTerritoryData && (
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Territory Performance</h2>
+
+          {/* Bar chart: contacts by territory */}
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 mb-2">Contacts by Territory</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={territoryData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="territory"
+                  type="category"
+                  tick={{ fontSize: 11 }}
+                  stroke="#9ca3af"
+                  width={100}
+                />
+                <Tooltip />
+                <Bar
+                  dataKey="contacts_count"
+                  fill="#0d9488"
+                  radius={[0, 4, 4, 0]}
+                  name="Contacts"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Summary table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-gray-400 font-medium py-2 pr-4">Territory</th>
+                  <th className="text-right text-gray-400 font-medium py-2 pr-4">Contacts</th>
+                  <th className="text-right text-gray-400 font-medium py-2 pr-4">Customers</th>
+                  <th className="text-right text-gray-400 font-medium py-2">Conversion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {territoryData.map((row) => (
+                  <tr key={row.territory} className="border-b border-gray-50 last:border-0">
+                    <td className="py-2 pr-4 text-gray-900 font-medium">{row.territory}</td>
+                    <td className="py-2 pr-4 text-right text-gray-600">{row.contacts_count}</td>
+                    <td className="py-2 pr-4 text-right text-gray-600">{row.customers_count}</td>
+                    <td className="py-2 text-right">
+                      <span
+                        className={
+                          row.conversion_rate >= 50
+                            ? 'text-green-600 font-medium'
+                            : row.conversion_rate >= 25
+                              ? 'text-amber-600'
+                              : 'text-gray-500'
+                        }
+                      >
+                        {row.conversion_rate.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
