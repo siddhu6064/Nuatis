@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   LineChart,
   Line,
@@ -210,6 +211,8 @@ export default function InsightsDashboard({
   packageRecords,
   vertical,
 }: Props) {
+  const router = useRouter()
+
   const stats = useMemo(() => {
     const totalCalls = sessions.length
     let totalLatency = 0
@@ -556,6 +559,81 @@ export default function InsightsDashboard({
   }, [])
 
   const hasTerritoryData = territoryData.some((r) => r.territory && r.territory !== '')
+
+  // Pinned Reports state
+  interface PinnedReport {
+    id: string
+    name: string
+    chart_type: 'bar' | 'line' | 'pie' | 'table' | 'number'
+    pin_order: number
+  }
+
+  interface ReportDataRow {
+    [key: string]: string | number | null
+  }
+
+  const CHART_COLORS = [
+    '#3b82f6',
+    '#22c55e',
+    '#f59e0b',
+    '#ef4444',
+    '#8b5cf6',
+    '#ec4899',
+    '#14b8a6',
+    '#f97316',
+  ]
+
+  const [pinnedReports, setPinnedReports] = useState<PinnedReport[]>([])
+  const [pinnedReportData, setPinnedReportData] = useState<Record<string, ReportDataRow[]>>({})
+
+  const fetchPinnedReports = useCallback(() => {
+    fetch('/api/reports?pinned=true')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((reports: PinnedReport[]) => {
+        if (!Array.isArray(reports)) return
+        const sorted = [...reports].sort((a, b) => a.pin_order - b.pin_order)
+        setPinnedReports(sorted)
+        sorted.forEach((report) => {
+          fetch(`/api/reports/${report.id}/data`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data: ReportDataRow[]) => {
+              if (Array.isArray(data)) {
+                setPinnedReportData((prev) => ({ ...prev, [report.id]: data }))
+              }
+            })
+            .catch(() => {})
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchPinnedReports()
+  }, [fetchPinnedReports])
+
+  const handleReorder = (reportId: string, direction: 'up' | 'down') => {
+    setPinnedReports((prev) => {
+      const idx = prev.findIndex((r) => r.id === reportId)
+      if (idx === -1) return prev
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (newIdx < 0 || newIdx >= prev.length) return prev
+      const updated = [...prev]
+      const temp = updated[idx]!
+      updated[idx] = { ...updated[newIdx]!, pin_order: temp.pin_order }
+      updated[newIdx] = { ...temp, pin_order: updated[idx]!.pin_order }
+      // Re-assign sequential pin_order values
+      const reordered = updated.map((r, i) => ({ ...r, pin_order: i + 1 }))
+      // Persist new order
+      reordered.forEach((r) => {
+        fetch(`/api/reports/${r.id}/pin`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin_order: r.pin_order }),
+        }).catch(() => {})
+      })
+      return reordered
+    })
+  }
 
   // Pipeline Forecast state
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
@@ -1290,6 +1368,154 @@ export default function InsightsDashboard({
             </div>
           )}
         </div>
+      )}
+
+      {/* Section 11: Custom Reports */}
+      {pinnedReports.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Custom Reports</h2>
+            <a href="/reports" className="text-sm text-teal-600 hover:text-teal-700 font-medium">
+              Manage Reports →
+            </a>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pinnedReports.map((report, idx) => {
+              const data = pinnedReportData[report.id] ?? []
+              const keys = data.length > 0 ? Object.keys(data[0]!) : []
+              const valueKey = keys.find((k) => k !== keys[0]) ?? keys[0] ?? 'value'
+              const labelKey = keys[0] ?? 'label'
+
+              return (
+                <div
+                  key={report.id}
+                  className="bg-white rounded-xl border border-gray-100 p-5 cursor-pointer hover:border-teal-200 hover:shadow-sm transition-all relative group"
+                  onClick={() => router.push(`/reports/${report.id}`)}
+                >
+                  {/* Reorder buttons */}
+                  <div
+                    className="absolute top-3 right-3 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      disabled={idx === 0}
+                      onClick={() => handleReorder(report.id, 'up')}
+                      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      disabled={idx === pinnedReports.length - 1}
+                      onClick={() => handleReorder(report.id, 'down')}
+                      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
+                  </div>
+
+                  <p className="text-sm font-semibold text-gray-900 mb-3 pr-8">{report.name}</p>
+
+                  {data.length === 0 ? (
+                    <p className="text-xs text-gray-300 py-8 text-center">No data</p>
+                  ) : report.chart_type === 'bar' ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                        <Tooltip />
+                        <Bar dataKey={valueKey} radius={[3, 3, 0, 0]}>
+                          {data.map((_, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : report.chart_type === 'line' ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey={valueKey}
+                          stroke={CHART_COLORS[0]}
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : report.chart_type === 'pie' ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={data}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          dataKey={valueKey}
+                          nameKey={labelKey}
+                          label={({ name, percent }) =>
+                            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
+                        >
+                          {data.map((_, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : report.chart_type === 'number' ? (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <p className="text-5xl font-bold text-gray-900">
+                        {String(data[0]?.[valueKey] ?? '--')}
+                      </p>
+                    </div>
+                  ) : report.chart_type === 'table' ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            {keys.map((k) => (
+                              <th
+                                key={k}
+                                className="text-left text-gray-400 font-medium py-1.5 pr-3"
+                              >
+                                {k}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.slice(0, 3).map((row, i) => (
+                            <tr key={i} className="border-b border-gray-50 last:border-0">
+                              {keys.map((k) => (
+                                <td key={k} className="py-1.5 pr-3 text-gray-700">
+                                  {String(row[k] ?? '')}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 text-center py-4">
+          <a href="/reports" className="hover:text-teal-600 transition-colors">
+            Pin custom reports to see them here →
+          </a>
+        </p>
       )}
 
       {/* Section 10: Territory Performance */}

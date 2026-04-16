@@ -45,6 +45,7 @@ const NAV: NavItem[] = [
   },
   { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true, requireModule: 'insights' },
   { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
+  { href: '/reports', label: 'Reports', icon: '📊', suiteOnly: true },
   { href: '/tasks', label: 'Tasks', icon: '☑', suiteOnly: true },
   { href: '/settings/voice', label: 'Voice AI', icon: '◇', requireModule: 'maya' },
   { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },

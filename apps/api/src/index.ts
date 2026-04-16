@@ -44,6 +44,7 @@ import bookingPublicRouter from './routes/booking-public.js'
 import bookingSettingsRouter from './routes/booking-settings.js'
 import intakeFormsRouter from './routes/intake-forms.js'
 import leadScoringRouter from './routes/lead-scoring.js'
+import reportsRouter from './routes/reports.js'
 import reviewSettingsRouter, { reviewTrackingRouter } from './routes/review-settings.js'
 import notificationSettingsRouter from './routes/notification-settings.js'
 import pipelinesRouter from './routes/pipelines.js'
@@ -128,6 +129,7 @@ app.use('/api/booking', bookingPublicRouter)
 app.use('/api/settings/booking', bookingSettingsRouter)
 app.use('/api/intake-forms', intakeFormsRouter)
 app.use('/api/lead-scoring', leadScoringRouter)
+app.use('/api/reports', reportsRouter)
 app.use('/api/settings/review-automation', reviewSettingsRouter)
 app.use('/api/review-tracking', reviewTrackingRouter)
 app.use('/api/settings/notifications', notificationSettingsRouter)
