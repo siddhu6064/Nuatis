@@ -127,8 +127,8 @@ export async function startWorkers(): Promise<void> {
   const leadScoreCompute = createLeadScoreComputeWorker()
   managed.push({
     name: 'lead-score-compute',
-    queue: leadScoreCompute.queues[0],
-    worker: leadScoreCompute.workers[0],
+    queue: leadScoreCompute.queues[0]!,
+    worker: leadScoreCompute.workers[0]!,
   })
   console.info('[workers] lead-score-compute worker started')
 
@@ -136,22 +136,22 @@ export async function startWorkers(): Promise<void> {
   const leadScoreBulk = createLeadScoreBulkWorker()
   managed.push({
     name: 'lead-score-bulk',
-    queue: leadScoreBulk.queues[0],
-    worker: leadScoreBulk.workers[0],
+    queue: leadScoreBulk.queues[0]!,
+    worker: leadScoreBulk.workers[0]!,
   })
   console.info('[workers] lead-score-bulk worker started')
 
   // 14. Lead score decay — every 24 hours
   const leadScoreDecay = createLeadScoreDecayWorker()
-  await leadScoreDecay.queues[0].add(
+  await leadScoreDecay.queues[0]!.add(
     'decay',
     {},
     { repeat: { every: 86400000 }, jobId: 'lead-score-decay-repeat' }
   )
   managed.push({
     name: 'lead-score-decay',
-    queue: leadScoreDecay.queues[0],
-    worker: leadScoreDecay.workers[0],
+    queue: leadScoreDecay.queues[0]!,
+    worker: leadScoreDecay.workers[0]!,
   })
   console.info('[workers] lead-score-decay started, repeating every 24h')
 

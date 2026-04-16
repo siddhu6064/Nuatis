@@ -47,7 +47,7 @@ export default function BookingSettingsPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [slugError, setSlugError] = useState<string | null>(null)
 
-  const token = (session as Record<string, unknown>)?.accessToken ?? ''
+  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
 
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',

@@ -78,7 +78,7 @@ export default function EmailComposeModal({
           setAccounts(d.accounts)
           const def = d.accounts.find((a) => a.is_default)
           if (def) setSelectedAccountId(def.id)
-          else if (d.accounts.length > 0) setSelectedAccountId(d.accounts[0].id)
+          else if (d.accounts.length > 0 && d.accounts[0]) setSelectedAccountId(d.accounts[0].id)
         }
       })
       .catch(() => {})

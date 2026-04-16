@@ -237,7 +237,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     return
   }
 
-  await clearReportCache(authed.tenantId, id)
+  await clearReportCache(authed.tenantId, id!)
 
   res.json(updated)
 })
@@ -267,7 +267,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
     return
   }
 
-  await clearReportCache(authed.tenantId, id)
+  await clearReportCache(authed.tenantId, id!)
 
   res.json({ deleted: true })
 })
@@ -364,7 +364,7 @@ router.post('/:id/refresh', requireAuth, async (req: Request, res: Response): Pr
     return
   }
 
-  await clearReportCache(authed.tenantId, id)
+  await clearReportCache(authed.tenantId, id!)
 
   try {
     const result = await executeReport(authed.tenantId, report)

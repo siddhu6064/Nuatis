@@ -15,7 +15,13 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/coverage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/.next/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      'apps/mobile/**',
+    ],
   },
   {
     files: ['**/postcss.config.js', '**/tailwind.config.js'],
@@ -24,6 +30,29 @@ export default tseslint.config(
         module: 'writable',
         require: 'readonly',
       },
+    },
+  },
+  {
+    // Embeddable chat widget — runs in customer browsers, uses browser globals
+    files: ['apps/web/public/widget/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        navigator: 'readonly',
+        URL: 'readonly',
+      },
+    },
+    rules: {
+      'no-empty': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   }
 )

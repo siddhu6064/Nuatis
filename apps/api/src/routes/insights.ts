@@ -1057,7 +1057,7 @@ router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response):
       const { count, total_value } = stageCountMap.get(stage.id) ?? { count: 0, total_value: 0 }
       let drop_off_pct: number | null = null
       if (idx > 0) {
-        const prevEntry = stageCountMap.get(stages[idx - 1].id) ?? { count: 0, total_value: 0 }
+        const prevEntry = stageCountMap.get(stages[idx - 1]!.id) ?? { count: 0, total_value: 0 }
         const prevCount = prevEntry.count
         drop_off_pct =
           prevCount > 0 ? Math.round(((prevCount - count) / prevCount) * 10000) / 100 : 0

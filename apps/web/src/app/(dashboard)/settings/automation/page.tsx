@@ -74,7 +74,7 @@ function Toggle({
 
 export default function ReviewAutomationPage() {
   const { data: session } = useSession()
-  const token = (session as Record<string, unknown>)?.accessToken ?? ''
+  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token as string}` } : {}),

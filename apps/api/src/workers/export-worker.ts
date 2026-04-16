@@ -64,7 +64,8 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
 // ── Table fetchers ───────────────────────────────────────────────────────────
 
 async function fetchTable(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   tenantId: string,
   table: string
 ): Promise<{ label: string; columns: string[]; rows: Record<string, unknown>[] }> {

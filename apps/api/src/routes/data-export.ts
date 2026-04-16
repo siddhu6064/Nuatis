@@ -58,7 +58,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   if (existing && existing.length > 0) {
     res.status(429).json({
       error: 'An export is already in progress. Please wait for it to complete.',
-      exportJobId: existing[0].id,
+      exportJobId: existing[0]!.id,
     })
     return
   }

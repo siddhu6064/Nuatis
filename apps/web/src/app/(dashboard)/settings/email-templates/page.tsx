@@ -58,7 +58,7 @@ export default function EmailTemplatesPage() {
   const [deleting, setDeleting] = useState(false)
 
   const token =
-    (session as Record<string, unknown>)?.accessToken ??
+    (session as unknown as Record<string, unknown>)?.accessToken ??
     ((session?.user as Record<string, unknown> | undefined)?.accessToken as string) ??
     ''
 

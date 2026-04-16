@@ -380,7 +380,7 @@ const VERTICAL_FORMS: Record<string, FormDefinition> = {
 }
 
 // sales_crm maps to the same form definition as default
-VERTICAL_FORMS['sales_crm'] = VERTICAL_FORMS['default']
+VERTICAL_FORMS['sales_crm'] = VERTICAL_FORMS['default']!
 
 async function main() {
   const tenantId = process.argv[2]

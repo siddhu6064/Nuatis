@@ -136,7 +136,7 @@ export async function computeLeadScore(
   // --- DECAY scoring ---
   let decayScore = 0
   if (activityList.length > 0) {
-    const mostRecentDate = new Date(activityList[0].created_at)
+    const mostRecentDate = new Date(activityList[0]!.created_at)
     const now = new Date()
     const daysSinceLastActivity = Math.floor(
       (now.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24)

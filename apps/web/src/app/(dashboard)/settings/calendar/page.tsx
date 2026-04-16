@@ -67,7 +67,7 @@ export default function CalendarSettingsPage() {
   const [switchConfirm, setSwitchConfirm] = useState<'google' | 'outlook' | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const token = (session as Record<string, unknown>)?.accessToken ?? ''
+  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })

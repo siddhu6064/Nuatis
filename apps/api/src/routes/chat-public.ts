@@ -124,18 +124,20 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
     .from('chat_sessions')
     .update({
       last_message_at: new Date().toISOString(),
-      unread_count: supabase.rpc ? undefined : undefined, // handled below via raw update
+      // unread_count handled below via RPC
     })
     .eq('id', sessionId)
 
   // Increment unread_count separately
-  await supabase.rpc('increment_chat_unread', { p_session_id: sessionId }).catch(() => {
+  try {
+    await supabase.rpc('increment_chat_unread', { p_session_id: sessionId })
+  } catch {
     // Fallback if RPC not available — best effort
     void supabase
       .from('chat_sessions')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', sessionId)
-  })
+  }
 
   // Handle visitor info / contact find-or-create
   let contactId: string | null = (session.contact_id as string | null) ?? null
@@ -198,7 +200,10 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
 
           // Auto-enrich new contact
           try {
-            const enrichResult = autoEnrichContact({ phone, email })
+            const enrichResult = autoEnrichContact({
+              phone: phone ?? undefined,
+              email: email ?? undefined,
+            })
             const enrichUpdates: Record<string, unknown> = {}
             if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
             if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state

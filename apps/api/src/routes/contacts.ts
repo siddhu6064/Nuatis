@@ -531,7 +531,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     possibleDuplicates = await findDuplicates(supabase, authed.tenantId, phone, email, id)
   }
 
-  enqueueScoreCompute(authed.tenantId, req.params['id'], 'contact_updated')
+  enqueueScoreCompute(authed.tenantId, req.params['id']!, 'contact_updated')
 
   // Auto-enrich if phone or email changed
   if (phone || email) {

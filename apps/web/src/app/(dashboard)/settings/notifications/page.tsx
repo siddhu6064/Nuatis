@@ -84,7 +84,7 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const token = (session as Record<string, unknown>)?.accessToken ?? ''
+  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
@@ -101,13 +101,11 @@ export default function NotificationSettingsPage() {
   }, [])
 
   function toggle(eventKey: string, channel: keyof ChannelPrefs) {
-    setPrefs((prev) => ({
-      ...prev,
-      [eventKey]: {
-        ...prev[eventKey],
-        [channel]: !prev[eventKey]?.[channel],
-      },
-    }))
+    setPrefs((prev) => {
+      const current: ChannelPrefs = prev[eventKey] ?? { push: false, sms: false, email: false }
+      const updated: ChannelPrefs = { ...current, [channel]: !current[channel] }
+      return { ...prev, [eventKey]: updated }
+    })
   }
 
   async function save() {

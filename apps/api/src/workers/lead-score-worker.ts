@@ -98,7 +98,7 @@ async function processBulk(data: BulkJobData): Promise<void> {
   let enqueued = 0
 
   for (let i = 0; i < contacts.length; i++) {
-    const contact = contacts[i]
+    const contact = contacts[i]!
     await queue.add(
       'compute',
       { tenantId, contactId: contact.id, trigger: 'bulk' },
