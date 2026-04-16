@@ -118,24 +118,34 @@ export default function CpqSettingsForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Deposit %</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">Deposit Percentage</label>
           <p className="text-xs text-gray-400 mb-2">
-            Required deposit percentage when accepting a quote (used with Stripe integration)
+            Set to 0 to disable deposits. When enabled, clients will see the required deposit amount
+            on their quote. Payment collection coming soon.
           </p>
-          <input
-            type="number"
-            value={settings.deposit_pct}
-            onChange={(e) =>
-              setSettings((s) => ({
-                ...s,
-                deposit_pct: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
-              }))
-            }
-            className={inputCls}
-            min="0"
-            max="100"
-            step="1"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={settings.deposit_pct}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  deposit_pct: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                }))
+              }
+              className={inputCls}
+              min="0"
+              max="100"
+              step="1"
+            />
+            <span className="text-sm text-gray-500">%</span>
+          </div>
+          {settings.deposit_pct > 0 && (
+            <p className="text-xs text-teal-600 mt-2">
+              On a $1,000 quote: Deposit ${((1000 * settings.deposit_pct) / 100).toFixed(0)} ·
+              Remaining ${(1000 - (1000 * settings.deposit_pct) / 100).toFixed(0)}
+            </p>
+          )}
         </div>
       </div>
 

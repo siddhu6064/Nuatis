@@ -5,6 +5,7 @@ interface LineItem {
   quantity: number
   unit_price: number
   total: number
+  package_id?: string | null
 }
 
 interface QuotePdfData {
@@ -21,6 +22,9 @@ interface QuotePdfData {
   taxRate: number
   taxAmount: number
   total: number
+  depositPct?: number | null
+  depositAmount?: number | null
+  remainingBalance?: number | null
   notes: string | null
   lineItems: LineItem[]
 }
@@ -118,17 +122,70 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
     doc.text('Total', colX.total, y + 6, { width: 75, align: 'right' })
     y += 22
 
-    // Rows
+    // Rows — group by package_id
     doc.fontSize(9).fillColor(DARK)
-    data.lineItems.forEach((item, i) => {
-      if (i % 2 === 1) doc.rect(50, y, pageWidth, 20).fill('#fafafa')
-      doc.fillColor(GRAY).text(String(i + 1), colX.num + 4, y + 5)
-      doc.fillColor(DARK).text(item.description, colX.desc, y + 5, { width: 260 })
-      doc.text(String(item.quantity), colX.qty, y + 5, { width: 50, align: 'right' })
-      doc.text(fmt(item.unit_price), colX.price, y + 5, { width: 65, align: 'right' })
-      doc.text(fmt(item.total), colX.total, y + 5, { width: 75, align: 'right' })
-      y += 20
-    })
+    const renderedPkgIds = new Set<string>()
+    let rowNum = 0
+
+    for (let idx = 0; idx < data.lineItems.length; idx++) {
+      const item = data.lineItems[idx]!
+      if (item.package_id && !renderedPkgIds.has(item.package_id)) {
+        renderedPkgIds.add(item.package_id)
+        const group = data.lineItems.filter((li) => li.package_id === item.package_id)
+        const pkgName =
+          group.find((li) => li.unit_price < 0)?.description?.replace(' — Bundle Savings', '') ??
+          'Package'
+
+        // Package header row
+        doc.rect(50, y, pageWidth, 20).fill('#eef2ff')
+        doc.fontSize(8).fillColor('#4338ca')
+        doc.font('Helvetica-Bold').text(`Package: ${pkgName}`, colX.desc, y + 5, { width: 400 })
+        doc.font('Helvetica')
+        y += 20
+
+        for (const gi of group) {
+          rowNum++
+          const isDiscount = gi.unit_price < 0
+          if (rowNum % 2 === 0) doc.rect(50, y, pageWidth, 20).fill('#fafafa')
+
+          doc
+            .fontSize(8)
+            .fillColor(GRAY)
+            .text('', colX.num + 4, y + 5)
+          if (isDiscount) {
+            doc
+              .fontSize(8)
+              .fillColor('#059669')
+              .text(gi.description, colX.desc + 10, y + 5, { width: 250 })
+            doc.text(fmt(gi.total), colX.total, y + 5, { width: 75, align: 'right' })
+          } else {
+            doc
+              .fontSize(8)
+              .fillColor(GRAY)
+              .text(gi.description, colX.desc + 10, y + 5, { width: 250 })
+            doc.fillColor(DARK)
+            doc.text(String(gi.quantity), colX.qty, y + 5, { width: 50, align: 'right' })
+            doc.text(fmt(gi.unit_price), colX.price, y + 5, { width: 65, align: 'right' })
+            doc.text(fmt(gi.total), colX.total, y + 5, { width: 75, align: 'right' })
+          }
+          y += 20
+        }
+      } else if (item.package_id) {
+        // Already rendered
+      } else {
+        rowNum++
+        if (rowNum % 2 === 0) doc.rect(50, y, pageWidth, 20).fill('#fafafa')
+        doc
+          .fontSize(9)
+          .fillColor(GRAY)
+          .text(String(rowNum), colX.num + 4, y + 5)
+        doc.fillColor(DARK).text(item.description, colX.desc, y + 5, { width: 260 })
+        doc.text(String(item.quantity), colX.qty, y + 5, { width: 50, align: 'right' })
+        doc.text(fmt(item.unit_price), colX.price, y + 5, { width: 65, align: 'right' })
+        doc.text(fmt(item.total), colX.total, y + 5, { width: 75, align: 'right' })
+        y += 20
+      }
+    }
 
     // ── Totals ────────────────────────────────────────────────────────────
     y += 10
@@ -149,6 +206,35 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
     y += 8
     doc.fontSize(14).fillColor(TEAL).text('Total', 380, y)
     doc.text(fmt(data.total), 475, y, { width: 75, align: 'right' })
+
+    // ── Deposit ──────────────────────────────────────────────────────────
+    if (data.depositAmount != null && data.depositAmount > 0) {
+      y += 28
+      doc.moveTo(380, y).lineTo(550, y).strokeColor(LIGHT_GRAY).lineWidth(0.5).stroke()
+      y += 10
+
+      doc
+        .fontSize(9)
+        .fillColor(DARK)
+        .font('Helvetica-Bold')
+        .text(`Deposit Required (${data.depositPct ?? 0}%)`, 380, y)
+      doc.text(fmt(data.depositAmount), 475, y, { width: 75, align: 'right' })
+      doc.font('Helvetica')
+
+      y += 18
+      doc.fillColor(GRAY).text('Remaining Balance', 380, y)
+      doc
+        .fillColor(DARK)
+        .text(fmt(data.remainingBalance ?? 0), 475, y, { width: 75, align: 'right' })
+
+      y += 16
+      doc
+        .fontSize(7)
+        .fillColor(GRAY)
+        .font('Helvetica-Oblique')
+        .text('A deposit is required to confirm your booking.', 380, y, { width: 170 })
+      doc.font('Helvetica')
+    }
 
     // ── Notes ─────────────────────────────────────────────────────────────
     if (data.notes) {

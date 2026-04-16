@@ -89,8 +89,24 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       product,
       modules:
         product === 'maya_only'
-          ? { maya: true, crm: false, revenue_ops: false, cpq: false, insights: false }
-          : { maya: true, crm: true, revenue_ops: true, cpq: true, insights: true },
+          ? {
+              maya: true,
+              crm: false,
+              appointments: false,
+              pipeline: false,
+              automation: false,
+              cpq: false,
+              insights: false,
+            }
+          : {
+              maya: true,
+              crm: true,
+              appointments: true,
+              pipeline: true,
+              automation: true,
+              cpq: ['contractor', 'law_firm', 'real_estate', 'sales_crm'].includes(vertical_slug),
+              insights: true,
+            },
     })
     .select('id')
     .single()

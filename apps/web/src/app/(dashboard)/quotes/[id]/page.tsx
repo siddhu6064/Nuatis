@@ -35,6 +35,9 @@ interface Quote {
   approval_note: string | null
   approved_by: string | null
   approved_at: string | null
+  deposit_pct: number | null
+  deposit_amount: number | null
+  remaining_balance: number | null
   contacts: { full_name: string; phone: string | null; email: string | null } | null
 }
 
@@ -264,6 +267,23 @@ export default async function QuoteDetailPage({ params }: Props) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Deposit info */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
+        <h2 className="text-sm font-semibold text-gray-900 mb-2">Deposit</h2>
+        {quote.deposit_amount != null ? (
+          <div className="space-y-1 text-sm">
+            <p className="text-gray-700">
+              Deposit: {Number(quote.deposit_pct)}% — ${Number(quote.deposit_amount).toFixed(2)}
+            </p>
+            <p className="text-gray-700">
+              Remaining: ${Number(quote.remaining_balance).toFixed(2)}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Not configured</p>
+        )}
       </div>
 
       {/* Notes */}

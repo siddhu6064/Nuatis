@@ -7,6 +7,7 @@ interface LineItem {
   quantity: number
   unit_price: number
   total: number
+  package_id: string | null
 }
 
 interface QuoteData {
@@ -17,11 +18,14 @@ interface QuoteData {
   tax_rate: number
   tax_amount: number
   total: number
+  deposit_pct: number | null
+  deposit_amount: number | null
+  remaining_balance: number | null
   notes: string | null
   valid_until: string | null
   created_at: string
   business_name: string
-  contacts: { full_name: string } | null
+  contacts: { full_name: string; email?: string | null } | null
   line_items: LineItem[]
 }
 
@@ -150,21 +154,80 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
             )}
           </div>
 
-          {/* Line items */}
+          {/* Line items with package grouping */}
           <div className="divide-y divide-gray-50">
-            {quote.line_items.map((item, i) => (
-              <div key={i} className="px-6 py-3 flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-gray-700">{item.description}</p>
-                  <p className="text-xs text-gray-400">
-                    {item.quantity} &times; ${Number(item.unit_price).toFixed(2)}
-                  </p>
-                </div>
-                <p className="text-sm font-medium text-gray-900">
-                  ${Number(item.total).toFixed(2)}
-                </p>
-              </div>
-            ))}
+            {(() => {
+              const rendered: React.ReactNode[] = []
+              const renderedPkgIds = new Set<string>()
+
+              for (let i = 0; i < quote.line_items.length; i++) {
+                const item = quote.line_items[i]!
+                if (item.package_id && !renderedPkgIds.has(item.package_id)) {
+                  renderedPkgIds.add(item.package_id)
+                  const group = quote.line_items.filter((li) => li.package_id === item.package_id)
+                  const discountRow = group.find((li) => Number(li.unit_price) < 0)
+                  const serviceRows = group.filter((li) => Number(li.unit_price) >= 0)
+                  const pkgName =
+                    discountRow?.description?.replace(' — Bundle Savings', '') ?? 'Package'
+                  const bundleTotal = group.reduce((s, li) => s + Number(li.total), 0)
+
+                  rendered.push(
+                    <div key={`pkg-${item.package_id}`} className="border-l-2 border-indigo-200">
+                      <div className="px-6 py-2 bg-indigo-50/50 flex items-center justify-between">
+                        <p className="text-sm font-medium text-indigo-800">{pkgName}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          ${bundleTotal.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="hidden sm:block">
+                        {serviceRows.map((si, j) => (
+                          <div
+                            key={j}
+                            className="px-6 pl-10 py-2 flex items-center justify-between"
+                          >
+                            <div className="flex-1">
+                              <p className="text-xs text-gray-600">{si.description}</p>
+                              <p className="text-[10px] text-gray-400">
+                                {si.quantity} &times; ${Number(si.unit_price).toFixed(2)}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-500">${Number(si.total).toFixed(2)}</p>
+                          </div>
+                        ))}
+                        {discountRow && (
+                          <div className="px-6 pl-10 py-2 flex items-center justify-between">
+                            <p className="text-xs text-green-600 italic">
+                              {discountRow.description}
+                            </p>
+                            <p className="text-xs text-green-600 italic">
+                              -${Math.abs(Number(discountRow.total)).toFixed(2)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                } else if (item.package_id) {
+                  // Already rendered as part of group
+                } else {
+                  // Regular flat item
+                  rendered.push(
+                    <div key={i} className="px-6 py-3 flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-700">{item.description}</p>
+                        <p className="text-xs text-gray-400">
+                          {item.quantity} &times; ${Number(item.unit_price).toFixed(2)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">
+                        ${Number(item.total).toFixed(2)}
+                      </p>
+                    </div>
+                  )
+                }
+              }
+              return rendered
+            })()}
           </div>
 
           {/* Totals */}
@@ -205,6 +268,46 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
             </div>
           )}
         </div>
+
+        {/* Deposit info card */}
+        {quote.deposit_amount != null && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-6">
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">💳</span>
+                <h3 className="text-sm font-semibold text-gray-900">Deposit Information</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                A {Number(quote.deposit_pct)}% deposit is required to confirm this quote.
+              </p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Deposit Due</span>
+                  <span className="font-semibold text-gray-900">
+                    ${Number(quote.deposit_amount).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Remaining</span>
+                  <span className="text-gray-700">
+                    ${Number(quote.remaining_balance).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400">(due at completion)</p>
+              </div>
+            </div>
+            {quote.contacts?.email && (
+              <div className="border-t border-gray-100 px-6 py-3">
+                <a
+                  href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Deposit payment — ${quote.title}`)}`}
+                  className="block w-full text-center py-2 text-sm text-teal-600 font-medium border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
+                >
+                  Contact us to arrange payment
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action buttons */}
         {canAct && (

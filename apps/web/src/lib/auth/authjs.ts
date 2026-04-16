@@ -19,6 +19,7 @@ interface TenantInfo {
   vertical: string
   name: string
   subscription_status: string
+  modules: Record<string, boolean> | null
 }
 
 interface UserWithTenant {
@@ -55,7 +56,9 @@ const result = NextAuth({
 
         const { data: user } = await supabaseAdmin
           .from('users')
-          .select('id, tenant_id, role, full_name, tenants(vertical, name, subscription_status)')
+          .select(
+            'id, tenant_id, role, full_name, tenants(vertical, name, subscription_status, modules)'
+          )
           .eq('authjs_user_id', data.user.id)
           .single<UserWithTenant>()
 
@@ -72,6 +75,7 @@ const result = NextAuth({
           vertical: tenant?.vertical ?? '',
           businessName: tenant?.name ?? '',
           subscriptionStatus: tenant?.subscription_status ?? '',
+          modules: (tenant?.modules as Record<string, boolean>) ?? {},
         }
       },
     }),
@@ -84,7 +88,28 @@ const result = NextAuth({
         token.vertical = (user as Record<string, unknown>).vertical
         token.businessName = (user as Record<string, unknown>).businessName
         token.subscriptionStatus = (user as Record<string, unknown>).subscriptionStatus
+        token.modules = (user as Record<string, unknown>).modules
       }
+
+      // Re-read vertical + modules from DB on every token rotation so demo
+      // vertical switches and module toggles take effect without re-login
+      if (token.tenantId) {
+        try {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('vertical, name, modules')
+            .eq('id', token.tenantId as string)
+            .single<{ vertical: string; name: string; modules: Record<string, boolean> | null }>()
+          if (tenant) {
+            token.vertical = tenant.vertical
+            token.businessName = tenant.name
+            token.modules = tenant.modules ?? {}
+          }
+        } catch {
+          // DB unavailable — keep cached values
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -93,6 +118,7 @@ const result = NextAuth({
       session.user.vertical = token.vertical as string
       session.user.businessName = token.businessName as string
       session.user.subscriptionStatus = token.subscriptionStatus as string
+      session.user.modules = (token.modules as Record<string, boolean>) ?? {}
       return session
     },
   },

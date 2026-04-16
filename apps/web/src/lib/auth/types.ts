@@ -8,6 +8,7 @@ declare module 'next-auth' {
       vertical: string
       businessName: string
       subscriptionStatus: string
+      modules: Record<string, boolean>
     }
   }
 }
