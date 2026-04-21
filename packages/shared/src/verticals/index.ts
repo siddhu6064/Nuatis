@@ -14,6 +14,8 @@ export interface PipelineStageConfig {
   color: string
   is_default?: boolean
   is_terminal?: boolean
+  is_won?: boolean
+  is_lost?: boolean
 }
 
 export interface BusinessHours {
@@ -37,41 +39,82 @@ export interface VerticalConfig {
   system_prompt_template: string
   business_hours: BusinessHours
   follow_up_cadence: FollowUpStep[]
+  maya_intents?: string[]
 }
+
+const MAYA_PROMPT_SUFFIX =
+  ' LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.'
+
+// Pipeline stage colour palette (keep in sync with dashboard kanban + marketing popup)
+const C = {
+  blue: '#378ADD',
+  amber: '#EF9F27',
+  green: '#1D9E75',
+  teal: '#2DA89C',
+  gray: '#888780',
+} as const
 
 export const VERTICALS: Record<string, VerticalConfig> = {
   sales_crm: {
     slug: 'sales_crm',
     label: 'Sales CRM',
     fields: [
-      { key: 'company', label: 'Company', type: 'text', required: true },
+      { key: 'company_name', label: 'Company', type: 'text', required: true },
+      { key: 'job_title', label: 'Job title', type: 'text', required: false },
+      { key: 'industry', label: 'Industry', type: 'text', required: false },
       {
-        key: 'vertical_interest',
-        label: 'Vertical interest',
+        key: 'company_size',
+        label: 'Company size',
         type: 'select',
         required: false,
-        options: ['dental', 'salon', 'restaurant', 'contractor', 'law_firm', 'real_estate'],
+        options: ['1-10', '11-50', '51-200', '201-1000', '1000+'],
       },
+      { key: 'deal_value', label: 'Deal value ($)', type: 'number', required: false },
       {
-        key: 'demo_status',
-        label: 'Demo status',
+        key: 'decision_timeline',
+        label: 'Decision timeline',
         type: 'select',
         required: false,
-        options: ['not_contacted', 'demo_scheduled', 'demo_done', 'pilot', 'paying', 'lost'],
+        options: ['Immediate', '30 days', '60 days', 'Quarter', 'Year', 'Exploring'],
       },
-      { key: 'follow_up_date', label: 'Follow-up date', type: 'date', required: false },
-      { key: 'notes', label: 'Notes', type: 'textarea', required: false },
+      { key: 'decision_maker', label: 'Decision maker', type: 'boolean', required: false },
+      { key: 'budget_confirmed', label: 'Budget confirmed', type: 'boolean', required: false },
+      { key: 'pain_points', label: 'Pain points', type: 'textarea', required: false },
+      {
+        key: 'competitors_evaluated',
+        label: 'Competitors evaluated',
+        type: 'textarea',
+        required: false,
+      },
+      {
+        key: 'lead_source',
+        label: 'Lead source',
+        type: 'select',
+        required: false,
+        options: ['Website', 'Referral', 'Event', 'Outbound', 'Partner', 'Inbound call', 'Other'],
+      },
+      { key: 'lead_score', label: 'Lead score (0-100)', type: 'number', required: false },
     ],
     pipeline_stages: [
-      { name: 'Prospect', position: 1, color: '#888780', is_default: true },
-      { name: 'Demo scheduled', position: 2, color: '#378ADD' },
-      { name: 'Demo done', position: 3, color: '#EF9F27' },
-      { name: 'Pilot', position: 4, color: '#7F77DD' },
-      { name: 'Paying', position: 5, color: '#1D9E75' },
-      { name: 'Lost', position: 6, color: '#E05252', is_terminal: true },
+      { name: 'New lead', position: 1, color: C.blue, is_default: true },
+      { name: 'Qualified', position: 2, color: C.blue },
+      { name: 'Demo scheduled', position: 3, color: C.amber },
+      { name: 'Proposal sent', position: 4, color: C.amber },
+      { name: 'Negotiation', position: 5, color: C.teal },
+      { name: 'Closed won', position: 6, color: C.green, is_terminal: true, is_won: true },
+      { name: 'Closed lost', position: 7, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'Inbound sales qualification',
+      'Demo and discovery call scheduling',
+      'Pricing and package questions',
+      'Renewal or expansion inquiry',
+      'Partner or integration inquiry',
+      'Support escalation (route to CS)',
     ],
     system_prompt_template:
-      'You are Maya, a friendly AI assistant for {{business_name}}. Help callers learn about the product, book demos, and answer questions. Be warm and professional. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, a friendly AI assistant for {{business_name}}. Help callers learn about the product, book demos, and answer questions. Be warm and professional.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '9am-6pm', sat: 'closed', sun: 'closed' },
     follow_up_cadence: [
       {
@@ -99,37 +142,57 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   dental: {
     slug: 'dental',
     label: 'Dental practice',
+    // NOTE: insurance_id / insurance_provider intentionally removed — those are
+    // integration-layer values (eligibility check), not stored CRM fields.
     fields: [
       { key: 'date_of_birth', label: 'Date of birth', type: 'date', required: false },
-      { key: 'insurance_provider', label: 'Insurance provider', type: 'text', required: false },
-      { key: 'insurance_plan_id', label: 'Plan ID', type: 'text', required: false },
-      { key: 'last_cleaning_date', label: 'Last cleaning date', type: 'date', required: false },
+      { key: 'last_visit_date', label: 'Last visit date', type: 'date', required: false },
+      { key: 'next_recall_date', label: 'Next recall date', type: 'date', required: false },
+      { key: 'allergies', label: 'Allergies', type: 'textarea', required: false },
       {
-        key: 'recall_interval_months',
-        label: 'Recall interval (months)',
-        type: 'number',
+        key: 'current_medications',
+        label: 'Current medications',
+        type: 'textarea',
         required: false,
       },
+      { key: 'chief_complaint', label: 'Chief complaint', type: 'text', required: false },
+      { key: 'treatment_notes', label: 'Treatment notes', type: 'textarea', required: false },
+      { key: 'referral_source', label: 'Referral source', type: 'text', required: false },
       { key: 'preferred_dentist', label: 'Preferred dentist', type: 'text', required: false },
       {
-        key: 'treatment_plan_status',
-        label: 'Treatment plan status',
+        key: 'preferred_appointment_time',
+        label: 'Preferred appointment time',
         type: 'select',
         required: false,
-        options: ['none', 'active', 'completed', 'pending'],
+        options: ['Morning', 'Afternoon', 'Evening'],
       },
-      { key: 'allergies', label: 'Allergies', type: 'text', required: false },
-      { key: 'hipaa_consent_date', label: 'HIPAA consent date', type: 'date', required: false },
+      {
+        key: 'x_ray_consent_on_file',
+        label: 'X-ray consent on file',
+        type: 'boolean',
+        required: false,
+      },
+      { key: 'last_cleaning_date', label: 'Last cleaning date', type: 'date', required: false },
     ],
     pipeline_stages: [
-      { name: 'New inquiry', position: 1, color: '#888780', is_default: true },
-      { name: 'Consultation booked', position: 2, color: '#378ADD' },
-      { name: 'Treatment planned', position: 3, color: '#EF9F27' },
-      { name: 'Active patient', position: 4, color: '#1D9E75' },
-      { name: 'Recall due', position: 5, color: '#D85A30' },
+      { name: 'New inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Consultation scheduled', position: 2, color: C.blue },
+      { name: 'Treatment plan presented', position: 3, color: C.amber },
+      { name: 'Active patient', position: 4, color: C.green, is_won: true },
+      { name: 'Recall due', position: 5, color: C.teal },
+      { name: 'Inactive / lapsed', position: 6, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'New patient appointment request',
+      'Reschedule or cancel existing appointment',
+      'Insurance coverage and treatment pricing questions',
+      'Emergency toothache triage',
+      'Recall / routine cleaning reminder response',
+      'Prescription refill request',
     ],
     system_prompt_template:
-      'You are Maya, the AI receptionist for {{business_name}} dental practice. Help patients book appointments, answer questions about services, and handle recalls. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the AI receptionist for {{business_name}} dental practice. Help patients book appointments, answer questions about services, and handle recalls.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '8am-5pm', sat: '9am-1pm', sun: 'closed' },
     follow_up_cadence: [
       {
@@ -154,39 +217,233 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     ],
   },
 
+  medical: {
+    slug: 'medical',
+    label: 'Medical clinic',
+    // NOTE: insurance_id intentionally excluded — eligibility is an integration
+    // concern, not a stored CRM field.
+    fields: [
+      { key: 'date_of_birth', label: 'Date of birth', type: 'date', required: false },
+      { key: 'primary_physician', label: 'Primary physician', type: 'text', required: false },
+      { key: 'current_conditions', label: 'Current conditions', type: 'textarea', required: false },
+      {
+        key: 'current_medications',
+        label: 'Current medications',
+        type: 'textarea',
+        required: false,
+      },
+      { key: 'allergies', label: 'Allergies', type: 'textarea', required: false },
+      {
+        key: 'emergency_contact_name',
+        label: 'Emergency contact name',
+        type: 'text',
+        required: false,
+      },
+      {
+        key: 'emergency_contact_phone',
+        label: 'Emergency contact phone',
+        type: 'text',
+        required: false,
+      },
+      { key: 'last_visit_date', label: 'Last visit date', type: 'date', required: false },
+      { key: 'next_followup_date', label: 'Next follow-up date', type: 'date', required: false },
+      { key: 'chief_complaint', label: 'Chief complaint', type: 'text', required: false },
+      { key: 'preferred_pharmacy', label: 'Preferred pharmacy', type: 'text', required: false },
+      { key: 'hipaa_acknowledged', label: 'HIPAA acknowledged', type: 'boolean', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'New patient', position: 1, color: C.blue, is_default: true },
+      { name: 'Intake scheduled', position: 2, color: C.blue },
+      { name: 'Consultation', position: 3, color: C.amber },
+      { name: 'Active patient', position: 4, color: C.green, is_won: true },
+      { name: 'Follow-up scheduled', position: 5, color: C.teal },
+      { name: 'Inactive / lapsed', position: 6, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'New patient intake and registration',
+      'Appointment booking and rescheduling',
+      'Prescription refill request',
+      'Billing and insurance questions (route to billing staff)',
+      'Test results inquiry (route to nurse line)',
+      'Urgent symptom triage (route to on-call)',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}} medical clinic. Help patients book appointments, handle intake, and route urgent issues to clinical staff. Never give medical advice.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '8am-5pm', sat: 'closed', sun: 'closed' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          'Hi {name}, thanks for calling {business}. Reply here or call us to schedule your visit.',
+      },
+      {
+        days_after: 3,
+        channel: 'email',
+        subject: 'Follow-up from {business}',
+        template:
+          "We wanted to follow up on your recent call. Our front desk is happy to help you schedule when you're ready.",
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          "Hi {name}, checking in from {business}. Let us know if you'd like to book a visit. Reply STOP to opt out.",
+      },
+    ],
+  },
+
+  veterinary: {
+    slug: 'veterinary',
+    label: 'Veterinary clinic',
+    fields: [
+      { key: 'pet_name', label: 'Pet name', type: 'text', required: true },
+      {
+        key: 'species',
+        label: 'Species',
+        type: 'select',
+        required: false,
+        options: ['Dog', 'Cat', 'Rabbit', 'Bird', 'Reptile', 'Exotic', 'Other'],
+      },
+      { key: 'breed', label: 'Breed', type: 'text', required: false },
+      { key: 'pet_date_of_birth', label: 'Pet date of birth', type: 'date', required: false },
+      { key: 'weight_lbs', label: 'Weight (lbs)', type: 'number', required: false },
+      { key: 'color_markings', label: 'Color / markings', type: 'text', required: false },
+      { key: 'microchip_number', label: 'Microchip number', type: 'text', required: false },
+      { key: 'spayed_neutered', label: 'Spayed / neutered', type: 'boolean', required: false },
+      {
+        key: 'vaccination_history',
+        label: 'Vaccination history',
+        type: 'textarea',
+        required: false,
+      },
+      {
+        key: 'current_medications',
+        label: 'Current medications',
+        type: 'textarea',
+        required: false,
+      },
+      {
+        key: 'allergies_conditions',
+        label: 'Allergies / conditions',
+        type: 'textarea',
+        required: false,
+      },
+      { key: 'preferred_vet', label: 'Preferred vet', type: 'text', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'New inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Consultation booked', position: 2, color: C.blue },
+      { name: 'Under care', position: 3, color: C.amber },
+      { name: 'Recovery', position: 4, color: C.teal },
+      { name: 'Annual recall', position: 5, color: C.teal },
+      { name: 'Active pet', position: 6, color: C.green, is_won: true },
+      { name: 'Inactive', position: 7, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'Checkup and vaccination booking',
+      'Emergency and after-hours triage',
+      'Boarding and grooming requests',
+      'Prescription refill',
+      'Surgery scheduling',
+      'Annual wellness recall',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}} veterinary clinic. Help pet owners book appointments, handle wellness recalls, and route emergencies to clinical staff. Never give medical advice.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '8am-6pm', sat: '9am-2pm', sun: 'closed' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for calling {business}! We'd love to get your pet on the schedule. Reply or call us.",
+      },
+      {
+        days_after: 3,
+        channel: 'email',
+        subject: 'Follow-up from {business}',
+        template: "Just following up on your recent call. We're here when you're ready to book.",
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template: 'Hi {name}, checking in from {business}. Reply STOP to opt out.',
+      },
+    ],
+  },
+
   salon: {
     slug: 'salon',
-    label: 'Hair salon',
+    label: 'Salon & spa',
     fields: [
       { key: 'preferred_stylist', label: 'Preferred stylist', type: 'text', required: false },
-      { key: 'last_service', label: 'Last service', type: 'text', required: false },
-      { key: 'last_service_date', label: 'Last service date', type: 'date', required: false },
       {
         key: 'hair_type',
         label: 'Hair type',
         type: 'select',
         required: false,
-        options: ['fine', 'medium', 'coarse', 'curly', 'wavy'],
+        options: ['Straight', 'Wavy', 'Curly', 'Coily'],
       },
-      { key: 'product_allergies', label: 'Product allergies', type: 'text', required: false },
       {
-        key: 'rebooking_interval_weeks',
-        label: 'Rebooking interval (weeks)',
-        type: 'number',
+        key: 'hair_length',
+        label: 'Hair length',
+        type: 'select',
+        required: false,
+        options: ['Short', 'Medium', 'Long'],
+      },
+      { key: 'color_formula', label: 'Colour formula', type: 'textarea', required: false },
+      { key: 'last_service_date', label: 'Last service date', type: 'date', required: false },
+      { key: 'last_service_type', label: 'Last service type', type: 'text', required: false },
+      {
+        key: 'preferred_service_time',
+        label: 'Preferred service time',
+        type: 'select',
+        required: false,
+        options: ['Morning', 'Afternoon', 'Evening', 'Weekend'],
+      },
+      { key: 'birthday', label: 'Birthday', type: 'date', required: false },
+      {
+        key: 'product_preferences',
+        label: 'Product preferences',
+        type: 'textarea',
         required: false,
       },
-      { key: 'color_formula', label: 'Colour formula notes', type: 'textarea', required: false },
-      { key: 'birthday', label: 'Birthday', type: 'date', required: false },
+      {
+        key: 'allergies_sensitivities',
+        label: 'Allergies / sensitivities',
+        type: 'text',
+        required: false,
+      },
+      {
+        key: 'loyalty_tier',
+        label: 'Loyalty tier',
+        type: 'select',
+        required: false,
+        options: ['New', 'Regular', 'VIP'],
+      },
+      { key: 'referral_source', label: 'Referral source', type: 'text', required: false },
     ],
     pipeline_stages: [
-      { name: 'New client', position: 1, color: '#888780', is_default: true },
-      { name: 'First booked', position: 2, color: '#378ADD' },
-      { name: 'Returning', position: 3, color: '#1D9E75' },
-      { name: 'VIP', position: 4, color: '#7F77DD' },
-      { name: 'Lapsed', position: 5, color: '#D85A30' },
+      { name: 'New inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Consultation', position: 2, color: C.blue },
+      { name: 'Service booked', position: 3, color: C.amber },
+      { name: 'Regular client', position: 4, color: C.green, is_won: true },
+      { name: 'At risk', position: 5, color: C.amber },
+      { name: 'Lapsed', position: 6, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'Color, cut, and treatment booking',
+      'Reschedule or cancel',
+      'Service pricing and stylist availability',
+      'Product availability',
+      'Gift card purchases',
+      'Last-minute cancellation fill',
     ],
     system_prompt_template:
-      'You are Maya, the AI receptionist for {{business_name}}. Help clients book hair and beauty appointments, check availability, and answer service questions. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the AI receptionist for {{business_name}}. Help clients book hair and beauty appointments, check availability, and answer service questions.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '9am-7pm', sat: '9am-5pm', sun: 'closed' },
     follow_up_cadence: [
       {
@@ -214,24 +471,68 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   restaurant: {
     slug: 'restaurant',
     label: 'Restaurant',
+    // NOTE: dietary_restrictions + favorite_occasions modelled as freeform text
+    // pending multiselect renderer support (current UI only handles single select).
     fields: [
-      { key: 'party_size_preference', label: 'Usual party size', type: 'number', required: false },
-      { key: 'seating_preference', label: 'Seating preference', type: 'text', required: false },
-      { key: 'dietary_restrictions', label: 'Dietary restrictions', type: 'text', required: false },
-      { key: 'last_visit_date', label: 'Last visit', type: 'date', required: false },
-      { key: 'vip_status', label: 'VIP', type: 'boolean', required: false },
-      { key: 'birthday', label: 'Birthday', type: 'date', required: false },
-      { key: 'anniversary', label: 'Anniversary', type: 'date', required: false },
-      { key: 'no_show_count', label: 'No-show count', type: 'number', required: false },
+      { key: 'party_size_typical', label: 'Usual party size', type: 'number', required: false },
+      {
+        key: 'seating_preference',
+        label: 'Seating preference',
+        type: 'select',
+        required: false,
+        options: ['Indoor', 'Outdoor', 'Bar', 'Private Room', 'No preference'],
+      },
+      {
+        key: 'dietary_restrictions',
+        label: 'Dietary restrictions (comma separated)',
+        type: 'textarea',
+        required: false,
+      },
+      {
+        key: 'favorite_occasions',
+        label: 'Favorite occasions (comma separated)',
+        type: 'textarea',
+        required: false,
+      },
+      { key: 'preferred_server', label: 'Preferred server', type: 'text', required: false },
+      { key: 'favorite_dishes', label: 'Favorite dishes', type: 'textarea', required: false },
+      { key: 'wine_preferences', label: 'Wine preferences', type: 'textarea', required: false },
+      {
+        key: 'loyalty_tier',
+        label: 'Loyalty tier',
+        type: 'select',
+        required: false,
+        options: ['New', 'Regular', 'VIP'],
+      },
+      { key: 'special_notes', label: 'Special notes', type: 'textarea', required: false },
+      { key: 'marketing_opt_in', label: 'Marketing opt-in', type: 'boolean', required: false },
+      { key: 'last_visit_date', label: 'Last visit date', type: 'date', required: false },
+      {
+        key: 'reservation_count_ytd',
+        label: 'Reservations YTD',
+        type: 'number',
+        required: false,
+      },
     ],
     pipeline_stages: [
-      { name: 'New guest', position: 1, color: '#888780', is_default: true },
-      { name: 'Returning', position: 2, color: '#1D9E75' },
-      { name: 'Regular', position: 3, color: '#378ADD' },
-      { name: 'VIP', position: 4, color: '#7F77DD' },
+      { name: 'Inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Reservation confirmed', position: 2, color: C.blue },
+      { name: 'Arrived', position: 3, color: C.amber },
+      { name: 'Past guest', position: 4, color: C.teal },
+      { name: 'VIP regular', position: 5, color: C.green, is_won: true },
+      { name: 'No-show', position: 6, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'Table reservation (any party size)',
+      'Large-party or private event inquiry',
+      'Hours, menu, dietary questions',
+      'Reservation change or cancellation',
+      'Gift card or voucher inquiry',
+      'Event / catering inquiry (route to owner)',
     ],
     system_prompt_template:
-      'You are Maya, the AI host for {{business_name}}. Help guests make reservations, answer questions about the menu and hours, and handle special requests. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the AI host for {{business_name}}. Help guests make reservations, answer questions about the menu and hours, and handle special requests.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '11am-10pm', sat: '11am-11pm', sun: '11am-9pm' },
     follow_up_cadence: [
       {
@@ -260,36 +561,74 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     slug: 'contractor',
     label: 'Contractor',
     fields: [
+      {
+        key: 'project_type',
+        label: 'Project type',
+        type: 'select',
+        required: false,
+        options: ['Remodel', 'New build', 'Repair', 'Maintenance', 'Inspection', 'Other'],
+      },
+      { key: 'scope_of_work', label: 'Scope of work', type: 'textarea', required: false },
       { key: 'property_address', label: 'Property address', type: 'text', required: false },
       {
         key: 'property_type',
         label: 'Property type',
         type: 'select',
         required: false,
-        options: ['residential', 'commercial'],
+        options: ['Residential', 'Commercial', 'Multifamily', 'Other'],
       },
-      { key: 'last_job_type', label: 'Last job type', type: 'text', required: false },
-      { key: 'last_job_date', label: 'Last job date', type: 'date', required: false },
       {
-        key: 'estimate_status',
-        label: 'Estimate status',
+        key: 'budget_range',
+        label: 'Budget range',
         type: 'select',
         required: false,
-        options: ['none', 'sent', 'accepted', 'expired', 'rejected'],
+        options: ['Under 5k', '5-15k', '15-50k', '50-150k', '150k+'],
       },
-      { key: 'warranty_expiry_date', label: 'Warranty expiry', type: 'date', required: false },
+      {
+        key: 'timeline_urgency',
+        label: 'Timeline / urgency',
+        type: 'select',
+        required: false,
+        options: ['Emergency', 'This month', '1-3 months', '3-6 months', 'Flexible'],
+      },
+      {
+        key: 'insurance_claim_involved',
+        label: 'Insurance claim involved',
+        type: 'boolean',
+        required: false,
+      },
+      { key: 'permit_required', label: 'Permit required', type: 'boolean', required: false },
+      { key: 'warranty_months', label: 'Warranty (months)', type: 'number', required: false },
+      { key: 'bid_amount', label: 'Bid amount ($)', type: 'number', required: false },
+      {
+        key: 'bid_status',
+        label: 'Bid status',
+        type: 'select',
+        required: false,
+        options: ['Draft', 'Sent', 'Accepted', 'Declined', 'Expired'],
+      },
       { key: 'referral_source', label: 'Referral source', type: 'text', required: false },
-      { key: 'permit_notes', label: 'Permit notes', type: 'textarea', required: false },
     ],
     pipeline_stages: [
-      { name: 'New lead', position: 1, color: '#888780', is_default: true },
-      { name: 'Estimate sent', position: 2, color: '#378ADD' },
-      { name: 'Estimate accepted', position: 3, color: '#EF9F27' },
-      { name: 'Job scheduled', position: 4, color: '#1D9E75' },
-      { name: 'Job completed', position: 5, color: '#7F77DD' },
+      { name: 'New lead', position: 1, color: C.blue, is_default: true },
+      { name: 'Site visit scheduled', position: 2, color: C.blue },
+      { name: 'Estimate sent', position: 3, color: C.amber },
+      { name: 'Accepted', position: 4, color: C.green },
+      { name: 'In progress', position: 5, color: C.teal },
+      { name: 'Completed', position: 6, color: C.green, is_terminal: true, is_won: true },
+      { name: 'Lost', position: 7, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'New project or estimate inquiry',
+      'Site visit scheduling',
+      'Project status and timeline questions',
+      'Warranty or punch-list items',
+      'Invoice or payment questions',
+      'Referral from another customer',
     ],
     system_prompt_template:
-      'You are Maya, the scheduling assistant for {{business_name}}. Help customers book estimates, follow up on jobs, and answer service questions. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the scheduling assistant for {{business_name}}. Help customers book estimates, follow up on jobs, and answer service questions.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '7am-5pm', sat: '8am-12pm', sun: 'closed' },
     follow_up_cadence: [
       {
@@ -318,56 +657,77 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     slug: 'law_firm',
     label: 'Law firm',
     fields: [
-      { key: 'matter_number', label: 'Matter number', type: 'text', required: false },
       {
         key: 'case_type',
         label: 'Case type',
         type: 'select',
         required: false,
         options: [
-          'family',
-          'criminal_defense',
-          'personal_injury',
-          'corporate',
-          'real_estate',
-          'immigration',
-          'other',
+          'Family',
+          'Estate',
+          'Personal injury',
+          'Criminal',
+          'Real estate',
+          'Corporate',
+          'Immigration',
+          'IP',
+          'Other',
         ],
       },
-      { key: 'assigned_attorney', label: 'Assigned attorney', type: 'text', required: false },
+      { key: 'matter_number', label: 'Matter number', type: 'text', required: false },
+      {
+        key: 'conflict_check_status',
+        label: 'Conflict check status',
+        type: 'select',
+        required: false,
+        options: ['Pending', 'Cleared', 'Conflict', 'Waived'],
+      },
+      { key: 'opposing_party', label: 'Opposing party', type: 'text', required: false },
+      {
+        key: 'statute_of_limitations_date',
+        label: 'Statute of limitations date',
+        type: 'date',
+        required: false,
+      },
       {
         key: 'retainer_status',
         label: 'Retainer status',
         type: 'select',
         required: false,
-        options: ['active', 'depleted', 'unpaid', 'none'],
+        options: ['Not Paid', 'Partial', 'Paid', 'Depleted'],
       },
-      { key: 'next_court_date', label: 'Next court date', type: 'date', required: false },
-      { key: 'jurisdiction', label: 'Jurisdiction', type: 'text', required: false },
+      { key: 'retainer_amount', label: 'Retainer amount ($)', type: 'number', required: false },
       {
-        key: 'conflict_check_status',
-        label: 'Conflict check',
-        type: 'select',
+        key: 'hourly_rate_agreed',
+        label: 'Hourly rate agreed ($)',
+        type: 'number',
         required: false,
-        options: ['pending', 'cleared', 'conflict'],
       },
-      {
-        key: 'case_status',
-        label: 'Case status',
-        type: 'select',
-        required: false,
-        options: ['active', 'closed', 'pending', 'settled'],
-      },
+      { key: 'court_jurisdiction', label: 'Court jurisdiction', type: 'text', required: false },
+      { key: 'case_description', label: 'Case description', type: 'textarea', required: false },
+      { key: 'referred_by', label: 'Referred by', type: 'text', required: false },
+      { key: 'privileged_notes', label: 'Privileged notes', type: 'textarea', required: false },
     ],
     pipeline_stages: [
-      { name: 'New inquiry', position: 1, color: '#888780', is_default: true },
-      { name: 'Conflict check', position: 2, color: '#378ADD' },
-      { name: 'Consultation set', position: 3, color: '#EF9F27' },
-      { name: 'Retained', position: 4, color: '#1D9E75' },
-      { name: 'Active matter', position: 5, color: '#7F77DD' },
+      { name: 'New inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Conflict check', position: 2, color: C.blue },
+      { name: 'Consultation scheduled', position: 3, color: C.amber },
+      { name: 'Consultation complete', position: 4, color: C.amber },
+      { name: 'Retained', position: 5, color: C.green },
+      { name: 'Active matter', position: 6, color: C.teal, is_won: true },
+      { name: 'Closed / declined', position: 7, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'New client intake and case screening',
+      'Consultation scheduling',
+      'Case status and document questions',
+      'Retainer or billing questions',
+      'Referral intake',
+      'Urgent matter (route to attorney directly)',
     ],
     system_prompt_template:
-      'You are Maya, the intake assistant for {{business_name}} law firm. Help potential clients schedule consultations and answer general questions. Never give legal advice. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the intake assistant for {{business_name}} law firm. Help potential clients schedule consultations and answer general questions. Never give legal advice.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '9am-5pm', sat: 'closed', sun: 'closed' },
     follow_up_cadence: [
       {
@@ -395,37 +755,71 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   real_estate: {
     slug: 'real_estate',
     label: 'Real estate',
+    // NOTE: property_types modelled as freeform text pending multiselect
+    // renderer support (current UI only handles single select).
     fields: [
       {
-        key: 'buyer_or_seller',
-        label: 'Buyer or seller',
+        key: 'client_type',
+        label: 'Client type',
         type: 'select',
         required: false,
-        options: ['buyer', 'seller', 'both'],
+        options: ['Buyer', 'Seller', 'Both', 'Investor', 'Renter'],
       },
+      { key: 'budget_min', label: 'Budget min ($)', type: 'number', required: false },
       { key: 'budget_max', label: 'Budget max ($)', type: 'number', required: false },
-      { key: 'target_neighborhoods', label: 'Target neighborhoods', type: 'text', required: false },
+      { key: 'preferred_areas', label: 'Preferred areas', type: 'textarea', required: false },
+      { key: 'bedrooms_min', label: 'Bedrooms (min)', type: 'number', required: false },
+      { key: 'bathrooms_min', label: 'Bathrooms (min)', type: 'number', required: false },
+      {
+        key: 'property_types',
+        label: 'Property types (comma separated)',
+        type: 'textarea',
+        required: false,
+      },
+      {
+        key: 'timeline',
+        label: 'Timeline',
+        type: 'select',
+        required: false,
+        options: ['0-30 days', '30-90 days', '3-6 months', '6-12 months', 'Flexible'],
+      },
       {
         key: 'pre_approval_status',
         label: 'Pre-approval status',
         type: 'select',
         required: false,
-        options: ['none', 'in_progress', 'approved'],
+        options: ['Not started', 'In progress', 'Approved', 'Cash buyer'],
       },
-      { key: 'assigned_agent', label: 'Assigned agent', type: 'text', required: false },
-      { key: 'target_close_date', label: 'Target close date', type: 'date', required: false },
-      { key: 'showings_count', label: 'Showings count', type: 'number', required: false },
-      { key: 'last_showing_address', label: 'Last showing address', type: 'text', required: false },
+      {
+        key: 'financing_type',
+        label: 'Financing type',
+        type: 'select',
+        required: false,
+        options: ['Conventional', 'FHA', 'VA', 'Cash', 'Other'],
+      },
+      { key: 'first_time_buyer', label: 'First-time buyer', type: 'boolean', required: false },
+      { key: 'referral_source', label: 'Referral source', type: 'text', required: false },
     ],
     pipeline_stages: [
-      { name: 'New lead', position: 1, color: '#888780', is_default: true },
-      { name: 'Qualified', position: 2, color: '#378ADD' },
-      { name: 'Showing booked', position: 3, color: '#EF9F27' },
-      { name: 'Offer stage', position: 4, color: '#D85A30' },
-      { name: 'Under contract', position: 5, color: '#1D9E75' },
+      { name: 'New lead', position: 1, color: C.blue, is_default: true },
+      { name: 'Showing scheduled', position: 2, color: C.blue },
+      { name: 'Actively touring', position: 3, color: C.amber },
+      { name: 'Offer made', position: 4, color: C.amber },
+      { name: 'Under contract', position: 5, color: C.teal },
+      { name: 'Closed won', position: 6, color: C.green, is_terminal: true, is_won: true },
+      { name: 'Closed lost', position: 7, color: C.gray, is_terminal: true, is_lost: true },
+    ],
+    maya_intents: [
+      'Listing and showing inquiries',
+      'Pre-qualification or buyer questions',
+      'Open house RSVPs',
+      'Offer and negotiation updates',
+      'Closing coordination',
+      'New seller listing inquiry',
     ],
     system_prompt_template:
-      'You are Maya, the assistant for {{business_name}} real estate. Help clients schedule property viewings, answer listing questions, and connect with agents. LANGUAGE: Always respond in the language the caller is currently speaking. If the caller switches languages mid-conversation, immediately switch to match them. You support English, Spanish, Hindi, and Telugu. Never announce that you are switching languages — just switch naturally. BUSINESS HOURS: You know this business\'s operating hours. When a caller asks to book outside business hours, politely let them know the business is closed at that time and suggest the nearest available time during business hours. If someone calls outside business hours, acknowledge that the office is currently closed but offer to help with booking for the next business day. Always use the get_business_hours tool to confirm hours before telling the caller. ESCALATION: If the caller asks to speak with a human, if you cannot answer their question, or if the caller seems frustrated, use the escalate_to_human tool to transfer the call. Before transferring, say something like "Let me connect you with someone who can help." Never refuse to transfer if the caller asks for a person. When the caller says goodbye or ends the conversation, say a warm closing line and then end the call. Do not wait for the caller to hang up.',
+      'You are Maya, the assistant for {{business_name}} real estate. Help clients schedule property viewings, answer listing questions, and connect with agents.' +
+      MAYA_PROMPT_SUFFIX,
     business_hours: { mon_fri: '9am-6pm', sat: '10am-4pm', sun: 'closed' },
     follow_up_cadence: [
       {

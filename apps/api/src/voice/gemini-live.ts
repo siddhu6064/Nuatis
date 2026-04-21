@@ -88,7 +88,8 @@ export async function createGeminiLiveSession(
   vertical: string,
   businessName?: string,
   callControlId?: string,
-  product?: 'maya_only' | 'suite'
+  product?: 'maya_only' | 'suite',
+  promptSuffix?: string
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -204,7 +205,7 @@ export async function createGeminiLiveSession(
         activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
       },
       systemInstruction: {
-        parts: [{ text: systemPrompt }],
+        parts: [{ text: systemPrompt + (promptSuffix ?? '') }],
       },
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     },
