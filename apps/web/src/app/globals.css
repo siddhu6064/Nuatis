@@ -1,3 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --bg: #f9f8f5;
+  --bg2: #f2f0eb;
+  --bg3: #e8e5de;
+  --ink: #1a1814;
+  --ink2: #3d3a34;
+  --ink3: #7a7468;
+  --accent: #1d4ed8;
+  --accent2: #1e40af;
+  --teal: #0d9488;
+  --amber: #d97706;
+  --border: #dedad2;
+  --white: #ffffff;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    'DM Sans',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'DM Serif Display', Georgia, serif;
+}

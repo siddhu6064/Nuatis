@@ -10,9 +10,9 @@ import GlobalSearch from '@/components/search/GlobalSearch'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <div className="flex h-screen bg-bg overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-bg">
           <DemoBanner />
           <PushNotificationPrompt />
           {children}
