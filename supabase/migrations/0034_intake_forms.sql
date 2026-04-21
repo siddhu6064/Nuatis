@@ -13,5 +13,5 @@ CREATE TABLE intake_forms (
 
 ALTER TABLE intake_forms ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON intake_forms
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_intake_forms_tenant ON intake_forms(tenant_id);

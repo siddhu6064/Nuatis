@@ -35,5 +35,5 @@ CREATE TABLE lead_scoring_rules (
 
 ALTER TABLE lead_scoring_rules ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON lead_scoring_rules
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_lead_scoring_rules_tenant ON lead_scoring_rules(tenant_id);

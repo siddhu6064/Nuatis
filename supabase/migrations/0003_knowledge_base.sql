@@ -15,7 +15,7 @@ CREATE TABLE knowledge_base (
   title         text NOT NULL,
   content       text NOT NULL,
   category      text DEFAULT 'general',
-  embedding     vector(768),
+  embedding     extensions.vector(768),
   token_count   integer,
   is_active     boolean DEFAULT true,
   created_at    timestamptz DEFAULT now(),
@@ -32,7 +32,7 @@ COMMENT ON COLUMN knowledge_base.token_count IS 'Approximate token count (chars 
 CREATE INDEX idx_knowledge_base_tenant ON knowledge_base(tenant_id);
 CREATE INDEX idx_knowledge_base_active ON knowledge_base(tenant_id, is_active) WHERE is_active = true;
 CREATE INDEX idx_knowledge_base_embedding ON knowledge_base
-  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+  USING ivfflat (embedding extensions.vector_cosine_ops) WITH (lists = 100);
 
 -- ── RLS ───────────────────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ CREATE TRIGGER trg_knowledge_base_updated_at
 -- Bypasses RLS (SECURITY DEFINER) since tenant_id is passed explicitly.
 
 CREATE OR REPLACE FUNCTION match_knowledge(
-  query_embedding   vector(768),
+  query_embedding   extensions.vector(768),
   match_tenant_id   uuid,
   match_count       int DEFAULT 5,
   match_threshold   float DEFAULT 0.5
@@ -80,4 +80,4 @@ AS $$
     AND 1 - (kb.embedding <=> query_embedding) > match_threshold
   ORDER BY kb.embedding <=> query_embedding
   LIMIT match_count;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions;

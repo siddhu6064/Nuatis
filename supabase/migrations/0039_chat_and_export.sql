@@ -15,7 +15,7 @@ CREATE TABLE chat_sessions (
 
 ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON chat_sessions
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_chat_sessions_tenant ON chat_sessions(tenant_id, last_message_at DESC);
 CREATE INDEX idx_chat_sessions_contact ON chat_sessions(contact_id);
 
@@ -32,7 +32,7 @@ CREATE TABLE chat_messages (
 
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON chat_messages
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_chat_messages_session ON chat_messages(session_id, created_at);
 
 -- Enable Supabase Realtime on chat_messages
@@ -63,5 +63,5 @@ CREATE TABLE export_jobs (
 
 ALTER TABLE export_jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON export_jobs
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_export_jobs_tenant ON export_jobs(tenant_id);

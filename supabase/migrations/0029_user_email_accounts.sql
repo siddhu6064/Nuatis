@@ -15,7 +15,7 @@ CREATE TABLE user_email_accounts (
 
 ALTER TABLE user_email_accounts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON user_email_accounts
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 
 CREATE INDEX idx_user_email_accounts_user ON user_email_accounts(user_id);
 CREATE INDEX idx_user_email_accounts_tenant ON user_email_accounts(tenant_id);

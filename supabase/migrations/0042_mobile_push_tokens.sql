@@ -12,6 +12,6 @@ CREATE TABLE mobile_push_tokens (
 
 ALTER TABLE mobile_push_tokens ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON mobile_push_tokens
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_mobile_push_tokens_user ON mobile_push_tokens(user_id);
 CREATE INDEX idx_mobile_push_tokens_tenant ON mobile_push_tokens(tenant_id);

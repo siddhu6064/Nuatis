@@ -99,4 +99,4 @@ CREATE TRIGGER trg_deals_updated_at
 -- ── Module flags for B2B verticals ──────────────────────────
 
 UPDATE tenants SET modules = COALESCE(modules, '{}'::jsonb) || '{"companies": true, "deals": true}'::jsonb
-WHERE vertical IN ('contractor', 'law_firm', 'real_estate', 'sales_crm');
+WHERE vertical::text IN ('contractor', 'law_firm', 'real_estate', 'sales_crm');

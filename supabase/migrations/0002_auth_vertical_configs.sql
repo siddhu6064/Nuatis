@@ -20,7 +20,7 @@ ALTER TABLE users
 
 -- 3. vertical_configs table — the engine that drives all dynamic fields
 CREATE TABLE vertical_configs (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vertical_slug TEXT NOT NULL,
   field_definitions   JSONB NOT NULL DEFAULT '[]',

@@ -76,7 +76,7 @@ CREATE TYPE doc_content_type AS ENUM ('pdf', 'docx', 'txt', 'manual');
 -- One row per business (Clerk Organization = one tenant)
 
 CREATE TABLE tenants (
-  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   clerk_org_id          TEXT UNIQUE NOT NULL,          -- Clerk Organization ID
   name                  TEXT NOT NULL,
   slug                  TEXT UNIQUE NOT NULL,          -- url-safe identifier e.g. "sunrise-dental"
@@ -102,7 +102,7 @@ COMMENT ON TABLE tenants IS 'One row per business. Maps 1:1 with a Clerk Organiz
 -- Stripe subscription tracking (separate from tenant for clean billing queries)
 
 CREATE TABLE subscriptions (
-  id                        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id                 UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   stripe_subscription_id    TEXT UNIQUE NOT NULL,
   stripe_customer_id        TEXT NOT NULL,
@@ -127,7 +127,7 @@ COMMENT ON COLUMN subscriptions.voice_minutes_cap IS 'Starter=300, Growth=1000, 
 -- Physical locations / branches of the business
 
 CREATE TABLE locations (
-  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id             UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name                  TEXT NOT NULL,
   address               TEXT,
@@ -153,7 +153,7 @@ COMMENT ON COLUMN locations.google_refresh_token IS 'Encrypted at application la
 -- Staff members belonging to a tenant
 
 CREATE TABLE users (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   location_id     UUID REFERENCES locations(id) ON DELETE SET NULL,  -- NULL = access all locations
   clerk_user_id   TEXT UNIQUE NOT NULL,
@@ -171,7 +171,7 @@ CREATE TABLE users (
 -- Customers / patients / clients — the core CRM entity
 
 CREATE TABLE contacts (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   location_id     UUID REFERENCES locations(id) ON DELETE SET NULL,
   created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -318,7 +318,7 @@ CREATE TABLE contacts (
 -- Provisioned Telnyx DIDs per tenant/location
 
 CREATE TABLE phone_numbers (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   location_id       UUID REFERENCES locations(id) ON DELETE SET NULL,
   number            TEXT NOT NULL,           -- E.164: +15125551234
@@ -333,7 +333,7 @@ CREATE TABLE phone_numbers (
 -- Every inbound/outbound call — AI-handled or missed
 
 CREATE TABLE calls (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id               UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   location_id             UUID REFERENCES locations(id) ON DELETE SET NULL,
   phone_number_id         UUID REFERENCES phone_numbers(id) ON DELETE SET NULL,
@@ -375,7 +375,7 @@ COMMENT ON COLUMN calls.ai_outcome IS 'appointment_booked | info_provided | esca
 -- Turn-by-turn transcript of every AI call
 
 CREATE TABLE call_transcripts (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   call_id       UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   role          transcript_role NOT NULL,
@@ -389,7 +389,7 @@ CREATE TABLE call_transcripts (
 -- ── 9. APPOINTMENTS ──────────────────────────────────────────
 
 CREATE TABLE appointments (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   location_id       UUID REFERENCES locations(id) ON DELETE SET NULL,
   contact_id        UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
@@ -420,7 +420,7 @@ CREATE TABLE appointments (
 -- Configurable Kanban stages per tenant
 
 CREATE TABLE pipeline_stages (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name          TEXT NOT NULL,
   position      INTEGER NOT NULL,           -- sort order
@@ -436,7 +436,7 @@ CREATE TABLE pipeline_stages (
 -- A contact's current (and historical) position in the pipeline
 
 CREATE TABLE pipeline_entries (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   contact_id        UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
   stage_id          UUID NOT NULL REFERENCES pipeline_stages(id) ON DELETE RESTRICT,
@@ -454,7 +454,7 @@ CREATE TABLE pipeline_entries (
 -- Per-tenant automation configuration
 
 CREATE TABLE automation_rules (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   type        automation_type NOT NULL,
   name        TEXT NOT NULL,
@@ -517,7 +517,7 @@ CREATE TABLE automation_rules (
 -- BullMQ job audit log (every enqueued/completed/failed job)
 
 CREATE TABLE automation_jobs (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   rule_id           UUID REFERENCES automation_rules(id) ON DELETE SET NULL,
   contact_id        UUID REFERENCES contacts(id) ON DELETE CASCADE,
@@ -540,7 +540,7 @@ CREATE TABLE automation_jobs (
 -- Audit log of every SMS and email sent
 
 CREATE TABLE notifications (
-  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id             UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   contact_id            UUID REFERENCES contacts(id) ON DELETE SET NULL,
   automation_job_id     UUID REFERENCES automation_jobs(id) ON DELETE SET NULL,
@@ -565,7 +565,7 @@ CREATE TABLE notifications (
 -- Business-uploaded documents for RAG (FAQs, menus, pricing, policies)
 
 CREATE TABLE knowledge_docs (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   uploaded_by     UUID REFERENCES users(id) ON DELETE SET NULL,
   filename        TEXT NOT NULL,
@@ -583,11 +583,11 @@ CREATE TABLE knowledge_docs (
 -- Chunked text + OpenAI embeddings (pgvector)
 
 CREATE TABLE knowledge_chunks (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   doc_id          UUID NOT NULL REFERENCES knowledge_docs(id) ON DELETE CASCADE,
   chunk_text      TEXT NOT NULL,
-  embedding       VECTOR(1536) NOT NULL,    -- OpenAI text-embedding-3-small = 1536 dims
+  embedding       extensions.vector(1536) NOT NULL,    -- OpenAI text-embedding-3-small = 1536 dims
   chunk_index     INTEGER NOT NULL,         -- position within the document
   token_count     INTEGER,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -732,7 +732,7 @@ CREATE INDEX idx_notifs_status            ON notifications(status, created_at DE
 
 -- Knowledge chunks — HNSW index for fast vector similarity search
 CREATE INDEX idx_chunks_embedding         ON knowledge_chunks
-  USING hnsw (embedding vector_cosine_ops)
+  USING hnsw (embedding extensions.vector_cosine_ops)
   WITH (m = 16, ef_construction = 64);
 CREATE INDEX idx_chunks_tenant_doc        ON knowledge_chunks(tenant_id, doc_id);
 
@@ -775,7 +775,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON subscriptions
 -- Usage: SELECT * FROM search_knowledge('my-tenant-uuid', 'what are your hours', 5);
 CREATE OR REPLACE FUNCTION search_knowledge(
   p_tenant_id   UUID,
-  p_query_embed VECTOR(1536),
+  p_query_embed extensions.vector(1536),
   p_limit       INTEGER DEFAULT 5
 )
 RETURNS TABLE(

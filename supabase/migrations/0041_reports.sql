@@ -21,6 +21,6 @@ CREATE TABLE reports (
 
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON reports
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_reports_tenant ON reports(tenant_id);
 CREATE INDEX idx_reports_pinned ON reports(tenant_id, pinned_to_dashboard) WHERE pinned_to_dashboard = true;

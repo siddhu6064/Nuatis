@@ -27,7 +27,9 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS modules jsonb NOT NULL DEFAULT '{
 -- Enable CPQ for verticals where quoting is core
 UPDATE tenants
 SET modules = modules || '{"cpq": true}'::jsonb
-WHERE vertical IN ('contractor', 'law_firm', 'real_estate', 'sales_crm');
+-- Cast to text to avoid enum-coercion error if 'sales_crm' is not yet in the
+-- vertical_type enum on this DB; the new value is added in a later migration.
+WHERE vertical::text IN ('contractor', 'law_firm', 'real_estate', 'sales_crm');
 
 -- Force all modules ON for internal + demo tenants
 UPDATE tenants

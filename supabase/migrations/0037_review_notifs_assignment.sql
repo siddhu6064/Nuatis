@@ -39,6 +39,6 @@ CREATE TABLE review_requests (
 
 ALTER TABLE review_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON review_requests
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_review_requests_tenant ON review_requests(tenant_id);
 CREATE INDEX idx_review_requests_contact ON review_requests(contact_id);

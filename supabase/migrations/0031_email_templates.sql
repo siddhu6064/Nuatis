@@ -12,6 +12,6 @@ CREATE TABLE email_templates (
 
 ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON email_templates
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 
 CREATE INDEX idx_email_templates_tenant ON email_templates(tenant_id);

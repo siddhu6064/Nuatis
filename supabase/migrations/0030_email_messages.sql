@@ -19,7 +19,7 @@ CREATE TABLE email_messages (
 
 ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON email_messages
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 
 CREATE INDEX idx_email_messages_contact ON email_messages(contact_id, created_at DESC);
 CREATE INDEX idx_email_messages_tracking ON email_messages(tracking_token);

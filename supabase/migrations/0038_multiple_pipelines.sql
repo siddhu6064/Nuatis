@@ -13,7 +13,7 @@ CREATE TABLE pipelines (
 
 ALTER TABLE pipelines ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tenant_isolation" ON pipelines
-  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()));
+  FOR ALL USING (tenant_id = (SELECT tenant_id FROM users WHERE authjs_user_id = auth.uid()::text));
 CREATE INDEX idx_pipelines_tenant ON pipelines(tenant_id);
 
 -- Add pipeline_id + probability to existing pipeline_stages
