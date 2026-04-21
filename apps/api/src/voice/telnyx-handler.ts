@@ -97,7 +97,9 @@ export function lookupTenant(toNumber: string, tenantMap: Map<string, string>): 
 
 /**
  * Fetch tenant config from Supabase. Returns safe fallback on any error
- * so voice calls never crash due to a failed DB lookup.
+ * so voice calls never crash due to a failed DB lookup. A hard 400ms
+ * timeout guards against slow Supabase responses delaying call pickup —
+ * the caller hears the fallback greeting rather than dead air.
  */
 export async function getTenantConfig(
   tenantId: string
@@ -113,19 +115,39 @@ export async function getTenantConfig(
     if (!url || !key) return FALLBACK
 
     const supabase = createClient(url, key)
-    const { data, error } = await supabase
-      .from('tenants')
-      .select('name, vertical, product')
-      .eq('id', tenantId)
-      .single()
+    type Result = { businessName: string; vertical: string; product: 'maya_only' | 'suite' }
+    let timedOut = false
+    const timeout = new Promise<Result>((resolve) =>
+      setTimeout(() => {
+        timedOut = true
+        console.warn(
+          `[telnyx-handler] getTenantConfig 400ms timeout — tenant=${tenantId} (using fallback)`
+        )
+        resolve(FALLBACK)
+      }, 400)
+    )
 
-    if (error || !data) return FALLBACK
-    const d = data as { name?: string; vertical?: string; product?: string }
-    return {
-      businessName: d.name || FALLBACK.businessName,
-      vertical: d.vertical || FALLBACK.vertical,
-      product: (d.product === 'maya_only' ? 'maya_only' : 'suite') as 'maya_only' | 'suite',
-    }
+    const query: Promise<Result> = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tenants')
+          .select('name, vertical, product')
+          .eq('id', tenantId)
+          .single()
+        if (timedOut) return FALLBACK
+        if (error || !data) return FALLBACK
+        const d = data as { name?: string; vertical?: string; product?: string }
+        return {
+          businessName: d.name || FALLBACK.businessName,
+          vertical: d.vertical || FALLBACK.vertical,
+          product: (d.product === 'maya_only' ? 'maya_only' : 'suite') as 'maya_only' | 'suite',
+        }
+      } catch {
+        return FALLBACK
+      }
+    })()
+
+    return Promise.race([query, timeout])
   } catch {
     return FALLBACK
   }
