@@ -31,15 +31,13 @@ const MODULES: ModuleInfo[] = [
   { key: 'insights', label: 'Insights', description: 'Analytics and performance dashboard' },
 ]
 
-const CPQ_RECOMMENDED = ['contractor', 'law_firm', 'real_estate', 'sales_crm']
-
 interface Props {
   initialModules: Record<string, boolean>
   isOwner: boolean
   vertical: string
 }
 
-export default function ModuleSettings({ initialModules, isOwner, vertical }: Props) {
+export default function ModuleSettings({ initialModules, isOwner }: Props) {
   const [modules, setModules] = useState<Record<string, boolean>>(initialModules)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -95,25 +93,14 @@ export default function ModuleSettings({ initialModules, isOwner, vertical }: Pr
         {MODULES.map((mod) => {
           const enabled = modules[mod.key] !== false
 
-          let hint: string | null = null
-          if (mod.key === 'cpq') {
-            hint = CPQ_RECOMMENDED.includes(vertical)
-              ? 'Recommended for your vertical'
-              : 'Off by default for your vertical — enable if you send quotes or estimates'
-          }
+          const hint = mod.key === 'cpq' ? 'CPQ is an add-on service. Contact us to enable.' : null
 
           return (
             <div key={mod.key} className="px-6 py-4 flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{mod.label}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{mod.description}</p>
-                {hint && (
-                  <p
-                    className={`text-[10px] mt-1 ${CPQ_RECOMMENDED.includes(vertical) ? 'text-teal-600' : 'text-amber-600'}`}
-                  >
-                    {hint}
-                  </p>
-                )}
+                {hint && <p className="text-[10px] mt-1 text-amber-600">{hint}</p>}
               </div>
               <button
                 onClick={() => toggle(mod.key, !enabled)}

@@ -104,7 +104,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               appointments: true,
               pipeline: true,
               automation: true,
-              cpq: ['contractor', 'law_firm', 'real_estate', 'sales_crm'].includes(vertical_slug),
+              cpq: false,
               insights: true,
             },
     })
