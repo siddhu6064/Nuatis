@@ -49,6 +49,7 @@ az containerapp create \
   --target-port 3001 \
   --ingress external \
   --transport http \
+  `# http transport on Azure Container Apps supports native WebSocket upgrades — required for voice pipeline` \
   --min-replicas 1 \
   --max-replicas 3 \
   --cpu 1.0 \

@@ -6,4 +6,7 @@ dist
 .git
 .gitignore
 *.test.ts
+__tests__
+coverage
+*.md
 jest.config.*
