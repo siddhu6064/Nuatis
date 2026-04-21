@@ -31,20 +31,24 @@ function getSupabase() {
 function getGenAI(): GoogleGenAI {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) throw new Error('GEMINI_API_KEY environment variable is not set')
-  return new GoogleGenAI({ apiKey })
+  // gemini-embedding-001 is served on v1beta only.
+  return new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } })
 }
 
 // ── Generate embedding ────────────────────────────────────────────────────────
 
 /**
- * Generate a 768-dim embedding vector using Google text-embedding-004.
+ * Generate a 768-dim embedding vector using Google gemini-embedding-001.
+ * The model's native dimensionality is 3072; outputDimensionality=768 forces
+ * a 768-dim vector to match the pgvector column width in the DB schema.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const ai = getGenAI()
 
   const result = await ai.models.embedContent({
-    model: 'text-embedding-004',
+    model: 'gemini-embedding-001',
     contents: text,
+    config: { outputDimensionality: 768 },
   })
 
   const values = result.embeddings?.[0]?.values
