@@ -50,3 +50,4 @@ apps/web/.env.local
 
 # Git worktrees
 .worktrees/
+supabase/.temp/
