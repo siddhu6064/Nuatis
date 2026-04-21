@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
-const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ChartType = 'bar' | 'line' | 'pie' | 'table' | 'number'
@@ -223,7 +221,7 @@ export default function ReportsPage() {
     if (!token) return
     setLoading(true)
     try {
-      const res = await fetch(`${apiUrl}/api/reports`, { headers: authHeaders })
+      const res = await fetch(`/api/reports`, { headers: authHeaders })
       if (res.ok) {
         const data = await res.json()
         setReports(data.reports ?? data ?? [])
@@ -242,7 +240,7 @@ export default function ReportsPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this report?')) return
     try {
-      await fetch(`${apiUrl}/api/reports/${id}`, { method: 'DELETE', headers: authHeaders })
+      await fetch(`/api/reports/${id}`, { method: 'DELETE', headers: authHeaders })
       setReports((prev) => prev.filter((r) => r.id !== id))
       showToast('success', 'Report deleted')
     } catch {
@@ -252,7 +250,7 @@ export default function ReportsPage() {
 
   async function handleTogglePin(id: string) {
     try {
-      const res = await fetch(`${apiUrl}/api/reports/${id}/pin`, {
+      const res = await fetch(`/api/reports/${id}/pin`, {
         method: 'PUT',
         headers: authHeaders,
       })
@@ -274,7 +272,7 @@ export default function ReportsPage() {
     }
     setSaving(true)
     try {
-      const res = await fetch(`${apiUrl}/api/reports`, {
+      const res = await fetch(`/api/reports`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({

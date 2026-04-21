@@ -73,7 +73,7 @@ export default function ChatWidgetSettingsPage() {
 
   useEffect(() => {
     if (!token) return
-    fetch(`${apiUrl}/api/settings/chat-widget`, { headers: authHeaders })
+    fetch(`/api/settings/chat-widget`, { headers: authHeaders })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: ChatWidgetSettings | null) => {
         if (data) setForm(data)
@@ -85,7 +85,7 @@ export default function ChatWidgetSettingsPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch(`${apiUrl}/api/settings/chat-widget`, {
+      const res = await fetch(`/api/settings/chat-widget`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify(form),

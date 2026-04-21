@@ -92,13 +92,11 @@ export default function ReviewAutomationPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   useEffect(() => {
-    const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
     Promise.all([
-      fetch(`${apiUrl}/api/settings/review-automation`, { headers: authHeaders }).then((r) =>
+      fetch(`/api/settings/review-automation`, { headers: authHeaders }).then((r) =>
         r.ok ? r.json() : null
       ),
-      fetch(`${apiUrl}/api/settings/review-automation/stats`, { headers: authHeaders }).then((r) =>
+      fetch(`/api/settings/review-automation/stats`, { headers: authHeaders }).then((r) =>
         r.ok ? r.json() : null
       ),
     ])
@@ -128,9 +126,8 @@ export default function ReviewAutomationPage() {
   async function save() {
     setSaving(true)
     setToast(null)
-    const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
     try {
-      const res = await fetch(`${apiUrl}/api/settings/review-automation`, {
+      const res = await fetch(`/api/settings/review-automation`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify({

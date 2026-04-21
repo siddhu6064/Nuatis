@@ -42,8 +42,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
 
   useEffect(() => {
     if (!token) return
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-    fetch(`${apiUrl}/api/quotes/view/${token}`)
+    fetch(`/api/quotes/view/${token}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) setQuote(data as QuoteData)
@@ -55,8 +54,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   async function accept() {
     if (!token) return
     setActing(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-    const res = await fetch(`${apiUrl}/api/quotes/view/${token}/accept`, { method: 'POST' })
+    const res = await fetch(`/api/quotes/view/${token}/accept`, { method: 'POST' })
     if (res.ok) setActed('accepted')
     setActing(false)
   }
@@ -64,8 +62,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   async function decline() {
     if (!token) return
     setActing(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-    const res = await fetch(`${apiUrl}/api/quotes/view/${token}/decline`, { method: 'POST' })
+    const res = await fetch(`/api/quotes/view/${token}/decline`, { method: 'POST' })
     if (res.ok) setActed('declined')
     setActing(false)
   }
@@ -332,8 +329,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
         <div className="text-center mt-6">
           <button
             onClick={() => {
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-              window.open(`${apiUrl}/api/quotes/view/${token}/pdf`, '_blank')
+              window.open(`/api/quotes/view/${token}/pdf`, '_blank')
             }}
             className="text-xs text-gray-400 hover:text-gray-600"
           >

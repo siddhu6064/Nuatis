@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 
-const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 interface ExportJob {
@@ -70,7 +68,7 @@ export default function DataExportPage() {
   const fetchHistory = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${apiUrl}/api/settings/data-export`, { headers: authHeaders })
+      const res = await fetch(`/api/settings/data-export`, { headers: authHeaders })
       if (res.ok) {
         const data: ExportJob[] = await res.json()
         setHistory(data)
@@ -99,7 +97,7 @@ export default function DataExportPage() {
     }
     setExporting(true)
     try {
-      const res = await fetch(`${apiUrl}/api/settings/data-export`, {
+      const res = await fetch(`/api/settings/data-export`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ tables: selectedTables }),
@@ -120,7 +118,7 @@ export default function DataExportPage() {
   }
 
   function downloadExport(id: string) {
-    window.open(`${apiUrl}/api/settings/data-export/${id}/download`, '_blank')
+    window.open(`/api/settings/data-export/${id}/download`, '_blank')
   }
 
   return (

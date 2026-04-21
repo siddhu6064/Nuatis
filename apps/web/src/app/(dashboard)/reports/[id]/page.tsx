@@ -18,8 +18,6 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 const COLORS = [
   '#3b82f6',
   '#22c55e',
@@ -109,7 +107,7 @@ export default function ReportDetailPage() {
     if (!token || !id) return
     setLoadingReport(true)
     try {
-      const res = await fetch(`${apiUrl}/api/reports/${id}`, { headers: authHeaders })
+      const res = await fetch(`/api/reports/${id}`, { headers: authHeaders })
       if (res.ok) {
         const data = await res.json()
         const cfg: ReportConfig = data.report ?? data
@@ -137,7 +135,7 @@ export default function ReportDetailPage() {
         if (customFrom) params.set('date_from', customFrom)
         if (customTo) params.set('date_to', customTo)
       }
-      const res = await fetch(`${apiUrl}/api/reports/${id}/data?${params.toString()}`, {
+      const res = await fetch(`/api/reports/${id}/data?${params.toString()}`, {
         headers: authHeaders,
       })
       if (res.ok) {
@@ -162,7 +160,7 @@ export default function ReportDetailPage() {
   async function handleRefresh() {
     setRefreshing(true)
     try {
-      await fetch(`${apiUrl}/api/reports/${id}/refresh`, {
+      await fetch(`/api/reports/${id}/refresh`, {
         method: 'POST',
         headers: authHeaders,
       })
@@ -178,7 +176,7 @@ export default function ReportDetailPage() {
   async function handleTogglePin() {
     if (!report) return
     try {
-      const res = await fetch(`${apiUrl}/api/reports/${id}/pin`, {
+      const res = await fetch(`/api/reports/${id}/pin`, {
         method: 'PUT',
         headers: authHeaders,
       })

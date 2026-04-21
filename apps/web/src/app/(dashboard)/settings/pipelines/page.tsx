@@ -5,8 +5,6 @@ import { useSession } from 'next-auth/react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 const STAGE_COLORS = [
   { value: '#6b7280', label: 'Gray' },
   { value: '#ef4444', label: 'Red' },
@@ -252,7 +250,7 @@ function PipelineModal({
 
     try {
       if (mode === 'create') {
-        const res = await fetch(`${API_URL}/api/pipelines`, {
+        const res = await fetch(`/api/pipelines`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
@@ -269,7 +267,7 @@ function PipelineModal({
         }
       } else if (pipeline) {
         // Update name/description
-        const updateRes = await fetch(`${API_URL}/api/pipelines/${pipeline.id}`, {
+        const updateRes = await fetch(`/api/pipelines/${pipeline.id}`, {
           method: 'PUT',
           headers: authHeaders,
           body: JSON.stringify({
@@ -290,7 +288,7 @@ function PipelineModal({
         // Delete removed stages
         for (const origStage of pipeline.stages) {
           if (!newIds.has(origStage.id)) {
-            await fetch(`${API_URL}/api/pipelines/${pipeline.id}/stages/${origStage.id}`, {
+            await fetch(`/api/pipelines/${pipeline.id}/stages/${origStage.id}`, {
               method: 'DELETE',
               headers: authHeaders,
             }).catch(() => {})
@@ -303,13 +301,13 @@ function PipelineModal({
           if (!s) continue
           const payload = { name: s.name, color: s.color, probability: s.probability, position: i }
           if (s.id && originalIds.has(s.id)) {
-            await fetch(`${API_URL}/api/pipelines/${pipeline.id}/stages/${s.id}`, {
+            await fetch(`/api/pipelines/${pipeline.id}/stages/${s.id}`, {
               method: 'PUT',
               headers: authHeaders,
               body: JSON.stringify(payload),
             }).catch(() => {})
           } else {
-            await fetch(`${API_URL}/api/pipelines/${pipeline.id}/stages`, {
+            await fetch(`/api/pipelines/${pipeline.id}/stages`, {
               method: 'POST',
               headers: authHeaders,
               body: JSON.stringify(payload),
@@ -320,7 +318,7 @@ function PipelineModal({
         // Reorder
         const stageIds = stages.filter((s) => s.id).map((s) => s.id!)
         if (stageIds.length > 0) {
-          await fetch(`${API_URL}/api/pipelines/${pipeline.id}/stages/reorder`, {
+          await fetch(`/api/pipelines/${pipeline.id}/stages/reorder`, {
             method: 'PUT',
             headers: authHeaders,
             body: JSON.stringify({ stage_ids: stageIds }),
@@ -476,7 +474,7 @@ function DeleteDialog({ pipeline, authHeaders, onClose, onDeleted }: DeleteDialo
     setDeleting(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/api/pipelines/${pipeline.id}`, {
+      const res = await fetch(`/api/pipelines/${pipeline.id}`, {
         method: 'DELETE',
         headers: authHeaders,
       })
@@ -627,7 +625,7 @@ function PipelinesPanel({ pipelineType, authHeaders }: PipelinesPanelProps) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/pipelines?type=${pipelineType}`, {
+      const res = await fetch(`/api/pipelines?type=${pipelineType}`, {
         headers: authHeaders,
       })
       if (res.ok) {
@@ -648,7 +646,7 @@ function PipelinesPanel({ pipelineType, authHeaders }: PipelinesPanelProps) {
   async function handleEdit(p: Pipeline) {
     setLoadingEdit(true)
     try {
-      const res = await fetch(`${API_URL}/api/pipelines/${p.id}`, { headers: authHeaders })
+      const res = await fetch(`/api/pipelines/${p.id}`, { headers: authHeaders })
       if (res.ok) {
         const detail = (await res.json()) as PipelineDetail
         setModal({ mode: 'edit', pipeline: detail })
@@ -665,7 +663,7 @@ function PipelinesPanel({ pipelineType, authHeaders }: PipelinesPanelProps) {
   async function handleSetDefault(p: Pipeline) {
     setSettingDefault(p.id)
     try {
-      const res = await fetch(`${API_URL}/api/pipelines/${p.id}/set-default`, {
+      const res = await fetch(`/api/pipelines/${p.id}/set-default`, {
         method: 'PUT',
         headers: authHeaders,
       })

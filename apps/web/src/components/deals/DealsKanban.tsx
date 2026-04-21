@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 interface Pipeline {
   id: string
   name: string
@@ -74,7 +72,7 @@ export default function DealsKanban() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/pipelines?type=deals`, { credentials: 'include' })
+        const res = await fetch(`/api/pipelines?type=deals`, { credentials: 'include' })
         if (res.ok) {
           const data = (await res.json()) as Pipeline[]
           setPipelines(data)
@@ -104,8 +102,8 @@ export default function DealsKanban() {
         stagesUrl = `/api/contacts/stages`
         dealsUrl = `/api/deals`
       } else {
-        stagesUrl = `${API_URL}/api/pipelines/${pipelineId}`
-        dealsUrl = `${API_URL}/api/deals?pipeline_id=${pipelineId}`
+        stagesUrl = `/api/pipelines/${pipelineId}`
+        dealsUrl = `/api/deals?pipeline_id=${pipelineId}`
       }
 
       const [stagesRes, dealsRes] = await Promise.all([
@@ -147,7 +145,7 @@ export default function DealsKanban() {
     setDeals((prev) =>
       prev.map((d) => (d.id === dealId ? { ...d, pipeline_stage_id: stageId } : d))
     )
-    await fetch(`${API_URL}/api/deals/${dealId}`, {
+    await fetch(`/api/deals/${dealId}`, {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +157,7 @@ export default function DealsKanban() {
     if (!newTitle.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/api/deals`, {
+      const res = await fetch(`/api/deals`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

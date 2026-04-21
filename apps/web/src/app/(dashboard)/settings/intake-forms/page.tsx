@@ -59,8 +59,6 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 const PLACEHOLDER_TYPES: FieldType[] = ['text', 'email', 'phone', 'number']
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -316,9 +314,7 @@ function FormBuilderModal({
       ...(editingForm ? { isActive } : {}),
     }
 
-    const url = editingForm
-      ? `${API_URL}/api/intake-forms/${editingForm.id}`
-      : `${API_URL}/api/intake-forms`
+    const url = editingForm ? `/api/intake-forms/${editingForm.id}` : `/api/intake-forms`
     const method = editingForm ? 'PUT' : 'POST'
 
     try {
@@ -522,7 +518,7 @@ function SubmissionsPanel({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/api/intake-forms/${form.id}/submissions`, {
+    fetch(`/api/intake-forms/${form.id}/submissions`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : { submissions: [] }))
@@ -635,7 +631,7 @@ export default function IntakeFormsPage() {
   }
 
   const fetchForms = useCallback(async () => {
-    const res = await fetch(`${API_URL}/api/intake-forms`, {
+    const res = await fetch(`/api/intake-forms`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (res.ok) {
@@ -647,10 +643,10 @@ export default function IntakeFormsPage() {
   useEffect(() => {
     if (!token) return
     Promise.all([
-      fetch(`${API_URL}/api/intake-forms`, {
+      fetch(`/api/intake-forms`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => (r.ok ? r.json() : { forms: [] })),
-      fetch(`${API_URL}/api/settings/booking`, {
+      fetch(`/api/settings/booking`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => (r.ok ? r.json() : { services: [] })),
     ])
@@ -684,7 +680,7 @@ export default function IntakeFormsPage() {
     )
       return
 
-    const res = await fetch(`${API_URL}/api/intake-forms/${form.id}`, {
+    const res = await fetch(`/api/intake-forms/${form.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })

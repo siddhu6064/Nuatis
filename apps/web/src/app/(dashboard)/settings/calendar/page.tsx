@@ -4,8 +4,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 function GoogleCalendarIcon() {
@@ -78,7 +76,7 @@ export default function CalendarSettingsPage() {
     if (!token) return
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/settings/calendar`, {
+      const res = await fetch(`/api/settings/calendar`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -120,7 +118,7 @@ export default function CalendarSettingsPage() {
     if (!token) return
     setConnecting('outlook')
     try {
-      const res = await fetch(`${API_URL}/api/settings/calendar/outlook/auth-url`, {
+      const res = await fetch(`/api/settings/calendar/outlook/auth-url`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -140,7 +138,7 @@ export default function CalendarSettingsPage() {
     if (!token) return
     setDisconnecting(true)
     try {
-      const res = await fetch(`${API_URL}/api/settings/calendar/outlook`, {
+      const res = await fetch(`/api/settings/calendar/outlook`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

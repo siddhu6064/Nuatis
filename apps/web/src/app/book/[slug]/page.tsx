@@ -309,11 +309,8 @@ function StepSelectDateTime({
 
   useEffect(() => {
     if (!selectedDate) return
-    const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
     setLoadingSlots(true)
-    fetch(
-      `${apiUrl}/api/booking/${slug}/availability?serviceId=${service.id}&date=${toYMD(selectedDate)}`
-    )
+    fetch(`/api/booking/${slug}/availability?serviceId=${service.id}&date=${toYMD(selectedDate)}`)
       .then((r) => (r.ok ? r.json() : { slots: [] }))
       .then((data) => setSlots(data.slots ?? []))
       .catch(() => setSlots([]))
@@ -429,9 +426,8 @@ function StepYourInfo({
     setSubmitting(true)
     setSubmitError(null)
 
-    const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
     try {
-      const res = await fetch(`${apiUrl}/api/booking/${slug}/confirm`, {
+      const res = await fetch(`/api/booking/${slug}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -747,8 +743,7 @@ export default function BookingPage() {
   // Fetch booking page on mount
   useEffect(() => {
     if (!slug) return
-    const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-    fetch(`${apiUrl}/api/booking/${slug}`)
+    fetch(`/api/booking/${slug}`)
       .then(async (r) => {
         if (r.status === 404) {
           setNotFound(true)

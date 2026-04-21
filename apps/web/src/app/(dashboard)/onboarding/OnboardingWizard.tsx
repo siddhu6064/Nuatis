@@ -126,8 +126,7 @@ export default function OnboardingWizard({
   }
 
   function connectCalendar() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-    window.location.href = `${apiUrl}/api/auth/google?return_to=/onboarding`
+    window.location.href = `/api/auth/google?return_to=/onboarding`
   }
 
   return (

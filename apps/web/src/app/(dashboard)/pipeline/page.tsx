@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 interface Pipeline {
   id: string
   name: string
@@ -80,7 +78,7 @@ export default function PipelinePage() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/pipelines?type=contacts`, {
+        const res = await fetch(`/api/pipelines?type=contacts`, {
           credentials: 'include',
         })
         if (res.ok) {
@@ -106,8 +104,8 @@ export default function PipelinePage() {
     setLoading(true)
     try {
       const [stagesRes, contactsRes] = await Promise.all([
-        fetch(`${API_URL}/api/pipelines/${pipelineId}`, { credentials: 'include' }),
-        fetch(`${API_URL}/api/contacts?pipeline_id=${pipelineId}`, { credentials: 'include' }),
+        fetch(`/api/pipelines/${pipelineId}`, { credentials: 'include' }),
+        fetch(`/api/contacts?pipeline_id=${pipelineId}`, { credentials: 'include' }),
       ])
 
       if (stagesRes.ok) {
@@ -143,7 +141,7 @@ export default function PipelinePage() {
       prev.map((c) => (c.id === contactId ? { ...c, pipeline_stage: stageName } : c))
     )
     try {
-      await fetch(`${API_URL}/api/contacts/${contactId}`, {
+      await fetch(`/api/contacts/${contactId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

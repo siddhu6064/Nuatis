@@ -73,14 +73,11 @@ export default function SignUpPage() {
     setError('')
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/tenants`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        }
-      )
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/tenants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
       const data = (await res.json()) as { error?: string; message?: string }
 

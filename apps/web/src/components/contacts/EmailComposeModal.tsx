@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 interface EmailTemplate {
   id: string
   name: string
@@ -64,14 +62,14 @@ export default function EmailComposeModal({
 
   // Fetch templates and accounts on mount
   useEffect(() => {
-    void fetch(`${API_URL}/api/email-templates`, { headers })
+    void fetch(`/api/email-templates`, { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { templates?: EmailTemplate[] } | null) => {
         if (d?.templates) setTemplates(d.templates)
       })
       .catch(() => {})
 
-    void fetch(`${API_URL}/api/email-integrations`, { headers })
+    void fetch(`/api/email-integrations`, { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { accounts?: EmailAccount[] } | null) => {
         if (d?.accounts) {
@@ -94,10 +92,9 @@ export default function EmailComposeModal({
     }
     setLoadingPreview(true)
     try {
-      const res = await fetch(
-        `${API_URL}/api/email-templates/${templateId}/preview?contactId=${contactId}`,
-        { headers }
-      )
+      const res = await fetch(`/api/email-templates/${templateId}/preview?contactId=${contactId}`, {
+        headers,
+      })
       if (res.ok) {
         const d = (await res.json()) as { subject?: string; body?: string; bodyHtml?: string }
         setSubject(d.subject ?? '')
@@ -126,7 +123,7 @@ export default function EmailComposeModal({
     setError('')
     setSending(true)
     try {
-      const res = await fetch(`${API_URL}/api/email-integrations/send/${contactId}`, {
+      const res = await fetch(`/api/email-integrations/send/${contactId}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

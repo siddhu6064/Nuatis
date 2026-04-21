@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 const VERTICALS = [
   { value: 'dental', label: 'Dental' },
   { value: 'salon', label: 'Salon' },
@@ -66,7 +64,7 @@ export default function EmailTemplatesPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/api/email-templates`, {
+      const res = await fetch(`/api/email-templates`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to load templates')
@@ -122,7 +120,7 @@ export default function EmailTemplatesPage() {
       }
 
       if (editingTemplate) {
-        const res = await fetch(`${API_URL}/api/email-templates/${editingTemplate.id}`, {
+        const res = await fetch(`/api/email-templates/${editingTemplate.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -132,7 +130,7 @@ export default function EmailTemplatesPage() {
         })
         if (!res.ok) throw new Error('Failed to update template')
       } else {
-        const res = await fetch(`${API_URL}/api/email-templates`, {
+        const res = await fetch(`/api/email-templates`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -155,7 +153,7 @@ export default function EmailTemplatesPage() {
   async function handleDelete(id: string) {
     setDeleting(true)
     try {
-      const res = await fetch(`${API_URL}/api/email-templates/${id}`, {
+      const res = await fetch(`/api/email-templates/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

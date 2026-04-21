@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
-const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
-
 interface EmailAccount {
   id: string
   provider: 'gmail' | 'outlook'
@@ -62,7 +60,7 @@ export default function IntegrationsPage() {
   const fetchAccounts = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${apiUrl}/api/email-integrations`, {
+      const res = await fetch(`/api/email-integrations`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -79,7 +77,7 @@ export default function IntegrationsPage() {
   const fetchBcc = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${apiUrl}/api/settings/bcc-logging`, {
+      const res = await fetch(`/api/settings/bcc-logging`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -111,7 +109,7 @@ export default function IntegrationsPage() {
     if (!token) return
     setConnectingProvider(provider)
     try {
-      const res = await fetch(`${apiUrl}/api/email-integrations/${provider}/auth-url`, {
+      const res = await fetch(`/api/email-integrations/${provider}/auth-url`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -132,7 +130,7 @@ export default function IntegrationsPage() {
     if (!token) return
     setDisconnecting(id)
     try {
-      const res = await fetch(`${apiUrl}/api/email-integrations/${id}`, {
+      const res = await fetch(`/api/email-integrations/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -153,7 +151,7 @@ export default function IntegrationsPage() {
     if (!token) return
     setGeneratingBcc(true)
     try {
-      const res = await fetch(`${apiUrl}/api/settings/bcc-logging/enable`, {
+      const res = await fetch(`/api/settings/bcc-logging/enable`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
