@@ -48,8 +48,13 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
     params
 
   // Read and clean up session state
-  const booking = callSessionState.get(callControlId)
-  callSessionState.delete(callControlId)
+  let booking: CallSessionBooking | undefined
+  try {
+    booking = callSessionState.get(callControlId)
+    callSessionState.delete(callControlId)
+  } catch (err) {
+    console.warn('[post-call] callSessionState cleanup skipped:', err)
+  }
 
   const bookedAppointment = booking?.bookedAppointment ?? false
   let contactId = booking?.contactId ?? null

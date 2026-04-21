@@ -156,8 +156,15 @@ app.post('/voice/inbound', async (req, res) => {
   if (event === 'call.initiated') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
     const toNumber: string = req.body?.data?.payload?.to ?? ''
+    const fromNumber: string = req.body?.data?.payload?.from ?? ''
     const streamUrl = process.env['TELNYX_STREAM_URL'] ?? VOICE_WS_URL
     const apiKey = process.env['TELNYX_API_KEY'] ?? ''
+
+    if (!callControlId) {
+      console.warn('[voice/inbound] call.initiated missing call_control_id — skipping')
+      res.sendStatus(200)
+      return
+    }
 
     console.info(`[voice/inbound] call.initiated call_control_id=${callControlId} to=${toNumber}`)
 
@@ -195,7 +202,7 @@ app.post('/voice/inbound', async (req, res) => {
         }
 
         const prewarmStart = Date.now()
-        await prewarmGemini(callControlId, toNumber)
+        await prewarmGemini(callControlId, toNumber, fromNumber || undefined)
         console.info(`[latency] gemini_prewarm_ms=${Date.now() - prewarmStart}`)
 
         const base = `https://api.telnyx.com/v2/calls/${encodeURIComponent(callControlId)}/actions`
@@ -279,16 +286,20 @@ app.post('/voice/inbound', async (req, res) => {
         ? Number(payload.call_quality_stats.inbound.mos)
         : null
 
-    if (hangupCallControlId) {
-      hangupDataStore.set(hangupCallControlId, {
-        hangupSource,
-        hangupCause,
-        callQualityMos: mos,
-      })
-      console.info(
-        `[call-logger] hangup data captured: call_control_id=${hangupCallControlId} source=${hangupSource} cause=${hangupCause} mos=${mos}`
-      )
+    if (!hangupCallControlId) {
+      console.warn('[voice/inbound] call.hangup missing call_control_id — skipping')
+      res.sendStatus(200)
+      return
     }
+
+    hangupDataStore.set(hangupCallControlId, {
+      hangupSource,
+      hangupCause,
+      callQualityMos: mos,
+    })
+    console.info(
+      `[call-logger] hangup data captured: call_control_id=${hangupCallControlId} source=${hangupSource} cause=${hangupCause} mos=${mos}`
+    )
 
     res.sendStatus(200)
     return
@@ -301,6 +312,12 @@ app.post('/voice/inbound', async (req, res) => {
       payload.recording_urls?.mp3 ?? payload.public_recording_urls?.mp3 ?? ''
     const recDuration: number | null =
       payload.duration_secs != null ? Math.round(Number(payload.duration_secs)) : null
+
+    if (!recCallControlId) {
+      console.warn('[voice/inbound] call.recording.saved missing call_control_id — skipping')
+      res.sendStatus(200)
+      return
+    }
 
     if (recCallControlId && recordingUrl) {
       // Update voice_session with recording URL
@@ -356,6 +373,11 @@ app.post('/voice/inbound', async (req, res) => {
   if (event === 'streaming.started') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
     const streamId: string = req.body?.data?.payload?.stream_id ?? ''
+    if (!callControlId) {
+      console.warn('[voice/inbound] streaming.started missing call_control_id — skipping')
+      res.sendStatus(200)
+      return
+    }
     if (callControlId && streamId) {
       rekeyPrewarmedSession(callControlId, streamId)
       console.info(`[prewarm] rekeyed via webhook ${callControlId} → ${streamId}`)

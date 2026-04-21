@@ -7,6 +7,7 @@ import { logCall } from './call-logger.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { handlePostCall, callSessionState } from './post-call.js'
 import { persistVoiceSession } from './call-session-logger.js'
+import { lookupCaller, buildSystemPromptSuffix, type CallerContext } from './pre-call-lookup.js'
 import { Sentry } from '../lib/sentry.js'
 
 // ── Hangup data registry ─────────────────────────────────────────────────────
@@ -160,6 +161,8 @@ interface PrewarmedEntry {
   product: 'maya_only' | 'suite'
   callControlId: string
   cleanupTimer: ReturnType<typeof setTimeout>
+  callerContext?: CallerContext
+  contextSuffix?: string
 }
 
 export const prewarmedSessions = new Map<string, PrewarmedEntry>()
@@ -168,8 +171,14 @@ const streamWaiters = new Map<string, (entry: PrewarmedEntry) => void>()
 /**
  * Pre-warm a Gemini Live session before answering the call.
  * Resolves when setupComplete fires or after 3500ms (whichever first).
+ * If fromNumber is provided, caller lookup runs in parallel with tenant config
+ * so personalized context can be attached to the session.
  */
-export async function prewarmGemini(callControlId: string, toNumber: string): Promise<void> {
+export async function prewarmGemini(
+  callControlId: string,
+  toNumber: string,
+  fromNumber?: string
+): Promise<void> {
   const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
   const tenantMap = parseTenantMap(tenantMapRaw)
   let tenantId = lookupTenant(toNumber, tenantMap) ?? null
@@ -177,16 +186,26 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
     tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
   }
 
+  const lookupPromise: Promise<CallerContext> =
+    fromNumber && tenantId !== 'unknown'
+      ? lookupCaller(tenantId, fromNumber)
+      : Promise.resolve({ matched: false })
+
   const { businessName, vertical, product } = await getTenantConfig(tenantId)
   const safeName = businessName || 'the business'
   const safeVertical = vertical || 'sales_crm'
+
+  // Resolve caller lookup before opening Gemini so the suffix lands in systemInstruction
+  const callerContext = await lookupPromise
+  const contextSuffix = buildSystemPromptSuffix(callerContext)
 
   const session = await createGeminiLiveSession(
     tenantId,
     safeVertical,
     safeName,
     callControlId,
-    product
+    product,
+    contextSuffix
   )
 
   return new Promise<void>((resolve) => {
@@ -220,6 +239,8 @@ export async function prewarmGemini(callControlId: string, toNumber: string): Pr
       product,
       callControlId,
       cleanupTimer,
+      callerContext,
+      contextSuffix,
     })
   })
 }
@@ -280,6 +301,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let sessionVertical: string | null = null
     let sessionBusinessName: string | null = null
     let sessionProduct: 'maya_only' | 'suite' = 'suite'
+    let preCallContactId: string | null = null
+    let preCallContextSuffix = ''
 
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
@@ -366,7 +389,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 resolvedTenantId,
                 vertical,
                 businessName,
-                callControlId ?? undefined
+                callControlId ?? undefined,
+                undefined,
+                preCallContextSuffix
               )
                 .then((newSession) => {
                   if (!isCallActive) {
@@ -406,6 +431,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           console.info(`[telnyx-handler] using pre-warmed Gemini session (stream_id=${streamId})`)
           tenantId = prewarmed.tenantId
           callControlId = prewarmed.callControlId
+          preCallContactId = prewarmed.callerContext?.contactId ?? null
+          preCallContextSuffix = prewarmed.contextSuffix ?? ''
+          console.info('[pre-call-ctx]', {
+            tenantId,
+            matched: prewarmed.callerContext?.matched ?? false,
+            suffixChars: preCallContextSuffix.length,
+          })
           wireSession(
             prewarmed.session,
             prewarmed.vertical,
@@ -431,6 +463,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             console.info(`[telnyx-handler] pre-warm claimed via waiter (stream_id=${streamId})`)
             tenantId = waited.tenantId
             callControlId = waited.callControlId
+            preCallContactId = waited.callerContext?.contactId ?? null
+            preCallContextSuffix = waited.contextSuffix ?? ''
+            console.info('[pre-call-ctx]', {
+              tenantId,
+              matched: waited.callerContext?.matched ?? false,
+              suffixChars: preCallContextSuffix.length,
+            })
             wireSession(waited.session, waited.vertical, waited.businessName, waited.product)
           } else {
             console.info('[telnyx-handler] pre-warm wait timeout — creating fresh')
@@ -440,14 +479,27 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               )
             }
             try {
+              const fallbackLookup: Promise<CallerContext> = callerId
+                ? lookupCaller(resolvedTenantId, callerId)
+                : Promise.resolve({ matched: false })
               const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
               const safeName = businessName || 'the business'
               const safeVertical = vertical || 'sales_crm'
+              const fallbackCtx = await fallbackLookup
+              preCallContactId = fallbackCtx.contactId ?? null
+              preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx)
+              console.info('[pre-call-ctx]', {
+                tenantId: resolvedTenantId,
+                matched: fallbackCtx.matched,
+                suffixChars: preCallContextSuffix.length,
+              })
               const session = await createGeminiLiveSession(
                 resolvedTenantId,
                 safeVertical,
                 safeName,
-                callControlId ?? undefined
+                callControlId ?? undefined,
+                undefined,
+                preCallContextSuffix
               )
               if (!isCallActive) {
                 session.close()
@@ -478,14 +530,27 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             )
           }
           try {
+            const fallbackLookup: Promise<CallerContext> = callerId
+              ? lookupCaller(resolvedTenantId, callerId)
+              : Promise.resolve({ matched: false })
             const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
             const safeName = businessName || 'the business'
             const safeVertical = vertical || 'sales_crm'
+            const fallbackCtx = await fallbackLookup
+            preCallContactId = fallbackCtx.contactId ?? null
+            preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx)
+            console.info('[pre-call-ctx]', {
+              tenantId: resolvedTenantId,
+              matched: fallbackCtx.matched,
+              suffixChars: preCallContextSuffix.length,
+            })
             const session = await createGeminiLiveSession(
               resolvedTenantId,
               safeVertical,
               safeName,
-              callControlId ?? undefined
+              callControlId ?? undefined,
+              undefined,
+              preCallContextSuffix
             )
             if (!isCallActive) {
               session.close()
@@ -555,24 +620,22 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           (latencyMs !== null ? `, first_response_ms: ${latencyMs}` : '')
       )
 
+      const ccId = callControlId ?? ''
+      const booking = ccId ? callSessionState.get(ccId) : undefined
+      const hangup = ccId ? hangupDataStore.get(ccId) : undefined
+
       // Fire-and-forget post-call automation
       if (tenantId && tenantId !== 'unknown') {
         handlePostCall({
           tenantId,
           callerId: callerId ?? '',
           streamId: streamId ?? '',
-          callControlId: callControlId ?? '',
+          callControlId: ccId,
           duration,
           vertical: sessionVertical ?? 'sales_crm',
           businessName: sessionBusinessName ?? 'the business',
           product: sessionProduct,
         }).catch((err) => console.error('[post-call] error:', err))
-
-        // Persist voice session to database (best-effort, fire-and-forget)
-        const ccId = callControlId ?? ''
-        const booking = ccId ? callSessionState.get(ccId) : undefined
-        const hangup = ccId ? hangupDataStore.get(ccId) : undefined
-        if (hangup) hangupDataStore.delete(ccId)
 
         persistVoiceSession({
           tenantId,
@@ -583,7 +646,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           firstResponseMs: latencyMs,
           bookedAppointment: booking?.bookedAppointment ?? false,
           appointmentId: booking?.appointmentId ?? null,
-          contactId: booking?.contactId ?? null,
+          contactId: booking?.contactId ?? preCallContactId,
           escalated: booking?.escalated ?? false,
           escalationReason: booking?.escalationReason ?? null,
           vertical: sessionVertical ?? 'sales_crm',
@@ -593,6 +656,12 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           callQualityMos: hangup?.callQualityMos ?? null,
           startedAt: callStartTime ? new Date(callStartTime) : new Date(),
         }).catch((err) => console.error('[call-logger] error:', err))
+      }
+
+      // Always clean up Maps to prevent leaks when post-call path is skipped
+      if (ccId) {
+        hangupDataStore.delete(ccId)
+        callSessionState.delete(ccId)
       }
     }
   })
