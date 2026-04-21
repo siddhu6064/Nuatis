@@ -42,7 +42,7 @@ export default function SignInPage() {
           <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center">
             <span className="text-white font-bold text-base">N</span>
           </div>
-          <span className="font-display text-[22px] tracking-tight text-ink">
+          <span className="font-display font-bold text-[22px] tracking-tight text-ink">
             Nua<span className="text-accent">tis</span>
           </span>
         </div>

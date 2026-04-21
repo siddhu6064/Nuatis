@@ -118,7 +118,7 @@ export default function SignUpPage() {
           <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
             <span className="text-white text-sm font-bold">N</span>
           </div>
-          <span className="font-display text-[22px] tracking-tight text-ink">
+          <span className="font-display font-bold text-[22px] tracking-tight text-ink">
             Nua<span className="text-accent">tis</span>
           </span>
         </div>
