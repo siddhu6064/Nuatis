@@ -28,14 +28,18 @@ const TABLES_WITH_RLS = EXPECTED_TABLES.filter((t) => t !== 'schema_versions')
 
 describe('Schema migration tests', () => {
   const supabaseUrl = process.env['SUPABASE_URL']
-  const supabaseKey = process.env['SUPABASE_ANON_KEY']
+  const anonKey = process.env['SUPABASE_ANON_KEY']
+  const serviceKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
 
-  if (!supabaseUrl || !supabaseKey) {
-    it.skip('Skipping — SUPABASE_URL and SUPABASE_ANON_KEY not set', () => {})
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    it.skip('Skipping — SUPABASE_URL and keys not set', () => {})
     return
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  // Anon client — subject to RLS; used for RLS-blocking assertions
+  const supabase = createClient(supabaseUrl, anonKey)
+  // Service role client — bypasses RLS; used to verify tables exist
+  const admin = createClient(supabaseUrl, serviceKey)
 
   it('anon user cannot read contacts table (RLS active)', async () => {
     const { data, error } = await supabase.from('contacts').select('*').limit(1)
@@ -75,15 +79,15 @@ describe('Schema migration tests', () => {
   })
 
   it(`all ${EXPECTED_TABLES.length} expected tables exist`, async () => {
+    // Use service role so we can distinguish "table missing" from
+    // "anon blocked / permission denied". A service-role query on a
+    // missing table returns a 42P01 error; on an existing table it
+    // returns data (or an empty set) with no error.
     const checks = await Promise.all(
       EXPECTED_TABLES.map(async (table) => {
-        const { error } = await supabase.from(table).select('count').limit(0)
-        const blocked =
-          error?.message?.includes('RLS') ||
-          error?.message?.includes('policy') ||
-          error?.code === 'PGRST301' ||
-          !error
-        return { table, exists: blocked || !error }
+        const { error } = await admin.from(table).select('count').limit(0)
+        const tableMissing = error?.code === '42P01' || error?.message?.includes('does not exist')
+        return { table, exists: !tableMissing }
       })
     )
     const missing = checks.filter((c) => !c.exists).map((c) => c.table)
