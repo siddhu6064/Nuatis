@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
@@ -35,6 +35,14 @@ function OutlookIcon() {
 }
 
 export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <IntegrationsContent />
+    </Suspense>
+  )
+}
+
+function IntegrationsContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
 

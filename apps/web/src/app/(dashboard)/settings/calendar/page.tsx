@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
@@ -55,6 +55,15 @@ interface CalendarStatus {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CalendarSettingsPage() {
+  // useSearchParams must be inside a Suspense boundary during prerender (Next 16).
+  return (
+    <Suspense fallback={<div className="px-8 py-8 text-sm text-gray-400">Loading…</div>}>
+      <CalendarSettingsContent />
+    </Suspense>
+  )
+}
+
+function CalendarSettingsContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
 

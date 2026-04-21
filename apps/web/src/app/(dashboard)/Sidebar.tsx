@@ -141,7 +141,7 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="font-display font-bold text-[22px] tracking-tight text-ink leading-none">
-              Nua<span className="text-accent">tis</span>
+              Nu<span className="text-accent">atis</span>
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5 leading-none">
               {isMayaOnly ? 'Maya AI' : 'Front Office AI'}

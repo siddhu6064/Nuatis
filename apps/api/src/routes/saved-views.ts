@@ -11,10 +11,17 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // ── GET /api/views ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
+
+  if (!UUID_RE.test(authed.tenantId) || !UUID_RE.test(authed.userId)) {
+    res.json({ views: [] })
+    return
+  }
 
   const { data, error } = await supabase
     .from('saved_views')

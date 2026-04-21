@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
@@ -115,7 +116,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Client-side interactive sections */}
-      <ContactDetailClient contactId={contact.id} contactName={contact.full_name} />
+      <Suspense fallback={null}>
+        <ContactDetailClient contactId={contact.id} contactName={contact.full_name} />
+      </Suspense>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { VerticalSelector } from '@/components/crm'
 
@@ -27,6 +27,14 @@ const INITIAL: FormData = {
 }
 
 export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpForm />
+    </Suspense>
+  )
+}
+
+function SignUpForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>(1)
@@ -119,7 +127,7 @@ export default function SignUpPage() {
             <span className="text-white text-sm font-bold">N</span>
           </div>
           <span className="font-display font-bold text-[22px] tracking-tight text-ink">
-            Nua<span className="text-accent">tis</span>
+            Nu<span className="text-accent">atis</span>
           </span>
         </div>
 

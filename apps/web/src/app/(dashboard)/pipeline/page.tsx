@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -62,6 +62,14 @@ const lifecycleLabel: Record<string, string> = {
 }
 
 export default function PipelinePage() {
+  return (
+    <Suspense fallback={null}>
+      <PipelineContent />
+    </Suspense>
+  )
+}
+
+function PipelineContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
