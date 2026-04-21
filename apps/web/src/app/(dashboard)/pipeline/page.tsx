@@ -82,7 +82,8 @@ export default function PipelinePage() {
           credentials: 'include',
         })
         if (res.ok) {
-          const data = (await res.json()) as Pipeline[]
+          const payload = (await res.json()) as { pipelines?: Pipeline[] } | Pipeline[]
+          const data: Pipeline[] = Array.isArray(payload) ? payload : (payload.pipelines ?? [])
           setPipelines(data)
           // Determine initial active pipeline
           const paramId = searchParams.get('pipeline')
@@ -92,9 +93,13 @@ export default function PipelinePage() {
             const def = data.find((p) => p.is_default) ?? data[0]
             if (def) setActivePipelineId(def.id)
           }
+          if (data.length === 0) setLoading(false)
+        } else {
+          setLoading(false)
         }
       } catch {
         // silently fail — board stays empty
+        setLoading(false)
       }
     })()
   }, [])

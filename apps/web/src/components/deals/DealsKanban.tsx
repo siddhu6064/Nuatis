@@ -74,7 +74,8 @@ export default function DealsKanban() {
       try {
         const res = await fetch(`/api/pipelines?type=deals`, { credentials: 'include' })
         if (res.ok) {
-          const data = (await res.json()) as Pipeline[]
+          const payload = (await res.json()) as { pipelines?: Pipeline[] } | Pipeline[]
+          const data: Pipeline[] = Array.isArray(payload) ? payload : (payload.pipelines ?? [])
           setPipelines(data)
           const paramId = searchParams.get('pipeline')
           if (paramId && data.find((p) => p.id === paramId)) {
@@ -83,6 +84,9 @@ export default function DealsKanban() {
             const def = data.find((p) => p.is_default) ?? data[0]
             if (def) setActivePipelineId(def.id)
           }
+          if (data.length === 0) setLoading(false)
+        } else {
+          setLoading(false)
         }
       } catch {
         // silently fail — fallback to old behaviour below
