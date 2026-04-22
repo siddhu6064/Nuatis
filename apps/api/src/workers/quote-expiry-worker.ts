@@ -12,7 +12,7 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[quote-expiry] scanning for expired quotes...')
 
   try {

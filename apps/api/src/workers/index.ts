@@ -17,6 +17,7 @@ import {
 } from './lead-score-worker.js'
 import { createReviewRequestWorker } from './review-request-worker.js'
 import { createExportWorker } from './export-worker.js'
+import { createLowStockScanner } from './low-stock-scanner.js'
 
 interface ManagedWorker {
   name: string
@@ -164,6 +165,16 @@ export async function startWorkers(): Promise<void> {
   const exportWorker = createExportWorker()
   managed.push({ name: 'data-export', queue: exportWorker.queue, worker: exportWorker.worker })
   console.info('[workers] data-export worker started')
+
+  // 17. Low-stock scanner — daily at 08:00 UTC
+  const lowStockScanner = createLowStockScanner()
+  await lowStockScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 8 * * *' }, jobId: 'low-stock-repeat' }
+  )
+  managed.push({ name: 'low-stock-scanner', ...lowStockScanner })
+  console.info('[workers] low-stock-scanner started, cron 0 8 * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

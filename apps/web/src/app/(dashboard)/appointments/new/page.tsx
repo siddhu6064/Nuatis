@@ -9,17 +9,32 @@ interface Contact {
   full_name: string
 }
 
+interface StaffOption {
+  id: string
+  name: string
+  color_hex: string
+}
+
 export default async function NewAppointmentPage() {
   const session = await auth()
   if (!session?.user?.tenantId) redirect('/sign-in')
 
   const supabase = createAdminClient()
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('id, full_name')
-    .eq('tenant_id', session.user.tenantId)
-    .order('full_name')
-    .returns<Contact[]>()
+  const [contactsRes, staffRes] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('id, full_name')
+      .eq('tenant_id', session.user.tenantId)
+      .order('full_name')
+      .returns<Contact[]>(),
+    supabase
+      .from('staff_members')
+      .select('id, name, color_hex')
+      .eq('tenant_id', session.user.tenantId)
+      .eq('is_active', true)
+      .order('name')
+      .returns<StaffOption[]>(),
+  ])
 
   return (
     <div className="px-8 py-8">
@@ -35,7 +50,7 @@ export default async function NewAppointmentPage() {
         <p className="text-sm text-gray-500 mt-0.5">Schedule a new appointment</p>
       </div>
 
-      <AddAppointmentForm contacts={contacts ?? []} />
+      <AddAppointmentForm contacts={contactsRes.data ?? []} staff={staffRes.data ?? []} />
     </div>
   )
 }

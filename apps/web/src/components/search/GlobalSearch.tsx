@@ -28,10 +28,20 @@ interface SearchQuote {
   contact_id: string | null
 }
 
+interface SearchInventory {
+  id: string
+  name: string
+  sku: string | null
+  quantity: number
+  reorder_threshold: number
+  type: 'inventory'
+}
+
 interface SearchResults {
   contacts: SearchContact[]
   appointments: SearchAppointment[]
   quotes: SearchQuote[]
+  inventory?: SearchInventory[]
   total: number
 }
 
@@ -150,6 +160,15 @@ export default function GlobalSearch() {
         sub: `${q.status} \u00B7 $${Number(q.total).toFixed(2)}`,
       })
     }
+    for (const i of results.inventory ?? []) {
+      allItems.push({
+        type: 'inventory',
+        id: i.id,
+        href: `/inventory?highlight=${i.id}`,
+        label: i.name,
+        sub: i.sku ?? '',
+      })
+    }
   }
 
   const navigate = (href: string) => {
@@ -177,6 +196,13 @@ export default function GlobalSearch() {
     contact: '\u25CE',
     appointment: '\u25F7',
     quote: '\u25EB',
+    inventory: '\u25E8',
+  }
+
+  const invQtyClass = (qty: number, thr: number): string => {
+    if (qty <= thr) return 'bg-red-100 text-red-700'
+    if (qty <= thr * 2) return 'bg-amber-100 text-amber-700'
+    return 'bg-green-100 text-green-700'
   }
 
   if (!open) return null
@@ -312,6 +338,43 @@ export default function GlobalSearch() {
                         <span className="font-medium flex-1">{q.title}</span>
                         <span className="text-xs text-gray-400">
                           {q.status} &middot; ${Number(q.total).toFixed(2)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {(results.inventory ?? []).length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-gray-400 uppercase">
+                    Inventory ({(results.inventory ?? []).length})
+                  </p>
+                  {(results.inventory ?? []).map((inv, i) => {
+                    const idx =
+                      results.contacts.length +
+                      results.appointments.length +
+                      results.quotes.length +
+                      i
+                    const qty = Number(inv.quantity ?? 0)
+                    const thr = Number(inv.reorder_threshold ?? 0)
+                    return (
+                      <button
+                        key={inv.id}
+                        onClick={() => navigate(`/inventory?highlight=${inv.id}`)}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-2 text-sm transition-colors ${
+                          selectedIndex === idx
+                            ? 'bg-teal-50 text-teal-700'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-gray-400">{typeIcon['inventory']}</span>
+                        <span className="font-medium flex-1">{inv.name}</span>
+                        {inv.sku && <span className="text-xs text-gray-400">{inv.sku}</span>}
+                        <span
+                          className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${invQtyClass(qty, thr)}`}
+                        >
+                          {qty}
                         </span>
                       </button>
                     )

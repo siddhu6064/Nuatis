@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { isModuleEnabled } from '../lib/modules.js'
 
 const router = Router()
 
@@ -24,7 +25,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const supabase = getSupabase()
   const pattern = `%${q}%`
 
-  const [contactsRes, appointmentsRes, quotesRes] = await Promise.all([
+  const crmEnabled = await isModuleEnabled(authed.tenantId, 'crm')
+
+  const [contactsRes, appointmentsRes, quotesRes, inventoryRes] = await Promise.all([
     // Contacts: name, phone, email
     supabase
       .from('contacts')
@@ -52,6 +55,18 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       .ilike('title', pattern)
       .order('created_at', { ascending: false })
       .limit(3),
+
+    // Inventory: name, sku — only queried when CRM module is enabled
+    crmEnabled
+      ? supabase
+          .from('inventory_items')
+          .select('id, name, sku, quantity, reorder_threshold')
+          .eq('tenant_id', authed.tenantId)
+          .is('deleted_at', null)
+          .or(`name.ilike.${pattern},sku.ilike.${pattern}`)
+          .order('name', { ascending: true })
+          .limit(5)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
   ])
 
   const contacts = (contactsRes.data ?? []).map((c) => ({
@@ -79,11 +94,23 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     contact_id: q.contact_id,
   }))
 
+  const inventory = crmEnabled
+    ? (inventoryRes.data ?? []).map((i) => ({
+        id: i['id'] as string,
+        name: i['name'] as string,
+        sku: (i['sku'] as string | null) ?? null,
+        quantity: Number(i['quantity'] ?? 0),
+        reorder_threshold: Number(i['reorder_threshold'] ?? 0),
+        type: 'inventory' as const,
+      }))
+    : []
+
   res.json({
     contacts,
     appointments,
     quotes,
-    total: contacts.length + appointments.length + quotes.length,
+    inventory,
+    total: contacts.length + appointments.length + quotes.length + inventory.length,
   })
 })
 

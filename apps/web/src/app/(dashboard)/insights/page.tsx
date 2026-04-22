@@ -3,11 +3,15 @@ import { createAdminClient } from '@/lib/supabase/server'
 import InsightsDashboard from './InsightsDashboard'
 import ReferralInsights from '@/components/insights/ReferralInsights'
 import DealsForecast from '@/components/insights/DealsForecast'
+import StockHealthInsights from '@/components/insights/StockHealthInsights'
+import TeamScheduleInsights from '@/components/insights/TeamScheduleInsights'
 
 export default async function InsightsPage() {
   const session = await auth()
   const tenantId = session?.user?.tenantId
   const vertical = session?.user?.vertical || 'sales_crm'
+  const modules = (session?.user?.modules as Record<string, boolean> | undefined) ?? {}
+  const crmEnabled = modules['crm'] !== false
 
   const supabase = createAdminClient()
   const now = new Date()
@@ -80,6 +84,8 @@ export default async function InsightsPage() {
       />
       <ReferralInsights />
       <DealsForecast />
+      {crmEnabled && <StockHealthInsights />}
+      {crmEnabled && <TeamScheduleInsights />}
     </div>
   )
 }

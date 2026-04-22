@@ -17,6 +17,8 @@ const EVENT_KEYS = [
   'form_submitted',
   'low_lead_score',
   'contact_assigned',
+  'inventory_low_stock',
+  'staff_shift_conflict',
 ] as const
 
 type EventKey = (typeof EVENT_KEYS)[number]
@@ -42,6 +44,8 @@ const DEFAULT_PREFS: NotificationPrefs = {
   form_submitted: { push: true, sms: false, email: false },
   low_lead_score: { push: true, sms: false, email: false },
   contact_assigned: { push: true, sms: false, email: false },
+  inventory_low_stock: { push: true, sms: false, email: false },
+  staff_shift_conflict: { push: true, sms: false, email: false },
 }
 
 function getSupabase() {
@@ -70,6 +74,17 @@ function isValidPrefs(body: unknown): body is NotificationPrefs {
   return true
 }
 
+function withDefaults(raw: unknown): NotificationPrefs {
+  const merged: NotificationPrefs = { ...DEFAULT_PREFS }
+  if (raw && typeof raw === 'object') {
+    const src = raw as Record<string, unknown>
+    for (const key of EVENT_KEYS) {
+      if (isChannelPrefs(src[key])) merged[key] = src[key] as ChannelPrefs
+    }
+  }
+  return merged
+}
+
 // ── GET /api/settings/notifications ─────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
@@ -86,7 +101,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  const prefs = tenant.notification_prefs ?? DEFAULT_PREFS
+  // Merge stored prefs over defaults so newly-added event keys are always present
+  // without requiring a DB backfill.
+  const prefs = withDefaults(tenant.notification_prefs)
   res.json(prefs)
 })
 

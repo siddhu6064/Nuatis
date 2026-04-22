@@ -31,7 +31,7 @@ interface FollowupJobData {
   shareToken: string
 }
 
-async function processFollowup(data: FollowupJobData): Promise<void> {
+export async function processFollowup(data: FollowupJobData): Promise<void> {
   const { quoteId, tenantId, contactPhone, contactName, quoteNumber, shareToken } = data
   const supabase = getSupabase()
 

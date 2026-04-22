@@ -22,7 +22,7 @@ interface ReviewRequestJobData {
   appointmentId: string
 }
 
-async function processReviewRequest(data: ReviewRequestJobData): Promise<void> {
+export async function processReviewRequest(data: ReviewRequestJobData): Promise<void> {
   const { tenantId, contactId, appointmentId } = data
   const supabase = getSupabase()
 

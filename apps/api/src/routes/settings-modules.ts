@@ -4,7 +4,17 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
-const VALID_MODULES = ['maya', 'crm', 'appointments', 'pipeline', 'automation', 'cpq', 'insights']
+const VALID_MODULES = [
+  'maya',
+  'crm',
+  'appointments',
+  'pipeline',
+  'automation',
+  'cpq',
+  'insights',
+  'companies',
+  'deals',
+]
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

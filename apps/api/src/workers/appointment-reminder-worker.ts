@@ -45,7 +45,7 @@ async function sendSms(from: string, to: string, text: string): Promise<boolean>
   }
 }
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[appointment-reminder] scanning for upcoming appointments...')
 
   try {

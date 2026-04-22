@@ -31,7 +31,7 @@ export interface TaskReminderJob {
   assignedUserId?: string
 }
 
-async function processReminder(data: TaskReminderJob): Promise<void> {
+export async function processReminder(data: TaskReminderJob): Promise<void> {
   const { taskId, tenantId, contactId, title } = data
   const supabase = getSupabase()
 

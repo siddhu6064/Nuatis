@@ -26,7 +26,7 @@ interface BulkJobData {
   tenantId: string
 }
 
-async function processCompute(data: ComputeJobData): Promise<void> {
+export async function processCompute(data: ComputeJobData): Promise<void> {
   const { tenantId, contactId, trigger } = data
   const supabase = getSupabase()
 
@@ -114,7 +114,7 @@ async function processBulk(data: BulkJobData): Promise<void> {
   console.info(`[lead-score-bulk] enqueued ${enqueued} compute jobs for tenant=${tenantId}`)
 }
 
-async function processDecay(): Promise<void> {
+export async function processDecay(): Promise<void> {
   const supabase = getSupabase()
 
   // Find all distinct tenants with contacts that have a positive lead_score

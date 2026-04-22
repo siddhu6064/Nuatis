@@ -45,7 +45,7 @@ function interpolate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '')
 }
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[follow-up-cadence] scanning for contacts due for follow-up...')
 
   try {

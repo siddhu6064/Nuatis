@@ -36,6 +36,9 @@ import attachmentsRouter from './routes/attachments.js'
 import smsRouter from './routes/sms.js'
 import companiesRouter from './routes/companies.js'
 import dealsRouter from './routes/deals.js'
+import inventoryRouter from './routes/inventory.js'
+import inventorySettingsRouter from './routes/inventory-settings.js'
+import staffRouter from './routes/staff.js'
 import usersRouter from './routes/users.js'
 import emailIntegrationsRouter from './routes/email-integrations.js'
 import emailTemplatesRouter from './routes/email-templates.js'
@@ -123,6 +126,9 @@ app.use('/api/contacts', attachmentsRouter)
 app.use('/api', smsRouter)
 app.use('/api/companies', companiesRouter)
 app.use('/api/deals', dealsRouter)
+app.use('/api/inventory', inventoryRouter)
+app.use('/api/settings/inventory', inventorySettingsRouter)
+app.use('/api/staff', staffRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/email-integrations', emailIntegrationsRouter)
 app.use('/api/email-templates', emailTemplatesRouter)

@@ -286,7 +286,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
 // ── Auto-quote generation ────────────────────────────────────────────────────
 
-async function generateAutoQuote(
+export async function generateAutoQuote(
   tenantId: string,
   contactId: string,
   _vertical: string

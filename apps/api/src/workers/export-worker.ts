@@ -140,7 +140,7 @@ async function fetchTable(
 
 // ── Main processor ───────────────────────────────────────────────────────────
 
-async function processExport(data: ExportJobData): Promise<void> {
+export async function processExport(data: ExportJobData): Promise<void> {
   const { tenantId, exportJobId, tables } = data
   const supabase = getSupabase()
 

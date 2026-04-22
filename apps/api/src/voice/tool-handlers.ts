@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { VERTICALS } from '@nuatis/shared'
 import { getCalendarClient } from '../services/google.js'
 import { callSessionState } from './post-call.js'
+import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 
 export interface ToolCallContext {
   tenantId: string
@@ -55,6 +56,11 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
         duration_minutes: {
           type: Type.NUMBER,
           description: 'Appointment duration in minutes. Default 60 if not specified.',
+        },
+        staff_name: {
+          type: Type.STRING,
+          description:
+            "Optional staff member name when caller requests a specific provider/stylist/attorney/etc. Matches case-insensitively against the staff directory. When provided, availability is additionally constrained to that staff member's shifts on the requested date.",
         },
       },
       required: ['date'],
@@ -141,6 +147,94 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
+}
+
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+async function getStaffContext(tenantId: string): Promise<CachedStaffMember[]> {
+  const cached = getCachedStaff(tenantId)
+  if (cached) return cached
+  try {
+    const supabase = getSupabase()
+    const { data } = await supabase
+      .from('staff_members')
+      .select('id, name, role, color_hex, availability')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+    const staff = (data ?? []).map((r) => ({
+      id: r.id as string,
+      name: r.name as string,
+      role: r.role as string,
+      color_hex: r.color_hex as string,
+      availability:
+        (r.availability as Record<
+          string,
+          { enabled?: boolean; start?: string; end?: string }
+        > | null) ?? {},
+    }))
+    setCachedStaff(tenantId, staff)
+    return staff
+  } catch (err) {
+    console.error('[tool-handlers] getStaffContext failed:', err)
+    return []
+  }
+}
+
+function staffAvailableToday(staff: CachedStaffMember, isoDate: string): boolean {
+  const dow = new Date(`${isoDate}T12:00:00Z`).getUTCDay()
+  const key = DAY_KEYS[dow]
+  if (!key) return false
+  const entry = staff.availability?.[key]
+  return Boolean(entry?.enabled)
+}
+
+function summarizeStaff(
+  staff: CachedStaffMember[],
+  isoDate: string
+): Array<{ id: string; name: string; role: string; color_hex: string; available_today: boolean }> {
+  return staff.map((s) => ({
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    color_hex: s.color_hex,
+    available_today: staffAvailableToday(s, isoDate),
+  }))
+}
+
+async function fetchShiftsForStaffOnDate(
+  tenantId: string,
+  staffId: string,
+  isoDate: string
+): Promise<Array<{ start_time: string; end_time: string }>> {
+  try {
+    const supabase = getSupabase()
+    const { data } = await supabase
+      .from('shifts')
+      .select('start_time, end_time')
+      .eq('tenant_id', tenantId)
+      .eq('staff_id', staffId)
+      .eq('date', isoDate)
+      .order('start_time', { ascending: true })
+    return (data ?? []).map((r) => ({
+      start_time: r.start_time as string,
+      end_time: r.end_time as string,
+    }))
+  } catch {
+    return []
+  }
+}
+
+function timeWithinAnyShift(
+  hhmm: string,
+  shifts: Array<{ start_time: string; end_time: string }>
+): boolean {
+  for (const s of shifts) {
+    const a = s.start_time.slice(0, 5)
+    const b = s.end_time.slice(0, 5)
+    if (hhmm >= a && hhmm < b) return true
+  }
+  return false
 }
 
 /** Strip everything except digits and leading +, e.g. "+1 (763) 340-6385" → "+17633406385" */
@@ -321,10 +415,38 @@ const handlers: Record<string, ToolHandler> = {
     const preferredTime = args['preferred_time'] ? String(args['preferred_time']) : null
     const durationMinutes =
       typeof args['duration_minutes'] === 'number' ? args['duration_minutes'] : 60
+    const staffNameArg = args['staff_name'] ? String(args['staff_name']).trim() : ''
 
     console.info(
       `[tool-handlers] check_availability: date=${date} preferred_time=${preferredTime ?? 'any'} tenant=${context.tenantId}`
     )
+
+    // Enrich with staff context (cached, TTL 5m). Never blocks main calendar flow on failure.
+    const staff = await getStaffContext(context.tenantId)
+    const staffSummary = summarizeStaff(staff, date)
+    const matchedStaff = staffNameArg
+      ? (staff.find((s) => s.name.toLowerCase() === staffNameArg.toLowerCase()) ??
+        staff.find((s) => s.name.toLowerCase().includes(staffNameArg.toLowerCase())) ??
+        null)
+      : null
+    const matchedStaffShifts = matchedStaff
+      ? await fetchShiftsForStaffOnDate(context.tenantId, matchedStaff.id, date)
+      : []
+    const staffFields = {
+      staff_members: staffSummary,
+      ...(matchedStaff
+        ? {
+            requested_staff_member: {
+              id: matchedStaff.id,
+              name: matchedStaff.name,
+              shifts_today: matchedStaffShifts,
+            },
+          }
+        : {}),
+      ...(staffNameArg && !matchedStaff
+        ? { requested_staff_member: { name: staffNameArg, not_found: true } }
+        : {}),
+    }
 
     // 1. Get tenant's Google Calendar credentials from locations table
     try {
@@ -338,12 +460,16 @@ const handlers: Record<string, ToolHandler> = {
 
       if (locErr) {
         console.error(`[tool-handlers] check_availability location query error: ${locErr.message}`)
-        return { available: false, error: 'Unable to check calendar' }
+        return { available: false, error: 'Unable to check calendar', ...staffFields }
       }
 
       if (!location?.google_refresh_token) {
         console.info('[tool-handlers] check_availability: no Google Calendar tokens for tenant')
-        return { available: false, error: 'Google Calendar not connected for this business' }
+        return {
+          available: false,
+          error: 'Google Calendar not connected for this business',
+          ...staffFields,
+        }
       }
 
       const refreshToken = location.google_refresh_token
@@ -355,7 +481,13 @@ const handlers: Record<string, ToolHandler> = {
 
       if (!hoursWindow) {
         console.info('[tool-handlers] check_availability: business is closed on this date')
-        return { available: false, date, message: 'The business is closed on this date', slots: [] }
+        return {
+          available: false,
+          date,
+          message: 'The business is closed on this date',
+          slots: [],
+          ...staffFields,
+        }
       }
 
       // 3. If preferred_time given, check business hours BEFORE hitting Calendar API
@@ -394,6 +526,7 @@ const handlers: Record<string, ToolHandler> = {
               close: formatHourAmPm(hoursWindow.close),
             },
             suggested_times: suggested,
+            ...staffFields,
           }
         }
       }
@@ -427,7 +560,14 @@ const handlers: Record<string, ToolHandler> = {
 
         const conflicts = busyPeriods.filter((b) => slotStart < b.end && slotEnd > b.start)
 
-        const isAvailable = conflicts.length === 0
+        // When a specific staff member was requested, additionally verify the
+        // slot falls within one of their scheduled shifts for the day.
+        const staffShiftBlocks =
+          matchedStaff && !timeWithinAnyShift(preferredTime, matchedStaffShifts)
+            ? [{ reason: 'staff_not_scheduled', shifts: matchedStaffShifts }]
+            : []
+
+        const isAvailable = conflicts.length === 0 && staffShiftBlocks.length === 0
         console.info(
           `[tool-handlers] check_availability: busy_periods=${busyPeriods.length}, available=${isAvailable}`
         )
@@ -446,6 +586,8 @@ const handlers: Record<string, ToolHandler> = {
                 })),
               }
             : {}),
+          ...(staffShiftBlocks.length > 0 ? { staff_shift_conflicts: staffShiftBlocks } : {}),
+          ...staffFields,
         }
       }
 
@@ -472,13 +614,18 @@ const handlers: Record<string, ToolHandler> = {
         cursor += stepMs
       }
 
+      // When a specific staff member was requested, constrain slots to their shift windows.
+      const finalSlots = matchedStaff
+        ? slots.filter((s) => timeWithinAnyShift(s.start, matchedStaffShifts))
+        : slots
+
       console.info(
-        `[tool-handlers] check_availability: busy_periods=${busyPeriods.length}, available_slots=${slots.length}`
+        `[tool-handlers] check_availability: busy_periods=${busyPeriods.length}, available_slots=${finalSlots.length} (staff_filter=${matchedStaff?.name ?? 'none'})`
       )
-      return { available: slots.length > 0, date, slots }
+      return { available: finalSlots.length > 0, date, slots: finalSlots, ...staffFields }
     } catch (err) {
       console.error('[tool-handlers] check_availability error:', err)
-      return { available: false, error: 'Unable to check calendar' }
+      return { available: false, error: 'Unable to check calendar', ...staffFields }
     }
   },
 

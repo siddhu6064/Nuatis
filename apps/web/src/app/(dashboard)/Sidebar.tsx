@@ -28,6 +28,8 @@ const NAV: NavItem[] = [
   },
   { href: '/pipeline', label: 'Pipeline', icon: '◈', suiteOnly: true, requireModule: 'pipeline' },
   { href: '/deals', label: 'Deals', icon: '◆', suiteOnly: true, requireModule: 'deals' },
+  { href: '/inventory', label: 'Inventory', icon: '◨', suiteOnly: true, requireModule: 'crm' },
+  { href: '/staff', label: 'Staff', icon: '👥', suiteOnly: true, requireModule: 'crm' },
   {
     href: '/appointments',
     label: 'Appointments',
@@ -75,6 +77,13 @@ const NAV: NavItem[] = [
   { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
   { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
   { href: '/settings/chat-widget', label: 'Chat Widget', icon: '💬', suiteOnly: true },
+  {
+    href: '/settings/inventory',
+    label: 'Inventory Settings',
+    icon: '⚙',
+    suiteOnly: true,
+    requireModule: 'crm',
+  },
   { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
   { href: '/settings/calendar', label: 'Calendar', icon: '📆', suiteOnly: true },
   { href: '/settings', label: 'Settings', icon: '◌' },
@@ -86,6 +95,7 @@ export default function Sidebar() {
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
   const [modules, setModules] = useState<Record<string, boolean>>({})
   const [unreadSms, setUnreadSms] = useState(0)
+  const [lowStockCount, setLowStockCount] = useState(0)
 
   useEffect(() => {
     void fetch('/api/sms/unread-count')
@@ -93,6 +103,22 @@ export default function Sidebar() {
       .then((d: { count: number }) => setUnreadSms(d.count))
       .catch(() => {})
   }, [path]) // re-fetch when navigating
+
+  // Poll low-stock count every 5 minutes (only when CRM module is enabled)
+  useEffect(() => {
+    if (modules['crm'] === false) return undefined
+    const fetchLowStock = () => {
+      void fetch('/api/inventory?count=true&low_stock=true')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { count?: number } | null) => {
+          if (d && typeof d.count === 'number') setLowStockCount(d.count)
+        })
+        .catch(() => {})
+    }
+    fetchLowStock()
+    const id = setInterval(fetchLowStock, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [modules])
 
   useEffect(() => {
     fetch('/api/auth/session')
@@ -179,6 +205,12 @@ export default function Sidebar() {
                 <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
                   {unreadSms > 99 ? '99+' : unreadSms}
                 </span>
+              )}
+              {item.href === '/inventory' && lowStockCount > 0 && (
+                <span
+                  className="ml-auto w-2 h-2 rounded-full bg-amber-400"
+                  aria-label={`${lowStockCount} low-stock item(s)`}
+                />
               )}
             </Link>
           )

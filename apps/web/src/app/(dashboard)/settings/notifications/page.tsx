@@ -15,7 +15,13 @@ type NotificationPrefs = Record<string, ChannelPrefs>
 
 // ─── Event definitions ────────────────────────────────────────────────────────
 
-const EVENTS = [
+interface EventDef {
+  key: string
+  label: string
+  requireModule?: string
+}
+
+const EVENTS: EventDef[] = [
   { key: 'new_contact', label: 'New Contact' },
   { key: 'appointment_booked', label: 'Appointment Booked' },
   { key: 'appointment_completed', label: 'Appointment Completed' },
@@ -28,6 +34,8 @@ const EVENTS = [
   { key: 'form_submitted', label: 'Form Submitted' },
   { key: 'low_lead_score', label: 'Lead Score Alert' },
   { key: 'contact_assigned', label: 'Contact Assigned' },
+  { key: 'inventory_low_stock', label: 'Low Stock Alert', requireModule: 'crm' },
+  { key: 'staff_shift_conflict', label: 'Shift Conflict', requireModule: 'crm' },
 ]
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -43,6 +51,8 @@ const DEFAULT_PREFS: NotificationPrefs = {
   form_submitted: { push: true, sms: false, email: false },
   low_lead_score: { push: true, sms: false, email: false },
   contact_assigned: { push: true, sms: false, email: false },
+  inventory_low_stock: { push: true, sms: false, email: false },
+  staff_shift_conflict: { push: true, sms: false, email: false },
 }
 
 // ─── Toggle component ─────────────────────────────────────────────────────────
@@ -83,6 +93,10 @@ export default function NotificationSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const modules = ((session?.user as Record<string, unknown> | undefined)?.['modules'] ??
+    {}) as Record<string, boolean>
+  const visibleEvents = EVENTS.filter((e) => !e.requireModule || modules[e.requireModule] !== false)
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
@@ -179,7 +193,7 @@ export default function NotificationSettingsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {EVENTS.map(({ key, label }) => (
+            {visibleEvents.map(({ key, label }) => (
               <tr key={key} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-6 py-3.5 text-sm text-gray-800">{label}</td>
                 <td className="px-6 py-3.5 text-center">

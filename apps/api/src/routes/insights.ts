@@ -1253,4 +1253,147 @@ router.get('/territory', requireAuth, async (req: Request, res: Response): Promi
   }
 })
 
+// ── GET /api/insights/inventory ──────────────────────────────────────────────
+router.get('/inventory', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('id, name, quantity, reorder_threshold, unit, unit_cost')
+      .eq('tenant_id', authed.tenantId)
+      .is('deleted_at', null)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    const items = data ?? []
+    const total_skus = items.length
+    const total_value = items.reduce(
+      (s, i) =>
+        s + Number(i.quantity ?? 0) * Number((i as { unit_cost?: number | null }).unit_cost ?? 0),
+      0
+    )
+    const low_stock_count = items.filter(
+      (i) => Number(i.quantity ?? 0) <= Number(i.reorder_threshold ?? 0)
+    ).length
+
+    const ranked = [...items]
+      .map((i) => {
+        const qty = Number(i.quantity ?? 0)
+        const thr = Number(i.reorder_threshold ?? 0)
+        const status: 'red' | 'amber' | 'green' =
+          qty <= thr ? 'red' : qty <= thr * 2 ? 'amber' : 'green'
+        return {
+          name: i.name as string,
+          quantity: qty,
+          reorder_threshold: thr,
+          unit: (i.unit as string) ?? 'each',
+          status,
+        }
+      })
+      .sort((a, b) => a.quantity - b.quantity)
+      .slice(0, 10)
+
+    res.json({
+      total_skus,
+      total_value: Math.round(total_value * 100) / 100,
+      low_stock_count,
+      top_items: ranked,
+    })
+  } catch (err) {
+    console.error('[insights] inventory error:', err)
+    res.status(500).json({ error: 'Failed to fetch inventory insights' })
+  }
+})
+
+// ── GET /api/insights/staff ──────────────────────────────────────────────────
+router.get('/staff', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  const authed = _req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Compute current week bounds (Monday 00:00 → Sunday 23:59 local-ish).
+    // Uses plain Date arithmetic — matches the rest of insights.ts (no date-fns).
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const dow = now.getDay() // 0=Sun .. 6=Sat
+    const mondayOffset = (dow + 6) % 7
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - mondayOffset)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    const toIso = (d: Date): string => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    const mondayIso = toIso(monday)
+    const sundayIso = toIso(sunday)
+
+    const [staffRes, shiftsRes] = await Promise.all([
+      supabase
+        .from('staff_members')
+        .select('id, name, color_hex')
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_active', true),
+      supabase
+        .from('shifts')
+        .select('id, staff_id, date, start_time, end_time')
+        .eq('tenant_id', authed.tenantId)
+        .gte('date', mondayIso)
+        .lte('date', sundayIso),
+    ])
+
+    const shifts = shiftsRes.data ?? []
+    const staff = (staffRes.data ?? []) as Array<{
+      id: string
+      name: string
+      color_hex: string
+    }>
+
+    const toMinutes = (t: string): number => {
+      const [h, m] = t.split(':')
+      return parseInt(h ?? '0', 10) * 60 + parseInt(m ?? '0', 10)
+    }
+    const shiftHours = (s: { start_time: string; end_time: string }): number =>
+      (toMinutes(s.end_time) - toMinutes(s.start_time)) / 60
+
+    const total_shifts_this_week = shifts.length
+    const totalHours = shifts.reduce((sum, s) => sum + shiftHours(s), 0)
+    const avg_shift_hours =
+      shifts.length > 0 ? Math.round((totalHours / shifts.length) * 10) / 10 : 0
+
+    const by_staff = staff
+      .map((sm) => {
+        const mine = shifts.filter((s) => s.staff_id === sm.id)
+        const total = mine.reduce((sum, s) => sum + shiftHours(s), 0)
+        return {
+          id: sm.id,
+          name: sm.name,
+          color_hex: sm.color_hex,
+          shift_count: mine.length,
+          total_hours: Math.round(total * 10) / 10,
+        }
+      })
+      .sort((a, b) => b.shift_count - a.shift_count)
+
+    const busiest_staff = by_staff.find((s) => s.shift_count > 0) ?? null
+
+    res.json({
+      total_shifts_this_week,
+      avg_shift_hours,
+      busiest_staff,
+      by_staff,
+    })
+  } catch (err) {
+    console.error('[insights] staff error:', err)
+    res.status(500).json({ error: 'Failed to fetch staff insights' })
+  }
+})
+
 export default router

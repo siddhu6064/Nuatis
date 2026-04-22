@@ -22,7 +22,7 @@ interface ContactFollowUp {
   last_contact_date: string
 }
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[follow-up-missed-scanner] scanning for missed follow-ups...')
 
   try {

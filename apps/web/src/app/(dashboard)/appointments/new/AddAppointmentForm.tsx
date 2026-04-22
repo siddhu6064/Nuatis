@@ -9,8 +9,15 @@ interface Contact {
   full_name: string
 }
 
+interface StaffOption {
+  id: string
+  name: string
+  color_hex: string
+}
+
 interface Props {
   contacts: Contact[]
+  staff: StaffOption[]
 }
 
 function SubmitButton() {
@@ -26,7 +33,7 @@ function SubmitButton() {
   )
 }
 
-export default function AddAppointmentForm({ contacts }: Props) {
+export default function AddAppointmentForm({ contacts, staff }: Props) {
   return (
     <div className="max-w-lg">
       <div className="bg-white rounded-xl border border-gray-100 p-6">
@@ -96,6 +103,25 @@ export default function AddAppointmentForm({ contacts }: Props) {
               />
             </div>
           </div>
+
+          {staff.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                Assigned staff
+              </label>
+              <select
+                name="assigned_staff_id"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white text-gray-700"
+              >
+                <option value="">Any available</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>

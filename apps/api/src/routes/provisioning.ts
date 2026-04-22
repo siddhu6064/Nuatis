@@ -187,13 +187,29 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
 
+    if (authed.role !== 'owner') {
+      res.status(403).json({ error: 'Only workspace owners can upgrade to suite' })
+      return
+    }
+
     try {
       const supabase = getSupabase()
       await supabase
         .from('tenants')
         .update({
           product: 'suite',
-          modules: { maya: true, crm: true, revenue_ops: true, cpq: true, insights: true },
+          modules: {
+            maya: true,
+            crm: true,
+            revenue_ops: true,
+            cpq: true,
+            insights: true,
+            appointments: true,
+            pipeline: true,
+            automation: true,
+            companies: true,
+            deals: true,
+          },
         })
         .eq('id', authed.tenantId)
 

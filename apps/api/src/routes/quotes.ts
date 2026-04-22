@@ -130,7 +130,7 @@ router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Pr
 })
 
 // ── GET /api/quotes/:id ──────────────────────────────────────────────────────
-router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
 
@@ -286,7 +286,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
 })
 
 // ── PUT /api/quotes/:id ──────────────────────────────────────────────────────
-router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
 
@@ -381,255 +381,272 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 })
 
 // ── DELETE /api/quotes/:id ───────────────────────────────────────────────────
-router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.delete(
+  '/:id',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { error } = await supabase
-    .from('quotes')
-    .delete()
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .eq('status', 'draft')
+    const { error } = await supabase
+      .from('quotes')
+      .delete()
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'draft')
 
-  if (error) {
-    res.status(500).json({ error: error.message })
-    return
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+    res.json({ deleted: true })
   }
-  res.json({ deleted: true })
-})
+)
 
 // ── POST /api/quotes/:id/send ────────────────────────────────────────────────
-router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/send',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('*, contacts(full_name, phone, email)')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
-
-  if (!quote) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
-  }
-
-  // Block sending if approval is pending or rejected
-  if (quote.approval_status === 'pending') {
-    const cpq = await getCpqSettings(supabase, authed.tenantId)
-    res.status(403).json({
-      error: `Quote requires approval before sending. Discount of ${quote.discount_pct}% exceeds the ${cpq.require_approval_above}% approval threshold.`,
-    })
-    return
-  }
-  if (quote.approval_status === 'rejected') {
-    res.status(403).json({ error: 'Quote was rejected. Revise the discount and resubmit.' })
-    return
-  }
-
-  // Snapshot deposit settings
-  const cpqForDeposit = await getCpqSettings(supabase, authed.tenantId)
-  const sendUpdate: Record<string, unknown> = {
-    status: 'sent',
-    sent_at: new Date().toISOString(),
-  }
-  if (cpqForDeposit.deposit_pct > 0) {
-    const quoteTotal = Number(quote.total)
-    const depAmount = Math.round(((quoteTotal * cpqForDeposit.deposit_pct) / 100) * 100) / 100
-    const remaining = Math.round((quoteTotal - depAmount) * 100) / 100
-    sendUpdate['deposit_pct'] = cpqForDeposit.deposit_pct
-    sendUpdate['deposit_amount'] = depAmount
-    sendUpdate['remaining_balance'] = remaining
-  }
-
-  await supabase.from('quotes').update(sendUpdate).eq('id', quote.id)
-
-  const shareUrl = `${API_BASE_URL}/quotes/view/${quote.share_token}`
-  const contact = quote.contacts as { full_name?: string; phone?: string; email?: string } | null
-  const contactName = contact?.full_name ?? 'Customer'
-
-  // Get business name
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('name')
-    .eq('id', authed.tenantId)
-    .single()
-  const businessName = tenant?.name ?? ''
-
-  // SMS
-  if (contact?.phone) {
-    const { data: location } = await supabase
-      .from('locations')
-      .select('telnyx_number')
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('*, contacts(full_name, phone, email)')
+      .eq('id', req.params['id'])
       .eq('tenant_id', authed.tenantId)
-      .eq('is_primary', true)
-      .maybeSingle()
+      .single()
 
-    const apiKey = process.env['TELNYX_API_KEY']
-    if (location?.telnyx_number && apiKey) {
-      const validDate = quote.valid_until
-        ? new Date(quote.valid_until).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-          })
-        : ''
-      void fetch('https://api.telnyx.com/v2/messages', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: location.telnyx_number,
-          to: contact.phone,
-          text: `You've received a quote from ${businessName}. View and accept: ${shareUrl}${validDate ? `. Valid until ${validDate}` : ''}${contact?.email ? '. A copy was also sent to your email.' : ''}.`,
-        }),
-      }).catch((err) => console.error('[quotes] SMS send error:', err))
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
     }
-  }
 
-  // Email with PDF attachment
-  if (contact?.email) {
-    void (async () => {
-      try {
-        const pdfResult = await buildPdfForQuote(supabase, quote.id)
-        await sendEmail({
-          to: contact!.email!,
-          subject: `Quote ${quote.quote_number} from ${businessName}`,
-          html: quoteEmailHtml({
-            contactName,
-            businessName,
-            quoteNumber: quote.quote_number,
-            quoteTotal: `$${Number(quote.total).toFixed(2)}`,
-            quoteUrl: shareUrl,
-            validUntil: quote.valid_until
-              ? new Date(quote.valid_until).toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
-              : '',
+    // Block sending if approval is pending or rejected
+    if (quote.approval_status === 'pending') {
+      const cpq = await getCpqSettings(supabase, authed.tenantId)
+      res.status(403).json({
+        error: `Quote requires approval before sending. Discount of ${quote.discount_pct}% exceeds the ${cpq.require_approval_above}% approval threshold.`,
+      })
+      return
+    }
+    if (quote.approval_status === 'rejected') {
+      res.status(403).json({ error: 'Quote was rejected. Revise the discount and resubmit.' })
+      return
+    }
+
+    // Snapshot deposit settings
+    const cpqForDeposit = await getCpqSettings(supabase, authed.tenantId)
+    const sendUpdate: Record<string, unknown> = {
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+    }
+    if (cpqForDeposit.deposit_pct > 0) {
+      const quoteTotal = Number(quote.total)
+      const depAmount = Math.round(((quoteTotal * cpqForDeposit.deposit_pct) / 100) * 100) / 100
+      const remaining = Math.round((quoteTotal - depAmount) * 100) / 100
+      sendUpdate['deposit_pct'] = cpqForDeposit.deposit_pct
+      sendUpdate['deposit_amount'] = depAmount
+      sendUpdate['remaining_balance'] = remaining
+    }
+
+    await supabase.from('quotes').update(sendUpdate).eq('id', quote.id)
+
+    const shareUrl = `${API_BASE_URL}/quotes/view/${quote.share_token}`
+    const contact = quote.contacts as { full_name?: string; phone?: string; email?: string } | null
+    const contactName = contact?.full_name ?? 'Customer'
+
+    // Get business name
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('name')
+      .eq('id', authed.tenantId)
+      .single()
+    const businessName = tenant?.name ?? ''
+
+    // SMS
+    if (contact?.phone) {
+      const { data: location } = await supabase
+        .from('locations')
+        .select('telnyx_number')
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_primary', true)
+        .maybeSingle()
+
+      const apiKey = process.env['TELNYX_API_KEY']
+      if (location?.telnyx_number && apiKey) {
+        const validDate = quote.valid_until
+          ? new Date(quote.valid_until).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })
+          : ''
+        void fetch('https://api.telnyx.com/v2/messages', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: location.telnyx_number,
+            to: contact.phone,
+            text: `You've received a quote from ${businessName}. View and accept: ${shareUrl}${validDate ? `. Valid until ${validDate}` : ''}${contact?.email ? '. A copy was also sent to your email.' : ''}.`,
           }),
-          attachments: pdfResult
-            ? [{ filename: pdfResult.filename, content: pdfResult.buffer }]
-            : undefined,
-        })
-      } catch (err) {
-        console.error('[quotes] email+pdf error:', err)
+        }).catch((err) => console.error('[quotes] SMS send error:', err))
       }
-    })()
-  }
-
-  void dispatchWebhook(authed.tenantId, 'quote.sent', {
-    quote_id: quote.id,
-    quote_number: quote.quote_number,
-    contact_id: quote.contact_id,
-  })
-
-  // Enqueue 48h follow-up job for unopened quotes
-  if (contact?.phone) {
-    try {
-      const queue = getFollowupQueue()
-      const job = await queue.add(
-        'unopened-followup',
-        {
-          quoteId: quote.id,
-          tenantId: authed.tenantId,
-          contactPhone: contact.phone,
-          contactName: contactName,
-          quoteNumber: quote.quote_number,
-          shareToken: quote.share_token,
-        },
-        {
-          delay: 48 * 60 * 60 * 1000, // 48 hours
-          removeOnComplete: true,
-          removeOnFail: true,
-        }
-      )
-      await supabase.from('quotes').update({ followup_job_id: job.id }).eq('id', quote.id)
-      console.info(`[quotes] enqueued 48h follow-up job=${job.id} for quote=${quote.quote_number}`)
-    } catch (err) {
-      console.error('[quotes] failed to enqueue follow-up job:', err)
     }
+
+    // Email with PDF attachment
+    if (contact?.email) {
+      void (async () => {
+        try {
+          const pdfResult = await buildPdfForQuote(supabase, quote.id)
+          await sendEmail({
+            to: contact!.email!,
+            subject: `Quote ${quote.quote_number} from ${businessName}`,
+            html: quoteEmailHtml({
+              contactName,
+              businessName,
+              quoteNumber: quote.quote_number,
+              quoteTotal: `$${Number(quote.total).toFixed(2)}`,
+              quoteUrl: shareUrl,
+              validUntil: quote.valid_until
+                ? new Date(quote.valid_until).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })
+                : '',
+            }),
+            attachments: pdfResult
+              ? [{ filename: pdfResult.filename, content: pdfResult.buffer }]
+              : undefined,
+          })
+        } catch (err) {
+          console.error('[quotes] email+pdf error:', err)
+        }
+      })()
+    }
+
+    void dispatchWebhook(authed.tenantId, 'quote.sent', {
+      quote_id: quote.id,
+      quote_number: quote.quote_number,
+      contact_id: quote.contact_id,
+    })
+
+    // Enqueue 48h follow-up job for unopened quotes
+    if (contact?.phone) {
+      try {
+        const queue = getFollowupQueue()
+        const job = await queue.add(
+          'unopened-followup',
+          {
+            quoteId: quote.id,
+            tenantId: authed.tenantId,
+            contactPhone: contact.phone,
+            contactName: contactName,
+            quoteNumber: quote.quote_number,
+            shareToken: quote.share_token,
+          },
+          {
+            delay: 48 * 60 * 60 * 1000, // 48 hours
+            removeOnComplete: true,
+            removeOnFail: true,
+          }
+        )
+        await supabase.from('quotes').update({ followup_job_id: job.id }).eq('id', quote.id)
+        console.info(
+          `[quotes] enqueued 48h follow-up job=${job.id} for quote=${quote.quote_number}`
+        )
+      } catch (err) {
+        console.error('[quotes] failed to enqueue follow-up job:', err)
+      }
+    }
+
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: quote.contact_id ?? undefined,
+      type: 'quote',
+      body: `Quote sent: "${quote.title}" — $${Number(quote.total).toFixed(2)}`,
+      metadata: { quote_id: quote.id, status: 'sent' },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+
+    res.json({ sent: true, share_url: shareUrl })
   }
-
-  void logActivity({
-    tenantId: authed.tenantId,
-    contactId: quote.contact_id ?? undefined,
-    type: 'quote',
-    body: `Quote sent: "${quote.title}" — $${Number(quote.total).toFixed(2)}`,
-    metadata: { quote_id: quote.id, status: 'sent' },
-    actorType: 'user',
-    actorId: authed.userId,
-  })
-
-  res.json({ sent: true, share_url: shareUrl })
-})
+)
 
 // ── POST /api/quotes/:id/duplicate ───────────────────────────────────────────
-router.post('/:id/duplicate', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/duplicate',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: original } = await supabase
-    .from('quotes')
-    .select('*')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    const { data: original } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (!original) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
+    if (!original) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    const quoteNumber = await nextQuoteNumber(supabase, authed.tenantId)
+
+    const { data: newQuote, error } = await supabase
+      .from('quotes')
+      .insert({
+        tenant_id: authed.tenantId,
+        contact_id: original.contact_id,
+        quote_number: quoteNumber,
+        title: original.title,
+        status: 'draft',
+        subtotal: original.subtotal,
+        tax_rate: original.tax_rate,
+        tax_amount: original.tax_amount,
+        total: original.total,
+        notes: original.notes,
+        valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
+        share_token: randomUUID(),
+        created_by: authed.userId,
+      })
+      .select('*')
+      .single()
+
+    if (error || !newQuote) {
+      res.status(500).json({ error: 'Failed to duplicate' })
+      return
+    }
+
+    // Copy line items
+    const { data: items } = await supabase
+      .from('quote_line_items')
+      .select('*')
+      .eq('quote_id', original.id)
+    if (items && items.length > 0) {
+      await supabase.from('quote_line_items').insert(
+        items.map((i) => ({
+          quote_id: newQuote.id,
+          service_id: i.service_id,
+          description: i.description,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          total: i.total,
+          sort_order: i.sort_order,
+        }))
+      )
+    }
+
+    res.status(201).json(newQuote)
   }
-
-  const quoteNumber = await nextQuoteNumber(supabase, authed.tenantId)
-
-  const { data: newQuote, error } = await supabase
-    .from('quotes')
-    .insert({
-      tenant_id: authed.tenantId,
-      contact_id: original.contact_id,
-      quote_number: quoteNumber,
-      title: original.title,
-      status: 'draft',
-      subtotal: original.subtotal,
-      tax_rate: original.tax_rate,
-      tax_amount: original.tax_amount,
-      total: original.total,
-      notes: original.notes,
-      valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
-      share_token: randomUUID(),
-      created_by: authed.userId,
-    })
-    .select('*')
-    .single()
-
-  if (error || !newQuote) {
-    res.status(500).json({ error: 'Failed to duplicate' })
-    return
-  }
-
-  // Copy line items
-  const { data: items } = await supabase
-    .from('quote_line_items')
-    .select('*')
-    .eq('quote_id', original.id)
-  if (items && items.length > 0) {
-    await supabase.from('quote_line_items').insert(
-      items.map((i) => ({
-        quote_id: newQuote.id,
-        service_id: i.service_id,
-        description: i.description,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        total: i.total,
-        sort_order: i.sort_order,
-      }))
-    )
-  }
-
-  res.status(201).json(newQuote)
-})
+)
 
 // ── PDF helper ───────────────────────────────────────────────────────────────
 
@@ -704,33 +721,38 @@ async function buildPdfForQuote(
 }
 
 // ── GET /api/quotes/:id/pdf ──────────────────────────────────────────────────
-router.get('/:id/pdf', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.get(
+  '/:id/pdf',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  // Verify ownership
-  const { data: check } = await supabase
-    .from('quotes')
-    .select('id')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    // Verify ownership
+    const { data: check } = await supabase
+      .from('quotes')
+      .select('id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (!check) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
+    if (!check) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    const result = await buildPdfForQuote(supabase, req.params['id']!)
+    if (!result) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
+    res.send(result.buffer)
   }
-
-  const result = await buildPdfForQuote(supabase, req.params['id']!)
-  if (!result) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
-  }
-
-  res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
-  res.send(result.buffer)
-})
+)
 
 // ── PUBLIC: GET /api/quotes/view/:token ──────────────────────────────────────
 router.get('/view/:token', async (req: Request, res: Response): Promise<void> => {
@@ -945,6 +967,74 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
     maybeAdvanceLifecycle(quote.tenant_id, quote.contact_id, 'opportunity')
   }
 
+  // Inventory auto-deduct (P11): decrement linked inventory items when quote accepted.
+  // Wrapped in try/catch so any failure never blocks the quote acceptance response.
+  try {
+    const { data: tenantRow } = await supabase
+      .from('tenants')
+      .select('settings')
+      .eq('id', quote.tenant_id)
+      .single()
+
+    const settings = (tenantRow?.settings as Record<string, unknown> | null) ?? {}
+    if (settings['inventory_auto_deduct'] === true) {
+      const { data: lineItems } = await supabase
+        .from('quote_line_items')
+        .select('inventory_item_id, quantity')
+        .eq('quote_id', quote.id)
+        .not('inventory_item_id', 'is', null)
+
+      for (const li of lineItems ?? []) {
+        const itemId = li['inventory_item_id'] as string | null
+        const lineQty = Number(li['quantity'] ?? 0)
+        if (!itemId || lineQty <= 0) continue
+
+        const { data: item } = await supabase
+          .from('inventory_items')
+          .select('id, name, quantity')
+          .eq('id', itemId)
+          .eq('tenant_id', quote.tenant_id)
+          .is('deleted_at', null)
+          .single()
+
+        if (!item) continue
+
+        const currentQty = Number(item.quantity ?? 0)
+        const newQty = Math.max(0, currentQty - lineQty)
+        const clamped = currentQty - lineQty < 0
+
+        await supabase
+          .from('inventory_items')
+          .update({ quantity: newQty, updated_at: new Date().toISOString() })
+          .eq('id', item.id)
+          .eq('tenant_id', quote.tenant_id)
+
+        void logActivity({
+          tenantId: quote.tenant_id,
+          type: 'inventory_adjust',
+          body: `Inventory deducted: -${lineQty} ${item.name} (Quote #${quote.quote_number} accepted)`,
+          metadata: {
+            item_id: item.id,
+            item_name: item.name,
+            delta: -lineQty,
+            new_quantity: newQty,
+            quote_id: quote.id,
+            clamped,
+          },
+          actorType: 'ai',
+        })
+      }
+    }
+  } catch (err) {
+    console.error('[quotes] inventory auto-deduct failed:', err)
+    try {
+      const { Sentry } = await import('../lib/sentry.js')
+      if (err instanceof Error) Sentry.captureException(err)
+    } catch {
+      // sentry import failure — already logged above
+    }
+  }
+
   res.json({ accepted: true })
 })
 
@@ -1026,245 +1116,261 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
 })
 
 // ── POST /api/quotes/:id/approve ─────────────────────────────────────────────
-router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/approve',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('id, quote_number, approval_status, discount_pct, created_by')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, quote_number, approval_status, discount_pct, created_by')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (!quote) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
-  }
-  if (quote.approval_status !== 'pending') {
-    res.status(400).json({ error: 'Quote is not pending approval' })
-    return
-  }
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+    if (quote.approval_status !== 'pending') {
+      res.status(400).json({ error: 'Quote is not pending approval' })
+      return
+    }
 
-  const note = typeof req.body?.note === 'string' ? req.body.note : null
+    const note = typeof req.body?.note === 'string' ? req.body.note : null
 
-  await supabase
-    .from('quotes')
-    .update({
-      approval_status: 'approved',
-      approved_by: authed.userId,
-      approved_at: new Date().toISOString(),
-      approval_note: note,
+    await supabase
+      .from('quotes')
+      .update({
+        approval_status: 'approved',
+        approved_by: authed.userId,
+        approved_at: new Date().toISOString(),
+        approval_note: note,
+      })
+      .eq('id', quote.id)
+
+    void sendPushNotification(authed.tenantId, {
+      title: 'Quote Approved',
+      body: `Quote ${quote.quote_number} has been approved. You can now send it.`,
+      url: `/quotes/${quote.id}`,
     })
-    .eq('id', quote.id)
 
-  void sendPushNotification(authed.tenantId, {
-    title: 'Quote Approved',
-    body: `Quote ${quote.quote_number} has been approved. You can now send it.`,
-    url: `/quotes/${quote.id}`,
-  })
+    void logAuditEvent({
+      tenantId: authed.tenantId,
+      action: 'quote_approved',
+      resourceType: 'quotes',
+      resourceId: quote.id,
+      details: { discount_pct: quote.discount_pct, note },
+    })
 
-  void logAuditEvent({
-    tenantId: authed.tenantId,
-    action: 'quote_approved',
-    resourceType: 'quotes',
-    resourceId: quote.id,
-    details: { discount_pct: quote.discount_pct, note },
-  })
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: undefined,
+      type: 'quote',
+      body: 'Quote approved by owner',
+      metadata: { quote_id: quote.id, status: 'approved', note },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
 
-  void logActivity({
-    tenantId: authed.tenantId,
-    contactId: undefined,
-    type: 'quote',
-    body: 'Quote approved by owner',
-    metadata: { quote_id: quote.id, status: 'approved', note },
-    actorType: 'user',
-    actorId: authed.userId,
-  })
-
-  res.json({ approved: true, quote_number: quote.quote_number })
-})
+    res.json({ approved: true, quote_number: quote.quote_number })
+  }
+)
 
 // ── POST /api/quotes/:id/reject ─────────────────────────────────────────────
-router.post('/:id/reject', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/reject',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('id, quote_number, approval_status, discount_pct')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, quote_number, approval_status, discount_pct')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (!quote) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+    if (quote.approval_status !== 'pending') {
+      res.status(400).json({ error: 'Quote is not pending approval' })
+      return
+    }
+
+    const note = typeof req.body?.note === 'string' ? req.body.note : null
+
+    await supabase
+      .from('quotes')
+      .update({ approval_status: 'rejected', approval_note: note })
+      .eq('id', quote.id)
+
+    void sendPushNotification(authed.tenantId, {
+      title: 'Quote Rejected',
+      body: `Quote ${quote.quote_number} was rejected: ${note || 'No reason given'}`,
+      url: `/quotes/${quote.id}`,
+    })
+
+    void logAuditEvent({
+      tenantId: authed.tenantId,
+      action: 'quote_rejected',
+      resourceType: 'quotes',
+      resourceId: quote.id,
+      details: { discount_pct: quote.discount_pct, note },
+    })
+
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: undefined,
+      type: 'quote',
+      body: `Quote rejected: "${quote.quote_number}"${note ? ` — ${note}` : ''}`,
+      metadata: { quote_id: quote.id, status: 'rejected', note },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+
+    res.json({ rejected: true, quote_number: quote.quote_number })
   }
-  if (quote.approval_status !== 'pending') {
-    res.status(400).json({ error: 'Quote is not pending approval' })
-    return
-  }
-
-  const note = typeof req.body?.note === 'string' ? req.body.note : null
-
-  await supabase
-    .from('quotes')
-    .update({ approval_status: 'rejected', approval_note: note })
-    .eq('id', quote.id)
-
-  void sendPushNotification(authed.tenantId, {
-    title: 'Quote Rejected',
-    body: `Quote ${quote.quote_number} was rejected: ${note || 'No reason given'}`,
-    url: `/quotes/${quote.id}`,
-  })
-
-  void logAuditEvent({
-    tenantId: authed.tenantId,
-    action: 'quote_rejected',
-    resourceType: 'quotes',
-    resourceId: quote.id,
-    details: { discount_pct: quote.discount_pct, note },
-  })
-
-  void logActivity({
-    tenantId: authed.tenantId,
-    contactId: undefined,
-    type: 'quote',
-    body: `Quote rejected: "${quote.quote_number}"${note ? ` — ${note}` : ''}`,
-    metadata: { quote_id: quote.id, status: 'rejected', note },
-    actorType: 'user',
-    actorId: authed.userId,
-  })
-
-  res.json({ rejected: true, quote_number: quote.quote_number })
-})
+)
 
 // ── POST /api/quotes/:id/add-package ────────────────────────────────────────
-router.post('/:id/add-package', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
-  const packageId = typeof req.body?.package_id === 'string' ? req.body.package_id : null
+router.post(
+  '/:id/add-package',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const packageId = typeof req.body?.package_id === 'string' ? req.body.package_id : null
 
-  if (!packageId) {
-    res.status(400).json({ error: 'package_id is required' })
-    return
+    if (!packageId) {
+      res.status(400).json({ error: 'package_id is required' })
+      return
+    }
+
+    // Verify quote belongs to tenant
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, tenant_id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    // Verify package belongs to same tenant
+    const { data: pkg } = await supabase
+      .from('service_packages')
+      .select('id, name, items, bundle_price')
+      .eq('id', packageId)
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_active', true)
+      .single()
+
+    if (!pkg) {
+      res.status(404).json({ error: 'Package not found' })
+      return
+    }
+
+    const pkgItems = pkg.items as Array<{ service_id: string; qty: number }>
+
+    // Resolve service records
+    const serviceIds = pkgItems.map((i) => i.service_id)
+    const { data: services } = await supabase
+      .from('services')
+      .select('id, name, unit_price')
+      .in('id', serviceIds)
+
+    const serviceMap = new Map(
+      (services ?? []).map((s) => [
+        s.id,
+        { name: s.name as string, unit_price: Number(s.unit_price) },
+      ])
+    )
+
+    // Get current max sort_order
+    const { data: existingItems } = await supabase
+      .from('quote_line_items')
+      .select('sort_order')
+      .eq('quote_id', quote.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+    const maxSort = existingItems?.[0]?.sort_order ?? -1
+
+    // Build line item rows for each package service
+    let listPriceTotal = 0
+    const rows: Array<Record<string, unknown>> = []
+    let sortIdx = maxSort + 1
+
+    for (const item of pkgItems) {
+      const svc = serviceMap.get(item.service_id)
+      if (!svc) continue
+      const lineTotal = Number((item.qty * svc.unit_price).toFixed(2))
+      listPriceTotal += lineTotal
+      rows.push({
+        quote_id: quote.id,
+        service_id: item.service_id,
+        package_id: packageId,
+        description: svc.name,
+        quantity: item.qty,
+        unit_price: svc.unit_price,
+        total: lineTotal,
+        sort_order: sortIdx++,
+      })
+    }
+
+    // Add the discount row (negative amount)
+    const savings = Number((listPriceTotal - Number(pkg.bundle_price)).toFixed(2))
+    if (savings > 0) {
+      rows.push({
+        quote_id: quote.id,
+        service_id: null,
+        package_id: packageId,
+        description: `${pkg.name} — Bundle Savings`,
+        quantity: 1,
+        unit_price: -savings,
+        total: -savings,
+        sort_order: sortIdx,
+      })
+    }
+
+    const { error: insertErr } = await supabase.from('quote_line_items').insert(rows)
+    if (insertErr) {
+      res.status(500).json({ error: insertErr.message })
+      return
+    }
+
+    // Return updated quote with all line items
+    const { data: updatedQuote } = await supabase
+      .from('quotes')
+      .select('*, contacts(full_name, phone, email)')
+      .eq('id', quote.id)
+      .single()
+    const { data: allItems } = await supabase
+      .from('quote_line_items')
+      .select('*')
+      .eq('quote_id', quote.id)
+      .order('sort_order', { ascending: true })
+
+    res.json({ ...updatedQuote, line_items: allItems ?? [] })
   }
-
-  // Verify quote belongs to tenant
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('id, tenant_id')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
-
-  if (!quote) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
-  }
-
-  // Verify package belongs to same tenant
-  const { data: pkg } = await supabase
-    .from('service_packages')
-    .select('id, name, items, bundle_price')
-    .eq('id', packageId)
-    .eq('tenant_id', authed.tenantId)
-    .eq('is_active', true)
-    .single()
-
-  if (!pkg) {
-    res.status(404).json({ error: 'Package not found' })
-    return
-  }
-
-  const pkgItems = pkg.items as Array<{ service_id: string; qty: number }>
-
-  // Resolve service records
-  const serviceIds = pkgItems.map((i) => i.service_id)
-  const { data: services } = await supabase
-    .from('services')
-    .select('id, name, unit_price')
-    .in('id', serviceIds)
-
-  const serviceMap = new Map(
-    (services ?? []).map((s) => [
-      s.id,
-      { name: s.name as string, unit_price: Number(s.unit_price) },
-    ])
-  )
-
-  // Get current max sort_order
-  const { data: existingItems } = await supabase
-    .from('quote_line_items')
-    .select('sort_order')
-    .eq('quote_id', quote.id)
-    .order('sort_order', { ascending: false })
-    .limit(1)
-  const maxSort = existingItems?.[0]?.sort_order ?? -1
-
-  // Build line item rows for each package service
-  let listPriceTotal = 0
-  const rows: Array<Record<string, unknown>> = []
-  let sortIdx = maxSort + 1
-
-  for (const item of pkgItems) {
-    const svc = serviceMap.get(item.service_id)
-    if (!svc) continue
-    const lineTotal = Number((item.qty * svc.unit_price).toFixed(2))
-    listPriceTotal += lineTotal
-    rows.push({
-      quote_id: quote.id,
-      service_id: item.service_id,
-      package_id: packageId,
-      description: svc.name,
-      quantity: item.qty,
-      unit_price: svc.unit_price,
-      total: lineTotal,
-      sort_order: sortIdx++,
-    })
-  }
-
-  // Add the discount row (negative amount)
-  const savings = Number((listPriceTotal - Number(pkg.bundle_price)).toFixed(2))
-  if (savings > 0) {
-    rows.push({
-      quote_id: quote.id,
-      service_id: null,
-      package_id: packageId,
-      description: `${pkg.name} — Bundle Savings`,
-      quantity: 1,
-      unit_price: -savings,
-      total: -savings,
-      sort_order: sortIdx,
-    })
-  }
-
-  const { error: insertErr } = await supabase.from('quote_line_items').insert(rows)
-  if (insertErr) {
-    res.status(500).json({ error: insertErr.message })
-    return
-  }
-
-  // Return updated quote with all line items
-  const { data: updatedQuote } = await supabase
-    .from('quotes')
-    .select('*, contacts(full_name, phone, email)')
-    .eq('id', quote.id)
-    .single()
-  const { data: allItems } = await supabase
-    .from('quote_line_items')
-    .select('*')
-    .eq('quote_id', quote.id)
-    .order('sort_order', { ascending: true })
-
-  res.json({ ...updatedQuote, line_items: allItems ?? [] })
-})
+)
 
 // ── DELETE /api/quotes/:quoteId/items/:itemId ───────────────────────────────
 router.delete(
   '/:quoteId/items/:itemId',
   requireAuth,
+  requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getSupabase()

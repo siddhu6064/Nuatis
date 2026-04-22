@@ -17,6 +17,7 @@ interface Appointment {
   end_time: string
   status: AppointmentStatus
   contacts: { full_name: string } | null
+  staff_members: { id: string; name: string; color_hex: string } | null
 }
 
 const STATUS_STYLE: Record<AppointmentStatus, string> = {
@@ -57,7 +58,9 @@ export default async function AppointmentsPage() {
   const supabase = createAdminClient()
   const { data: appointments } = await supabase
     .from('appointments')
-    .select('id, title, start_time, end_time, status, contacts(full_name)')
+    .select(
+      'id, title, start_time, end_time, status, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
+    )
     .eq('tenant_id', tenantId)
     .gte('start_time', today.toISOString())
     .lt('start_time', tomorrow.toISOString())
@@ -127,9 +130,20 @@ export default async function AppointmentsPage() {
                           {appt.contacts?.full_name?.charAt(0)?.toUpperCase() ?? '?'}
                         </span>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {appt.contacts?.full_name ?? '—'}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-gray-900 block">
+                          {appt.contacts?.full_name ?? '—'}
+                        </span>
+                        {appt.staff_members && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 text-xs text-gray-500">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full"
+                              style={{ backgroundColor: appt.staff_members.color_hex }}
+                            />
+                            {appt.staff_members.name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{appt.title}</td>

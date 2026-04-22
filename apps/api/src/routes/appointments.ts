@@ -25,6 +25,7 @@ const CreateAppointmentSchema = z.object({
   end_time: z.string().datetime(),
   location_id: z.string().uuid().optional(),
   assigned_user_id: z.string().uuid().optional(),
+  assigned_staff_id: z.string().uuid().nullable().optional(),
 })
 
 const UpdateAppointmentSchema = z.object({
@@ -35,6 +36,7 @@ const UpdateAppointmentSchema = z.object({
   status: z
     .enum(['scheduled', 'confirmed', 'completed', 'no_show', 'canceled', 'rescheduled'])
     .optional(),
+  assigned_staff_id: z.string().uuid().nullable().optional(),
 })
 
 // ── GET /api/appointments ─────────────────────────────────────
@@ -49,7 +51,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, contacts(full_name, phone, email)')
+    .select(
+      '*, contacts(full_name, phone, email), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
+    )
     .eq('tenant_id', authed.tenantId)
     .order('start_time', { ascending: true })
 
@@ -74,8 +78,16 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   }
 
   const supabase = getSupabase()
-  const { contact_id, title, description, start_time, end_time, location_id, assigned_user_id } =
-    parsed.data
+  const {
+    contact_id,
+    title,
+    description,
+    start_time,
+    end_time,
+    location_id,
+    assigned_user_id,
+    assigned_staff_id,
+  } = parsed.data
 
   // Get location + refresh token for Google Calendar sync
   const { data: location } = await supabase
@@ -125,6 +137,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       end_time,
       location_id: location_id ?? null,
       assigned_user_id: assigned_user_id ?? null,
+      assigned_staff_id: assigned_staff_id ?? null,
       google_event_id: googleEventId,
       status: 'scheduled',
     })

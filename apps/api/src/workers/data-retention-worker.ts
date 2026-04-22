@@ -2,6 +2,19 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 
+/**
+ * HIPAA RETENTION NOTE — P11 addition (April 2026)
+ * Tables added in P11: staff_members, shifts, inventory_items
+ *
+ * staff_members + shifts: workforce records (NOT PHI), but for dental
+ * and medical tenants these must be retained for 6 years under HIPAA
+ * §164.316. Current worker covers audit_log (365d) + voice_sessions (180d).
+ * TODO before dental/medical GTM: confirm whether staff_members requires
+ * explicit 6-yr retention policy or is covered by standard HR record rules.
+ *
+ * inventory_items: not subject to HIPAA — standard 3-yr business record.
+ */
+
 const QUEUE_NAME = 'data-retention'
 
 function getSupabase() {
@@ -23,7 +36,7 @@ const RULES: RetentionRule[] = [
   { table: 'push_subscriptions', days: 90, column: 'created_at' },
 ]
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[data-retention] running retention cleanup...')
 
   try {

@@ -23,6 +23,8 @@ export default function TabLayout() {
         options={{ title: 'Appointments', tabBarLabel: 'Calendar' }}
       />
       <Tabs.Screen name="pipeline" options={{ title: 'Pipeline', tabBarLabel: 'Pipeline' }} />
+      <Tabs.Screen name="inventory" options={{ title: 'Inventory', tabBarLabel: 'Inventory' }} />
+      <Tabs.Screen name="staff" options={{ title: 'Staff', tabBarLabel: 'Staff' }} />
       <Tabs.Screen
         name="notifications"
         options={{ title: 'Notifications', tabBarLabel: 'Alerts' }}

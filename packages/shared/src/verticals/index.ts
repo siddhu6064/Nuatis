@@ -34,6 +34,8 @@ export interface FollowUpStep {
 export interface VerticalConfig {
   slug: string
   label: string
+  inventory_label: string
+  staff_label: string
   fields: VerticalField[]
   pipeline_stages: PipelineStageConfig[]
   system_prompt_template: string
@@ -58,6 +60,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   sales_crm: {
     slug: 'sales_crm',
     label: 'Sales CRM',
+    inventory_label: 'Assets',
+    staff_label: 'Team Members',
     fields: [
       { key: 'company_name', label: 'Company', type: 'text', required: true },
       { key: 'job_title', label: 'Job title', type: 'text', required: false },
@@ -142,6 +146,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   dental: {
     slug: 'dental',
     label: 'Dental practice',
+    inventory_label: 'Clinical Supplies',
+    staff_label: 'Providers & Staff',
     // NOTE: insurance_id / insurance_provider intentionally removed — those are
     // integration-layer values (eligibility check), not stored CRM fields.
     fields: [
@@ -220,6 +226,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   medical: {
     slug: 'medical',
     label: 'Medical clinic',
+    inventory_label: 'Medical Supplies',
+    staff_label: 'Providers & Staff',
     // NOTE: insurance_id intentionally excluded — eligibility is an integration
     // concern, not a stored CRM field.
     fields: [
@@ -297,6 +305,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   veterinary: {
     slug: 'veterinary',
     label: 'Veterinary clinic',
+    inventory_label: 'Medical & Veterinary Supplies',
+    staff_label: 'Veterinarians & Staff',
     fields: [
       { key: 'pet_name', label: 'Pet name', type: 'text', required: true },
       {
@@ -377,6 +387,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   salon: {
     slug: 'salon',
     label: 'Salon & spa',
+    inventory_label: 'Products',
+    staff_label: 'Stylists',
     fields: [
       { key: 'preferred_stylist', label: 'Preferred stylist', type: 'text', required: false },
       {
@@ -471,6 +483,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   restaurant: {
     slug: 'restaurant',
     label: 'Restaurant',
+    inventory_label: 'Ingredients & Stock',
+    staff_label: 'Staff',
     // NOTE: dietary_restrictions + favorite_occasions modelled as freeform text
     // pending multiselect renderer support (current UI only handles single select).
     fields: [
@@ -560,6 +574,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   contractor: {
     slug: 'contractor',
     label: 'Contractor',
+    inventory_label: 'Materials',
+    staff_label: 'Crew',
     fields: [
       {
         key: 'project_type',
@@ -656,6 +672,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   law_firm: {
     slug: 'law_firm',
     label: 'Law firm',
+    inventory_label: 'Office Supplies',
+    staff_label: 'Attorneys & Staff',
     fields: [
       {
         key: 'case_type',
@@ -755,6 +773,8 @@ export const VERTICALS: Record<string, VerticalConfig> = {
   real_estate: {
     slug: 'real_estate',
     label: 'Real estate',
+    inventory_label: 'Marketing Materials',
+    staff_label: 'Agents',
     // NOTE: property_types modelled as freeform text pending multiselect
     // renderer support (current UI only handles single select).
     fields: [

@@ -16,7 +16,7 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-async function scan(): Promise<void> {
+export async function scan(): Promise<void> {
   console.info('[no-show-scanner] scanning for no-shows...')
 
   try {

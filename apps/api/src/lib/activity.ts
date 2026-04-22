@@ -12,6 +12,8 @@ type ActivityType =
   | 'system'
   | 'lead_score'
   | 'lifecycle_change'
+  | 'inventory_adjust'
+  | 'low_stock_alert'
 
 type ActorType = 'ai' | 'user' | 'system' | 'contact'
 
