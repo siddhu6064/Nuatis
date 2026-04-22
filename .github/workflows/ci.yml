@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # apps/api and apps/web resolve @nuatis/shared to packages/shared/dist/,
+      # which doesn't exist on a fresh checkout. Build shared before any
+      # workspace runs typecheck or tests.
+      - name: Build (Shared)
+        run: npm run build --workspace=packages/shared
+
       - name: Lint
         run: npm run lint
 

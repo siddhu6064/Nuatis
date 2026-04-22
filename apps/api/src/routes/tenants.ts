@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
-import { getVertical, VERTICAL_SLUGS } from '@nuatis/shared'
+import {
+  getVertical,
+  VERTICAL_SLUGS,
+  seedInventory,
+  seedStaff,
+  type PipelineStageConfig,
+} from '@nuatis/shared'
 import { z } from 'zod'
 
 const router = Router()
@@ -165,7 +171,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   // 8. Seed pipeline stages
-  const stageInserts = vertical.pipeline_stages.map((stage) => ({
+  const stageInserts = vertical.pipeline_stages.map((stage: PipelineStageConfig) => ({
     tenant_id: tenantId,
     name: stage.name,
     position: stage.position,
@@ -176,7 +182,19 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   await supabase.from('pipeline_stages').insert(stageInserts)
 
-  // 9. Seed default automation rules
+  // 9. Seed inventory + staff (non-fatal — tenant still works without them)
+  try {
+    await seedInventory(tenantId, vertical_slug)
+  } catch (err) {
+    console.error(`[tenants] seedInventory failed for tenant ${tenantId}:`, err)
+  }
+  try {
+    await seedStaff(tenantId, vertical_slug)
+  } catch (err) {
+    console.error(`[tenants] seedStaff failed for tenant ${tenantId}:`, err)
+  }
+
+  // 10. Seed default automation rules
   await supabase.from('automation_rules').insert([
     {
       tenant_id: tenantId,

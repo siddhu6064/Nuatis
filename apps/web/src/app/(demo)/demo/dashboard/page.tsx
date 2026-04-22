@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { VerticalSwitcher } from '@/components/crm/VerticalSwitcher'
 import { VerticalFieldRenderer } from '@/components/crm/VerticalFieldRenderer'
-import { getVertical } from '@nuatis/shared'
+import { getVertical, type PipelineStageConfig } from '@nuatis/shared'
 
 // Demo seed data per vertical — shown during prospect calls
 const DEMO_DATA: Record<string, Record<string, unknown>> = {
@@ -117,7 +117,7 @@ export default function DemoDashboardPage() {
             Pipeline
           </p>
           <div className="flex gap-2 flex-wrap">
-            {vertical.pipeline_stages.map((stage, i) => (
+            {vertical.pipeline_stages.map((stage: PipelineStageConfig, i: number) => (
               <div
                 key={stage.name}
                 className={`
