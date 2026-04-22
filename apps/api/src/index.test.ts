@@ -12,7 +12,7 @@ import request from 'supertest'
 // module-load time. GET /health also performs live Supabase + Redis pings
 // whose DNS lookups can cost several seconds under parallel-worker load.
 // 30s gives enough headroom.
-jest.setTimeout(30000)
+jest.setTimeout(60000)
 
 describe('API health check', () => {
   it('GET /health returns 200 with status ok', async () => {

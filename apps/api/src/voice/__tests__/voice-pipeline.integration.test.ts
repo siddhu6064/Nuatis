@@ -32,7 +32,7 @@ import { EventEmitter } from 'events'
 // Full suite parallel load can push individual tests over the default 5s
 // timeout (WS tests include 1100ms sleeps; supertest against imported
 // index.js adds startup cost). 15s keeps headroom.
-jest.setTimeout(15000)
+jest.setTimeout(60000)
 
 // ── Module mocks (must run before dynamic imports) ───────────────────────────
 

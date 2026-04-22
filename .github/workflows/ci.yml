@@ -1,12 +1,17 @@
 name: CI
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
   pull_request:
     branches: [main]
+
 jobs:
   ci:
-    name: Lint · Typecheck · Test · Build
+    name: Lint · Typecheck · Test · Build · Coverage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,8 +20,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
         run: npm ci
@@ -27,17 +33,53 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --workspaces --if-present
 
+      # Tests use an in-memory supabase mock — dummy values are fine.
+      # AUTH_SECRET stays a real secret because JWT tests sign/verify with it.
       - name: Test
         run: npm test --workspaces --if-present
         env:
+          NODE_OPTIONS: --experimental-vm-modules
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
+          SUPABASE_URL: https://mock.supabase.co
+          SUPABASE_ANON_KEY: mock-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: mock-service-role-key
+          REDIS_URL: redis://localhost:6379
+
+      # Coverage is informational — don't fail the pipeline on a dip.
+      - name: Coverage (API)
+        continue-on-error: true
+        run: npm run test:coverage --workspace=apps/api
+        env:
+          NODE_OPTIONS: --experimental-vm-modules
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          SUPABASE_URL: https://mock.supabase.co
+          SUPABASE_ANON_KEY: mock-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: mock-service-role-key
+          REDIS_URL: redis://localhost:6379
+
+      - name: Upload coverage artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: apps/api/coverage/
+          retention-days: 14
 
       - name: Build (API)
         run: npm run build --workspace=apps/api --if-present
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # Next.js reads NEXT_PUBLIC_* at build time. Provide dummy values so the
+      # build doesn't crash when the real secrets are unavailable (e.g. fork PRs).
+      - name: Build (Web)
+        run: npm run build --workspace=apps/web --if-present
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_WEB_URL: http://localhost:3000
+          NEXT_PUBLIC_SUPABASE_URL: https://mock.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: mock-anon-key
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: mock-vapid-public-key
+          SUPABASE_SERVICE_ROLE_KEY: mock-service-role-key
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_URL: http://localhost:3000

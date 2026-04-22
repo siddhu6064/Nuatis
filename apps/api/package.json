@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests --forceExit",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --passWithNoTests --forceExit",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts"
   },
