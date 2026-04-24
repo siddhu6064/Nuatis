@@ -53,6 +53,9 @@ export async function sendExpoPush(
         'Content-Type': 'application/json',
         Accept: 'application/json',
         'Accept-encoding': 'gzip, deflate',
+        ...(process.env['EXPO_PUSH_ACCESS_TOKEN']
+          ? { Authorization: `Bearer ${process.env['EXPO_PUSH_ACCESS_TOKEN']}` }
+          : {}),
       },
       body: JSON.stringify(messages),
     })
@@ -115,6 +118,9 @@ export async function sendExpoPushToTenant(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(process.env['EXPO_PUSH_ACCESS_TOKEN']
+          ? { Authorization: `Bearer ${process.env['EXPO_PUSH_ACCESS_TOKEN']}` }
+          : {}),
       },
       body: JSON.stringify(messages),
     })
