@@ -79,8 +79,16 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
   const activeParam = typeof req.query['active'] === 'string' ? req.query['active'] : 'true'
   let query = supabase.from('staff_members').select('*').eq('tenant_id', authed.tenantId)
 
-  if (authed.vertical) {
-    query = query.or(`vertical.eq.${authed.vertical},vertical.is.null`)
+  const { data: tenantRow } = await supabase
+    .from('tenants')
+    .select('vertical')
+    .eq('id', authed.tenantId)
+    .single()
+
+  const currentVertical = tenantRow?.vertical as string | null | undefined
+
+  if (currentVertical) {
+    query = query.or(`vertical.eq.${currentVertical},vertical.is.null`)
   }
 
   if (activeParam !== 'all') {

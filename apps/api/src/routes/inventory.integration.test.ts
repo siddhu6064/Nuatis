@@ -78,8 +78,10 @@ describe('POST /api/inventory', () => {
 })
 
 describe('GET /api/inventory — vertical filtering', () => {
-  it('returns only items matching the JWT vertical or items with no vertical set', async () => {
-    const token = await makeToken() // vertical: 'dental'
+  it('returns only items matching the tenant vertical or items with no vertical set', async () => {
+    const token = await makeToken()
+    // Tenant vertical drives the filter, not the JWT
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { crm: true }, vertical: 'dental' }]
     store.tables['inventory_items'] = [
       {
         id: 'inv-dental',
@@ -121,13 +123,14 @@ describe('GET /api/inventory — vertical filtering', () => {
     expect(ids).not.toContain('inv-salon')
   })
 
-  it('returns all items when no vertical in JWT', async () => {
+  it('returns all items when tenant has no vertical set', async () => {
     const secretBytes = new TextEncoder().encode(SECRET)
     const noVerticalToken = await new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('1h')
       .sign(secretBytes)
+    // tenant row has no vertical — beforeEach seeds it without one
 
     store.tables['inventory_items'] = [
       {

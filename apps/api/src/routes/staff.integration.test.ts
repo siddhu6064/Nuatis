@@ -87,8 +87,10 @@ describe('POST /api/staff', () => {
 })
 
 describe('GET /api/staff — vertical filtering', () => {
-  it('returns only staff matching the JWT vertical or staff with no vertical set', async () => {
-    const token = await makeToken() // vertical: 'dental'
+  it('returns only staff matching the tenant vertical or staff with no vertical set', async () => {
+    const token = await makeToken()
+    // Tenant vertical drives the filter, not the JWT
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { crm: true }, vertical: 'dental' }]
     store.tables['staff_members'] = [
       {
         id: 'staff-dental',
@@ -125,13 +127,14 @@ describe('GET /api/staff — vertical filtering', () => {
     expect(ids).not.toContain('staff-salon')
   })
 
-  it('returns all staff when no vertical in JWT', async () => {
+  it('returns all staff when tenant has no vertical set', async () => {
     const secretBytes = new TextEncoder().encode(SECRET)
     const noVerticalToken = await new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('1h')
       .sign(secretBytes)
+    // tenant row has no vertical — beforeEach seeds it without one
 
     store.tables['staff_members'] = [
       {
