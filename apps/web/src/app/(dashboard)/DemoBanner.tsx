@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-const DEMO_TENANT_ID = '0d9a00b9-ce40-4702-a99c-ed23f11fdb08'
+const DEMO_TENANT_IDS = [
+  '0d9a00b9-ce40-4702-a99c-ed23f11fdb08', // old demo
+  '018323e5-4866-486e-bc90-15cfeb910fc4', // new demo
+]
 
 const VERTICALS = [
   { slug: 'sales_crm', label: 'Sales CRM', icon: '📊' },
@@ -31,7 +34,7 @@ export default function DemoBanner() {
     fetch('/api/auth/session')
       .then((r) => r.json())
       .then((session: { user?: { tenantId?: string; vertical?: string } }) => {
-        if (session?.user?.tenantId === DEMO_TENANT_ID) {
+        if (session?.user?.tenantId && DEMO_TENANT_IDS.includes(session.user.tenantId)) {
           setInfo({
             tenantId: session.user.tenantId,
             vertical: session.user.vertical ?? 'sales_crm',

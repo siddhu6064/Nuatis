@@ -4,7 +4,10 @@ import { VERTICALS } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-const DEMO_TENANT_ID = '0d9a00b9-ce40-4702-a99c-ed23f11fdb08'
+const DEMO_TENANT_IDS = [
+  '0d9a00b9-ce40-4702-a99c-ed23f11fdb08', // old demo
+  '018323e5-4866-486e-bc90-15cfeb910fc4', // new demo
+]
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -17,7 +20,7 @@ function getSupabase() {
 router.put('/switch-vertical', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
 
-  if (authed.tenantId !== DEMO_TENANT_ID) {
+  if (!DEMO_TENANT_IDS.includes(authed.tenantId)) {
     res.status(403).json({ error: 'Vertical switching is only available for the demo tenant' })
     return
   }
@@ -31,7 +34,11 @@ router.put('/switch-vertical', requireAuth, async (req: Request, res: Response):
 
   try {
     const supabase = getSupabase()
-    const { error } = await supabase.from('tenants').update({ vertical }).eq('id', DEMO_TENANT_ID)
+    const { error } = await supabase
+      .from('tenants')
+      .update({ vertical })
+      .eq('id', authed.tenantId)
+      .in('id', DEMO_TENANT_IDS)
 
     if (error) {
       console.error(`[demo] switch-vertical error: ${error.message}`)
