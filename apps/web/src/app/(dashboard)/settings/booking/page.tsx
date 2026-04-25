@@ -190,7 +190,7 @@ export default function BookingSettingsPage() {
           </p>
           <input
             type="text"
-            value={settings.slug}
+            value={settings.slug ?? ''}
             onChange={(e) => handleSlugChange(e.target.value)}
             placeholder="bright-smile-dental"
             className={`${inputCls} ${slugError ? 'border-red-300 focus:ring-red-500' : ''}`}

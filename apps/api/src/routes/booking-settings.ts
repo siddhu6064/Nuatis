@@ -24,7 +24,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     supabase
       .from('tenants')
       .select(
-        'booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
+        'vertical, booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
       )
       .eq('id', authed.tenantId)
       .single(),
@@ -35,6 +35,8 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
   ])
+
+  const currentVertical = tenantResult.data?.vertical as string | null | undefined
 
   if (tenantResult.error || !tenantResult.data) {
     res.status(404).json({ error: 'Tenant not found' })
@@ -47,6 +49,13 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   }
 
   const t = tenantResult.data
+  const allServices = servicesResult.data ?? []
+  const availableServices = currentVertical
+    ? allServices.filter(
+        (s) => s.vertical === currentVertical || s.vertical === null || s.vertical === undefined
+      )
+    : allServices
+
   res.json({
     enabled: t.booking_page_enabled ?? false,
     slug: t.booking_page_slug ?? null,
@@ -58,7 +67,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       'Your appointment has been booked! We look forward to seeing you.',
     googleReviewUrl: t.booking_google_review_url ?? null,
     accentColor: t.booking_accent_color ?? '#2563eb',
-    availableServices: servicesResult.data ?? [],
+    availableServices,
   })
 })
 

@@ -114,6 +114,7 @@ async function main() {
 
   const rows = services.map((s, i) => ({
     tenant_id: tenantId,
+    vertical,
     name: s.name,
     unit_price: s.unit_price,
     unit: s.unit ?? 'each',
