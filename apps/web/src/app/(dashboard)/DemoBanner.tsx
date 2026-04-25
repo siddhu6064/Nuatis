@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 const DEMO_TENANT_IDS = [
   '0d9a00b9-ce40-4702-a99c-ed23f11fdb08', // old demo
@@ -24,7 +23,6 @@ interface DemoInfo {
 }
 
 export default function DemoBanner() {
-  const router = useRouter()
   const [info, setInfo] = useState<DemoInfo | null>(null)
   const [switching, setSwitching] = useState(false)
   const [open, setOpen] = useState(false)
@@ -58,8 +56,7 @@ export default function DemoBanner() {
         body: JSON.stringify({ vertical: slug }),
       })
       if (res.ok) {
-        setInfo((prev) => (prev ? { ...prev, vertical: slug } : null))
-        router.refresh()
+        window.location.reload()
       }
     } catch {
       // silently fail
