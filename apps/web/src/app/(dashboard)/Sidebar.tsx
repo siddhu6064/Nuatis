@@ -30,6 +30,7 @@ const TOP_NAV: NavItem[] = [
   { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
   { href: '/inbox', label: 'Inbox', icon: '◻', suiteOnly: true },
+  { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true, requireModule: 'insights' },
 ]
 
 const NAV_GROUPS: NavGroup[] = [
@@ -84,13 +85,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
       { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
       { href: '/reports', label: 'Reports', icon: '📊', suiteOnly: true },
-      {
-        href: '/insights',
-        label: 'Insights',
-        icon: '▤',
-        suiteOnly: true,
-        requireModule: 'insights',
-      },
     ],
   },
   {
@@ -156,7 +150,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
       { href: '/settings/import', label: 'Import', icon: '↑', suiteOnly: true },
       { href: '/settings/chat-widget', label: 'Chat Widget', icon: '💬', suiteOnly: true },
-      { href: '/settings', label: 'Settings', icon: '◌' },
     ],
   },
 ]
