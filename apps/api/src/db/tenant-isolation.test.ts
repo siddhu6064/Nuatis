@@ -101,7 +101,7 @@ describe('Tenant isolation — RLS integration tests', () => {
 
     expect(error).toBeNull()
     expect(data?.name).toBe('Nuatis Demo')
-    expect(data?.vertical).toBe('sales_crm')
+    expect(data?.vertical).toBe('restaurant')
   })
 
   // ── Cross-tenant isolation ──────────────────────────────────

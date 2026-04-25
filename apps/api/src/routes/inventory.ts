@@ -74,6 +74,10 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
     .eq('tenant_id', authed.tenantId)
     .is('deleted_at', null)
 
+  if (authed.vertical) {
+    query = query.or(`vertical.eq.${authed.vertical},vertical.is.null`)
+  }
+
   if (q) {
     const pat = `%${q}%`
     query = query.or(`name.ilike.${pat},sku.ilike.${pat}`)

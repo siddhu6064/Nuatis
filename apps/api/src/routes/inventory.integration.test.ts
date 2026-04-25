@@ -77,6 +77,90 @@ describe('POST /api/inventory', () => {
   })
 })
 
+describe('GET /api/inventory — vertical filtering', () => {
+  it('returns only items matching the JWT vertical or items with no vertical set', async () => {
+    const token = await makeToken() // vertical: 'dental'
+    store.tables['inventory_items'] = [
+      {
+        id: 'inv-dental',
+        tenant_id: TENANT_ID,
+        name: 'Dental Gloves',
+        vertical: 'dental',
+        deleted_at: null,
+        quantity: 10,
+        reorder_threshold: 5,
+      },
+      {
+        id: 'inv-salon',
+        tenant_id: TENANT_ID,
+        name: 'Hair Color',
+        vertical: 'salon',
+        deleted_at: null,
+        quantity: 5,
+        reorder_threshold: 2,
+      },
+      {
+        id: 'inv-legacy',
+        tenant_id: TENANT_ID,
+        name: 'Copy Paper',
+        vertical: null,
+        deleted_at: null,
+        quantity: 20,
+        reorder_threshold: 5,
+      },
+    ]
+
+    const res = await request(makeApp())
+      .get('/api/inventory')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id)
+    expect(ids).toContain('inv-dental')
+    expect(ids).toContain('inv-legacy')
+    expect(ids).not.toContain('inv-salon')
+  })
+
+  it('returns all items when no vertical in JWT', async () => {
+    const secretBytes = new TextEncoder().encode(SECRET)
+    const noVerticalToken = await new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(secretBytes)
+
+    store.tables['inventory_items'] = [
+      {
+        id: 'inv-dental',
+        tenant_id: TENANT_ID,
+        name: 'Dental Gloves',
+        vertical: 'dental',
+        deleted_at: null,
+        quantity: 10,
+        reorder_threshold: 5,
+      },
+      {
+        id: 'inv-salon',
+        tenant_id: TENANT_ID,
+        name: 'Hair Color',
+        vertical: 'salon',
+        deleted_at: null,
+        quantity: 5,
+        reorder_threshold: 2,
+      },
+    ]
+
+    const res = await request(makeApp())
+      .get('/api/inventory')
+      .set('Authorization', `Bearer ${noVerticalToken}`)
+
+    expect(res.status).toBe(200)
+    const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id)
+    expect(ids).toContain('inv-dental')
+    expect(ids).toContain('inv-salon')
+  })
+})
+
 describe('POST /api/inventory/:id/adjust', () => {
   it('positive delta increases quantity', async () => {
     const token = await makeToken()

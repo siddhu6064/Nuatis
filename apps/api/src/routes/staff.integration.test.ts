@@ -86,6 +86,83 @@ describe('POST /api/staff', () => {
   })
 })
 
+describe('GET /api/staff — vertical filtering', () => {
+  it('returns only staff matching the JWT vertical or staff with no vertical set', async () => {
+    const token = await makeToken() // vertical: 'dental'
+    store.tables['staff_members'] = [
+      {
+        id: 'staff-dental',
+        tenant_id: TENANT_ID,
+        name: 'Dr. Chen',
+        role: 'Dentist',
+        vertical: 'dental',
+        is_active: true,
+      },
+      {
+        id: 'staff-salon',
+        tenant_id: TENANT_ID,
+        name: 'Ava Mitchell',
+        role: 'Stylist',
+        vertical: 'salon',
+        is_active: true,
+      },
+      {
+        id: 'staff-legacy',
+        tenant_id: TENANT_ID,
+        name: 'Front Desk',
+        role: 'Admin',
+        vertical: null,
+        is_active: true,
+      },
+    ]
+
+    const res = await request(makeApp()).get('/api/staff').set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id)
+    expect(ids).toContain('staff-dental')
+    expect(ids).toContain('staff-legacy')
+    expect(ids).not.toContain('staff-salon')
+  })
+
+  it('returns all staff when no vertical in JWT', async () => {
+    const secretBytes = new TextEncoder().encode(SECRET)
+    const noVerticalToken = await new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(secretBytes)
+
+    store.tables['staff_members'] = [
+      {
+        id: 'staff-dental',
+        tenant_id: TENANT_ID,
+        name: 'Dr. Chen',
+        role: 'Dentist',
+        vertical: 'dental',
+        is_active: true,
+      },
+      {
+        id: 'staff-salon',
+        tenant_id: TENANT_ID,
+        name: 'Ava Mitchell',
+        role: 'Stylist',
+        vertical: 'salon',
+        is_active: true,
+      },
+    ]
+
+    const res = await request(makeApp())
+      .get('/api/staff')
+      .set('Authorization', `Bearer ${noVerticalToken}`)
+
+    expect(res.status).toBe(200)
+    const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id)
+    expect(ids).toContain('staff-dental')
+    expect(ids).toContain('staff-salon')
+  })
+})
+
 describe('POST /api/staff/:id/shifts', () => {
   it('creates a valid shift and returns 201', async () => {
     const token = await makeToken()

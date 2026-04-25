@@ -147,6 +147,7 @@ export async function seedInventory(tenantId: string, vertical: string): Promise
     .filter((p) => !existingSkus.has(p.sku))
     .map((p) => ({
       tenant_id: tenantId,
+      vertical,
       name: p.name,
       sku: p.sku,
       unit: p.unit,

@@ -119,6 +119,7 @@ export async function seedStaff(tenantId: string, vertical: string): Promise<voi
     .filter(({ p }) => !existingByName.has(p.name))
     .map(({ p, i }) => ({
       tenant_id: tenantId,
+      vertical,
       name: p.name,
       role: p.role,
       color_hex: COLORS[i] ?? '#6366F1',
