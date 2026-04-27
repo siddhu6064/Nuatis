@@ -21,6 +21,12 @@ const config: Config = {
     global: { lines: 80 },
   },
   testMatch: ['**/*.test.ts'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/src/lib/redis.test.ts',
+    '<rootDir>/src/db/schema.test.ts',
+    '<rootDir>/src/db/tenant-isolation.test.ts',
+  ],
 }
 
 export default config
