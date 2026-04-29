@@ -100,7 +100,7 @@ describe('lookupCaller', () => {
     expect(buildSystemPromptSuffix(ctx)).toBe('')
   })
 
-  it('returns matched:false within 400ms when DB exceeds timeout', async () => {
+  it('returns matched:false within 800ms when DB exceeds timeout', async () => {
     ;(globalThis as any).__contactLookupFixture = {
       data: {
         id: 'x',
@@ -110,7 +110,7 @@ describe('lookupCaller', () => {
         lifecycle_stage: null,
       },
       error: null,
-      delayMs: 500,
+      delayMs: 1000,
     }
 
     const warnSpy = jest.spyOn(console, 'warn')
@@ -119,8 +119,8 @@ describe('lookupCaller', () => {
     const elapsed = Date.now() - t0
 
     expect(ctx.matched).toBe(false)
-    expect(elapsed).toBeLessThan(500)
-    expect(elapsed).toBeGreaterThanOrEqual(390)
+    expect(elapsed).toBeLessThan(1000)
+    expect(elapsed).toBeGreaterThanOrEqual(790)
     const timeoutLogged = warnSpy.mock.calls.some((call) =>
       String(call[0] ?? '').includes('timeout')
     )
