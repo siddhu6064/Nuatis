@@ -219,7 +219,7 @@ export async function prewarmGemini(
 
   // Resolve caller lookup before opening Gemini so the suffix lands in systemInstruction
   const callerContext = await lookupPromise
-  const contextSuffix = buildSystemPromptSuffix(callerContext)
+  const contextSuffix = buildSystemPromptSuffix(callerContext, fromNumber)
 
   const session = await createGeminiLiveSession(
     tenantId,
@@ -509,7 +509,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               const safeVertical = vertical || 'sales_crm'
               const fallbackCtx = await fallbackLookup
               preCallContactId = fallbackCtx.contactId ?? null
-              preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx)
+              preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx, callerId ?? undefined)
               console.info('[pre-call-ctx]', {
                 tenantId: resolvedTenantId,
                 matched: fallbackCtx.matched,

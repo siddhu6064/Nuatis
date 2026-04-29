@@ -9,7 +9,7 @@ export interface CallerContext {
   pipelineStage?: string
 }
 
-const LOOKUP_TIMEOUT_MS = 400
+const LOOKUP_TIMEOUT_MS = 800
 
 function normalizeE164(raw: string): string | null {
   if (!raw) return null
@@ -121,8 +121,12 @@ export async function lookupCaller(tenantId: string, phoneE164: string): Promise
  * Build a system-prompt suffix describing the caller. Returns '' on miss so
  * the baseline prompt is unchanged.
  */
-export function buildSystemPromptSuffix(ctx: CallerContext): string {
-  if (!ctx.matched) return ''
+export function buildSystemPromptSuffix(ctx: CallerContext, callerPhone?: string): string {
+  const phoneBlock = callerPhone
+    ? `\n\nThe caller's phone number is ${callerPhone}. Use this number when calling lookup_contact — do NOT ask the caller for their phone number.`
+    : ''
+
+  if (!ctx.matched) return phoneBlock
 
   const truncate = (s: string): string => (s.length > 60 ? s.slice(0, 60) + '…' : s)
 
@@ -146,6 +150,7 @@ export function buildSystemPromptSuffix(ctx: CallerContext): string {
     `Last contact: ${lastContact}\n` +
     `Known fields: ${fieldsStr}\n` +
     `Pipeline stage: ${stage}\n` +
-    'Instruction: Greet the caller by first name. Reference their history naturally if relevant. Do NOT read out their internal data verbatim.\n'
+    'Instruction: Greet the caller by first name. Reference their history naturally if relevant. Do NOT read out their internal data verbatim.\n' +
+    phoneBlock
   )
 }
