@@ -2,6 +2,12 @@ import { Type, type FunctionDeclaration } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 import { VERTICALS } from '@nuatis/shared'
 import { getCalendarClient } from '../services/google.js'
+import { getCalendarCredentials } from '../lib/calendar-provider.js'
+import {
+  getValidOutlookCalendarToken,
+  createOutlookEvent,
+  checkOutlookAvailability,
+} from '../lib/outlook-calendar.js'
 import { callSessionState } from './post-call.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 
@@ -448,32 +454,11 @@ const handlers: Record<string, ToolHandler> = {
         : {}),
     }
 
-    // 1. Get tenant's Google Calendar credentials from locations table
+    // 1. Resolve calendar provider
     try {
       const supabase = getSupabase()
-      const { data: location, error: locErr } = await supabase
-        .from('locations')
-        .select('google_refresh_token, google_calendar_id')
-        .eq('tenant_id', context.tenantId)
-        .eq('is_primary', true)
-        .maybeSingle()
-
-      if (locErr) {
-        console.error(`[tool-handlers] check_availability location query error: ${locErr.message}`)
-        return { available: false, error: 'Unable to check calendar', ...staffFields }
-      }
-
-      if (!location?.google_refresh_token) {
-        console.info('[tool-handlers] check_availability: no Google Calendar tokens for tenant')
-        return {
-          available: false,
-          error: 'Google Calendar not connected for this business',
-          ...staffFields,
-        }
-      }
-
-      const refreshToken = location.google_refresh_token
-      const calendarId = location.google_calendar_id || 'primary'
+      const calendarCreds = await getCalendarCredentials(context.tenantId)
+      const provider = calendarCreds?.provider ?? 'native'
 
       // 2. Determine business hours window for the requested date
       const requestedDate = new Date(`${date}T12:00:00Z`) // noon UTC to get correct day-of-week
@@ -535,21 +520,49 @@ const handlers: Record<string, ToolHandler> = {
       const timeMin = dateAtHour(date, hoursWindow.open, 0, tz)
       const timeMax = dateAtHour(date, hoursWindow.close, 0, tz)
 
-      // 5. Query Google Calendar FreeBusy
-      const calendar = getCalendarClient(refreshToken)
-      const freeBusy = await calendar.freebusy.query({
-        requestBody: {
+      // 5. Fetch busy periods — provider-dependent
+      let busyPeriods: Array<{ start: Date; end: Date }> = []
+
+      if (provider === 'google' && calendarCreds) {
+        const calendar = getCalendarClient(calendarCreds.refreshToken)
+        const freeBusy = await calendar.freebusy.query({
+          requestBody: {
+            timeMin,
+            timeMax,
+            items: [{ id: calendarCreds.calendarId }],
+          },
+        })
+        const busy = freeBusy.data.calendars?.[calendarCreds.calendarId]?.busy ?? []
+        busyPeriods = busy.map((b) => ({
+          start: new Date(b.start ?? ''),
+          end: new Date(b.end ?? ''),
+        }))
+      } else if (provider === 'outlook') {
+        const accessToken = await getValidOutlookCalendarToken(context.tenantId)
+        const busy = await checkOutlookAvailability(
+          accessToken,
           timeMin,
           timeMax,
-          items: [{ id: calendarId }],
-        },
-      })
-
-      const busy = freeBusy.data.calendars?.[calendarId]?.busy ?? []
-      const busyPeriods = busy.map((b) => ({
-        start: new Date(b.start ?? ''),
-        end: new Date(b.end ?? ''),
-      }))
+          calendarCreds?.timezone ?? tz
+        )
+        busyPeriods = busy.map((b) => ({
+          start: new Date(b.start),
+          end: new Date(b.end),
+        }))
+      } else {
+        // Native: busy periods from appointments table
+        const { data: nativeAppts } = await supabase
+          .from('appointments')
+          .select('start_time, end_time')
+          .eq('tenant_id', context.tenantId)
+          .in('status', ['scheduled', 'completed'])
+          .lt('start_time', timeMax)
+          .gt('end_time', timeMin)
+        busyPeriods = (nativeAppts ?? []).map((a: { start_time: string; end_time: string }) => ({
+          start: new Date(a.start_time),
+          end: new Date(a.end_time),
+        }))
+      }
 
       // 6a. If preferred_time given, check that specific slot
       if (preferredTime) {
@@ -649,27 +662,19 @@ const handlers: Record<string, ToolHandler> = {
     try {
       const supabase = getSupabase()
 
-      // 1. Get Calendar credentials
-      const { data: location, error: locErr } = await supabase
-        .from('locations')
-        .select('id, google_refresh_token, google_calendar_id')
-        .eq('tenant_id', context.tenantId)
-        .eq('is_primary', true)
-        .maybeSingle()
+      // 1. Resolve calendar provider + primary location id (parallel)
+      const [calendarCreds, locationResult] = await Promise.all([
+        getCalendarCredentials(context.tenantId),
+        supabase
+          .from('locations')
+          .select('id')
+          .eq('tenant_id', context.tenantId)
+          .eq('is_primary', true)
+          .maybeSingle(),
+      ])
 
-      if (locErr) {
-        console.error(`[tool-handlers] book_appointment error: ${locErr.message}`)
-        return { booked: false, error: 'Unable to access calendar credentials' }
-      }
-
-      if (!location?.google_refresh_token) {
-        console.info('[tool-handlers] book_appointment: no Google Calendar tokens')
-        return { booked: false, error: 'Google Calendar not connected for this business' }
-      }
-
-      const refreshToken = location.google_refresh_token
-      const calendarId = location.google_calendar_id || 'primary'
-      const locationId: string = location.id
+      const provider = calendarCreds?.provider ?? 'native'
+      const locationId: string | null = locationResult.data?.id ?? null
 
       // 2. Build time range
       const tz = DEFAULT_TZ
@@ -700,23 +705,39 @@ const handlers: Record<string, ToolHandler> = {
         }
       }
 
-      // 3. Create Google Calendar event
+      // 3. Create calendar event — branch on provider
       const title = reason ? `${reason} - ${callerName}` : `Appointment - ${callerName}`
       const description = `Booked by Maya AI. Caller: ${callerName}${callerPhone ? `, Phone: ${callerPhone}` : ''}`
 
-      const calendar = getCalendarClient(refreshToken)
-      const event = await calendar.events.insert({
-        calendarId,
-        requestBody: {
-          summary: title,
-          description,
-          start: { dateTime: startIso, timeZone: tz },
-          end: { dateTime: endIso, timeZone: tz },
-        },
-      })
+      let googleEventId: string | null = null
 
-      const googleEventId = event.data.id ?? ''
-      console.info(`[tool-handlers] book_appointment: gcal event created id=${googleEventId}`)
+      if (provider === 'google' && calendarCreds) {
+        const calendar = getCalendarClient(calendarCreds.refreshToken)
+        const event = await calendar.events.insert({
+          calendarId: calendarCreds.calendarId,
+          requestBody: {
+            summary: title,
+            description,
+            start: { dateTime: startIso, timeZone: tz },
+            end: { dateTime: endIso, timeZone: tz },
+          },
+        })
+        googleEventId = event.data.id ?? ''
+        console.info(`[tool-handlers] book_appointment: gcal event created id=${googleEventId}`)
+      } else if (provider === 'outlook') {
+        const accessToken = await getValidOutlookCalendarToken(context.tenantId)
+        const result = await createOutlookEvent(accessToken, {
+          subject: title,
+          start: startIso,
+          end: endIso,
+          timezone: calendarCreds?.timezone ?? tz,
+          body: description,
+        })
+        googleEventId = result.id
+        console.info(`[tool-handlers] book_appointment: outlook event created id=${googleEventId}`)
+      } else {
+        console.info('[tool-handlers] book_appointment: native provider, skipping calendar API')
+      }
 
       // Maya-only: skip CRM operations, return calendar-only result
       if (context.product === 'maya_only') {

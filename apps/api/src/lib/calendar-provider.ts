@@ -9,7 +9,7 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface CalendarCredentials {
-  provider: 'google' | 'outlook'
+  provider: 'google' | 'outlook' | 'native'
   refreshToken: string
   calendarId: string
   timezone: string
@@ -92,7 +92,12 @@ export async function getCalendarCredentials(
     }
   }
 
-  return null
+  return {
+    provider: 'native',
+    refreshToken: '',
+    calendarId: '',
+    timezone,
+  }
 }
 
 // ── Availability ──────────────────────────────────────────────────────────────
@@ -106,7 +111,7 @@ export async function checkCalendarAvailability(
   dateEnd: string
 ): Promise<Array<{ start: string; end: string }>> {
   const creds = await getCalendarCredentials(tenantId)
-  if (!creds) return []
+  if (!creds || creds.provider === 'native') return []
 
   if (creds.provider === 'outlook') {
     const accessToken = await getValidOutlookCalendarToken(tenantId)
@@ -144,7 +149,7 @@ export async function createCalendarAppointment(
   }
 ): Promise<{ eventId: string } | null> {
   const creds = await getCalendarCredentials(tenantId)
-  if (!creds) return null
+  if (!creds || creds.provider === 'native') return null
 
   if (creds.provider === 'outlook') {
     const accessToken = await getValidOutlookCalendarToken(tenantId)

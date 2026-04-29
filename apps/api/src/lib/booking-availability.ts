@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from './calendar-provider.js'
 import {
@@ -5,6 +6,13 @@ import {
   checkOutlookAvailability,
   createOutlookEvent,
 } from './outlook-calendar.js'
+
+function getSupabase() {
+  const url = process.env['SUPABASE_URL']
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+  if (!url || !key) throw new Error('Supabase env vars not set')
+  return createClient(url, key)
+}
 
 // ── Exported interfaces ───────────────────────────────────────────────────────
 
@@ -14,7 +22,7 @@ export interface TimeSlot {
 }
 
 export interface CalendarCredentials {
-  provider?: 'google' | 'outlook'
+  provider?: 'google' | 'outlook' | 'native'
   /** For Outlook: the tenantId used to fetch a valid access token. */
   tenantId?: string
   refreshToken: string
@@ -145,7 +153,43 @@ export async function getAvailableSlotsForDate(
 
   let busyPeriods: Array<{ start: Date; end: Date }> = []
 
-  if (provider === 'outlook') {
+  if (provider === 'native') {
+    if (!creds.tenantId) throw new Error('tenantId required for native calendar access')
+    const supabase = getSupabase()
+
+    const { data: tenantSettings } = await supabase
+      .from('tenants')
+      .select('booking_buffer_minutes, booking_advance_days')
+      .eq('id', creds.tenantId)
+      .maybeSingle()
+    const ts = tenantSettings as {
+      booking_buffer_minutes?: number | null
+      booking_advance_days?: number | null
+    } | null
+
+    // Enforce advance booking limit
+    const advanceDays = ts?.booking_advance_days ?? null
+    if (advanceDays !== null) {
+      const todayUtc = new Date()
+      todayUtc.setUTCHours(0, 0, 0, 0)
+      const requestedDay = new Date(`${date}T00:00:00Z`)
+      const diffDays = (requestedDay.getTime() - todayUtc.getTime()) / 86_400_000
+      if (diffDays > advanceDays) return { slots: [], closed: false }
+    }
+
+    const bookingBufferMs = (ts?.booking_buffer_minutes ?? 0) * 60_000
+    const { data: nativeAppts } = await supabase
+      .from('appointments')
+      .select('start_time, end_time')
+      .eq('tenant_id', creds.tenantId)
+      .in('status', ['scheduled', 'completed'])
+      .lt('start_time', timeMax)
+      .gt('end_time', timeMin)
+    busyPeriods = (nativeAppts ?? []).map((a: { start_time: string; end_time: string }) => ({
+      start: new Date(new Date(a.start_time).getTime() - bookingBufferMs),
+      end: new Date(new Date(a.end_time).getTime() + bookingBufferMs),
+    }))
+  } else if (provider === 'outlook') {
     if (!creds.tenantId) throw new Error('tenantId required for Outlook calendar access')
     const accessToken = await getValidOutlookCalendarToken(creds.tenantId)
     const busy = await checkOutlookAvailability(accessToken, timeMin, timeMax, timezone)
@@ -214,6 +258,19 @@ export async function isSlotAvailable(
   const startIso = dateAtHour(date, parseInt(hStr!, 10), parseInt(mStr ?? '0', 10), timezone)
   const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
 
+  if (provider === 'native') {
+    if (!creds.tenantId) throw new Error('tenantId required for native calendar access')
+    const supabase = getSupabase()
+    const { data: conflicts } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('tenant_id', creds.tenantId)
+      .in('status', ['scheduled', 'completed'])
+      .lt('start_time', endIso)
+      .gt('end_time', startIso)
+    return (conflicts ?? []).length === 0
+  }
+
   if (provider === 'outlook') {
     if (!creds.tenantId) throw new Error('tenantId required for Outlook calendar access')
     const accessToken = await getValidOutlookCalendarToken(creds.tenantId)
@@ -247,13 +304,17 @@ export async function createCalendarEvent(
   durationMinutes: number,
   title: string,
   description: string
-): Promise<{ googleEventId: string; startIso: string; endIso: string }> {
+): Promise<{ googleEventId: string | null; startIso: string; endIso: string }> {
   const { calendarId, timezone } = creds
   const provider = creds.provider ?? 'google'
 
   const [hStr, mStr] = startTime.split(':')
   const startIso = dateAtHour(date, parseInt(hStr!, 10), parseInt(mStr ?? '0', 10), timezone)
   const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
+
+  if (provider === 'native') {
+    return { googleEventId: null, startIso, endIso }
+  }
 
   if (provider === 'outlook') {
     if (!creds.tenantId) throw new Error('tenantId required for Outlook calendar access')
