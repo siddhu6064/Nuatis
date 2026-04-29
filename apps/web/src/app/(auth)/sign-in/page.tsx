@@ -16,6 +16,8 @@ function SignInForm() {
   const router = useRouter()
   const params = useSearchParams()
   const callbackUrl = params.get('callbackUrl') ?? '/dashboard'
+  const reset = params.get('reset') === '1'
+  const passwordUpdated = params.get('passwordUpdated') === '1'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,6 +62,17 @@ function SignInForm() {
           <h1 className="text-lg font-semibold text-gray-900 mb-1">Sign in</h1>
           <p className="text-sm text-gray-400 mb-6">Access your Nuatis dashboard</p>
 
+          {(reset || passwordUpdated) && (
+            <p
+              className="text-xs text-teal-700 bg-teal-50 border border-teal-100
+                          px-3 py-2 rounded-lg mb-4"
+            >
+              {passwordUpdated
+                ? 'Password updated — please sign in.'
+                : 'Check your email for a reset link.'}
+            </p>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
@@ -78,7 +91,12 @@ function SignInForm() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-gray-600">Password</label>
+                <a href="/forgot-password" className="text-xs text-teal-600 hover:underline">
+                  Forgot password?
+                </a>
+              </div>
               <input
                 type="password"
                 value={password}

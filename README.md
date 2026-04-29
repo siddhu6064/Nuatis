@@ -2,7 +2,7 @@
 
 AI-powered front-office SaaS for SMBs. Voice AI receptionist (Maya) + vertical-aware CRM + automated scheduling + lead pipeline + follow-up automation + CPQ.
 
-> Built by [Sid Yennamaneni](https://github.com/siddhu6064) | Phases 1-5 complete | 52 tests passing
+> Built by [Sid Yennamaneni](https://github.com/siddhu6064) | Phases 1-5 complete | 397 tests passing
 
 ## Architecture
 
@@ -33,7 +33,7 @@ infra/
   azure/        Deployment scripts (deploy.sh, update-env.sh, custom-domain.sh)
   cloudflare/   Cloudflare Tunnel config (ngrok alternative)
 supabase/
-  migrations/   12 migration files (0001-0012)
+  migrations/   56 migration files (0001-0056)
 ```
 
 ## Modules
@@ -98,6 +98,7 @@ supabase/
 - Security headers: HSTS, X-Frame-Options, CSP, Referrer-Policy
 - Onboarding wizard: 6-step (business info, phone provisioning, calendar, hours, test Maya, done)
 - Demo vertical switcher: live industry switching for sales demos
+- Self-serve auth: sign-up, sign-in, forgot-password (Supabase reset email), reset-password (hash token flow)
 
 ## Verticals
 
@@ -131,27 +132,31 @@ ls supabase/migrations/
 npm run dev        # starts web:3000 + api:3001
 
 # Run tests
-npm test           # 52 tests, 9 suites
+npm test           # 397 tests, 63 suites (live-infra suites excluded — see jest.config.ts)
 ```
 
 ## Environment Variables
 
 See `apps/api/.env.example` for the full list. Key vars:
 
-| Variable                       | Description                         |
-| ------------------------------ | ----------------------------------- |
-| SUPABASE_URL                   | Supabase project URL                |
-| SUPABASE_SERVICE_ROLE_KEY      | Supabase service role key           |
-| GEMINI_API_KEY                 | Google Gemini API key               |
-| TELNYX_API_KEY                 | Telnyx API key for voice + SMS      |
-| TELNYX_TENANT_MAP              | Phone-to-tenant mapping             |
-| REDIS_URL                      | Upstash Redis connection string     |
-| GOOGLE_CLIENT_ID / SECRET      | Google Calendar OAuth2              |
-| RESEND_API_KEY                 | Resend email API key                |
-| SENTRY_DSN                     | Sentry error monitoring DSN         |
-| VAPID_PUBLIC_KEY / PRIVATE_KEY | Web Push VAPID keys                 |
-| ADMIN_API_KEY                  | Admin stats endpoint key            |
-| VOICE_WS_URL                   | Production WebSocket URL for Telnyx |
+| Variable                       | Description                                              |
+| ------------------------------ | -------------------------------------------------------- |
+| SUPABASE_URL                   | Supabase project URL                                     |
+| SUPABASE_SERVICE_ROLE_KEY      | Supabase service role key                                |
+| GEMINI_API_KEY                 | Google Gemini API key                                    |
+| TELNYX_API_KEY                 | Telnyx API key for voice + SMS                           |
+| TELNYX_TENANT_MAP              | Phone-to-tenant mapping                                  |
+| REDIS_URL                      | Upstash Redis connection string                          |
+| GOOGLE_CLIENT_ID / SECRET      | Google Calendar OAuth2                                   |
+| RESEND_API_KEY                 | Resend email API key                                     |
+| SENTRY_DSN                     | Sentry error monitoring DSN                              |
+| VAPID_PUBLIC_KEY / PRIVATE_KEY | Web Push VAPID keys                                      |
+| ADMIN_API_KEY                  | Admin stats endpoint key                                 |
+| VOICE_WS_URL                   | Production WebSocket URL for Telnyx                      |
+| NEXT_PUBLIC_APP_URL            | Web app base URL (for password reset redirects)          |
+| NEXT_PUBLIC_SUPABASE_URL       | Supabase URL (browser, used by reset-password page)      |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY  | Supabase anon key (browser, used by reset-password page) |
+| AUTH_SECRET                    | Auth.js v5 JWT signing secret                            |
 
 ## Deployment
 
