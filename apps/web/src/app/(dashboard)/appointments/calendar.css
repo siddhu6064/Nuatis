@@ -1,0 +1,119 @@
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.rbc-toolbar button {
+  color: #1a1814;
+  border-color: #e5e7eb;
+}
+
+.rbc-toolbar button:hover,
+.rbc-toolbar button:focus {
+  background-color: #f0fdfa;
+  color: #0d9488;
+  border-color: #0d9488;
+}
+
+.rbc-toolbar button.rbc-active,
+.rbc-toolbar button.rbc-active:hover {
+  background-color: #0d9488;
+  color: #fff;
+  border-color: #0d9488;
+  box-shadow: none;
+}
+
+/* ── Today column highlight ──────────────────────────────────────────────── */
+
+.rbc-today {
+  background-color: #f0fdfa;
+}
+
+/* ── Selected / drag slot highlight ─────────────────────────────────────── */
+
+.rbc-slot-selection {
+  background-color: rgba(13, 148, 136, 0.15);
+  border: 1px solid #0d9488;
+}
+
+/* ── Event fallback color ────────────────────────────────────────────────── */
+
+.rbc-event {
+  background-color: #0d9488;
+  border-color: #0d9488;
+}
+
+.rbc-event:focus {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+
+.rbc-header {
+  background-color: #f9f8f5;
+  color: #1a1814;
+  font-weight: 500;
+  font-size: 12px;
+  border-color: #e5e7eb;
+  padding: 6px 8px;
+}
+
+/* ── Grid lines ──────────────────────────────────────────────────────────── */
+
+.rbc-time-content,
+.rbc-time-header-content,
+.rbc-day-bg + .rbc-day-bg,
+.rbc-timeslot-group,
+.rbc-time-slot,
+.rbc-time-gutter .rbc-timeslot-group {
+  border-color: #e5e7eb;
+}
+
+/* ── Time gutter labels ──────────────────────────────────────────────────── */
+
+.rbc-label {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+/* ── Month view date cells ───────────────────────────────────────────────── */
+
+.rbc-date-cell {
+  color: #1a1814;
+  font-size: 12px;
+}
+
+.rbc-off-range .rbc-date-cell,
+.rbc-off-range-bg {
+  background-color: #f9f8f5;
+  color: #9ca3af;
+}
+
+/* ── Agenda view ─────────────────────────────────────────────────────────── */
+
+.rbc-agenda-view table.rbc-agenda-table thead > tr > th,
+.rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  border-color: #e5e7eb;
+  color: #1a1814;
+}
+
+.rbc-agenda-date-cell,
+.rbc-agenda-time-cell {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* ── Popup (overflow events) ─────────────────────────────────────────────── */
+
+.rbc-overlay {
+  border-color: #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.rbc-overlay-header {
+  background-color: #f9f8f5;
+  color: #1a1814;
+  font-size: 12px;
+  border-color: #e5e7eb;
+}
