@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { checkTcpaOptIn } from './tcpa.js'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -26,6 +27,11 @@ export async function sendSms(
   if (!apiKey) return { success: false }
 
   try {
+    if (options?.contactId && options?.tenantId) {
+      const allowed = await checkTcpaOptIn(options.contactId, options.tenantId)
+      if (!allowed) return { success: false }
+    }
+
     const res = await fetch('https://api.telnyx.com/v2/messages', {
       method: 'POST',
       headers: {
