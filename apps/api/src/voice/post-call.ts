@@ -3,6 +3,8 @@ import { normalizePhone } from './tool-handlers.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
+import { sendSms } from '../lib/sms.js'
+import { buildConfirmationSms } from '../lib/sms-templates.js'
 
 // ── Session state — written by tool handlers, read at call end ──────────────
 
@@ -147,67 +149,68 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
   // ── Feature 2: SMS confirmation after booking ───────────────────────────
 
-  if (bookedAppointment && appointmentId && callerId) {
+  if (bookedAppointment && callerId) {
     try {
       const supabase = getSupabase()
 
-      // Get appointment details
-      const { data: appt } = await supabase
-        .from('appointments')
-        .select('title, start_time')
-        .eq('id', appointmentId)
-        .single()
+      const [{ data: location }, { data: tenantRow }] = await Promise.all([
+        supabase
+          .from('locations')
+          .select('telnyx_number')
+          .eq('tenant_id', tenantId)
+          .eq('is_primary', true)
+          .maybeSingle(),
+        supabase.from('tenants').select('timezone').eq('id', tenantId).maybeSingle(),
+      ])
 
-      // Get tenant's Telnyx phone number
-      const { data: location } = await supabase
-        .from('locations')
-        .select('telnyx_number')
-        .eq('tenant_id', tenantId)
-        .eq('is_primary', true)
-        .maybeSingle()
+      const fromNumber = (location as { telnyx_number?: string | null } | null)?.telnyx_number
+      const timezone =
+        (tenantRow as { timezone?: string | null } | null)?.timezone ?? 'America/Chicago'
 
-      const fromNumber = location?.telnyx_number
-      const apiKey = process.env['TELNYX_API_KEY']
+      if (!fromNumber) {
+        console.warn('[post-call] SMS skipped — no Telnyx number for tenant')
+      } else {
+        let appointmentDateTime: string | null = null
 
-      if (appt && fromNumber && apiKey) {
-        const startDate = new Date(appt.start_time)
-        const formatted = startDate.toLocaleString('en-US', {
-          timeZone: 'America/Chicago',
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
+        if (appointmentId) {
+          const { data: appt } = await supabase
+            .from('appointments')
+            .select('start_time')
+            .eq('id', appointmentId)
+            .single()
+          if (appt) {
+            appointmentDateTime = new Date(
+              (appt as { start_time: string }).start_time
+            ).toLocaleString('en-US', {
+              timeZone: timezone,
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })
+          } else {
+            console.warn('[post-call] SMS appointment not found — sending generic confirmation')
+          }
+        } else {
+          console.info('[post-call] SMS maya_only — sending generic confirmation')
+        }
+
+        const smsText = buildConfirmationSms({ businessName, appointmentDateTime, vertical })
+
+        const { success } = await sendSms(fromNumber, callerId, smsText, {
+          tenantId,
+          contactId: contactId ?? undefined,
         })
 
-        const smsText = `Your appointment '${appt.title}' is confirmed for ${formatted}. Reply CANCEL to cancel. - ${businessName}`
-
-        const res = await fetch('https://api.telnyx.com/v2/messages', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: fromNumber,
-            to: callerId,
-            text: smsText,
-          }),
-        })
-
-        if (res.ok) {
+        if (success) {
           console.info(
-            `[post-call] SMS confirmation sent to=${callerId} appointment=${appointmentId}`
+            `[post-call] SMS confirmation sent to=${callerId} appointment=${appointmentId ?? 'none'}`
           )
         } else {
-          const body = await res.text()
-          console.error(`[post-call] SMS confirmation failed (${res.status}): ${body}`)
+          console.warn('[post-call] SMS confirmation send failed')
         }
-      } else {
-        if (!appt) console.warn('[post-call] SMS skipped — appointment not found')
-        if (!fromNumber) console.warn('[post-call] SMS skipped — no Telnyx number for tenant')
-        if (!apiKey) console.warn('[post-call] SMS skipped — TELNYX_API_KEY not set')
       }
     } catch (err) {
       console.error('[post-call] SMS confirmation error:', err)
