@@ -5,6 +5,15 @@ import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
+import { sendEmail } from '../lib/email-client.js'
+import {
+  sendViaGmail,
+  sendViaOutlook,
+  buildMimeMessage,
+  injectTrackingPixel,
+} from '../lib/email-send.js'
+import { getValidToken } from '../lib/email-oauth.js'
+import { buildAppointmentConfirmationEmail } from '../lib/email-templates.js'
 
 // ── Session state — written by tool handlers, read at call end ──────────────
 
@@ -214,6 +223,120 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
       }
     } catch (err) {
       console.error('[post-call] SMS confirmation error:', err)
+    }
+  }
+
+  // ── Feature 3: Email confirmation after booking (Suite only) ──────────────
+
+  // maya_only has no contact record and no email on file — skip entirely
+  if (bookedAppointment && appointmentId && product !== 'maya_only' && contactId) {
+    try {
+      const supabase = getSupabase()
+
+      const { data: contactRow } = await supabase
+        .from('contacts')
+        .select('email, full_name')
+        .eq('id', contactId)
+        .single()
+
+      const contactEmail = (
+        contactRow as { email?: string | null; full_name?: string | null } | null
+      )?.email
+
+      if (contactEmail) {
+        // start_time fetched fresh — SMS block's appointmentDateTime is scoped inside its own try/catch
+        const [{ data: appt }, { data: tenantRow }] = await Promise.all([
+          supabase.from('appointments').select('start_time').eq('id', appointmentId).single(),
+          supabase.from('tenants').select('timezone').eq('id', tenantId).maybeSingle(),
+        ])
+
+        const timezone =
+          (tenantRow as { timezone?: string | null } | null)?.timezone ?? 'America/Chicago'
+
+        let appointmentDateTime: string | null = null
+        if (appt) {
+          appointmentDateTime = new Date(
+            (appt as { start_time: string }).start_time
+          ).toLocaleString('en-US', {
+            timeZone: timezone,
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })
+        }
+
+        const contactName = (contactRow as { full_name?: string | null } | null)?.full_name ?? null
+
+        const { subject, html, text } = buildAppointmentConfirmationEmail({
+          contactName,
+          businessName,
+          appointmentDateTime,
+          vertical,
+        })
+
+        const trackingToken = crypto.randomUUID()
+        const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+        const trackedHtml = injectTrackingPixel(html, trackingToken, apiUrl)
+
+        // Resolve provider: tenant's default OAuth account, or fall back to Resend
+        const { data: emailAccount } = await supabase
+          .from('user_email_accounts')
+          .select('id, provider, email_address')
+          .eq('tenant_id', tenantId)
+          .eq('is_default', true)
+          .maybeSingle()
+
+        let sent = false
+        let fromAddress = process.env['EMAIL_FROM'] ?? 'Maya <maya@nuatis.com>'
+        let emailAccountId: string | null = null
+
+        if (emailAccount) {
+          const acct = emailAccount as { id: string; provider: string; email_address: string }
+          fromAddress = acct.email_address
+          emailAccountId = acct.id
+          const { accessToken, provider } = await getValidToken(acct.id)
+          if (provider === 'gmail') {
+            const raw = buildMimeMessage(
+              acct.email_address,
+              contactEmail,
+              subject,
+              trackedHtml,
+              text
+            )
+            await sendViaGmail(accessToken, raw)
+          } else {
+            await sendViaOutlook(accessToken, contactEmail, subject, trackedHtml, text)
+          }
+          sent = true
+        } else {
+          sent = await sendEmail({ to: contactEmail, subject, html: trackedHtml })
+        }
+
+        if (sent) {
+          await supabase.from('email_messages').insert({
+            tenant_id: tenantId,
+            contact_id: contactId,
+            email_account_id: emailAccountId,
+            direction: 'outbound',
+            from_address: fromAddress,
+            to_address: contactEmail,
+            subject,
+            body_html: trackedHtml,
+            body_text: text,
+            tracking_token: trackingToken,
+          })
+          console.info(
+            `[post-call] email confirmation sent to=${contactEmail} appointment=${appointmentId}`
+          )
+        } else {
+          console.warn('[post-call] email confirmation send failed')
+        }
+      }
+    } catch (err) {
+      console.error('[post-call] email confirmation error:', err)
     }
   }
 
