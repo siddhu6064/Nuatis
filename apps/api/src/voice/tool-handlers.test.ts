@@ -152,3 +152,104 @@ describe('book_appointment — maya_only product', () => {
     expect((store.tables['appointments'] as Row[]).length).toBe(1)
   })
 })
+
+describe('reschedule_appointment', () => {
+  const CALLER_PHONE = '+15125559876'
+  const CONTACT_ID = randomUUID()
+  const EXISTING_APPT_ID = randomUUID()
+  const FUTURE_ISO = new Date(Date.now() + 86_400_000).toISOString()
+
+  beforeEach(() => {
+    // Location with calendar creds for the rebook step
+    ;(store.tables['locations'] as Row[]).push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      is_primary: true,
+      google_refresh_token: 'refresh-token-test',
+      google_calendar_id: 'primary',
+    })
+  })
+
+  it('cancels existing appointment and books new one (happy path)', async () => {
+    ;(store.tables['contacts'] as Row[]).push({
+      id: CONTACT_ID,
+      tenant_id: TENANT_ID,
+      full_name: 'Reschedule Remy',
+      phone: CALLER_PHONE,
+      is_archived: false,
+    })
+    ;(store.tables['appointments'] as Row[]).push({
+      id: EXISTING_APPT_ID,
+      tenant_id: TENANT_ID,
+      contact_id: CONTACT_ID,
+      status: 'scheduled',
+      start_time: FUTURE_ISO,
+      end_time: FUTURE_ISO,
+    })
+
+    const result = await executeToolCall(
+      'reschedule_appointment',
+      {
+        caller_phone: CALLER_PHONE,
+        new_date: WEEKDAY_DATE,
+        new_start_time: '14:00',
+      },
+      baseContext('suite')
+    )
+
+    expect(result['rescheduled']).toBe(true)
+    expect(result['old_appointment_id']).toBe(EXISTING_APPT_ID)
+    expect(result['new_appointment_id']).toBeDefined()
+
+    // Old appointment must be canceled
+    const old = (store.tables['appointments'] as Row[]).find((r) => r['id'] === EXISTING_APPT_ID)
+    expect(old?.['status']).toBe('canceled')
+
+    // New appointment must exist
+    const newAppt = (store.tables['appointments'] as Row[]).find(
+      (r) => r['id'] !== EXISTING_APPT_ID && r['status'] === 'scheduled'
+    )
+    expect(newAppt).toBeDefined()
+  })
+
+  it('returns rescheduled:false when no contact matches caller phone', async () => {
+    // No contacts in store
+
+    const result = await executeToolCall(
+      'reschedule_appointment',
+      {
+        caller_phone: '+15125550000',
+        new_date: WEEKDAY_DATE,
+        new_start_time: '10:00',
+      },
+      baseContext('suite')
+    )
+
+    expect(result['rescheduled']).toBe(false)
+    expect(String(result['message'])).toContain('No upcoming appointment')
+  })
+
+  it('returns rescheduled:false when contact exists but has no upcoming appointment', async () => {
+    ;(store.tables['contacts'] as Row[]).push({
+      id: CONTACT_ID,
+      tenant_id: TENANT_ID,
+      full_name: 'No Appt Nina',
+      phone: CALLER_PHONE,
+      is_archived: false,
+    })
+    // No appointments in store
+
+    const result = await executeToolCall(
+      'reschedule_appointment',
+      {
+        caller_phone: CALLER_PHONE,
+        new_date: WEEKDAY_DATE,
+        new_start_time: '10:00',
+      },
+      baseContext('suite')
+    )
+
+    expect(result['rescheduled']).toBe(false)
+    expect(String(result['message'])).toContain('No upcoming appointment')
+  })
+})

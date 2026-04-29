@@ -146,6 +146,33 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       'End the current phone call. Call this ONLY after you have said goodbye to the caller and the conversation is naturally complete. Do not call this while the caller is still speaking or mid-conversation.',
     parameters: { type: Type.OBJECT, properties: {}, required: [] },
   },
+  {
+    name: 'reschedule_appointment',
+    description:
+      'Cancel an existing upcoming appointment and book a new one at the requested time. Use when caller says they want to reschedule, change, or move their appointment.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        caller_phone: {
+          type: Type.STRING,
+          description: 'Caller E.164 phone number',
+        },
+        new_date: {
+          type: Type.STRING,
+          description: 'New appointment date in YYYY-MM-DD format',
+        },
+        new_start_time: {
+          type: Type.STRING,
+          description: 'New start time in HH:MM 24h format',
+        },
+        reason: {
+          type: Type.STRING,
+          description: 'Optional reason for rescheduling',
+        },
+      },
+      required: ['caller_phone', 'new_date', 'new_start_time'],
+    },
+  },
 ]
 
 function getSupabase() {
@@ -1103,6 +1130,102 @@ const handlers: Record<string, ToolHandler> = {
     }, 2000)
 
     return { ended: true, message: 'Call will end in 2 seconds' }
+  },
+
+  reschedule_appointment: async (args, context) => {
+    const rawPhone = String(args['caller_phone'] ?? context.callerId ?? '')
+    const callerPhone = normalizePhone(rawPhone)
+    const newDate = String(args['new_date'] ?? '')
+    const newStartTime = String(args['new_start_time'] ?? '')
+    const reason = args['reason'] ? String(args['reason']) : undefined
+
+    console.info(
+      `[tool-handlers] reschedule_appointment: caller=${callerPhone} new_date=${newDate} new_start=${newStartTime} tenant=${context.tenantId}`
+    )
+
+    try {
+      const supabase = getSupabase()
+      const digitsOnly = callerPhone.replace(/\+/, '')
+
+      // Find contact by phone (E.164 then digits-only fallback)
+      let { data: contact } = await supabase
+        .from('contacts')
+        .select('id, full_name, phone')
+        .eq('tenant_id', context.tenantId)
+        .eq('phone', callerPhone)
+        .eq('is_archived', false)
+        .maybeSingle()
+
+      if (!contact) {
+        ;({ data: contact } = await supabase
+          .from('contacts')
+          .select('id, full_name, phone')
+          .eq('tenant_id', context.tenantId)
+          .eq('phone', digitsOnly)
+          .eq('is_archived', false)
+          .maybeSingle())
+      }
+
+      if (!contact) {
+        return { rescheduled: false, message: 'No upcoming appointment found for this number' }
+      }
+
+      // Find next upcoming scheduled/confirmed appointment
+      const { data: existing } = await supabase
+        .from('appointments')
+        .select('id, start_time, end_time, status')
+        .eq('tenant_id', context.tenantId)
+        .eq('contact_id', contact['id'])
+        .in('status', ['scheduled', 'confirmed'])
+        .gt('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!existing) {
+        return { rescheduled: false, message: 'No upcoming appointment found for this number' }
+      }
+
+      // Cancel existing appointment
+      const { error: cancelErr } = await supabase
+        .from('appointments')
+        .update({ status: 'canceled' })
+        .eq('id', existing['id'])
+
+      if (cancelErr) {
+        console.error(`[tool-handlers] reschedule_appointment: cancel failed: ${cancelErr.message}`)
+        return { rescheduled: false, message: 'Failed to cancel existing appointment' }
+      }
+
+      // Book new appointment reusing existing handler
+      const bookArgs: Record<string, unknown> = {
+        date: newDate,
+        start_time: newStartTime,
+        caller_name: String(contact['full_name'] ?? ''),
+        caller_phone: callerPhone,
+      }
+      if (reason) bookArgs['reason'] = reason
+
+      const bookResult = await handlers['book_appointment']!(bookArgs, context)
+
+      if (!bookResult['booked']) {
+        return {
+          rescheduled: false,
+          message: String(bookResult['error'] ?? 'Failed to book new appointment'),
+        }
+      }
+
+      return {
+        rescheduled: true,
+        old_appointment_id: existing['id'],
+        new_appointment_id: bookResult['appointment_id'] ?? null,
+        new_start: bookResult['start'],
+        new_end: bookResult['end'],
+      }
+    } catch (err) {
+      console.error('[tool-handlers] reschedule_appointment error:', err)
+      return { rescheduled: false, message: 'Unable to reschedule appointment' }
+    }
   },
 }
 
