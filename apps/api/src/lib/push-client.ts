@@ -13,14 +13,13 @@ let vapidConfigured = false
 
 function ensureVapid(): boolean {
   if (vapidConfigured) return true
-  const publicKey = process.env['VAPID_PUBLIC_KEY']
-  const privateKey = process.env['VAPID_PRIVATE_KEY']
-  const email = process.env['VAPID_EMAIL'] ?? 'mailto:sid@nuatis.com'
-  if (!publicKey || !privateKey) {
-    console.warn('[push] VAPID keys not set — push disabled')
+  const publicKey = process.env.VAPID_PUBLIC_KEY?.replace(/=/g, '')
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.replace(/=/g, '')
+  if (!publicKey || !privateKey || !process.env.VAPID_EMAIL) {
+    console.warn('[push] VAPID keys not configured — skipping push notification')
     return false
   }
-  webpush.setVapidDetails(email, publicKey, privateKey)
+  webpush.setVapidDetails(process.env.VAPID_EMAIL, publicKey, privateKey)
   vapidConfigured = true
   return true
 }
