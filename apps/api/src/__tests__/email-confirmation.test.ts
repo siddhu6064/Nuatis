@@ -67,10 +67,17 @@ function seedStore(
   opts: {
     contactEmail?: string | null
     emailAccount?: { provider: 'gmail' | 'outlook' } | null
+    tenantName?: string | null
   } = {}
 ) {
   store = createStore()
-  store.tables['tenants'] = [{ id: TENANT_ID, timezone: 'America/Chicago' }]
+  store.tables['tenants'] = [
+    {
+      id: TENANT_ID,
+      timezone: 'America/Chicago',
+      ...(opts.tenantName !== undefined ? { name: opts.tenantName } : {}),
+    },
+  ]
   store.tables['contacts'] = [
     {
       id: CONTACT_ID,
@@ -303,5 +310,59 @@ describe('post-call email confirmation — integration', () => {
 
     expect(sendViaOutlook).toHaveBeenCalledTimes(1)
     expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  test('B5: tenant name from DB overrides businessName param in subject', async () => {
+    seedStore({ tenantName: 'DB Tenant Name' })
+    seedSession()
+    await handlePostCall(baseParams()) // baseParams passes businessName: 'Smile Dental'
+
+    expect(sendEmail).toHaveBeenCalledTimes(1)
+    const call = sendEmail.mock.calls[0]![0] as { subject: string }
+    expect(call.subject).toContain('DB Tenant Name')
+    expect(call.subject).not.toContain('Smile Dental')
+  })
+
+  test('B5: falls back to businessName param when tenant name is absent in DB', async () => {
+    seedStore() // no tenantName in row
+    seedSession()
+    await handlePostCall(baseParams())
+
+    expect(sendEmail).toHaveBeenCalledTimes(1)
+    const call = sendEmail.mock.calls[0]![0] as { subject: string }
+    expect(call.subject).toContain('Smile Dental')
+  })
+})
+
+// ── Unit: injectTrackingPixel (B6) ────────────────────────────────────────────
+
+import { injectTrackingPixel as realInjectTrackingPixel } from '../lib/email-send.js'
+
+describe('injectTrackingPixel — unit', () => {
+  const TOKEN = 'test-token-123'
+  const API = 'https://api.nuatis.com'
+  const PIXEL_SRC = `${API}/api/email-tracking/${TOKEN}`
+
+  test('replaces %%TRACKING_PIXEL%% placeholder with img tag', () => {
+    const html = '<html><body><p>Hello</p>%%TRACKING_PIXEL%%</body></html>'
+    const result = realInjectTrackingPixel(html, TOKEN, API)
+    expect(result).not.toContain('%%TRACKING_PIXEL%%')
+    expect(result).toContain(PIXEL_SRC)
+    expect(result).toContain('width="1"')
+    expect(result).toContain('height="1"')
+  })
+
+  test('falls back to inserting before </body> when no placeholder present', () => {
+    const html = '<html><body><p>Hello</p></body></html>'
+    const result = realInjectTrackingPixel(html, TOKEN, API)
+    expect(result).toContain(PIXEL_SRC)
+    expect(result).toMatch(new RegExp(`${PIXEL_SRC.replace(/\./g, '\\.')}.*</body>`, 's'))
+  })
+
+  test('appends pixel when no placeholder and no </body>', () => {
+    const html = '<p>Hello</p>'
+    const result = realInjectTrackingPixel(html, TOKEN, API)
+    expect(result).toContain(PIXEL_SRC)
+    expect(result.endsWith(`alt="" />`)).toBe(true)
   })
 })

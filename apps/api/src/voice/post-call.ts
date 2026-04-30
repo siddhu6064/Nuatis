@@ -253,11 +253,12 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
         // start_time fetched fresh — SMS block's appointmentDateTime is scoped inside its own try/catch
         const [{ data: appt }, { data: tenantRow }] = await Promise.all([
           supabase.from('appointments').select('start_time').eq('id', appointmentId).single(),
-          supabase.from('tenants').select('timezone').eq('id', tenantId).maybeSingle(),
+          supabase.from('tenants').select('timezone, name').eq('id', tenantId).maybeSingle(),
         ])
 
-        const timezone =
-          (tenantRow as { timezone?: string | null } | null)?.timezone ?? 'America/Chicago'
+        const tenantData = tenantRow as { timezone?: string | null; name?: string | null } | null
+        const timezone = tenantData?.timezone ?? 'America/Chicago'
+        const resolvedBusinessName = tenantData?.name?.trim() || businessName
 
         let appointmentDateTime: string | null = null
         if (appt) {
@@ -278,7 +279,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
         const { subject, html, text } = buildAppointmentConfirmationEmail({
           contactName,
-          businessName,
+          businessName: resolvedBusinessName,
           appointmentDateTime,
           vertical,
         })
