@@ -6,7 +6,13 @@ import 'dotenv/config'
 // UNIQUE(tenant_id, position) constraint on pipeline_stages.
 const INLINE_STAGES: Record<
   string,
-  Array<{ name: string; position: number; color: string; is_default?: boolean }>
+  Array<{
+    name: string
+    position: number
+    color: string
+    is_default?: boolean
+    is_terminal?: boolean
+  }>
 > = {
   sales_crm: [
     { name: 'New lead', position: 1, color: '#888780', is_default: true },
@@ -36,6 +42,13 @@ const INLINE_STAGES: Record<
     { name: 'First Visit', position: 3, color: '#EF9F27' },
     { name: 'Returning Client', position: 4, color: '#2DA89C' },
     { name: 'Member', position: 5, color: '#1D9E75' },
+  ],
+  gym: [
+    { name: 'Lead', position: 1, color: '#3B82F6', is_default: true },
+    { name: 'Trial Session', position: 2, color: '#F59E0B' },
+    { name: 'Active Member', position: 3, color: '#22C55E' },
+    { name: 'At-Risk Member', position: 4, color: '#EF4444' },
+    { name: 'Lapsed', position: 5, color: '#6B7280', is_terminal: true },
   ],
 }
 

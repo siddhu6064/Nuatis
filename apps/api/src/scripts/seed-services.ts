@@ -75,6 +75,35 @@ const VERTICAL_SERVICES: Record<
     { name: 'Custom Solution', unit_price: 0, unit: 'quote' },
     { name: 'Training Session', unit_price: 200, unit: 'hour' },
   ],
+  gym: [
+    {
+      name: 'Personal Training Session',
+      unit_price: 75,
+      duration_minutes: 60,
+      category: 'Training',
+    },
+    {
+      name: 'Group Fitness Class',
+      unit_price: 25,
+      duration_minutes: 45,
+      category: 'Classes',
+    },
+    {
+      name: 'Nutrition Consultation',
+      unit_price: 60,
+      duration_minutes: 45,
+      category: 'Wellness',
+    },
+    {
+      name: 'Body Composition Assessment',
+      unit_price: 40,
+      duration_minutes: 30,
+      category: 'Assessment',
+    },
+    { name: 'Yoga Class', unit_price: 20, duration_minutes: 60, category: 'Classes' },
+    { name: 'Pilates Class', unit_price: 22, duration_minutes: 50, category: 'Classes' },
+    { name: 'Sports Massage', unit_price: 50, duration_minutes: 30, category: 'Wellness' },
+  ],
   spa: [
     { name: 'Swedish Massage', unit_price: 90, duration_minutes: 60, category: 'Massage' },
     { name: 'Deep Tissue Massage', unit_price: 110, duration_minutes: 60, category: 'Massage' },

@@ -864,6 +864,80 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     ],
   },
 
+  gym: {
+    slug: 'gym',
+    label: 'Gym & Fitness Studio',
+    inventory_label: 'Equipment / Supps',
+    staff_label: 'Trainers / Coaches',
+    fields: [
+      {
+        key: 'fitness_goal',
+        label: 'Fitness goal',
+        type: 'select',
+        required: false,
+        options: ['Weight Loss', 'Muscle Gain', 'Endurance', 'Flexibility', 'General Fitness'],
+      },
+      {
+        key: 'membership_type',
+        label: 'Membership type',
+        type: 'select',
+        required: false,
+        options: ['Monthly', 'Annual', 'Drop-In', 'Class Pack'],
+      },
+      { key: 'preferred_trainer', label: 'Preferred trainer', type: 'text', required: false },
+      {
+        key: 'medical_clearance',
+        label: 'Medical clearance',
+        type: 'select',
+        required: false,
+        options: ['Yes', 'No', 'Pending'],
+      },
+      { key: 'emergency_contact', label: 'Emergency contact', type: 'text', required: false },
+      { key: 'join_date', label: 'Join date', type: 'date', required: false },
+      { key: 'last_visit_date', label: 'Last visit date', type: 'date', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'Lead', position: 1, color: '#3B82F6', is_default: true },
+      { name: 'Trial Session', position: 2, color: '#F59E0B' },
+      { name: 'Active Member', position: 3, color: '#22C55E' },
+      { name: 'At-Risk Member', position: 4, color: '#EF4444' },
+      { name: 'Lapsed', position: 5, color: '#6B7280', is_terminal: true },
+    ],
+    maya_intents: [
+      'Personal training session booking',
+      'Group fitness class booking',
+      'Membership inquiry',
+      'Trial session or free class request',
+      'Class schedule questions',
+      'Cancellation policy',
+    ],
+    system_prompt_template:
+      "You are Maya, the AI receptionist for {{business_name}}, a gym and fitness studio. Speak in an energetic, motivating, and friendly tone. You help callers book personal training sessions and fitness classes, answer questions about memberships, and get people excited about their fitness journey. You know the gym's full service menu including personal training, group fitness classes, yoga, pilates, nutrition consultations, and sports massage. Always encourage callers to book a trial session or free class if they are new. Never provide specific medical or dietary advice beyond general fitness guidance." +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '5am-10pm', sat: '7am-8pm', sun: '7am-8pm' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          'Hi {name}, thanks for reaching out to {business}! Ready to crush your fitness goals? Book your first session today. Reply STOP to opt out.',
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Your fitness journey starts at {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. We have classes and training sessions available and would love to help you reach your goals.',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, spots still available at {business} this week. Book your trial session today! Reply STOP to opt out.',
+      },
+    ],
+  },
+
   spa: {
     slug: 'spa',
     label: 'Spa & Wellness',

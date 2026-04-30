@@ -10,6 +10,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 interface StaffSeed {
   name: string
   role: string
+  color_hex?: string
 }
 
 const STAFF_PRESETS: Record<string, StaffSeed[]> = {
@@ -62,6 +63,11 @@ const STAFF_PRESETS: Record<string, StaffSeed[]> = {
     { name: 'Maya Patel', role: 'Lead Therapist' },
     { name: 'Chloe Bennett', role: 'Esthetician' },
     { name: 'Jordan Ellis', role: 'Receptionist' },
+  ],
+  gym: [
+    { name: 'Alex Rivera', role: 'Personal Trainer', color_hex: '#3B82F6' },
+    { name: 'Simone Carter', role: 'Group Fitness Instructor', color_hex: '#22C55E' },
+    { name: 'Tyler Brooks', role: 'Front Desk', color_hex: '#F59E0B' },
   ],
 }
 
@@ -127,7 +133,7 @@ export async function seedStaff(tenantId: string, vertical: string): Promise<voi
       vertical,
       name: p.name,
       role: p.role,
-      color_hex: COLORS[i] ?? '#6366F1',
+      color_hex: p.color_hex ?? COLORS[i] ?? '#6366F1',
       is_active: true,
       availability: AVAILABILITY,
     }))
