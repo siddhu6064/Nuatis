@@ -92,7 +92,7 @@ export { VERTICAL_SERVICES }
 
 async function main() {
   const tenantId = process.argv[2] ?? process.env['VOICE_DEV_TENANT_ID']
-  const vertical = process.argv[3] ?? 'sales_crm'
+  const vertical = process.argv[3] // optional — if omitted, seed all verticals
 
   if (!tenantId) {
     console.error('Usage: npx tsx src/scripts/seed-services.ts <tenant_id> [vertical]')
@@ -104,44 +104,49 @@ async function main() {
     process.env['SUPABASE_SERVICE_ROLE_KEY']!
   )
 
-  const { count } = await supabase
-    .from('services')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenantId)
+  const verticalsToSeed = vertical ? [vertical] : Object.keys(VERTICAL_SERVICES)
 
-  if (count && count > 0) {
+  for (const v of verticalsToSeed) {
+    const services = VERTICAL_SERVICES[v]
+    if (!services) {
+      console.error(`[seed-services] unknown vertical: ${v}`)
+      continue
+    }
+
+    const { count } = await supabase
+      .from('services')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('vertical', v)
+
+    if (count && count > 0) {
+      console.info(
+        `[seed-services] ${v} services already exist for tenant=${tenantId} (${count} found) — skipping`
+      )
+      continue
+    }
+
+    const rows = services.map((s, i) => ({
+      tenant_id: tenantId,
+      vertical: v,
+      name: s.name,
+      unit_price: s.unit_price,
+      unit: s.unit ?? 'each',
+      duration_minutes: s.duration_minutes ?? null,
+      category: s.category ?? null,
+      sort_order: i,
+    }))
+
+    const { error } = await supabase.from('services').insert(rows)
+    if (error) {
+      console.error(`[seed-services] insert error for ${v}: ${error.message}`)
+      continue
+    }
+
     console.info(
-      `[seed-services] services already exist for tenant=${tenantId} (${count} found) — skipping`
+      `[seed-services] inserted ${rows.length} services for tenant=${tenantId} vertical=${v}`
     )
-    return
   }
-
-  const services = VERTICAL_SERVICES[vertical]
-  if (!services) {
-    console.error(`[seed-services] unknown vertical: ${vertical}`)
-    process.exit(1)
-  }
-
-  const rows = services.map((s, i) => ({
-    tenant_id: tenantId,
-    vertical,
-    name: s.name,
-    unit_price: s.unit_price,
-    unit: s.unit ?? 'each',
-    duration_minutes: s.duration_minutes ?? null,
-    category: s.category ?? null,
-    sort_order: i,
-  }))
-
-  const { error } = await supabase.from('services').insert(rows)
-  if (error) {
-    console.error(`[seed-services] insert error: ${error.message}`)
-    process.exit(1)
-  }
-
-  console.info(
-    `[seed-services] inserted ${rows.length} services for tenant=${tenantId} vertical=${vertical}`
-  )
 }
 
 main().catch(console.error)
