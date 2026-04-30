@@ -1,4 +1,4 @@
-/* eslint-env node */
+/* global process, console */
 import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
 
@@ -38,9 +38,9 @@ for (const loc of locations) {
         name: loc.name,
       })
       .eq('tenant_id', loc.tenant_id)
-    console.log(`updated ${loc.name}:`, error ?? 'ok')
+    console.info(`updated ${loc.name}:`, error ?? 'ok')
   } else {
     const { error } = await s.from('locations').insert(loc)
-    console.log(`inserted ${loc.name}:`, error ?? 'ok')
+    console.info(`inserted ${loc.name}:`, error ?? 'ok')
   }
 }
