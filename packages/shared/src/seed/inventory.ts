@@ -12,6 +12,7 @@ interface ItemSeed {
   unit: string
   quantity: number
   reorder_threshold: number
+  unit_cost?: number
   supplier?: string
 }
 
@@ -119,6 +120,48 @@ const PRESETS: Record<string, ItemSeed[]> = {
     { name: 'USB Drives', sku: 'USB-16G', unit: 'each', quantity: 12, reorder_threshold: 3 },
     { name: 'HDMI Adapters', sku: 'HD-USB', unit: 'each', quantity: 8, reorder_threshold: 2 },
   ],
+  gym: [
+    {
+      name: 'Protein Supplements',
+      sku: 'GYM-SUPP-001',
+      unit: 'each',
+      quantity: 30,
+      reorder_threshold: 8,
+      unit_cost: 35.0,
+    },
+    {
+      name: 'Pre-Workout',
+      sku: 'GYM-SUPP-002',
+      unit: 'each',
+      quantity: 25,
+      reorder_threshold: 6,
+      unit_cost: 28.0,
+    },
+    {
+      name: 'Resistance Bands',
+      sku: 'GYM-ACC-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+      unit_cost: 12.0,
+    },
+    {
+      name: 'Water Bottles',
+      sku: 'GYM-ACC-002',
+      unit: 'each',
+      quantity: 30,
+      reorder_threshold: 10,
+      unit_cost: 8.0,
+    },
+    {
+      name: 'Recovery Foam Roller',
+      sku: 'GYM-REC-001',
+      unit: 'each',
+      quantity: 15,
+      reorder_threshold: 4,
+      unit_cost: 22.0,
+    },
+  ],
   spa: [
     {
       name: 'Essential Oils (Assorted)',
@@ -173,6 +216,7 @@ export async function seedInventory(tenantId: string, vertical: string): Promise
       unit: p.unit,
       quantity: p.quantity,
       reorder_threshold: p.reorder_threshold,
+      unit_cost: p.unit_cost ?? null,
       supplier: p.supplier ?? null,
     }))
 
