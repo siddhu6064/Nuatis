@@ -863,6 +863,86 @@ export const VERTICALS: Record<string, VerticalConfig> = {
       },
     ],
   },
+
+  spa: {
+    slug: 'spa',
+    label: 'Spa & Wellness',
+    inventory_label: 'Oils & Supplies',
+    staff_label: 'Therapists',
+    fields: [
+      {
+        key: 'skin_type',
+        label: 'Skin type',
+        type: 'select',
+        required: false,
+        options: ['Normal', 'Oily', 'Dry', 'Combination', 'Sensitive'],
+      },
+      { key: 'preferred_therapist', label: 'Preferred therapist', type: 'text', required: false },
+      { key: 'member_since', label: 'Member since', type: 'date', required: false },
+      {
+        key: 'allergies_sensitivities',
+        label: 'Allergies / sensitivities',
+        type: 'text',
+        required: false,
+      },
+      {
+        key: 'preferred_pressure',
+        label: 'Preferred pressure',
+        type: 'select',
+        required: false,
+        options: ['Light', 'Medium', 'Firm', 'Deep'],
+      },
+      {
+        key: 'preferred_appointment_time',
+        label: 'Preferred appointment time',
+        type: 'select',
+        required: false,
+        options: ['Morning', 'Afternoon', 'Evening', 'Weekend'],
+      },
+      { key: 'last_visit_date', label: 'Last visit date', type: 'date', required: false },
+      { key: 'special_requests', label: 'Special requests', type: 'textarea', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'Inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Consultation Booked', position: 2, color: C.blue },
+      { name: 'First Visit', position: 3, color: C.amber },
+      { name: 'Returning Client', position: 4, color: C.teal },
+      { name: 'Member', position: 5, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Massage and spa service booking',
+      'Reschedule or cancel appointment',
+      'Service menu and pricing questions',
+      'Gift card inquiries',
+      'Membership and package questions',
+      'Special occasion or couples booking',
+    ],
+    system_prompt_template:
+      "You are Maya, the AI receptionist for {{business_name}}, a spa and wellness center. Speak in a calm, soothing, wellness-focused tone. You help callers book massage and spa services, answer questions about treatments, and provide a relaxing first impression of the business. You know the spa's full service menu including Swedish massage, deep tissue, hot stone, facials, body wraps, and couples massages. Always mention that appointments are recommended. If asked about pricing, provide the listed price for each service. For gift cards or memberships, let the caller know to ask a staff member for details. Never diagnose health conditions or give medical advice." +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '9am-8pm', sat: '9am-8pm', sun: '10am-6pm' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thank you for calling {business}! We'd love to help you relax and unwind. Reply to book your appointment or STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Treat yourself — {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. We have some wonderful services available and would love to welcome you in for some well-deserved relaxation.',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, openings available this week at {business}. Book your treatment today! Reply STOP to opt out.',
+      },
+    ],
+  },
 }
 
 export const VERTICAL_SLUGS = Object.keys(VERTICALS) as (keyof typeof VERTICALS)[]

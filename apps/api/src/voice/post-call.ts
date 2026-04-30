@@ -4,6 +4,7 @@ import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { sendSms } from '../lib/sms.js'
+import { grantTcpaOptIn } from '../lib/tcpa.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
 import { sendEmail } from '../lib/email-client.js'
 import {
@@ -207,6 +208,11 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
         }
 
         const smsText = buildConfirmationSms({ businessName, appointmentDateTime, vertical })
+
+        // TCPA: grant SMS consent — verbal/transactional consent from Maya booking
+        if (contactId) {
+          await grantTcpaOptIn(contactId, tenantId)
+        }
 
         const { success } = await sendSms(fromNumber, callerId, smsText, {
           tenantId,

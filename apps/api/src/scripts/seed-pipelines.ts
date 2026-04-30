@@ -53,6 +53,13 @@ const INLINE_STAGES: Record<
     { name: 'Recovery', position: 4, color: '#7F77DD' },
     { name: 'Active pet', position: 5, color: '#1D9E75' },
   ],
+  spa: [
+    { name: 'Inquiry', position: 1, color: '#888780', is_default: true },
+    { name: 'Consultation Booked', position: 2, color: '#378ADD' },
+    { name: 'First Visit', position: 3, color: '#EF9F27' },
+    { name: 'Returning Client', position: 4, color: '#2DA89C' },
+    { name: 'Member', position: 5, color: '#1D9E75' },
+  ],
 }
 
 const DEFAULT_TENANTS: Array<{ id: string; vertical: string }> = [

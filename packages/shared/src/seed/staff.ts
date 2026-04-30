@@ -58,6 +58,11 @@ const STAFF_PRESETS: Record<string, StaffSeed[]> = {
     { name: 'Megan Harris', role: 'SDR' },
     { name: 'Brian Clark', role: 'Sales Manager' },
   ],
+  spa: [
+    { name: 'Maya Patel', role: 'Lead Therapist' },
+    { name: 'Chloe Bennett', role: 'Esthetician' },
+    { name: 'Jordan Ellis', role: 'Receptionist' },
+  ],
 }
 
 const COLORS = ['#6366F1', '#0EA5E9', '#10B981']
