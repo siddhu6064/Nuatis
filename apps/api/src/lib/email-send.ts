@@ -45,10 +45,15 @@ export function buildMimeMessage(
 }
 
 /**
- * Inserts a 1×1 tracking pixel before </body>. Falls back to appending.
+ * Replaces %%TRACKING_PIXEL%% placeholder with a 1×1 tracking img tag.
+ * Falls back to inserting before </body>, then appending.
  */
 export function injectTrackingPixel(html: string, trackingToken: string, apiUrl: string): string {
   const pixel = `<img src="${apiUrl}/api/email-tracking/${trackingToken}" width="1" height="1" style="display:none" alt="" />`
+
+  if (html.includes('%%TRACKING_PIXEL%%')) {
+    return html.replace('%%TRACKING_PIXEL%%', pixel)
+  }
 
   const bodyCloseIdx = html.toLowerCase().lastIndexOf('</body>')
   if (bodyCloseIdx !== -1) {
