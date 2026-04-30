@@ -8,11 +8,21 @@
 
 export type VerticalType =
   | 'dental'
-  | 'contractor'
+  | 'medical'
+  | 'veterinary'
   | 'salon'
-  | 'law_firm'
   | 'restaurant'
+  | 'contractor'
+  | 'law_firm'
   | 'real_estate'
+  | 'sales_crm'
+  | 'spa'
+  | 'gym'
+  | 'nail_bar'
+  | 'pet_grooming'
+  | 'tattoo'
+  | 'car_wash'
+  | 'laundry'
 
 export type SubscriptionPlan = 'starter' | 'growth' | 'pro'
 

@@ -119,6 +119,26 @@ const PRESETS: Record<string, ItemSeed[]> = {
     { name: 'USB Drives', sku: 'USB-16G', unit: 'each', quantity: 12, reorder_threshold: 3 },
     { name: 'HDMI Adapters', sku: 'HD-USB', unit: 'each', quantity: 8, reorder_threshold: 2 },
   ],
+  spa: [
+    {
+      name: 'Essential Oils (Assorted)',
+      sku: 'EO-AST',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    { name: 'Massage Lotion (1L)', sku: 'ML-1L', unit: 'each', quantity: 12, reorder_threshold: 3 },
+    { name: 'Hot Stones Set', sku: 'HS-SET', unit: 'each', quantity: 8, reorder_threshold: 2 },
+    { name: 'Face Masks (Box)', sku: 'FM-BOX', unit: 'box', quantity: 12, reorder_threshold: 3 },
+    { name: 'Body Wrap Supplies', sku: 'BW-SUP', unit: 'each', quantity: 8, reorder_threshold: 2 },
+    {
+      name: 'Retail Skincare (Assorted)',
+      sku: 'RS-AST',
+      unit: 'each',
+      quantity: 16,
+      reorder_threshold: 4,
+    },
+  ],
 }
 
 function getAdminClient(): SupabaseClient {

@@ -75,6 +75,16 @@ const VERTICAL_SERVICES: Record<
     { name: 'Custom Solution', unit_price: 0, unit: 'quote' },
     { name: 'Training Session', unit_price: 200, unit: 'hour' },
   ],
+  spa: [
+    { name: 'Swedish Massage', unit_price: 90, duration_minutes: 60, category: 'Massage' },
+    { name: 'Deep Tissue Massage', unit_price: 110, duration_minutes: 60, category: 'Massage' },
+    { name: 'Hot Stone Massage', unit_price: 130, duration_minutes: 90, category: 'Massage' },
+    { name: 'Classic Facial', unit_price: 85, duration_minutes: 60, category: 'Facial' },
+    { name: 'Body Wrap', unit_price: 120, duration_minutes: 90, category: 'Body' },
+    { name: "Couple's Massage", unit_price: 180, duration_minutes: 60, category: 'Massage' },
+    { name: 'Aromatherapy Massage', unit_price: 95, duration_minutes: 60, category: 'Massage' },
+    { name: 'Scalp Treatment', unit_price: 55, duration_minutes: 30, category: 'Scalp' },
+  ],
 }
 
 // Also export for use by auto-quote logic
