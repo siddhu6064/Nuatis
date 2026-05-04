@@ -11,7 +11,6 @@
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.0.6",
     "@nuatis/shared": "*",
     "@supabase/supabase-js": "^2.100.0",
     "@tailwindcss/forms": "^0.5.11",

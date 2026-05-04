@@ -1,12 +1,12 @@
 import type { Request, Response, NextFunction } from 'express'
-import { createRemoteJWKSet, jwtVerify } from 'jose'
+import { jwtVerify } from 'jose'
 
 export interface AuthenticatedRequest extends Request {
   tenantId: string
   userId: string
   role: string
   vertical: string
-  authProvider: 'authjs' | 'clerk'
+  authProvider: 'authjs'
 }
 
 async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>> {
@@ -14,14 +14,6 @@ async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>
   if (!secret) throw new Error('AUTH_SECRET not set')
   const secretBytes = new TextEncoder().encode(secret)
   const { payload } = await jwtVerify(token, secretBytes, { algorithms: ['HS256'] })
-  return payload as Record<string, unknown>
-}
-
-async function verifyClerkToken(token: string): Promise<Record<string, unknown>> {
-  const clerkJwksUrl = process.env['CLERK_JWKS_URL']
-  if (!clerkJwksUrl) throw new Error('CLERK_JWKS_URL not set')
-  const JWKS = createRemoteJWKSet(new URL(clerkJwksUrl))
-  const { payload } = await jwtVerify(token, JWKS, { algorithms: ['RS256'] })
   return payload as Record<string, unknown>
 }
 
@@ -42,23 +34,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.slice(7)
 
-  // Decode header to detect Clerk vs Auth.js
-  let isClerk = false
   try {
-    const [, rawPayload] = token.split('.')
-    if (rawPayload) {
-      const decoded = JSON.parse(Buffer.from(rawPayload, 'base64url').toString('utf-8')) as Record<
-        string,
-        unknown
-      >
-      isClerk = !!decoded['azp']
-    }
-  } catch {
-    // malformed token — will fail verification below
-  }
-
-  try {
-    const payload = isClerk ? await verifyClerkToken(token) : await verifyAuthjsToken(token)
+    const payload = await verifyAuthjsToken(token)
 
     const tenantId = (payload['tenantId'] ?? payload['org_id']) as string | undefined
 
@@ -72,7 +49,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     authedReq.userId = (payload['sub'] as string) ?? ''
     authedReq.role = (payload['role'] as string) ?? 'staff'
     authedReq.vertical = (payload['vertical'] as string) ?? ''
-    authedReq.authProvider = isClerk ? 'clerk' : 'authjs'
+    authedReq.authProvider = 'authjs'
     res.locals['tenantId'] = tenantId
 
     next()
