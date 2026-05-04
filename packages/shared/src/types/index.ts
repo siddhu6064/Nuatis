@@ -68,7 +68,6 @@ export type AutomationType =
 
 export interface Tenant {
   id: string
-  clerkOrgId: string
   name: string
   slug: string
   vertical: VerticalType
@@ -107,7 +106,6 @@ export interface User {
   id: string
   tenantId: string
   locationId: string | null
-  clerkUserId: string
   email: string
   fullName: string
   role: UserRole
