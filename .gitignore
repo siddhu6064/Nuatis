@@ -51,3 +51,6 @@ apps/web/.env.local
 # Git worktrees
 .worktrees/
 supabase/.temp/
+
+# Supabase CLI cache
+**/supabase/.temp/
