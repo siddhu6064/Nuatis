@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url, { request: { headers } })
   }
 
-  // Clerk handles /demo/* routes via (demo) layout
+  // Demo layout — no auth required
   if (pathname.startsWith('/demo')) {
     return NextResponse.next()
   }
