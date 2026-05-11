@@ -37,16 +37,11 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
 
   // Count-only path (used by sidebar low-stock badge polling)
   if (countOnly) {
-    let countQuery = supabase
+    const countQuery = supabase
       .from('inventory_items')
       .select('id, quantity, reorder_threshold', { count: 'exact', head: false })
       .eq('tenant_id', authed.tenantId)
       .is('deleted_at', null)
-
-    if (lowStock) {
-      // PostgREST filter: quantity <= reorder_threshold
-      countQuery = countQuery.filter('quantity', 'lte', 'reorder_threshold')
-    }
 
     const { data, error } = await countQuery
     if (error) {
