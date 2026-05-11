@@ -39,8 +39,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     query = query.eq('is_archived', false)
   }
 
-  // ── Text search (q) ──
-  const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : null
+  // ── Text search (q or search) ──
+  const rawQ = req.query['search'] ?? req.query['q']
+  const q = typeof rawQ === 'string' ? rawQ.trim() : null
   if (q && q.length > 0) {
     const pattern = `%${q}%`
     query = query.or(

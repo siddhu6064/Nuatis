@@ -222,7 +222,7 @@ export default function DealsKanban() {
           probability: parseInt(newProbability) || 50,
           pipeline_stage_id: stages[0]?.id,
           pipeline_id: activePipelineId !== '__legacy__' ? activePipelineId : undefined,
-          contact_id: selectedContact?.id ?? undefined,
+          contact_id: selectedContact?.id ?? null,
         }),
       })
       if (res.ok) {
