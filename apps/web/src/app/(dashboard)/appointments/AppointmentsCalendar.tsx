@@ -88,9 +88,15 @@ interface Props {
   tenantId: string
   initialAppointments: Appointment[]
   staff: StaffMember[]
+  userRole: string
 }
 
-export default function AppointmentsCalendar({ tenantId, initialAppointments, staff }: Props) {
+export default function AppointmentsCalendar({
+  tenantId,
+  initialAppointments,
+  staff,
+  userRole,
+}: Props) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [view, setView] = useState<View>(Views.WEEK)
   const [date, setDate] = useState(new Date())
@@ -244,10 +250,15 @@ export default function AppointmentsCalendar({ tenantId, initialAppointments, st
       {selectedAppt && (
         <AppointmentDrawer
           appt={selectedAppt}
+          userRole={userRole}
           onClose={() => setSelectedAppt(null)}
           onUpdated={(updated) => {
             setSelectedAppt(updated)
             setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
+          }}
+          onDeleted={() => {
+            setAppointments((prev) => prev.filter((a) => a.id !== selectedAppt.id))
+            setSelectedAppt(null)
           }}
         />
       )}

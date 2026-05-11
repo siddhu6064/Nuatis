@@ -96,19 +96,31 @@ function toForm(appt: Appointment): FormState {
 
 interface Props {
   appt: Appointment
+  userRole?: string
   onClose: () => void
   onUpdated: (updated: Appointment) => void
+  onDeleted: () => void
 }
 
 const INP =
   'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
-export default function AppointmentDrawer({ appt, onClose, onUpdated }: Props) {
+export default function AppointmentDrawer({
+  appt,
+  userRole,
+  onClose,
+  onUpdated,
+  onDeleted,
+}: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [localAppt, setLocalAppt] = useState(appt)
   const [form, setForm] = useState<FormState>(() => toForm(appt))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const canDelete = userRole === 'owner' || userRole === 'admin'
 
   const start = formatDateTime(localAppt.start_time)
   const endTime = new Date(localAppt.end_time).toLocaleTimeString('en-US', {
@@ -167,6 +179,25 @@ export default function AppointmentDrawer({ appt, onClose, onUpdated }: Props) {
       setError('Network error. Please try again.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/appointments/${localAppt.id}`, { method: 'DELETE' })
+      if (res.ok || res.status === 204) {
+        onDeleted()
+      } else {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(d.error ?? 'Failed to delete. Please try again.')
+        setDeleteConfirm(false)
+      }
+    } catch {
+      setError('Network error. Please try again.')
+      setDeleteConfirm(false)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -281,22 +312,54 @@ export default function AppointmentDrawer({ appt, onClose, onUpdated }: Props) {
             </div>
 
             {/* Edit footer */}
-            <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
-              <button
-                onClick={cancelEdit}
-                disabled={saving}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="flex-1 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
+            {deleteConfirm ? (
+              <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-3">
+                <p className="text-sm text-gray-700 font-medium">Delete this appointment?</p>
+                <p className="text-xs text-gray-500">This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDeleteConfirm(false)}
+                    disabled={deleting}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Keep
+                  </button>
+                  <button
+                    onClick={() => void handleDelete()}
+                    disabled={deleting}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {deleting ? 'Deleting…' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
+                {canDelete && (
+                  <button
+                    onClick={() => setDeleteConfirm(true)}
+                    disabled={saving}
+                    className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                )}
+                <button
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <>

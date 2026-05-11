@@ -22,6 +22,7 @@ interface StaffMember {
 export default async function AppointmentsPage() {
   const session = await auth()
   const tenantId = session?.user?.tenantId as string
+  const userRole = (session?.user as { role?: string })?.role ?? 'member'
 
   const windowStart = new Date()
   windowStart.setDate(windowStart.getDate() - 7)
@@ -57,6 +58,7 @@ export default async function AppointmentsPage() {
       tenantId={tenantId}
       initialAppointments={appointments ?? []}
       staff={staff ?? []}
+      userRole={userRole}
     />
   )
 }
