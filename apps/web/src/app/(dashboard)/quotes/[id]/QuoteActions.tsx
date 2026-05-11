@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 interface Props {
   quoteId: string
   status: string
-  shareUrl: string
+  shareToken: string
   approvalStatus?: string | null
   discountPct?: number
 }
@@ -14,7 +14,7 @@ interface Props {
 export default function QuoteActions({
   quoteId,
   status,
-  shareUrl,
+  shareToken,
   approvalStatus,
   discountPct,
 }: Props) {
@@ -46,6 +46,8 @@ export default function QuoteActions({
   }
 
   function copyLink() {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
+    const shareUrl = `${base}/quotes/view/${shareToken}`
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)

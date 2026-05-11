@@ -99,8 +99,6 @@ export default async function QuoteDetailPage({ params }: Props) {
   }
 
   const badge = STATUS_BADGE[quote.status] ?? STATUS_BADGE['draft']!
-  const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001'
-  const shareUrl = `${apiUrl}/quotes/view/${quote.share_token}`
 
   return (
     <div className="px-8 py-8 max-w-3xl">
@@ -168,7 +166,7 @@ export default async function QuoteDetailPage({ params }: Props) {
         <QuoteActions
           quoteId={quote.id}
           status={quote.status}
-          shareUrl={shareUrl}
+          shareToken={quote.share_token}
           approvalStatus={quote.approval_status}
           discountPct={Number(quote.discount_pct ?? 0)}
         />
