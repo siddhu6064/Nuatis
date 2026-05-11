@@ -81,23 +81,22 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     }
   }
 
-  const contactId = typeof b['contact_id'] === 'string' ? b['contact_id'] : null
+  const contactId = typeof b['contact_id'] === 'string' ? b['contact_id'] || null : null
   const assignedToUserId =
-    typeof b['assigned_to_user_id'] === 'string' ? b['assigned_to_user_id'] : null
+    typeof b['assigned_to_user_id'] === 'string' ? b['assigned_to_user_id'] || null : null
 
-  const { data: task, error } = await supabase
-    .from('tasks')
-    .insert({
-      tenant_id: authed.tenantId,
-      contact_id: contactId,
-      title,
-      due_date: dueDate?.toISOString() ?? null,
-      assigned_to_user_id: assignedToUserId,
-      priority,
-      created_by_user_id: authed.userId,
-    })
-    .select()
-    .single()
+  const insertPayload = {
+    tenant_id: authed.tenantId,
+    contact_id: contactId,
+    title,
+    due_date: dueDate?.toISOString() ?? null,
+    assigned_to_user_id: assignedToUserId,
+    priority,
+    created_by_user_id: authed.userId || null,
+  }
+  console.error('[tasks] insert payload:', JSON.stringify(insertPayload))
+
+  const { data: task, error } = await supabase.from('tasks').insert(insertPayload).select().single()
 
   if (error || !task) {
     res.status(500).json({ error: error?.message ?? 'Failed to create task' })
