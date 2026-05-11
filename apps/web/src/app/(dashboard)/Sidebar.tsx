@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import { trackEvent } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -225,6 +226,10 @@ export default function Sidebar() {
   const [modules, setModules] = useState<Record<string, boolean>>({})
   const [unreadSms, setUnreadSms] = useState(0)
   const [lowStockCount, setLowStockCount] = useState(0)
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  const popoverRef = useRef<HTMLDivElement>(null)
   // Start all collapsed on SSR; hydrate from localStorage in effect
   const [groupOpen, setGroupOpen] = useState<GroupState>(() =>
     NAV_GROUPS.reduce((acc, g) => ({ ...acc, [g.id]: false }), {} as GroupState)
@@ -281,10 +286,14 @@ export default function Sidebar() {
           user?: {
             tenantId?: string
             modules?: Record<string, boolean>
+            name?: string
+            email?: string
           }
         }) => {
           if (!s?.user?.tenantId) return
           if (s.user.modules) setModules(s.user.modules)
+          if (s.user.name) setUserName(s.user.name)
+          if (s.user.email) setUserEmail(s.user.email)
           fetch('/api/provisioning/onboarding-status')
             .then((r) => (r.ok ? r.json() : null))
             .then((data: { onboarding_completed?: boolean; product?: string } | null) => {
@@ -298,6 +307,18 @@ export default function Sidebar() {
       )
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopoverOpen(false)
+      }
+    }
+    if (popoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [popoverOpen])
 
   const isMayaOnly = product === 'maya_only'
   const moduleEnabled = (m: string) => modules[m] !== false
@@ -441,16 +462,53 @@ export default function Sidebar() {
       </nav>
 
       {/* User footer */}
-      <div className="px-4 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-2.5">
+      <div className="px-4 py-4 border-t border-gray-100 relative" ref={popoverRef}>
+        {/* Popover */}
+        {popoverOpen && (
+          <div className="absolute bottom-full left-2 right-2 mb-2 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
+            <div className="px-4 py-3">
+              <p className="text-xs font-semibold text-gray-900 truncate">{userName || 'User'}</p>
+              <p className="text-[10px] text-gray-400 truncate mt-0.5">{userEmail}</p>
+            </div>
+            <div className="border-t border-gray-100" />
+            <button
+              type="button"
+              onClick={() => void signOut({ callbackUrl: '/login' })}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <svg
+                className="w-3.5 h-3.5 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setPopoverOpen((prev) => !prev)}
+          className="w-full flex items-center gap-2.5 rounded-lg hover:bg-gray-50 transition-colors p-1 -mx-1"
+        >
           <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-            <span className="text-teal-700 text-xs font-bold">S</span>
+            <span className="text-teal-700 text-xs font-bold">
+              {(userName || 'U')[0]?.toUpperCase()}
+            </span>
           </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">Nuatis LLC</p>
-            <p className="text-[10px] text-gray-400 truncate">sid@nuatis.com</p>
+          <div className="min-w-0 text-left">
+            <p className="text-xs font-medium text-gray-900 truncate">{userName || 'User'}</p>
+            <p className="text-[10px] text-gray-400 truncate">{userEmail}</p>
           </div>
-        </div>
+        </button>
       </div>
     </aside>
   )
