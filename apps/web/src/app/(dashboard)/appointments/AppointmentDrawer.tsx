@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 type AppointmentStatus =
   | 'scheduled'
   | 'confirmed'
@@ -8,12 +10,13 @@ type AppointmentStatus =
   | 'canceled'
   | 'rescheduled'
 
-interface Appointment {
+export interface Appointment {
   id: string
   title: string
   start_time: string
   end_time: string
   status: AppointmentStatus
+  notes: string | null
   contacts: { full_name: string } | null
   staff_members: { id: string; name: string; color_hex: string } | null
 }
@@ -36,6 +39,14 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
   rescheduled: 'Rescheduled',
 }
 
+const STATUS_OPTIONS: Array<{ value: AppointmentStatus; label: string }> = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'no_show', label: 'No Show' },
+  { value: 'canceled', label: 'Canceled' },
+]
+
 function formatDateTime(iso: string) {
   const d = new Date(iso)
   return {
@@ -49,19 +60,115 @@ function formatDateTime(iso: string) {
   }
 }
 
+function pad(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+function toDateInput(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function toTimeInput(iso: string): string {
+  const d = new Date(iso)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+interface FormState {
+  title: string
+  date: string
+  startTime: string
+  endTime: string
+  status: AppointmentStatus
+  notes: string
+}
+
+function toForm(appt: Appointment): FormState {
+  return {
+    title: appt.title,
+    date: toDateInput(appt.start_time),
+    startTime: toTimeInput(appt.start_time),
+    endTime: toTimeInput(appt.end_time),
+    status: appt.status,
+    notes: appt.notes ?? '',
+  }
+}
+
 interface Props {
   appt: Appointment
   onClose: () => void
+  onUpdated: (updated: Appointment) => void
 }
 
-export default function AppointmentDrawer({ appt, onClose }: Props) {
-  const start = formatDateTime(appt.start_time)
-  const end = new Date(appt.end_time).toLocaleTimeString('en-US', {
+const INP =
+  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+
+export default function AppointmentDrawer({ appt, onClose, onUpdated }: Props) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [localAppt, setLocalAppt] = useState(appt)
+  const [form, setForm] = useState<FormState>(() => toForm(appt))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const start = formatDateTime(localAppt.start_time)
+  const endTime = new Date(localAppt.end_time).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   })
-  const color = STATUS_COLOR[appt.status] ?? '#0d9488'
+  const color = STATUS_COLOR[localAppt.status] ?? '#0d9488'
+
+  function enterEdit() {
+    setForm(toForm(localAppt))
+    setError(null)
+    setIsEditing(true)
+  }
+
+  function cancelEdit() {
+    setIsEditing(false)
+    setError(null)
+  }
+
+  function set(key: keyof FormState, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+    setError(null)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      const startISO = new Date(`${form.date}T${form.startTime}:00`).toISOString()
+      const endISO = new Date(`${form.date}T${form.endTime}:00`).toISOString()
+      const payload = {
+        title: form.title.trim(),
+        start_time: startISO,
+        end_time: endISO,
+        status: form.status,
+        notes: form.notes.trim() || null,
+      }
+
+      const res = await fetch(`/api/appointments/${localAppt.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        const updated: Appointment = { ...localAppt, ...payload }
+        setLocalAppt(updated)
+        onUpdated(updated)
+        setIsEditing(false)
+      } else {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(d.error ?? 'Failed to save. Please try again.')
+      }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <>
@@ -72,7 +179,9 @@ export default function AppointmentDrawer({ appt, onClose }: Props) {
       <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Appointment Details</h2>
+          <h2 className="text-sm font-semibold text-gray-900">
+            {isEditing ? 'Edit Appointment' : 'Appointment Details'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -90,67 +199,189 @@ export default function AppointmentDrawer({ appt, onClose }: Props) {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-              Contact
-            </p>
-            <p className="text-sm font-semibold text-gray-900">{appt.contacts?.full_name ?? '—'}</p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Status</p>
-            <span
-              className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold text-white"
-              style={{ backgroundColor: color }}
-            >
-              {STATUS_LABEL[appt.status]}
-            </span>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Date</p>
-            <p className="text-sm text-gray-700">{start.date}</p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Time</p>
-            <p className="text-sm text-gray-700">
-              {start.time} – {end}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Type</p>
-            <p className="text-sm text-gray-700">{appt.title}</p>
-          </div>
-
-          {appt.staff_members && (
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                Staff
-              </p>
-              <span className="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: appt.staff_members.color_hex }}
+        {isEditing ? (
+          <>
+            {/* Edit form */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => set('title', e.target.value)}
+                  className={INP}
+                  autoFocus
                 />
-                {appt.staff_members.name}
-              </span>
-            </div>
-          )}
-        </div>
+              </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100">
-          <a
-            href={`/appointments/${appt.id}`}
-            className="block w-full text-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            Edit Appointment
-          </a>
-        </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
+                  className={INP}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={form.startTime}
+                    onChange={(e) => set('startTime', e.target.value)}
+                    className={INP}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={form.endTime}
+                    onChange={(e) => set('endTime', e.target.value)}
+                    className={INP}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => set('status', e.target.value as AppointmentStatus)}
+                  className={`${INP} bg-white`}
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Notes <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                  rows={3}
+                  className={INP}
+                  placeholder="Internal notes…"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            {/* Edit footer */}
+            <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleSave()}
+                disabled={saving}
+                className="flex-1 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Read view */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  Contact
+                </p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {localAppt.contacts?.full_name ?? '—'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  Status
+                </p>
+                <span
+                  className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  {STATUS_LABEL[localAppt.status]}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  Date
+                </p>
+                <p className="text-sm text-gray-700">{start.date}</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  Time
+                </p>
+                <p className="text-sm text-gray-700">
+                  {start.time} – {endTime}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  Type
+                </p>
+                <p className="text-sm text-gray-700">{localAppt.title}</p>
+              </div>
+
+              {localAppt.staff_members && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                    Staff
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: localAppt.staff_members.color_hex }}
+                    />
+                    {localAppt.staff_members.name}
+                  </span>
+                </div>
+              )}
+
+              {localAppt.notes && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                    Notes
+                  </p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{localAppt.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Read footer */}
+            <div className="px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={enterEdit}
+                className="block w-full text-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+              >
+                Edit Appointment
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </>
   )

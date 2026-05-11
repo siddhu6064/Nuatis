@@ -31,6 +31,7 @@ const CreateAppointmentSchema = z.object({
 const UpdateAppointmentSchema = z.object({
   title: z.string().min(2).max(200).optional(),
   description: z.string().optional(),
+  notes: z.string().nullable().optional(),
   start_time: z.string().datetime().optional(),
   end_time: z.string().datetime().optional(),
   status: z

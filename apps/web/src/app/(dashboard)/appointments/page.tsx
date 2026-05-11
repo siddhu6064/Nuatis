@@ -8,6 +8,7 @@ interface Appointment {
   start_time: string
   end_time: string
   status: 'scheduled' | 'confirmed' | 'completed' | 'no_show' | 'canceled' | 'rescheduled'
+  notes: string | null
   contacts: { full_name: string } | null
   staff_members: { id: string; name: string; color_hex: string } | null
 }
@@ -36,7 +37,7 @@ export default async function AppointmentsPage() {
     supabase
       .from('appointments')
       .select(
-        'id, title, start_time, end_time, status, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
+        'id, title, start_time, end_time, status, notes, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
       )
       .eq('tenant_id', tenantId)
       .gte('start_time', windowStart.toISOString())
