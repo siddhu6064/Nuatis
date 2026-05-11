@@ -168,7 +168,7 @@ router.post('/', requireAuth, requireDeals, async (req: Request, res: Response):
       close_date: closeDate,
       probability,
       notes,
-      created_by_user_id: authed.userId,
+      created_by_user_id: authed.userId || null,
     })
     .select('*, pipeline_stages(id, name, color), contacts(id, full_name), companies(id, name)')
     .single()

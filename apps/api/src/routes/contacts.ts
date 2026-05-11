@@ -44,9 +44,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const q = typeof rawQ === 'string' ? rawQ.trim() : null
   if (q && q.length > 0) {
     const pattern = `%${q}%`
-    query = query.or(
-      `full_name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern},vertical_data::text.ilike.${pattern}`
-    )
+    query = query.or(`full_name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
   }
 
   // ── Pipeline stage filter (multi-select) ──
