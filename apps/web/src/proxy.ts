@@ -20,7 +20,7 @@ export async function proxy(request: NextRequest) {
       if (secret) {
         const secretBytes = new TextEncoder().encode(secret)
         const jwt = await new SignJWT({
-          sub: session.user.id ?? '',
+          sub: session.user.id || undefined,
           tenantId: session.user.tenantId,
           role: session.user.role,
           vertical: session.user.vertical,

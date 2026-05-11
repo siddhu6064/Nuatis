@@ -133,7 +133,7 @@ router.post(
         body,
         metadata: { pinned },
         actor_type: 'user',
-        actor_id: authed.userId,
+        actor_id: authed.userId || null,
       })
       .select()
       .single()
