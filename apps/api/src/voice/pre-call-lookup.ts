@@ -97,15 +97,21 @@ export async function lookupCaller(tenantId: string, phoneE164: string): Promise
     }
   })()
 
+  let timedOut = false
   const timeoutPromise = new Promise<CallerContext>((resolve) => {
-    setTimeout(() => resolve({ matched: false }), LOOKUP_TIMEOUT_MS)
+    setTimeout(() => {
+      timedOut = true
+      resolve({ matched: false })
+    }, LOOKUP_TIMEOUT_MS)
   })
 
   const result = await Promise.race([queryPromise, timeoutPromise])
   const durationMs = Date.now() - start
 
-  if (!result.matched && durationMs >= LOOKUP_TIMEOUT_MS) {
-    console.warn('[pre-call-lookup] timeout — falling back to baseline prompt')
+  if (timedOut) {
+    console.warn(
+      `[pre-call-lookup] timeout after ${LOOKUP_TIMEOUT_MS}ms — falling back to baseline prompt`
+    )
   }
 
   console.info('[pre-call-lookup]', {

@@ -75,7 +75,10 @@ export async function enqueueTaskReminder(
   dueDate: Date
 ): Promise<string | null> {
   const delay = dueDate.getTime() - Date.now()
-  if (delay <= 0) return null // already overdue
+  if (delay <= 0) {
+    console.info(`[task-scheduler] skipped — task=${job.taskId} is already overdue`)
+    return null
+  }
 
   const queue = getTaskReminderQueue()
   const added = await queue.add('reminder', job, {
@@ -83,6 +86,10 @@ export async function enqueueTaskReminder(
     removeOnComplete: true,
     removeOnFail: true,
   })
+
+  console.info(
+    `[task-scheduler] enqueued job for task=${job.taskId} due in ${Math.round(delay / 60000)}m (jobId=${added.id ?? 'unknown'})`
+  )
 
   return added.id ?? null
 }

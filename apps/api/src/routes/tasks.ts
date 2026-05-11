@@ -121,7 +121,10 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
         task.reminder_job_id = jobId
       }
     } catch (err) {
-      console.error('[tasks] failed to enqueue reminder:', err)
+      console.error(
+        '[tasks] failed to enqueue reminder — is REDIS_URL set?',
+        err instanceof Error ? err.message : err
+      )
     }
   }
 
