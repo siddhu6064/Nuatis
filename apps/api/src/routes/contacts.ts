@@ -466,6 +466,8 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   if (b['compliance_fields'] !== undefined) updates['compliance_fields'] = b['compliance_fields']
   if (typeof b['territory'] === 'string') updates['territory'] = b['territory'].trim() || null
   if (b['territory'] === null) updates['territory'] = null
+  if (typeof b['company_id'] === 'string') updates['company_id'] = b['company_id'] || null
+  if (b['company_id'] === null) updates['company_id'] = null
 
   const { data: updated, error } = await supabase
     .from('contacts')

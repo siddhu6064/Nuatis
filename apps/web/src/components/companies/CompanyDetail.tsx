@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 
 interface Company {
@@ -27,6 +27,13 @@ interface Props {
   companyId: string
 }
 
+interface ContactResult {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+}
+
 export default function CompanyDetail({ companyId }: Props) {
   const [company, setCompany] = useState<Company | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,6 +42,14 @@ export default function CompanyDetail({ companyId }: Props) {
   const [editDomain, setEditDomain] = useState('')
   const [editIndustry, setEditIndustry] = useState('')
   const [editWebsite, setEditWebsite] = useState('')
+
+  // Link contact state
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkSearch, setLinkSearch] = useState('')
+  const [linkResults, setLinkResults] = useState<ContactResult[]>([])
+  const [linkBusy, setLinkBusy] = useState(false)
+  const [unlinkingId, setUnlinkingId] = useState<string | null>(null)
+  const linkDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchCompany = useCallback(async () => {
     const res = await fetch(`/api/companies/${companyId}`)
@@ -52,6 +67,47 @@ export default function CompanyDetail({ companyId }: Props) {
     setLoading(true)
     void fetchCompany().finally(() => setLoading(false))
   }, [fetchCompany])
+
+  const handleLinkSearch = (q: string) => {
+    setLinkSearch(q)
+    if (linkDebounce.current) clearTimeout(linkDebounce.current)
+    if (!q.trim()) {
+      setLinkResults([])
+      return
+    }
+    linkDebounce.current = setTimeout(async () => {
+      const res = await fetch(`/api/contacts?q=${encodeURIComponent(q.trim())}&limit=8`)
+      if (res.ok) {
+        const data = (await res.json()) as { contacts: ContactResult[] }
+        setLinkResults(data.contacts ?? [])
+      }
+    }, 250)
+  }
+
+  const linkContact = async (contactId: string) => {
+    setLinkBusy(true)
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: companyId }),
+    })
+    setLinkBusy(false)
+    setLinkOpen(false)
+    setLinkSearch('')
+    setLinkResults([])
+    void fetchCompany()
+  }
+
+  const unlinkContact = async (contactId: string) => {
+    setUnlinkingId(contactId)
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: null }),
+    })
+    setUnlinkingId(null)
+    void fetchCompany()
+  }
 
   const saveEdits = async () => {
     await fetch(`/api/companies/${companyId}`, {
@@ -158,7 +214,54 @@ export default function CompanyDetail({ companyId }: Props) {
           <h3 className="text-sm font-semibold text-gray-700">
             Contacts ({company.contacts.length})
           </h3>
+          <button
+            onClick={() => {
+              setLinkOpen((o) => !o)
+              setLinkSearch('')
+              setLinkResults([])
+            }}
+            className="text-xs font-medium text-teal-600 hover:text-teal-700"
+          >
+            + Link Contact
+          </button>
         </div>
+
+        {/* Inline contact search */}
+        {linkOpen && (
+          <div className="mb-3 relative">
+            <input
+              autoFocus
+              type="text"
+              value={linkSearch}
+              onChange={(e) => handleLinkSearch(e.target.value)}
+              placeholder="Search contacts by name…"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            />
+            {linkResults.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                {linkResults.map((r) => (
+                  <button
+                    key={r.id}
+                    disabled={linkBusy}
+                    onClick={() => void linkContact(r.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left disabled:opacity-50"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                      <span className="text-teal-700 text-[10px] font-bold">
+                        {r.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{r.full_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{r.email ?? r.phone ?? ''}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {company.contacts.length === 0 ? (
           <p className="text-xs text-gray-400 py-4 text-center">
             No contacts linked to this company
@@ -166,26 +269,34 @@ export default function CompanyDetail({ companyId }: Props) {
         ) : (
           <div className="space-y-2">
             {company.contacts.map((c) => (
-              <Link
+              <div
                 key={c.id}
-                href={`/contacts/${c.id}`}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50"
               >
-                <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                  <span className="text-teal-700 text-xs font-bold">
-                    {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
-                  <p className="text-xs text-gray-400">{c.email ?? c.phone ?? ''}</p>
-                </div>
-                {c.pipeline_stage && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700">
-                    {c.pipeline_stage}
-                  </span>
-                )}
-              </Link>
+                <Link href={`/contacts/${c.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                    <span className="text-teal-700 text-xs font-bold">
+                      {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
+                    <p className="text-xs text-gray-400">{c.email ?? c.phone ?? ''}</p>
+                  </div>
+                  {c.pipeline_stage && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700">
+                      {c.pipeline_stage}
+                    </span>
+                  )}
+                </Link>
+                <button
+                  disabled={unlinkingId === c.id}
+                  onClick={() => void unlinkContact(c.id)}
+                  className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 ml-2 shrink-0"
+                >
+                  Unlink
+                </button>
+              </div>
             ))}
           </div>
         )}
