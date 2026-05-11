@@ -57,7 +57,7 @@ describe('appointment-reminder processor', () => {
         status: 'scheduled',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         reminder_24h_sent: false,
-        reminder_2h_sent: false,
+        reminder_1h_sent: false,
       },
     ]
 
@@ -68,7 +68,7 @@ describe('appointment-reminder processor', () => {
     expect(row?.['reminder_24h_sent']).toBe(true)
   })
 
-  it('sends 1h reminder and sets reminder_2h_sent flag', async () => {
+  it('sends 1h reminder and sets reminder_1h_sent flag', async () => {
     const apptId = randomUUID()
     store.tables['appointments'] = [
       {
@@ -79,7 +79,7 @@ describe('appointment-reminder processor', () => {
         status: 'scheduled',
         start_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         reminder_24h_sent: false,
-        reminder_2h_sent: false,
+        reminder_1h_sent: false,
       },
     ]
 
@@ -87,7 +87,7 @@ describe('appointment-reminder processor', () => {
 
     expect(fetchMock).toHaveBeenCalled()
     const row = (store.tables['appointments'] as Row[]).find((r) => r['id'] === apptId)
-    expect(row?.['reminder_2h_sent']).toBe(true)
+    expect(row?.['reminder_1h_sent']).toBe(true)
   })
 
   it('does not re-send 24h reminder if already sent', async () => {
@@ -101,7 +101,7 @@ describe('appointment-reminder processor', () => {
         status: 'scheduled',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         reminder_24h_sent: true,
-        reminder_2h_sent: false,
+        reminder_1h_sent: false,
       },
     ]
 
@@ -123,7 +123,7 @@ describe('appointment-reminder processor', () => {
         status: 'canceled',
         start_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         reminder_24h_sent: false,
-        reminder_2h_sent: false,
+        reminder_1h_sent: false,
       },
     ]
 

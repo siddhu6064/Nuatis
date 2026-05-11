@@ -50,6 +50,11 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+
+    if (!process.env['TELNYX_API_KEY']) {
+      console.warn('[appointment-reminder] SMS skipped — TELNYX_API_KEY not set or send failed')
+    }
+
     const now = Date.now()
 
     // 24h window: 23h to 25h from now
@@ -73,7 +78,7 @@ export async function scan(): Promise<void> {
       .from('appointments')
       .select('id, tenant_id, contact_id, title, start_time')
       .eq('status', 'scheduled')
-      .eq('reminder_2h_sent', false)
+      .eq('reminder_1h_sent', false)
       .gte('start_time', window1hStart)
       .lte('start_time', window1hEnd)
 
@@ -122,7 +127,7 @@ export async function scan(): Promise<void> {
       const sent = await sendSms(location.telnyx_number, contact.phone, text)
 
       if (sent) {
-        await supabase.from('appointments').update({ reminder_2h_sent: true }).eq('id', appt.id)
+        await supabase.from('appointments').update({ reminder_1h_sent: true }).eq('id', appt.id)
         console.info('[appointment-reminder] reminder sent, marked reminder_sent=true')
         sentCount++
       }
