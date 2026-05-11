@@ -309,6 +309,15 @@ export default function Sidebar() {
   }, [])
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ modules: Record<string, boolean> }>
+      if (ce.detail?.modules) setModules(ce.detail.modules)
+    }
+    window.addEventListener('nuatis:modules-changed', handler)
+    return () => window.removeEventListener('nuatis:modules-changed', handler)
+  }, [])
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         setPopoverOpen(false)

@@ -62,6 +62,9 @@ export default function ModuleSettings({ initialModules, isOwner }: Props) {
       if (res.ok) {
         const data = await res.json()
         setModules(data.modules)
+        window.dispatchEvent(
+          new CustomEvent('nuatis:modules-changed', { detail: { modules: data.modules } })
+        )
         showToast(
           'success',
           `${moduleKey.toUpperCase()} module ${enabled ? 'enabled' : 'disabled'}`
@@ -102,19 +105,28 @@ export default function ModuleSettings({ initialModules, isOwner }: Props) {
                 <p className="text-xs text-gray-400 mt-0.5">{mod.description}</p>
                 {hint && <p className="text-[10px] mt-1 text-amber-600">{hint}</p>}
               </div>
-              <button
-                onClick={() => toggle(mod.key, !enabled)}
-                disabled={!isOwner || toggling === mod.key}
-                className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-                  enabled ? 'bg-teal-600' : 'bg-gray-300'
-                } ${!isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              >
+              <div className="flex items-center gap-2 shrink-0">
                 <span
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    enabled ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
+                  className={`text-xs font-medium w-5 text-right ${enabled ? 'text-teal-600' : 'text-gray-400'}`}
+                >
+                  {enabled ? 'On' : 'Off'}
+                </span>
+                <button
+                  onClick={() => toggle(mod.key, !enabled)}
+                  disabled={!isOwner || toggling === mod.key}
+                  aria-checked={enabled}
+                  role="switch"
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    enabled ? 'bg-teal-600' : 'bg-gray-300'
+                  } ${!isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                      enabled ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           )
         })}
