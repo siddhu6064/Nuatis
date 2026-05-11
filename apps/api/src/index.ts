@@ -307,6 +307,20 @@ app.post('/voice/inbound', async (req, res) => {
       `[call-logger] hangup data captured: call_control_id=${hangupCallControlId} source=${hangupSource} cause=${hangupCause} mos=${mos}`
     )
 
+    // Patch voice_sessions if the row was already inserted (WS closed before webhook arrived)
+    const sbUrl = process.env['SUPABASE_URL']
+    const sbKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
+    if (sbUrl && sbKey) {
+      const sb = createClient(sbUrl, sbKey)
+      void sb
+        .from('voice_sessions')
+        .update({ hangup_source: hangupSource, hangup_cause: hangupCause, call_quality_mos: mos })
+        .eq('call_control_id', hangupCallControlId)
+        .then(({ error }) => {
+          if (error) console.error('[voice/inbound] hangup update error:', error.message)
+        })
+    }
+
     res.sendStatus(200)
     return
   }

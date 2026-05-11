@@ -634,7 +634,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       logCall({
         tenant_id: tenantId ?? 'unknown',
         duration_seconds: duration,
-        language: 'unknown', // language detection added in future task
+        language: 'en',
         timestamp: new Date(),
       })
       console.info(
@@ -676,6 +676,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           hangupSource: hangup?.hangupSource ?? null,
           hangupCause: hangup?.hangupCause ?? null,
           callQualityMos: hangup?.callQualityMos ?? null,
+          language: 'en',
           startedAt: callStartTime ? new Date(callStartTime) : new Date(),
         }).catch((err) => console.error('[call-logger] error:', err))
       }

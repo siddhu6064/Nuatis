@@ -6,23 +6,23 @@ AI-powered front-office SaaS for SMBs. Voice AI receptionist (Maya) + vertical-a
 
 ## Architecture
 
-| Layer       | Technology                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| Frontend    | Next.js 14 App Router, Tailwind v3, Vercel (port 3000)                                      |
-| Mobile      | React Native + Expo (Expo Router, NativeWind, Expo Push APNS/FCM, expo-sqlite, SecureStore) |
-| API         | Express ESM TypeScript, port 3001 (NodeNext, explicit `.js` imports)                        |
-| Auth        | Auth.js v5 (NextAuth) for customer tenants; Clerk for demo tenant only                      |
-| Database    | Supabase PostgreSQL + RLS, pgvector for RAG (54 tables, migrations 0001–0057)               |
-| Voice AI    | Gemini 2.0 Flash Live (unified STT/LLM/TTS, ~$0.008/call)                                   |
-| Telephony   | Telnyx (PSTN, SIP, SMS — Texas area codes)                                                  |
-| Calendar    | Native (default) + Google Calendar + Microsoft 365 (Graph API)                              |
-| Email       | Resend (transactional) + Gmail OAuth2 + Microsoft Graph (user mailbox sync)                 |
-| Queue       | BullMQ + Upstash Redis (17 workers)                                                         |
-| Push        | Web Push (VAPID) + Expo Push                                                                |
-| Monitoring  | Sentry, audit_log table, weekly data retention worker                                       |
-| Ops         | Nuatis-Ops-Copilot (Python sidecar, 5 detectors)                                            |
-| CI/CD       | GitHub Actions (Node 24)                                                                    |
-| Deploy      | Vercel (web), Azure Container Apps (api/voice — southcentralus, scripts ready)              |
+| Layer      | Technology                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| Frontend   | Next.js 14 App Router, Tailwind v3, Vercel (port 3000)                                      |
+| Mobile     | React Native + Expo (Expo Router, NativeWind, Expo Push APNS/FCM, expo-sqlite, SecureStore) |
+| API        | Express ESM TypeScript, port 3001 (NodeNext, explicit `.js` imports)                        |
+| Auth       | Auth.js v5 (NextAuth) for customer tenants; Clerk for demo tenant only                      |
+| Database   | Supabase PostgreSQL + RLS, pgvector for RAG (54 tables, migrations 0001–0057)               |
+| Voice AI   | Gemini 2.0 Flash Live (unified STT/LLM/TTS, ~$0.008/call)                                   |
+| Telephony  | Telnyx (PSTN, SIP, SMS — Texas area codes)                                                  |
+| Calendar   | Native (default) + Google Calendar + Microsoft 365 (Graph API)                              |
+| Email      | Resend (transactional) + Gmail OAuth2 + Microsoft Graph (user mailbox sync)                 |
+| Queue      | BullMQ + Upstash Redis (17 workers)                                                         |
+| Push       | Web Push (VAPID) + Expo Push                                                                |
+| Monitoring | Sentry, audit_log table, weekly data retention worker                                       |
+| Ops        | Nuatis-Ops-Copilot (Python sidecar, 5 detectors)                                            |
+| CI/CD      | GitHub Actions (Node 24)                                                                    |
+| Deploy     | Vercel (web), Azure Container Apps (api/voice — southcentralus, scripts ready)              |
 
 ## Monorepo Structure
 
@@ -133,40 +133,44 @@ supabase/
 **Live (9):** dental, medical, veterinary, salon, restaurant, contractor, law_firm, real_estate, sales_crm
 
 **P12 config-first (7):**
+
 - ✅ spa (complete on demo tenant)
 - ✅ gym (complete on demo tenant)
 - ⏳ nail_bar, pet_grooming, tattoo, car_wash, laundry (pending)
 
 **HIPAA-gated (deferred until HIPAA hardening):** physical_therapy, optometry
 
-| Vertical    | Custom Fields                              | Pipeline Stages                                                     | Business Hours                    |
-| ----------- | ------------------------------------------ | ------------------------------------------------------------------- | --------------------------------- |
-| dental      | insurance, recall interval, treatment plan | New inquiry → Consultation → Treatment → Active → Recall            | Mon-Fri 8am-5pm, Sat 9am-1pm      |
-| medical     | insurance, condition, referring physician  | New patient → Intake → Active → Follow-up → Discharged              | Mon-Fri 8am-5pm                   |
-| veterinary  | pet name, species, vaccination status      | New client → Intake → Active care → Recall → Lapsed                 | Mon-Fri 8am-6pm, Sat 9am-2pm      |
-| salon       | stylist, hair type, color formula          | New client → First booked → Returning → VIP → Lapsed                | Mon-Fri 9am-7pm, Sat 9am-5pm      |
-| restaurant  | party size, dietary, seating               | New guest → Returning → Regular → VIP                               | Mon-Fri 11am-10pm, Sat-Sun varies |
-| contractor  | property type, estimate status, warranty   | New lead → Estimate sent → Accepted → Scheduled → Completed         | Mon-Fri 7am-5pm, Sat 8am-12pm     |
-| law_firm    | case type, retainer, jurisdiction          | New inquiry → Conflict check → Consultation → Retained → Active     | Mon-Fri 9am-5pm                   |
-| real_estate | buyer/seller, budget, pre-approval         | New lead → Qualified → Showing → Offer → Under contract             | Mon-Fri 9am-6pm, Sat 10am-4pm     |
-| sales_crm   | company, demo status, vertical interest    | Prospect → Demo scheduled → Demo done → Pilot → Paying              | Mon-Fri 9am-6pm                   |
-| spa         | service preference, allergies, membership  | New client → First booked → Returning → VIP → Lapsed                | Mon-Sun 9am-8pm                   |
-| gym         | membership tier, fitness goal, trainer     | Trial → Member → Active → At-risk → Churned                         | Mon-Sun 5am-11pm                  |
+| Vertical    | Custom Fields                              | Pipeline Stages                                                 | Business Hours                    |
+| ----------- | ------------------------------------------ | --------------------------------------------------------------- | --------------------------------- |
+| dental      | insurance, recall interval, treatment plan | New inquiry → Consultation → Treatment → Active → Recall        | Mon-Fri 8am-5pm, Sat 9am-1pm      |
+| medical     | insurance, condition, referring physician  | New patient → Intake → Active → Follow-up → Discharged          | Mon-Fri 8am-5pm                   |
+| veterinary  | pet name, species, vaccination status      | New client → Intake → Active care → Recall → Lapsed             | Mon-Fri 8am-6pm, Sat 9am-2pm      |
+| salon       | stylist, hair type, color formula          | New client → First booked → Returning → VIP → Lapsed            | Mon-Fri 9am-7pm, Sat 9am-5pm      |
+| restaurant  | party size, dietary, seating               | New guest → Returning → Regular → VIP                           | Mon-Fri 11am-10pm, Sat-Sun varies |
+| contractor  | property type, estimate status, warranty   | New lead → Estimate sent → Accepted → Scheduled → Completed     | Mon-Fri 7am-5pm, Sat 8am-12pm     |
+| law_firm    | case type, retainer, jurisdiction          | New inquiry → Conflict check → Consultation → Retained → Active | Mon-Fri 9am-5pm                   |
+| real_estate | buyer/seller, budget, pre-approval         | New lead → Qualified → Showing → Offer → Under contract         | Mon-Fri 9am-6pm, Sat 10am-4pm     |
+| sales_crm   | company, demo status, vertical interest    | Prospect → Demo scheduled → Demo done → Pilot → Paying          | Mon-Fri 9am-6pm                   |
+| spa         | service preference, allergies, membership  | New client → First booked → Returning → VIP → Lapsed            | Mon-Sun 9am-8pm                   |
+| gym         | membership tier, fitness goal, trainer     | Trial → Member → Active → At-risk → Churned                     | Mon-Sun 5am-11pm                  |
 
 ## Architecture Decisions (Locked)
 
 ### Calendar (April 2026)
+
 - Native calendar is the default. Every tenant gets working booking with no integration required.
 - `appointments` table is always source of truth.
 - Provider resolution: `tenant.calendar_provider` → `location.google_refresh_token` → fallback `'native'`.
 
 ### SMS + Email Confirmation (April 2026)
+
 - Both fire from `post-call.ts`, not `tool-handlers.ts`.
 - Wrapped in try/catch — never block booking or each other.
 - **SMS**: gate = `bookedAppointment && callerId`. Vertical-aware via `buildConfirmationSms()`. Tenant timezone from DB. `maya_only` gets generic SMS.
 - **Email**: gate = `bookedAppointment && appointmentId && !maya_only && contactId && contact.email`. Gmail/Outlook/Resend routing. Tracking pixel injected after `email_messages` row insert.
 
 ### TCPA SMS Consent (April 2026)
+
 - `contacts.sms_opt_in` boolean NOT NULL DEFAULT false (migration 0055).
 - `apps/api/src/lib/tcpa.ts` exports `checkTcpaOptIn(contactId, tenantId)` and `grantTcpaOptIn(contactId, tenantId)`.
 - `sendSms()` gates on `sms_opt_in` when `options.contactId + options.tenantId` are provided. System messages without contactId bypass the gate.
@@ -174,22 +178,26 @@ supabase/
 - CSV-imported contacts default to `false` — never silently send to imported lists.
 
 ### Module Gating
+
 - Lives in `tenants.modules` jsonb.
 - Internal + both demo tenants forced all-ON.
 - CPQ defaults OFF for every new tenant.
 - Inventory + Staff are default-ON sub-features under `modules.crm`. API filters by vertical from DB (not JWT).
 
 ### Tier Structure
+
 - Maya Standalone → Starter → Pro. CPQ add-on. Memberships add-on (future).
 - **Starter**: maya, crm, appointments, inventory, staff
 - **Pro**: everything in Starter + pipeline, automation, insights, companies, deals
 - Public pricing not yet set.
 
 ### Maya Standalone
+
 - Same codebase, `tenant.product = 'maya_only' | 'suite'`.
 - Voice-only product, no CRM UI, generic SMS confirmation, email skipped.
 
 ### Tech Choices (don't re-litigate)
+
 - Gemini 2.0 Flash Live over Deepgram + ElevenLabs + Claude: 16x cheaper, native multilingual, <1.5s latency.
 - Auth.js over Clerk: Clerk per-org pricing breaks B2B unit economics.
 - Supabase RLS: multi-tenancy at the DB layer, not the app layer.
@@ -248,27 +256,27 @@ cloudflared tunnel --credentials-file ~/.cloudflared/<tunnel-id>.json run nuatis
 
 See `apps/api/.env.example` for the full list. Key vars:
 
-| Variable                       | Description                                              |
-| ------------------------------ | -------------------------------------------------------- |
-| SUPABASE_URL                   | Supabase project URL                                     |
-| SUPABASE_SERVICE_ROLE_KEY      | Supabase service role key                                |
-| GEMINI_API_KEY                 | Google Gemini API key                                    |
-| TELNYX_API_KEY                 | Telnyx API key for voice + SMS                           |
-| TELNYX_TENANT_MAP              | Phone-to-tenant mapping                                  |
-| REDIS_URL                      | Upstash Redis connection string                          |
-| GOOGLE_CLIENT_ID / SECRET      | Google Calendar OAuth2                                   |
-| MS_CLIENT_ID / SECRET          | Microsoft 365 (Graph API)                                |
-| RESEND_API_KEY                 | Resend email API key                                     |
-| SENTRY_DSN                     | Sentry error monitoring DSN                              |
-| VAPID_PUBLIC_KEY / PRIVATE_KEY | Web Push VAPID keys                                      |
-| ADMIN_API_KEY                  | Admin stats endpoint key                                 |
-| VOICE_WS_URL                   | Production WebSocket URL for Telnyx                      |
-| OPS_COPILOT_URL                | Ops-Copilot sidecar URL (set after Azure deploy)         |
-| NEXT_PUBLIC_APP_URL            | Web app base URL                                         |
-| NEXT_PUBLIC_SUPABASE_URL       | Supabase URL (browser, used by reset-password page)      |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY  | Supabase anon key (browser)                              |
-| AUTH_SECRET                    | Auth.js v5 JWT signing secret                            |
-| SCANNERS_ENABLED               | Toggle BullMQ workers in dev                             |
+| Variable                       | Description                                         |
+| ------------------------------ | --------------------------------------------------- |
+| SUPABASE_URL                   | Supabase project URL                                |
+| SUPABASE_SERVICE_ROLE_KEY      | Supabase service role key                           |
+| GEMINI_API_KEY                 | Google Gemini API key                               |
+| TELNYX_API_KEY                 | Telnyx API key for voice + SMS                      |
+| TELNYX_TENANT_MAP              | Phone-to-tenant mapping                             |
+| REDIS_URL                      | Upstash Redis connection string                     |
+| GOOGLE_CLIENT_ID / SECRET      | Google Calendar OAuth2                              |
+| MS_CLIENT_ID / SECRET          | Microsoft 365 (Graph API)                           |
+| RESEND_API_KEY                 | Resend email API key                                |
+| SENTRY_DSN                     | Sentry error monitoring DSN                         |
+| VAPID_PUBLIC_KEY / PRIVATE_KEY | Web Push VAPID keys                                 |
+| ADMIN_API_KEY                  | Admin stats endpoint key                            |
+| VOICE_WS_URL                   | Production WebSocket URL for Telnyx                 |
+| OPS_COPILOT_URL                | Ops-Copilot sidecar URL (set after Azure deploy)    |
+| NEXT_PUBLIC_APP_URL            | Web app base URL                                    |
+| NEXT_PUBLIC_SUPABASE_URL       | Supabase URL (browser, used by reset-password page) |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY  | Supabase anon key (browser)                         |
+| AUTH_SECRET                    | Auth.js v5 JWT signing secret                       |
+| SCANNERS_ENABLED               | Toggle BullMQ workers in dev                        |
 
 ## Deployment
 

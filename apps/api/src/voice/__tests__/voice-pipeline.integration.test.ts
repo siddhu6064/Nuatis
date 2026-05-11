@@ -366,7 +366,7 @@ describe('Tool call handlers', () => {
     expect(phoneEqCalls).toContain('15551234567')
   })
 
-  it('7. end_call schedules a Telnyx hangup POST after its 2s delay', async () => {
+  it('7. end_call schedules a Telnyx hangup POST after its 5s delay', async () => {
     const hangupFetch = jest.fn().mockResolvedValue({ ok: true, text: async () => '' } as any)
     global.fetch = hangupFetch as unknown as typeof fetch
 
@@ -375,13 +375,13 @@ describe('Tool call handlers', () => {
     try {
       const result = await executeToolCall('end_call', {}, toolContext)
       expect(result['ended']).toBe(true)
-      expect(result['message']).toContain('2 seconds')
+      expect(result['message']).toContain('5 seconds')
 
       // Hangup not fired yet
       expect(hangupFetch).not.toHaveBeenCalled()
 
-      // Advance past the 2s setTimeout
-      jest.advanceTimersByTime(2100)
+      // Advance past the 5s setTimeout
+      jest.advanceTimersByTime(5100)
       // Let any microtasks queued by fetch().then() settle
       await Promise.resolve()
 

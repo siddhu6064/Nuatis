@@ -52,5 +52,4 @@ apps/web/.env.local
 .worktrees/
 supabase/.temp/
 
-# Supabase CLI cache
-**/supabase/.temp/
+

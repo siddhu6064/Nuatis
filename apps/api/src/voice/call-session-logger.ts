@@ -19,6 +19,7 @@ export interface VoiceSessionParams {
   hangupSource: string | null
   hangupCause: string | null
   callQualityMos: number | null
+  language?: string
   startedAt: Date
 }
 
@@ -65,6 +66,7 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
         call_quality_mos: params.callQualityMos,
         hangup_source: params.hangupSource,
         hangup_cause: params.hangupCause,
+        language_detected: params.language ?? 'en',
         metadata: { vertical: params.vertical },
       })
       .select('id')

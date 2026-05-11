@@ -28,7 +28,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     let query = supabase
       .from('voice_sessions')
       .select(
-        'id, tenant_id, stream_id, call_control_id, caller_phone, caller_name, direction, status, started_at, ended_at, duration_seconds, first_response_ms, language_detected, outcome, booked_appointment, appointment_id, contact_id, escalated, escalation_reason, call_quality_mos, hangup_source, hangup_cause, created_at',
+        'id, tenant_id, stream_id, call_control_id, caller_phone, caller_name, direction, status, started_at, ended_at, duration_seconds, first_response_ms, language_detected, outcome, booked_appointment, appointment_id, contact_id, escalated, escalation_reason, call_quality_mos, hangup_source, hangup_cause, created_at, contacts(full_name)',
         { count: 'exact' }
       )
       .eq('tenant_id', authed.tenantId)
@@ -56,7 +56,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const total = count ?? 0
     const pages = Math.ceil(total / limit)
 
-    res.json({ sessions: data ?? [], total, page, pages })
+    const sessions = (data ?? []).map((s) => {
+      const { contacts, ...rest } = s as typeof s & { contacts?: { full_name?: string } | null }
+      return { ...rest, caller_name: contacts?.full_name ?? rest.caller_name ?? null }
+    })
+    res.json({ sessions, total, page, pages })
   } catch (err) {
     console.error('[calls] list error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -72,7 +76,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   try {
     const { data, error } = await supabase
       .from('voice_sessions')
-      .select('*')
+      .select('*, contacts(full_name)')
       .eq('id', sessionId)
       .eq('tenant_id', authed.tenantId)
       .single()
@@ -82,7 +86,8 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       return
     }
 
-    res.json(data)
+    const { contacts, ...rest } = data as typeof data & { contacts?: { full_name?: string } | null }
+    res.json({ ...rest, caller_name: contacts?.full_name ?? rest.caller_name ?? null })
   } catch (err) {
     console.error('[calls] detail error:', err)
     res.status(500).json({ error: 'Internal server error' })
