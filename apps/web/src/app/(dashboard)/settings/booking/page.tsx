@@ -306,7 +306,7 @@ export default function BookingSettingsPage() {
         </p>
         <input
           type="url"
-          value={settings.googleReviewUrl}
+          value={settings.googleReviewUrl ?? ''}
           onChange={(e) => setSettings((s) => ({ ...s, googleReviewUrl: e.target.value }))}
           placeholder="https://g.page/your-business/review"
           className={inputCls}

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 
 const VERTICALS = [
   { value: 'dental', label: 'Dental' },
@@ -42,7 +41,6 @@ interface FormState {
 const emptyForm: FormState = { name: '', subject: '', body: '', vertical: '' }
 
 export default function EmailTemplatesPage() {
-  const { data: session } = useSession()
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,18 +53,11 @@ export default function EmailTemplatesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const token =
-    (session as unknown as Record<string, unknown>)?.accessToken ??
-    ((session?.user as Record<string, unknown> | undefined)?.accessToken as string) ??
-    ''
-
   async function fetchTemplates() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/email-templates`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/email-templates`)
       if (!res.ok) throw new Error('Failed to load templates')
       const data = await res.json()
       setTemplates(data)
@@ -78,8 +69,8 @@ export default function EmailTemplatesPage() {
   }
 
   useEffect(() => {
-    if (token) fetchTemplates()
-  }, [token])
+    void fetchTemplates()
+  }, [])
 
   function openCreate() {
     setEditingTemplate(null)
@@ -122,20 +113,14 @@ export default function EmailTemplatesPage() {
       if (editingTemplate) {
         const res = await fetch(`/api/email-templates/${editingTemplate.id}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error('Failed to update template')
       } else {
         const res = await fetch(`/api/email-templates`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error('Failed to create template')
@@ -155,7 +140,6 @@ export default function EmailTemplatesPage() {
     try {
       const res = await fetch(`/api/email-templates/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to delete template')
       await fetchTemplates()
