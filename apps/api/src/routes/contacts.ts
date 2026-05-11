@@ -447,7 +447,10 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (typeof b['full_name'] === 'string') updates['full_name'] = b['full_name'].trim()
   if (typeof b['phone'] === 'string') updates['phone'] = b['phone'].trim() || null
+  if (typeof b['phone_alt'] === 'string') updates['phone_alt'] = b['phone_alt'].trim() || null
+  if (b['phone_alt'] === null) updates['phone_alt'] = null
   if (typeof b['email'] === 'string') updates['email'] = b['email'].trim().toLowerCase() || null
+  if (typeof b['source'] === 'string') updates['source'] = b['source'] || null
   if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
   if (Array.isArray(b['tags'])) updates['tags'] = b['tags']
   if (typeof b['pipeline_stage'] === 'string') updates['pipeline_stage'] = b['pipeline_stage']
