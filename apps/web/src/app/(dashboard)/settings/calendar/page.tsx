@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -64,7 +63,6 @@ export default function CalendarSettingsPage() {
 }
 
 function CalendarSettingsContent() {
-  const { data: session } = useSession()
   const searchParams = useSearchParams()
 
   const [status, setStatus] = useState<CalendarStatus | null>(null)
@@ -74,20 +72,15 @@ function CalendarSettingsContent() {
   const [switchConfirm, setSwitchConfirm] = useState<'google' | 'outlook' | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
-
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 4000)
   }
 
   const fetchStatus = useCallback(async () => {
-    if (!token) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/settings/calendar`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/settings/calendar`)
       if (res.ok) {
         const data: CalendarStatus = await res.json()
         setStatus(data)
@@ -97,18 +90,18 @@ function CalendarSettingsContent() {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
-    if (token) fetchStatus()
-  }, [token, fetchStatus])
+    void fetchStatus()
+  }, [fetchStatus])
 
   // Show success toast for Outlook OAuth redirect
   useEffect(() => {
     if (searchParams.get('connected') === 'outlook') {
       showToast('success', 'Outlook Calendar connected successfully!')
       // Refresh status after successful connect
-      if (token) fetchStatus()
+      void fetchStatus()
     }
     if (searchParams.get('error')) {
       const errCode = searchParams.get('error')
@@ -124,12 +117,9 @@ function CalendarSettingsContent() {
   }
 
   async function handleConnectOutlook() {
-    if (!token) return
     setConnecting('outlook')
     try {
-      const res = await fetch(`/api/settings/calendar/outlook/auth-url`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/settings/calendar/outlook/auth-url`)
       if (res.ok) {
         const data: { url: string } = await res.json()
         window.location.href = data.url
@@ -144,12 +134,10 @@ function CalendarSettingsContent() {
   }
 
   async function handleDisconnectOutlook() {
-    if (!token) return
     setDisconnecting(true)
     try {
       const res = await fetch(`/api/settings/calendar/outlook`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         setStatus({ provider: null, email: null, connected: false })

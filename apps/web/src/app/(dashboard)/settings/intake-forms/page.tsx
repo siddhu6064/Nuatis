@@ -641,14 +641,9 @@ export default function IntakeFormsPage() {
   }, [token])
 
   useEffect(() => {
-    if (!token) return
     Promise.all([
-      fetch(`/api/intake-forms`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((r) => (r.ok ? r.json() : { forms: [] })),
-      fetch(`/api/settings/booking`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((r) => (r.ok ? r.json() : { services: [] })),
+      fetch(`/api/intake-forms`).then((r) => (r.ok ? r.json() : { forms: [] })),
+      fetch(`/api/settings/booking`).then((r) => (r.ok ? r.json() : { services: [] })),
     ])
       .then(([formsData, bookingData]) => {
         const formsArr = Array.isArray(formsData)
