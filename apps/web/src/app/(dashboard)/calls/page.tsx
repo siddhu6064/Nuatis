@@ -7,6 +7,8 @@ interface VoiceSession {
   id: string
   caller_phone: string | null
   caller_name: string | null
+  contact_id: string | null
+  contacts: { full_name: string } | null
   started_at: string
   duration_seconds: number | null
   first_response_ms: number | null
@@ -77,7 +79,7 @@ export default async function CallsPage({ searchParams }: Props) {
   let query = supabase
     .from('voice_sessions')
     .select(
-      'id, caller_phone, caller_name, started_at, duration_seconds, first_response_ms, outcome, language_detected, call_quality_mos, booked_appointment, escalated',
+      'id, caller_phone, caller_name, contact_id, contacts(full_name), started_at, duration_seconds, first_response_ms, outcome, language_detected, call_quality_mos, booked_appointment, escalated',
       { count: 'exact' }
     )
     .eq('tenant_id', tenantId)
@@ -161,16 +163,23 @@ export default async function CallsPage({ searchParams }: Props) {
                         <div className="flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                             <span className="text-teal-700 text-xs font-bold">
-                              {(call.caller_name ?? call.caller_phone ?? '?')
+                              {(
+                                call.contacts?.full_name ??
+                                call.caller_name ??
+                                call.caller_phone ??
+                                '?'
+                              )
                                 .charAt(0)
                                 .toUpperCase()}
                             </span>
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {call.caller_name || formatPhone(call.caller_phone)}
+                              {call.contacts?.full_name ||
+                                call.caller_name ||
+                                formatPhone(call.caller_phone)}
                             </p>
-                            {call.caller_name && (
+                            {(call.contacts?.full_name || call.caller_name) && (
                               <p className="text-xs text-gray-400 truncate">
                                 {formatPhone(call.caller_phone)}
                               </p>

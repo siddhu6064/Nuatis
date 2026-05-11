@@ -38,6 +38,7 @@ interface VoiceSession {
   recording_duration_seconds: number | null
   metadata: Record<string, unknown> | null
   created_at: string
+  contacts: { full_name: string } | null
 }
 
 const OUTCOME_BADGES: Record<string, { label: string; bg: string; text: string }> = {
@@ -95,7 +96,7 @@ export default async function CallDetailPage({ params }: Props) {
   const supabase = createAdminClient()
   const { data: call, error } = await supabase
     .from('voice_sessions')
-    .select('*')
+    .select('*, contacts(full_name)')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single<VoiceSession>()
@@ -122,13 +123,15 @@ export default async function CallDetailPage({ params }: Props) {
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
             <span className="text-teal-700 text-sm font-bold">
-              {(call.caller_name ?? call.caller_phone ?? '?').charAt(0).toUpperCase()}
+              {(call.contacts?.full_name ?? call.caller_name ?? call.caller_phone ?? '?')
+                .charAt(0)
+                .toUpperCase()}
             </span>
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-gray-900">
-                {call.caller_name || formatPhone(call.caller_phone)}
+                {call.contacts?.full_name || call.caller_name || formatPhone(call.caller_phone)}
               </h1>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge!.bg} ${badge!.text}`}
@@ -136,7 +139,7 @@ export default async function CallDetailPage({ params }: Props) {
                 {badge!.label}
               </span>
             </div>
-            {call.caller_name && (
+            {(call.contacts?.full_name || call.caller_name) && (
               <p className="text-sm text-gray-500 mt-0.5">{formatPhone(call.caller_phone)}</p>
             )}
             <p className="text-sm text-gray-400 mt-1">
