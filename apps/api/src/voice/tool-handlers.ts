@@ -1127,9 +1127,9 @@ const handlers: Record<string, ToolHandler> = {
         .catch((err) => {
           console.error('[tool-handlers] end_call error:', err)
         })
-    }, 2000)
+    }, 5000)
 
-    return { ended: true, message: 'Call will end in 2 seconds' }
+    return { ended: true, message: 'Call will end in 5 seconds' }
   },
 
   reschedule_appointment: async (args, context) => {
