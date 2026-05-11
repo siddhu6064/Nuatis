@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -67,6 +67,18 @@ export default function DealsKanban() {
   const [newCloseDate, setNewCloseDate] = useState('')
   const [newProbability, setNewProbability] = useState('50')
   const [saving, setSaving] = useState(false)
+
+  // Contact search
+  const [contactSearch, setContactSearch] = useState('')
+  const [contactResults, setContactResults] = useState<
+    { id: string; full_name: string; email: string | null }[]
+  >([])
+  const [selectedContact, setSelectedContact] = useState<{ id: string; full_name: string } | null>(
+    null
+  )
+  const [contactDropOpen, setContactDropOpen] = useState(false)
+  const contactSearchRef = useRef<HTMLDivElement>(null)
+  const contactDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fetch pipelines on mount
   useEffect(() => {
@@ -137,6 +149,44 @@ export default function DealsKanban() {
     void fetchBoardData(activePipelineId)
   }, [activePipelineId, fetchBoardData])
 
+  // Close contact dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (contactSearchRef.current && !contactSearchRef.current.contains(e.target as Node)) {
+        setContactDropOpen(false)
+      }
+    }
+    if (contactDropOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [contactDropOpen])
+
+  function handleContactSearch(q: string) {
+    setContactSearch(q)
+    setSelectedContact(null)
+    if (contactDebounce.current) clearTimeout(contactDebounce.current)
+    if (!q.trim()) {
+      setContactResults([])
+      setContactDropOpen(false)
+      return
+    }
+    contactDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/contacts?q=${encodeURIComponent(q)}&limit=8`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const data = (await res.json()) as {
+            contacts?: { id: string; full_name: string; email: string | null }[]
+          }
+          setContactResults(data.contacts ?? [])
+          setContactDropOpen(true)
+        }
+      } catch {
+        // ignore
+      }
+    }, 250)
+  }
+
   const switchPipeline = (id: string) => {
     setActivePipelineId(id)
     const params = new URLSearchParams(searchParams.toString())
@@ -172,6 +222,7 @@ export default function DealsKanban() {
           probability: parseInt(newProbability) || 50,
           pipeline_stage_id: stages[0]?.id,
           pipeline_id: activePipelineId !== '__legacy__' ? activePipelineId : undefined,
+          contact_id: selectedContact?.id ?? undefined,
         }),
       })
       if (res.ok) {
@@ -179,6 +230,9 @@ export default function DealsKanban() {
         setNewValue('')
         setNewCloseDate('')
         setNewProbability('50')
+        setContactSearch('')
+        setSelectedContact(null)
+        setContactResults([])
         setShowCreate(false)
         if (activePipelineId) void fetchBoardData(activePipelineId)
       }
@@ -290,6 +344,51 @@ export default function DealsKanban() {
               className="text-sm border border-gray-200 rounded px-3 py-2"
             />
           </div>
+
+          {/* Contact search */}
+          <div className="relative mb-3" ref={contactSearchRef}>
+            <input
+              type="text"
+              value={selectedContact ? selectedContact.full_name : contactSearch}
+              onChange={(e) => handleContactSearch(e.target.value)}
+              onFocus={() => contactResults.length > 0 && setContactDropOpen(true)}
+              placeholder="Search contacts... (optional)"
+              className="w-full text-sm border border-gray-200 rounded px-3 py-2"
+            />
+            {selectedContact && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedContact(null)
+                  setContactSearch('')
+                  setContactResults([])
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+              >
+                ×
+              </button>
+            )}
+            {contactDropOpen && contactResults.length > 0 && (
+              <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {contactResults.map((c) => (
+                  <li
+                    key={c.id}
+                    onMouseDown={() => {
+                      setSelectedContact({ id: c.id, full_name: c.full_name })
+                      setContactSearch('')
+                      setContactResults([])
+                      setContactDropOpen(false)
+                    }}
+                    className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                  >
+                    <span className="font-medium text-gray-800">{c.full_name}</span>
+                    {c.email && <span className="ml-2 text-xs text-gray-400">{c.email}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2">
             <button
               onClick={() => setShowCreate(false)}
