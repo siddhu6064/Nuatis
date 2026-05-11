@@ -424,12 +424,14 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   res.status(201).json({ ...contact, possible_duplicates: possibleDuplicates })
 })
 
-// ── PUT /api/contacts/:id ────────────────────────────────────────────────────
-router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+// ── PUT / PATCH /api/contacts/:id ────────────────────────────────────────────
+const handleContactUpdate = async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
+
+  console.info('[contacts update] id=', id, 'tenantId=', authed.tenantId)
 
   const { data: existing } = await supabase
     .from('contacts')
@@ -567,7 +569,9 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   }
 
   res.json({ ...updated, possible_duplicates: possibleDuplicates })
-})
+}
+router.put('/:id', requireAuth, handleContactUpdate)
+router.patch('/:id', requireAuth, handleContactUpdate)
 
 // ── GET /api/contacts/duplicates ─────────────────────────────────────────────
 router.get('/duplicates', requireAuth, async (req: Request, res: Response): Promise<void> => {
