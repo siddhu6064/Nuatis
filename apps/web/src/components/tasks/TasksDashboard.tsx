@@ -70,7 +70,10 @@ function categorize(tasks: Task[]) {
 }
 
 function formatDue(dueDate: string): string {
-  return new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const d = new Date(dueDate)
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return `${date} at ${time}`
 }
 
 export default function TasksDashboard() {
@@ -82,6 +85,7 @@ export default function TasksDashboard() {
   const [showAdd, setShowAdd] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDue, setNewDue] = useState('')
+  const [newTime, setNewTime] = useState('12:00')
   const [newPriority, setNewPriority] = useState('medium')
   const [saving, setSaving] = useState(false)
 
@@ -124,13 +128,14 @@ export default function TasksDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTitle.trim(),
-          due_date: newDue || undefined,
+          due_date: newDue ? new Date(`${newDue}T${newTime}`).toISOString() : undefined,
           priority: newPriority,
         }),
       })
       if (res.ok) {
         setNewTitle('')
         setNewDue('')
+        setNewTime('12:00')
         setNewPriority('medium')
         setShowAdd(false)
         void fetchTasks()
@@ -250,6 +255,12 @@ export default function TasksDashboard() {
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+            />
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
               className="text-xs border border-gray-200 rounded px-2 py-1.5"
             />
             <select

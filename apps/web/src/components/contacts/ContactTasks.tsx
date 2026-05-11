@@ -34,7 +34,10 @@ function isOverdue(dueDate: string | null): boolean {
 
 function formatDue(dueDate: string | null): string {
   if (!dueDate) return ''
-  return new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const d = new Date(dueDate)
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return `${date} at ${time}`
 }
 
 export default function ContactTasks({ contactId }: Props) {
@@ -47,6 +50,7 @@ export default function ContactTasks({ contactId }: Props) {
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDue, setNewDue] = useState('')
+  const [newTime, setNewTime] = useState('12:00')
   const [newPriority, setNewPriority] = useState('medium')
   const [saving, setSaving] = useState(false)
 
@@ -95,13 +99,14 @@ export default function ContactTasks({ contactId }: Props) {
         body: JSON.stringify({
           title: newTitle.trim(),
           contact_id: contactId,
-          due_date: newDue || undefined,
+          due_date: newDue ? new Date(`${newDue}T${newTime}`).toISOString() : undefined,
           priority: newPriority,
         }),
       })
       if (res.ok) {
         setNewTitle('')
         setNewDue('')
+        setNewTime('12:00')
         setNewPriority('medium')
         setAdding(false)
         void fetchTasks()
@@ -146,6 +151,12 @@ export default function ContactTasks({ contactId }: Props) {
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1"
+            />
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
               className="text-xs border border-gray-200 rounded px-2 py-1"
             />
             <select
