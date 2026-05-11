@@ -34,6 +34,7 @@ export function logCall(entry: CallLogEntry): void {
       tenant_id: entry.tenant_id,
       duration_seconds: entry.duration_seconds,
       language: entry.language,
+      caller_number: entry.phone_number_from ?? '',
       phone_number_from: entry.phone_number_from ?? null,
       phone_number_to: entry.phone_number_to ?? null,
       outcome: entry.outcome ?? 'completed',
