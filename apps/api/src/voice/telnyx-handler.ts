@@ -227,7 +227,8 @@ export async function prewarmGemini(
     safeName,
     callControlId,
     product,
-    contextSuffix
+    contextSuffix,
+    callerContext.contactId ?? null
   )
 
   return new Promise<void>((resolve) => {
@@ -413,7 +414,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 businessName,
                 callControlId ?? undefined,
                 undefined,
-                preCallContextSuffix
+                preCallContextSuffix,
+                preCallContactId
               )
                 .then((newSession) => {
                   if (!isCallActive) {
@@ -521,7 +523,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 safeName,
                 callControlId ?? undefined,
                 undefined,
-                preCallContextSuffix
+                preCallContextSuffix,
+                preCallContactId
               )
               if (!isCallActive) {
                 session.close()
@@ -572,7 +575,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               safeName,
               callControlId ?? undefined,
               undefined,
-              preCallContextSuffix
+              preCallContextSuffix,
+              preCallContactId
             )
             if (!isCallActive) {
               session.close()

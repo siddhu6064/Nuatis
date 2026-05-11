@@ -15,7 +15,7 @@ export const BOOKING_CONTRACT = `
 
 # CRITICAL TOOL-USE RULES — READ BEFORE EVERY RESPONSE
 
-You have access to these tools: lookup_contact, get_business_hours, check_availability, book_appointment, reschedule_appointment, end_call, escalate_to_human.
+You have access to these tools: lookup_contact, get_business_hours, check_availability, book_appointment, reschedule_appointment, get_appointments, end_call, escalate_to_human.
 
 ## Booking flow — exact sequence required
 
@@ -122,7 +122,8 @@ export async function createGeminiLiveSession(
   businessName?: string,
   callControlId?: string,
   product?: 'maya_only' | 'suite',
-  promptSuffix?: string
+  promptSuffix?: string,
+  callerContactId?: string | null
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -209,6 +210,7 @@ export async function createGeminiLiveSession(
     streamId: '',
     callControlId: callControlId ?? '',
     product: product ?? 'suite',
+    callerContactId: callerContactId ?? null,
   }
 
   function armSilenceFallback(): void {

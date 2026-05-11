@@ -18,6 +18,7 @@ export interface ToolCallContext {
   streamId: string
   callControlId: string
   product: 'maya_only' | 'suite'
+  callerContactId?: string | null
 }
 
 export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
@@ -172,6 +173,12 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       },
       required: ['caller_phone', 'new_date', 'new_start_time'],
     },
+  },
+  {
+    name: 'get_appointments',
+    description:
+      'Look up upcoming appointments for the current caller. Returns appointments scheduled for today or in the future with status scheduled or confirmed. Call this when a caller asks "what are my appointments", "when is my appointment", or "do I have anything booked".',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] },
   },
 ]
 
@@ -444,6 +451,7 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   check_availability: async (args, context) => {
+    // Read-only: only queries calendar freebusy + appointments SELECT. Never inserts/mutates.
     const date = String(args['date'] ?? '')
     const preferredTime = args['preferred_time'] ? String(args['preferred_time']) : null
     const durationMinutes =
@@ -1086,6 +1094,58 @@ const handlers: Record<string, ToolHandler> = {
     } catch (err) {
       console.error('[tool-handlers] capture_referral_source error:', err)
       return { captured: false, error: 'Failed to save referral source' }
+    }
+  },
+
+  get_appointments: async (_args, context) => {
+    const contactId = context.callerContactId
+    if (!contactId) {
+      console.info('[tool-handlers] get_appointments: no callerContactId in context')
+      return { found: false, message: 'No contact record found for this caller' }
+    }
+
+    try {
+      const supabase = getSupabase()
+      const now = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('id, title, start_time, end_time, status, notes')
+        .eq('tenant_id', context.tenantId)
+        .eq('contact_id', contactId)
+        .in('status', ['scheduled', 'confirmed'])
+        .gte('start_time', now)
+        .order('start_time', { ascending: true })
+        .limit(5)
+
+      if (error) {
+        console.error(`[tool-handlers] get_appointments error: ${error.message}`)
+        return { found: false, error: 'Unable to look up appointments' }
+      }
+
+      if (!data || data.length === 0) {
+        console.info(
+          `[tool-handlers] get_appointments: no upcoming appointments for contact=${contactId}`
+        )
+        return { found: false, message: 'No upcoming appointments found for this caller' }
+      }
+
+      console.info(
+        `[tool-handlers] get_appointments: found ${data.length} appointments for contact=${contactId}`
+      )
+      return {
+        found: true,
+        appointments: data.map((a) => ({
+          id: a.id,
+          title: a.title,
+          start_time: a.start_time,
+          end_time: a.end_time,
+          status: a.status,
+          notes: a.notes,
+        })),
+      }
+    } catch (err) {
+      console.error('[tool-handlers] get_appointments error:', err)
+      return { found: false, error: 'Unable to look up appointments' }
     }
   },
 
