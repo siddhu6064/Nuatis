@@ -114,6 +114,27 @@ const VERTICAL_SERVICES: Record<
     { name: 'Aromatherapy Massage', unit_price: 95, duration_minutes: 60, category: 'Massage' },
     { name: 'Scalp Treatment', unit_price: 55, duration_minutes: 30, category: 'Scalp' },
   ],
+  pet_grooming: [
+    { name: 'Bath & Brush', unit_price: 45, duration_minutes: 60, category: 'Bath' },
+    { name: 'Full Groom', unit_price: 75, duration_minutes: 90, category: 'Groom' },
+    { name: 'Nail Trim', unit_price: 15, duration_minutes: 15, category: 'Add-On' },
+    { name: 'Ear Cleaning', unit_price: 15, duration_minutes: 15, category: 'Add-On' },
+    { name: 'Teeth Brushing', unit_price: 12, duration_minutes: 15, category: 'Add-On' },
+    { name: 'De-shedding Treatment', unit_price: 55, duration_minutes: 45, category: 'Treatment' },
+    { name: "Puppy's First Groom", unit_price: 50, duration_minutes: 60, category: 'Groom' },
+    { name: 'Cat Groom', unit_price: 65, duration_minutes: 75, category: 'Groom' },
+  ],
+  nail_bar: [
+    { name: 'Classic Manicure', unit_price: 35, duration_minutes: 30, category: 'Manicure' },
+    { name: 'Classic Pedicure', unit_price: 45, duration_minutes: 45, category: 'Pedicure' },
+    { name: 'Gel Manicure', unit_price: 50, duration_minutes: 45, category: 'Manicure' },
+    { name: 'Gel Pedicure', unit_price: 60, duration_minutes: 60, category: 'Pedicure' },
+    { name: 'Acrylic Full Set', unit_price: 65, duration_minutes: 75, category: 'Acrylic' },
+    { name: 'Acrylic Fill', unit_price: 40, duration_minutes: 45, category: 'Acrylic' },
+    { name: 'Dip Powder Manicure', unit_price: 55, duration_minutes: 50, category: 'Manicure' },
+    { name: 'Nail Art Add-On', unit_price: 5, duration_minutes: 15, category: 'Add-On' },
+    { name: 'Gel Removal', unit_price: 20, duration_minutes: 20, category: 'Removal' },
+  ],
 }
 
 // Also export for use by auto-quote logic

@@ -15,6 +15,10 @@ const VERTICALS = [
   { slug: 'contractor', label: 'Contractor', icon: '🔧' },
   { slug: 'law_firm', label: 'Law Firm', icon: '⚖️' },
   { slug: 'real_estate', label: 'Real Estate', icon: '🏠' },
+  { slug: 'spa', label: 'Spa', icon: '💆' },
+  { slug: 'gym', label: 'Gym', icon: '🏋️' },
+  { slug: 'nail_bar', label: 'Nail Bar', icon: '💅' },
+  { slug: 'pet_grooming', label: 'Pet Grooming', icon: '🐾' },
 ]
 
 interface DemoInfo {

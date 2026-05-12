@@ -42,6 +42,7 @@ export interface VerticalConfig {
   business_hours: BusinessHours
   follow_up_cadence: FollowUpStep[]
   maya_intents?: string[]
+  compliance_tier?: string
 }
 
 const MAYA_PROMPT_SUFFIX =
@@ -934,6 +935,165 @@ export const VERTICALS: Record<string, VerticalConfig> = {
         channel: 'sms',
         template:
           'Hi {name}, spots still available at {business} this week. Book your trial session today! Reply STOP to opt out.',
+      },
+    ],
+  },
+
+  pet_grooming: {
+    slug: 'pet_grooming',
+    label: 'Pet Grooming',
+    inventory_label: 'Grooming Supplies',
+    staff_label: 'Groomers',
+    compliance_tier: 'tcpa',
+    fields: [
+      { key: 'pet_name', label: 'Pet name', type: 'text', required: false },
+      {
+        key: 'species',
+        label: 'Species',
+        type: 'select',
+        required: false,
+        options: ['Dog', 'Cat', 'Other'],
+      },
+      { key: 'breed', label: 'Breed', type: 'text', required: false },
+      { key: 'preferred_groomer', label: 'Preferred groomer', type: 'text', required: false },
+      { key: 'last_groom_date', label: 'Last groom date', type: 'date', required: false },
+      {
+        key: 'coat_type',
+        label: 'Coat type',
+        type: 'select',
+        required: false,
+        options: ['Short', 'Medium', 'Long', 'Double', 'Wire', 'Curly'],
+      },
+      {
+        key: 'allergies_sensitivities',
+        label: 'Allergies / sensitivities',
+        type: 'text',
+        required: false,
+      },
+      {
+        key: 'vaccination_current',
+        label: 'Vaccinations current',
+        type: 'boolean',
+        required: false,
+      },
+    ],
+    pipeline_stages: [
+      { name: 'New Client', position: 1, color: C.blue, is_default: true },
+      { name: 'First Appointment', position: 2, color: C.amber },
+      { name: 'Regular', position: 3, color: C.teal },
+      { name: 'Member', position: 4, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Grooming appointment booking',
+      'Breed-specific cut questions',
+      'First-visit preparation questions',
+      'Cat grooming inquiry',
+      'Appointment reschedule or cancel',
+      'Membership and loyalty questions',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}}, a pet grooming salon. Speak in a warm, nurturing, and pet-loving tone. Opening: "Hi, thank you for calling {{business_name}}! This is Maya. How can I help you and your furry friend today?" You know the full grooming service menu including baths, full grooms, nail trims, ear cleaning, teeth brushing, de-shedding treatments, and specialty services for puppies and cats. Always be reassuring about the safety and comfort of pets. If a caller asks about sedation, say "We never use sedation — our groomers are trained in gentle handling techniques to keep your pet calm and comfortable throughout the visit." When a caller books an appointment by phone, note that verbal consent to receive text message reminders has been granted per TCPA guidelines.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '8am-6pm', sat: '8am-5pm', sun: 'closed' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for calling {business}! We'd love to get your pet booked for a grooming appointment. Reply or call us anytime. Reply STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Your pet deserves the best — {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. Our groomers would love to pamper your furry friend!',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          "Hi {name}, openings available this week at {business}. Book your pet's grooming appointment today! Reply STOP to opt out.",
+      },
+    ],
+  },
+
+  nail_bar: {
+    slug: 'nail_bar',
+    label: 'Nail Bar',
+    inventory_label: 'Polish & Supplies',
+    staff_label: 'Nail Techs',
+    compliance_tier: 'tcpa',
+    fields: [
+      { key: 'preferred_tech', label: 'Preferred nail tech', type: 'text', required: false },
+      {
+        key: 'nail_type',
+        label: 'Nail type preference',
+        type: 'select',
+        required: false,
+        options: ['Natural', 'Gel', 'Acrylic', 'Dip Powder', 'No preference'],
+      },
+      { key: 'last_service_date', label: 'Last service date', type: 'date', required: false },
+      { key: 'last_service_type', label: 'Last service type', type: 'text', required: false },
+      {
+        key: 'allergies_sensitivities',
+        label: 'Allergies / sensitivities',
+        type: 'text',
+        required: false,
+      },
+      {
+        key: 'preferred_appointment_time',
+        label: 'Preferred appointment time',
+        type: 'select',
+        required: false,
+        options: ['Morning', 'Afternoon', 'Evening', 'Weekend'],
+      },
+      { key: 'birthday', label: 'Birthday', type: 'date', required: false },
+      {
+        key: 'loyalty_tier',
+        label: 'Loyalty tier',
+        type: 'select',
+        required: false,
+        options: ['New Client', 'Regular', 'Loyal Member'],
+      },
+    ],
+    pipeline_stages: [
+      { name: 'New Client', position: 1, color: C.blue, is_default: true },
+      { name: 'First Appointment', position: 2, color: C.amber },
+      { name: 'Regular', position: 3, color: C.teal },
+      { name: 'Loyal Member', position: 4, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Manicure and pedicure booking',
+      'Gel, acrylic, and dip powder service questions',
+      'Nail art inquiry',
+      'Walk-in availability',
+      'Appointment reschedule or cancel',
+      'Loyalty membership questions',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}}, a nail bar. Speak in a friendly, bubbly, and detail-oriented tone. Opening: "Hi, thank you for calling {{business_name}}! This is Maya. What can I help you with today?" You know the full service menu including gel, acrylic, and dip powder manicures and pedicures. Always mention that walk-ins are welcome but appointments are preferred. If a caller asks about nail art pricing for multiple nails or complex designs, say "Pricing depends on the design — I\'d recommend booking a consultation so your nail tech can give you an exact quote." When a caller books an appointment by phone, note that verbal consent to receive text message reminders has been granted per TCPA guidelines.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '10am-7pm', sat: '9am-6pm', sun: '11am-5pm' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for calling {business}! We'd love to get you booked for your next nail appointment. Reply or call us anytime. Reply STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Treat yourself — {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. We have great availability this week and would love to take care of your nails!',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, openings available this week at {business}. Book your nail appointment today! Reply STOP to opt out.',
       },
     ],
   },

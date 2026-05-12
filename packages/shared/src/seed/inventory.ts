@@ -182,6 +182,76 @@ const PRESETS: Record<string, ItemSeed[]> = {
       reorder_threshold: 4,
     },
   ],
+  pet_grooming: [
+    {
+      name: 'Shampoo & Conditioner',
+      sku: 'PG-SHP-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    { name: 'Grooming Tools', sku: 'PG-TLS-001', unit: 'each', quantity: 20, reorder_threshold: 5 },
+    {
+      name: 'Ear Care Products',
+      sku: 'PG-EAR-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    {
+      name: 'Nail Clippers & Files',
+      sku: 'PG-NAL-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    {
+      name: 'Dental Care Products',
+      sku: 'PG-DEN-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    {
+      name: 'Retail Pet Products',
+      sku: 'PG-RET-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+  ],
+  nail_bar: [
+    {
+      name: 'Nail Polish (color stock)',
+      sku: 'NB-POL-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    { name: 'Gel Products', sku: 'NB-GEL-001', unit: 'each', quantity: 20, reorder_threshold: 5 },
+    {
+      name: 'Acrylic Supplies',
+      sku: 'NB-ACR-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    { name: 'Dip Powder', sku: 'NB-DIP-001', unit: 'each', quantity: 20, reorder_threshold: 5 },
+    {
+      name: 'Nail Tools & Files',
+      sku: 'NB-TOOL-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+    {
+      name: 'Retail Nail Care',
+      sku: 'NB-RET-001',
+      unit: 'each',
+      quantity: 20,
+      reorder_threshold: 5,
+    },
+  ],
 }
 
 function getAdminClient(): SupabaseClient {

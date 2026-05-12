@@ -69,6 +69,16 @@ const STAFF_PRESETS: Record<string, StaffSeed[]> = {
     { name: 'Simone Carter', role: 'Group Fitness Instructor', color_hex: '#22C55E' },
     { name: 'Tyler Brooks', role: 'Front Desk', color_hex: '#F59E0B' },
   ],
+  nail_bar: [
+    { name: 'Jessica Kim', role: 'Senior Nail Technician' },
+    { name: 'Ashley Nguyen', role: 'Nail Technician' },
+    { name: 'Taylor Brown', role: 'Receptionist' },
+  ],
+  pet_grooming: [
+    { name: 'Brooke Anderson', role: 'Senior Groomer' },
+    { name: 'Marcus Lee', role: 'Groomer' },
+    { name: 'Caitlin Ross', role: 'Receptionist' },
+  ],
 }
 
 const COLORS = ['#6366F1', '#0EA5E9', '#10B981']

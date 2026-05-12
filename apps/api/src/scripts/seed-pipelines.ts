@@ -50,6 +50,18 @@ const INLINE_STAGES: Record<
     { name: 'At-Risk Member', position: 4, color: '#EF4444' },
     { name: 'Lapsed', position: 5, color: '#6B7280', is_terminal: true },
   ],
+  nail_bar: [
+    { name: 'New Client', position: 1, color: '#378ADD', is_default: true },
+    { name: 'First Appointment', position: 2, color: '#EF9F27' },
+    { name: 'Regular', position: 3, color: '#2DA89C' },
+    { name: 'Loyal Member', position: 4, color: '#1D9E75' },
+  ],
+  pet_grooming: [
+    { name: 'New Client', position: 1, color: '#378ADD', is_default: true },
+    { name: 'First Appointment', position: 2, color: '#EF9F27' },
+    { name: 'Regular', position: 3, color: '#2DA89C' },
+    { name: 'Member', position: 4, color: '#1D9E75' },
+  ],
 }
 
 function getSupabase(): SupabaseClient {
