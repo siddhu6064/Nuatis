@@ -29,7 +29,12 @@ export async function sendSms(
   try {
     if (options?.contactId && options?.tenantId) {
       const allowed = await checkTcpaOptIn(options.contactId, options.tenantId)
-      if (!allowed) return { success: false }
+      if (!allowed) {
+        console.info(
+          `[sendSms] TCPA suppressed: contact=${options.contactId} tenant=${options.tenantId} to=${to}`
+        )
+        return { success: false }
+      }
     }
 
     const res = await fetch('https://api.telnyx.com/v2/messages', {
