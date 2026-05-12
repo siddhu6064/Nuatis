@@ -939,6 +939,214 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     ],
   },
 
+  laundry: {
+    slug: 'laundry',
+    label: 'Laundry & Dry Cleaning',
+    inventory_label: 'Laundry Supplies',
+    staff_label: 'Staff & Pressers',
+    compliance_tier: 'tcpa',
+    fields: [
+      {
+        key: 'preferred_service',
+        label: 'Preferred service',
+        type: 'select',
+        required: false,
+        options: ['Wash & Fold', 'Dry Cleaning', 'Shirt Press', 'Specialty'],
+      },
+      { key: 'membership_active', label: 'Membership active', type: 'boolean', required: false },
+      { key: 'last_order_date', label: 'Last order date', type: 'date', required: false },
+      {
+        key: 'preferred_contact_time',
+        label: 'Preferred contact time',
+        type: 'select',
+        required: false,
+        options: ['Morning', 'Afternoon', 'Evening'],
+      },
+      {
+        key: 'special_instructions',
+        label: 'Special instructions',
+        type: 'textarea',
+        required: false,
+      },
+    ],
+    pipeline_stages: [
+      { name: 'Lead', position: 1, color: C.blue, is_default: true },
+      { name: 'First Order', position: 2, color: C.amber },
+      { name: 'Regular', position: 3, color: C.teal },
+      { name: 'Member', position: 4, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Drop-off laundry scheduling',
+      'Dry cleaning inquiry',
+      'Rush same-day service request',
+      'Pickup and delivery availability',
+      'Membership and pricing questions',
+      'Order status and ready-for-pickup',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}}, a laundry and dry cleaning service. Speak in a helpful, efficient, and detail-oriented tone. Opening: "Thanks for calling {{business_name}}! This is Maya. I can help with drop-off laundry, dry cleaning, or scheduling a pickup — what can I do for you today?" You know turnaround times and pricing for all services. Rush same-day service is available for an additional fee. When callers ask about pricing, mention that monthly membership plans are available for discounted rates. When a caller books a pickup by phone, note that verbal consent to receive text message reminders has been granted per TCPA guidelines.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '7am-7pm', sat: '8am-5pm', sun: 'closed' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for calling {business}! We'd love to handle your laundry or dry cleaning. Reply or call us anytime. Reply STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Fresh clothes, fast — {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. We offer same-day rush service and monthly membership plans for regular customers.',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, ready for a fresh batch? Drop off anytime at {business}. Reply STOP to opt out.',
+      },
+    ],
+  },
+
+  car_wash: {
+    slug: 'car_wash',
+    label: 'Car Wash',
+    inventory_label: 'Wash Supplies',
+    staff_label: 'Detailers',
+    compliance_tier: 'tcpa',
+    fields: [
+      {
+        key: 'vehicle_type',
+        label: 'Vehicle type',
+        type: 'select',
+        required: false,
+        options: ['Sedan', 'SUV', 'Truck', 'Van', 'Sports', 'Other'],
+      },
+      { key: 'preferred_package', label: 'Preferred package', type: 'text', required: false },
+      { key: 'membership_active', label: 'Membership active', type: 'boolean', required: false },
+      { key: 'last_wash_date', label: 'Last wash date', type: 'date', required: false },
+      { key: 'license_plate', label: 'License plate', type: 'text', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'Lead', position: 1, color: C.blue, is_default: true },
+      { name: 'First Wash', position: 2, color: C.amber },
+      { name: 'Regular', position: 3, color: C.teal },
+      { name: 'Club Member', position: 4, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Wash package booking',
+      'Full detail appointment scheduling',
+      'Membership and wash club questions',
+      'Walk-in availability',
+      'Pricing questions',
+      'Appointment reschedule or cancel',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}}, a car wash and detailing service. Speak in an efficient, friendly, and quick-service tone. Opening: "Thanks for calling {{business_name}}! This is Maya. I can help you schedule a wash or detail — what can I do for you?" You know the full service menu including Basic, Deluxe, and Premium washes, interior detail, full detail packages, hand wax, tire and rim cleaning, and engine bay cleaning. For full detail packages, mention it takes 2 to 4 hours and an appointment is recommended. When callers ask about pricing, always mention that wash club memberships are available for unlimited washes at a fixed monthly rate. When a caller books an appointment by phone, note that verbal consent to receive text message reminders has been granted per TCPA guidelines.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '7am-7pm', sat: '7am-6pm', sun: '8am-5pm' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for calling {business}! We'd love to get your vehicle sparkling. Reply or call to book your wash or detail. Reply STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Keep your ride looking sharp — {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. We have great availability this week for washes and detail packages.',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, openings available this week at {business}. Book your wash or detail today! Reply STOP to opt out.',
+      },
+    ],
+  },
+
+  tattoo: {
+    slug: 'tattoo',
+    label: 'Tattoo Studio',
+    inventory_label: 'Inks & Supplies',
+    staff_label: 'Artists',
+    compliance_tier: 'tcpa',
+    fields: [
+      {
+        key: 'style_preference',
+        label: 'Style preference',
+        type: 'select',
+        required: false,
+        options: [
+          'Traditional',
+          'Neo-Traditional',
+          'Blackwork',
+          'Realism',
+          'Watercolor',
+          'Minimalist',
+          'Other',
+        ],
+      },
+      { key: 'preferred_artist', label: 'Preferred artist', type: 'text', required: false },
+      { key: 'placement', label: 'Placement / body area', type: 'text', required: false },
+      {
+        key: 'has_reference_image',
+        label: 'Has reference image',
+        type: 'boolean',
+        required: false,
+      },
+      { key: 'deposit_paid', label: 'Deposit paid', type: 'boolean', required: false },
+      { key: 'consultation_date', label: 'Consultation date', type: 'date', required: false },
+      { key: 'session_date', label: 'Session date', type: 'date', required: false },
+      { key: 'is_cover_up', label: 'Cover-up', type: 'boolean', required: false },
+    ],
+    pipeline_stages: [
+      { name: 'Inquiry', position: 1, color: C.blue, is_default: true },
+      { name: 'Consultation', position: 2, color: C.amber },
+      { name: 'Deposit Paid', position: 3, color: C.teal },
+      { name: 'Session Booked', position: 4, color: C.teal },
+      { name: 'Completed', position: 5, color: C.green, is_won: true },
+    ],
+    maya_intents: [
+      'Tattoo consultation booking',
+      'Flash tattoo and walk-in availability',
+      'Cover-up inquiry',
+      'Piercing booking',
+      'Deposit and appointment questions',
+      'Aftercare questions',
+    ],
+    system_prompt_template:
+      'You are Maya, the AI receptionist for {{business_name}}, a tattoo studio. Speak in a creative, professional, and consultation-focused tone. Opening: "Thanks for calling {{business_name}}! This is Maya. Whether you have an idea in mind or need some inspiration, I\'m here to help." Never quote specific pricing — if a caller asks about cost, say "Pricing depends on the size, complexity, and artist — I can book you a free consultation to get an exact quote." Do not discuss artist licensing. When booking any tattoo session, always mention that a deposit is required to secure the appointment.' +
+      MAYA_PROMPT_SUFFIX,
+    business_hours: { mon_fri: '11am-8pm', sat: '10am-7pm', sun: '12pm-6pm' },
+    follow_up_cadence: [
+      {
+        days_after: 1,
+        channel: 'sms',
+        template:
+          "Hi {name}, thanks for reaching out to {business}! We'd love to help bring your tattoo idea to life. Reply or call to book a free consultation. Reply STOP to opt out.",
+      },
+      {
+        days_after: 4,
+        channel: 'email',
+        subject: 'Your tattoo journey starts at {business}',
+        template:
+          'We wanted to follow up on your recent inquiry. Our artists offer free consultations to walk through your idea and provide an accurate quote.',
+      },
+      {
+        days_after: 7,
+        channel: 'sms',
+        template:
+          'Hi {name}, consultation slots available this week at {business}. Book yours today! Reply STOP to opt out.',
+      },
+    ],
+  },
+
   pet_grooming: {
     slug: 'pet_grooming',
     label: 'Pet Grooming',

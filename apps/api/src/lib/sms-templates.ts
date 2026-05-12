@@ -1,7 +1,16 @@
 // ── Vertical groups ───────────────────────────────────────────────────────────
 
 const CLINICAL = new Set(['dental', 'medical', 'vet'])
-const SERVICE = new Set(['salon', 'spa', 'gym', 'nail_bar', 'tattoo', 'pet_grooming'])
+const SERVICE = new Set([
+  'salon',
+  'spa',
+  'gym',
+  'nail_bar',
+  'tattoo',
+  'pet_grooming',
+  'car_wash',
+  'laundry',
+])
 const HOSPITALITY = new Set(['restaurant'])
 const PROFESSIONAL = new Set(['contractor', 'law_firm', 'real_estate', 'sales_crm'])
 

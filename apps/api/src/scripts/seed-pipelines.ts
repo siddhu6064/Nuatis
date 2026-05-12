@@ -62,6 +62,25 @@ const INLINE_STAGES: Record<
     { name: 'Regular', position: 3, color: '#2DA89C' },
     { name: 'Member', position: 4, color: '#1D9E75' },
   ],
+  laundry: [
+    { name: 'Lead', position: 1, color: '#378ADD', is_default: true },
+    { name: 'First Order', position: 2, color: '#EF9F27' },
+    { name: 'Regular', position: 3, color: '#2DA89C' },
+    { name: 'Member', position: 4, color: '#1D9E75' },
+  ],
+  car_wash: [
+    { name: 'Lead', position: 1, color: '#378ADD', is_default: true },
+    { name: 'First Wash', position: 2, color: '#EF9F27' },
+    { name: 'Regular', position: 3, color: '#2DA89C' },
+    { name: 'Club Member', position: 4, color: '#1D9E75' },
+  ],
+  tattoo: [
+    { name: 'Inquiry', position: 1, color: '#378ADD', is_default: true },
+    { name: 'Consultation', position: 2, color: '#EF9F27' },
+    { name: 'Deposit Paid', position: 3, color: '#2DA89C' },
+    { name: 'Session Booked', position: 4, color: '#2DA89C' },
+    { name: 'Completed', position: 5, color: '#1D9E75' },
+  ],
 }
 
 function getSupabase(): SupabaseClient {

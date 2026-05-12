@@ -74,6 +74,21 @@ const STAFF_PRESETS: Record<string, StaffSeed[]> = {
     { name: 'Ashley Nguyen', role: 'Nail Technician' },
     { name: 'Taylor Brown', role: 'Receptionist' },
   ],
+  laundry: [
+    { name: 'Rosa Delgado', role: 'Lead Presser' },
+    { name: 'Kevin Park', role: 'Laundry Attendant' },
+    { name: 'Tina Walsh', role: 'Front Desk' },
+  ],
+  car_wash: [
+    { name: 'Jordan Hayes', role: 'Lead Detailer' },
+    { name: 'Priya Solan', role: 'Detailer' },
+    { name: 'Chris Navarro', role: 'Cashier' },
+  ],
+  tattoo: [
+    { name: 'Diego Reyes', role: 'Lead Artist' },
+    { name: 'Nadia Voss', role: 'Tattoo Artist' },
+    { name: 'Sam Okoro', role: 'Receptionist' },
+  ],
   pet_grooming: [
     { name: 'Brooke Anderson', role: 'Senior Groomer' },
     { name: 'Marcus Lee', role: 'Groomer' },

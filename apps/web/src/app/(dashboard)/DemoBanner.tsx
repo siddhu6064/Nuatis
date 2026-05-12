@@ -19,6 +19,9 @@ const VERTICALS = [
   { slug: 'gym', label: 'Gym', icon: '🏋️' },
   { slug: 'nail_bar', label: 'Nail Bar', icon: '💅' },
   { slug: 'pet_grooming', label: 'Pet Grooming', icon: '🐾' },
+  { slug: 'tattoo', label: 'Tattoo Studio', icon: '🎨' },
+  { slug: 'car_wash', label: 'Car Wash', icon: '🚗' },
+  { slug: 'laundry', label: 'Laundry', icon: '👕' },
 ]
 
 interface DemoInfo {
