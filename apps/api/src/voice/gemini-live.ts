@@ -131,7 +131,7 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  let systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'our office')
+  let systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'the business')
 
   // ── Inject knowledge base entries into system prompt (2s timeout) ────────
   try {
