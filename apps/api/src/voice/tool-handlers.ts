@@ -1160,7 +1160,7 @@ const handlers: Record<string, ToolHandler> = {
       `[tool-handlers] end_call: hanging up call_control_id=${ccId} tenant=${context.tenantId}`
     )
 
-    // Return immediately, schedule hangup after 2s so farewell audio finishes playing
+    // Return immediately, schedule hangup after 5s so farewell audio finishes playing
     setTimeout(() => {
       const apiKey = process.env['TELNYX_API_KEY']
       if (!apiKey) {

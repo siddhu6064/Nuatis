@@ -92,7 +92,7 @@ export default function MayaLandingPage() {
             name: 'Maya AI',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',
-            offers: { '@type': 'Offer', price: '49', priceCurrency: 'USD' },
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
           }),
         }}
       />
@@ -135,7 +135,7 @@ export default function MayaLandingPage() {
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-8 text-center">
           {[
             ['< 1.5s', 'response time'],
-            ['$0.008', 'per call'],
+            ['per-call pricing', 'no monthly cap'],
             ['7', 'industries'],
             ['4', 'languages'],
           ].map(([value, label]) => (
@@ -222,10 +222,12 @@ export default function MayaLandingPage() {
             <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide mb-2">
               Maya AI
             </p>
-            <div className="flex items-end justify-center gap-1 mb-4">
-              <span className="text-4xl font-bold text-gray-900">$49</span>
-              <span className="text-sm text-gray-400 mb-1">/mo</span>
+            <div className="flex items-end justify-center gap-1 mb-2">
+              <span className="text-2xl font-bold text-gray-900">Founding Member Pricing</span>
             </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Contact us to lock in your rate before public launch.
+            </p>
             <ul className="text-sm text-gray-600 space-y-2 mb-6 text-left">
               {[
                 'Unlimited calls',
