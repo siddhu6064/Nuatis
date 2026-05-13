@@ -141,7 +141,8 @@ export async function processImportRows(
         continue
       }
 
-      // INSERT new contact
+      // INSERT new contact — sms_opt_in must be explicit; do not rely on DB default
+      contact['sms_opt_in'] = false
       const { data: newContact, error: insertErr } = await supabase
         .from('contacts')
         .insert(contact)
