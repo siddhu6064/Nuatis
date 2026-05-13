@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 
 interface EmailTemplate {
   id: string
@@ -42,9 +41,6 @@ export default function EmailComposeModal({
   onClose,
   onSent,
 }: Props) {
-  const { data: session } = useSession()
-  const token = (session as { accessToken?: string } | null)?.accessToken
-
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -57,7 +53,6 @@ export default function EmailComposeModal({
 
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 
   // Fetch templates and accounts on mount

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -782,11 +781,8 @@ const TABS: { key: TabKey; label: string }[] = [
 ]
 
 export default function PipelinesSettingsPage() {
-  const { data: session } = useSession()
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   const [activeTab, setActiveTab] = useState<TabKey>('contacts')

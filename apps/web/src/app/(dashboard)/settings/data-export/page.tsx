@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 
 type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -47,17 +46,14 @@ function formatDate(iso: string): string {
 }
 
 export default function DataExportPage() {
-  const { data: session } = useSession()
   const [selectedTables, setSelectedTables] = useState<string[]>(TABLES.map((t) => t.key))
   const [exporting, setExporting] = useState(false)
   const [history, setHistory] = useState<ExportJob[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   function showToast(type: 'success' | 'error', msg: string) {
@@ -66,7 +62,6 @@ export default function DataExportPage() {
   }
 
   const fetchHistory = useCallback(async () => {
-    if (!token) return
     try {
       const res = await fetch(`/api/settings/data-export`, { headers: authHeaders })
       if (res.ok) {
@@ -78,11 +73,11 @@ export default function DataExportPage() {
     } finally {
       setHistoryLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
-    if (token) fetchHistory()
-  }, [token, fetchHistory])
+    fetchHistory()
+  }, [fetchHistory])
 
   function toggleTable(key: string) {
     setSelectedTables((prev) =>

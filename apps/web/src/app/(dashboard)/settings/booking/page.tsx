@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 
 interface AvailableService {
   id: string
@@ -40,18 +39,14 @@ function isValidHex(val: string) {
 }
 
 export default function BookingSettingsPage() {
-  const { data: session } = useSession()
   const [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [slugError, setSlugError] = useState<string | null>(null)
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
-
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   useEffect(() => {

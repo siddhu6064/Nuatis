@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -240,13 +239,11 @@ function FormBuilderModal({
   services,
   onClose,
   onSaved,
-  token,
 }: {
   editingForm: IntakeForm | null
   services: Service[]
   onClose: () => void
   onSaved: () => void
-  token: string
 }) {
   const [name, setName] = useState(editingForm?.name ?? '')
   const [description, setDescription] = useState(editingForm?.description ?? '')
@@ -322,7 +319,6 @@ function FormBuilderModal({
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
       })
@@ -505,22 +501,12 @@ function FormBuilderModal({
 // Submissions Panel
 // ---------------------------------------------------------------------------
 
-function SubmissionsPanel({
-  form,
-  token,
-  onClose,
-}: {
-  form: IntakeForm
-  token: string
-  onClose: () => void
-}) {
+function SubmissionsPanel({ form, onClose }: { form: IntakeForm; onClose: () => void }) {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/intake-forms/${form.id}/submissions`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`/api/intake-forms/${form.id}/submissions`)
       .then((r) => (r.ok ? r.json() : { submissions: [] }))
       .then((data: { submissions?: Submission[] } | Submission[]) => {
         if (Array.isArray(data)) {
@@ -531,7 +517,7 @@ function SubmissionsPanel({
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [form.id, token])
+  }, [form.id])
 
   // Show up to 5 key fields in the table
   const keyFields = form.fields.slice(0, 5)
@@ -614,9 +600,6 @@ function SubmissionsPanel({
 // ---------------------------------------------------------------------------
 
 export default function IntakeFormsPage() {
-  const { data: session } = useSession()
-  const token = ((session as unknown as Record<string, unknown>)?.accessToken ?? '') as string
-
   const [forms, setForms] = useState<IntakeForm[]>([])
   const [loading, setLoading] = useState(true)
   const [services, setServices] = useState<Service[]>([])
@@ -631,14 +614,12 @@ export default function IntakeFormsPage() {
   }
 
   const fetchForms = useCallback(async () => {
-    const res = await fetch(`/api/intake-forms`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const res = await fetch(`/api/intake-forms`)
     if (res.ok) {
       const data = await res.json()
       setForms(Array.isArray(data) ? data : ((data as { forms?: IntakeForm[] }).forms ?? []))
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -655,7 +636,7 @@ export default function IntakeFormsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   function openCreate() {
     setEditingForm(null)
@@ -677,7 +658,6 @@ export default function IntakeFormsPage() {
 
     const res = await fetch(`/api/intake-forms/${form.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     })
 
     if (res.ok) {
@@ -829,11 +809,7 @@ export default function IntakeFormsPage() {
               {/* Inline submissions panel */}
               {viewingSubmissionsFor?.id === form.id && (
                 <div className="mt-2">
-                  <SubmissionsPanel
-                    form={form}
-                    token={token}
-                    onClose={() => setViewingSubmissionsFor(null)}
-                  />
+                  <SubmissionsPanel form={form} onClose={() => setViewingSubmissionsFor(null)} />
                 </div>
               )}
             </div>
@@ -851,7 +827,6 @@ export default function IntakeFormsPage() {
             setEditingForm(null)
           }}
           onSaved={handleSaved}
-          token={token}
         />
       )}
     </div>

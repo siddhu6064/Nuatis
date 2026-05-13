@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 
 function Toggle({
   checked,
@@ -32,11 +31,8 @@ function Toggle({
 }
 
 export default function InventorySettingsPage() {
-  const { data: session } = useSession()
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   const [autoDeduct, setAutoDeduct] = useState(false)

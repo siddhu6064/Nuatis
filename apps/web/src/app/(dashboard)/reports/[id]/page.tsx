@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   BarChart,
@@ -77,15 +76,12 @@ const DATE_RANGE_OPTIONS = [
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReportDetailPage() {
-  const { data: session } = useSession()
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   const [report, setReport] = useState<ReportConfig | null>(null)
@@ -104,7 +100,7 @@ export default function ReportDetailPage() {
   }
 
   const fetchReport = useCallback(async () => {
-    if (!token || !id) return
+    if (!id) return
     setLoadingReport(true)
     try {
       const res = await fetch(`/api/reports/${id}`, { headers: authHeaders })
@@ -124,10 +120,10 @@ export default function ReportDetailPage() {
     } finally {
       setLoadingReport(false)
     }
-  }, [token, id])
+  }, [id])
 
   const fetchData = useCallback(async () => {
-    if (!token || !id) return
+    if (!id) return
     setLoadingData(true)
     try {
       const params = new URLSearchParams({ date_range: dateRange })
@@ -147,15 +143,15 @@ export default function ReportDetailPage() {
     } finally {
       setLoadingData(false)
     }
-  }, [token, id, dateRange, customFrom, customTo])
+  }, [id, dateRange, customFrom, customTo])
 
   useEffect(() => {
-    if (token) fetchReport()
-  }, [token, fetchReport])
+    fetchReport()
+  }, [fetchReport])
 
   useEffect(() => {
-    if (token && dateRange) fetchData()
-  }, [token, dateRange, fetchData])
+    if (dateRange) fetchData()
+  }, [dateRange, fetchData])
 
   async function handleRefresh() {
     setRefreshing(true)

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -301,11 +300,8 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LeadScoringSettingsPage() {
-  const { data: session } = useSession()
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   const [rules, setRules] = useState<RulesByCategory>({

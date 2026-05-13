@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import type { Session } from 'next-auth'
 import { createClient } from '@supabase/supabase-js'
+import { SignJWT } from 'jose'
 
 // anon key — for signInWithPassword
 const supabaseAuth = createClient(
@@ -110,6 +111,25 @@ const result = NextAuth({
         }
       }
 
+      if (token.tenantId) {
+        const secret = process.env['AUTH_SECRET']
+        if (secret) {
+          const secretBytes = new TextEncoder().encode(secret)
+          token.accessToken = await new SignJWT({
+            sub: token.sub,
+            tenantId: token.tenantId,
+            role: token.role,
+            vertical: token.vertical,
+            businessName: token.businessName,
+            subscriptionStatus: token.subscriptionStatus,
+          })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setIssuedAt()
+            .setExpirationTime('60s')
+            .sign(secretBytes)
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -119,6 +139,7 @@ const result = NextAuth({
       session.user.businessName = token.businessName as string
       session.user.subscriptionStatus = token.subscriptionStatus as string
       session.user.modules = (token.modules as Record<string, boolean>) ?? {}
+      ;(session as unknown as Record<string, unknown>).accessToken = token.accessToken as string
       return session
     },
   },

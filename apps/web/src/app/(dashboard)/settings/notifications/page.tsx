@@ -98,10 +98,8 @@ export default function NotificationSettingsPage() {
     {}) as Record<string, boolean>
   const visibleEvents = EVENTS.filter((e) => !e.requireModule || modules[e.requireModule] !== false)
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   useEffect(() => {

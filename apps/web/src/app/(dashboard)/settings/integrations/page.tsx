@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
 interface EmailAccount {
@@ -43,7 +42,6 @@ export default function IntegrationsPage() {
 }
 
 function IntegrationsContent() {
-  const { data: session } = useSession()
   const searchParams = useSearchParams()
 
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
@@ -63,14 +61,9 @@ function IntegrationsContent() {
     setTimeout(() => setToast(null), 4000)
   }
 
-  const token = (session as { accessToken?: string } | null)?.accessToken
-
   const fetchAccounts = useCallback(async () => {
-    if (!token) return
     try {
-      const res = await fetch(`/api/email-integrations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/email-integrations`)
       if (res.ok) {
         const data: EmailAccount[] = await res.json()
         setAccounts(data)
@@ -80,14 +73,11 @@ function IntegrationsContent() {
     } finally {
       setAccountsLoading(false)
     }
-  }, [token])
+  }, [])
 
   const fetchBcc = useCallback(async () => {
-    if (!token) return
     try {
-      const res = await fetch(`/api/settings/bcc-logging`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/settings/bcc-logging`)
       if (res.ok) {
         const data: { bcc_logging_address?: string } = await res.json()
         setBccAddress(data.bcc_logging_address ?? null)
@@ -97,14 +87,12 @@ function IntegrationsContent() {
     } finally {
       setBccLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
-    if (token) {
-      fetchAccounts()
-      fetchBcc()
-    }
-  }, [token, fetchAccounts, fetchBcc])
+    fetchAccounts()
+    fetchBcc()
+  }, [fetchAccounts, fetchBcc])
 
   // Show success toast if redirected back after OAuth
   useEffect(() => {
@@ -114,12 +102,9 @@ function IntegrationsContent() {
   }, [searchParams])
 
   async function connectProvider(provider: 'gmail' | 'outlook') {
-    if (!token) return
     setConnectingProvider(provider)
     try {
-      const res = await fetch(`/api/email-integrations/${provider}/auth-url`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/email-integrations/${provider}/auth-url`)
       if (res.ok) {
         const data: { url: string } = await res.json()
         window.location.href = data.url
@@ -135,12 +120,10 @@ function IntegrationsContent() {
 
   async function disconnectAccount(id: string, email: string) {
     if (!confirm(`Disconnect ${email}? This cannot be undone.`)) return
-    if (!token) return
     setDisconnecting(id)
     try {
       const res = await fetch(`/api/email-integrations/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         setAccounts((prev) => prev.filter((a) => a.id !== id))
@@ -156,12 +139,10 @@ function IntegrationsContent() {
   }
 
   async function generateBccAddress() {
-    if (!token) return
     setGeneratingBcc(true)
     try {
       const res = await fetch(`/api/settings/bcc-logging/enable`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         const data: { bcc_logging_address?: string } = await res.json()

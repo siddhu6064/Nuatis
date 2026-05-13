@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -195,13 +194,10 @@ const DEFAULT_WIZARD: WizardState = {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const { data: session } = useSession()
   const router = useRouter()
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   const [reports, setReports] = useState<Report[]>([])
@@ -218,7 +214,6 @@ export default function ReportsPage() {
   }
 
   const fetchReports = useCallback(async () => {
-    if (!token) return
     setLoading(true)
     try {
       const res = await fetch(`/api/reports`, { headers: authHeaders })
@@ -231,11 +226,11 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
-    if (token) fetchReports()
-  }, [token, fetchReports])
+    fetchReports()
+  }, [fetchReports])
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this report?')) return

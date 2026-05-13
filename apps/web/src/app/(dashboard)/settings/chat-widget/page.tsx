@@ -56,14 +56,12 @@ export default function ChatWidgetSettingsPage() {
   const [copied, setCopied] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const token = (session as unknown as Record<string, unknown>)?.accessToken ?? ''
   const tenantId =
     ((session as unknown as Record<string, unknown>)?.user as Record<string, unknown> | undefined)
       ?.tenantId ?? ''
 
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token as string}` } : {}),
   }
 
   function showToast(type: 'success' | 'error', msg: string) {
@@ -72,7 +70,6 @@ export default function ChatWidgetSettingsPage() {
   }
 
   useEffect(() => {
-    if (!token) return
     fetch(`/api/settings/chat-widget`, { headers: authHeaders })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: ChatWidgetSettings | null) => {
@@ -80,7 +77,7 @@ export default function ChatWidgetSettingsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   async function save() {
     setSaving(true)
