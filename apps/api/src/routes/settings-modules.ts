@@ -14,6 +14,7 @@ const VALID_MODULES = [
   'insights',
   'companies',
   'deals',
+  'campaigns',
 ]
 
 function getSupabase() {

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import InsightsDashboard from './InsightsDashboard'
@@ -11,6 +12,7 @@ export default async function InsightsPage() {
   const tenantId = session?.user?.tenantId
   const vertical = session?.user?.vertical || 'sales_crm'
   const modules = (session?.user?.modules as Record<string, boolean> | undefined) ?? {}
+  if (modules['insights'] === false) redirect('/dashboard')
   const crmEnabled = modules['crm'] !== false
 
   const supabase = createAdminClient()

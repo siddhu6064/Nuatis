@@ -1,8 +1,24 @@
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { isModuleEnabled } from '../lib/modules.js'
 
 const router = Router()
+
+// Insights module gate
+async function requireInsights(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authed = req as AuthenticatedRequest
+  const enabled = await isModuleEnabled(authed.tenantId, 'insights')
+  if (!enabled) {
+    res.status(403).json({
+      error: 'Insights module is not enabled for your workspace. Enable it in Settings → Modules.',
+    })
+    return
+  }
+  next()
+}
+
+router.use(requireAuth, requireInsights)
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

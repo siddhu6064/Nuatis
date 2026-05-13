@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import AppointmentsCalendar from './AppointmentsCalendar'
@@ -21,6 +22,8 @@ interface StaffMember {
 
 export default async function AppointmentsPage() {
   const session = await auth()
+  const modules = (session?.user?.modules as Record<string, boolean> | undefined) ?? {}
+  if (modules['appointments'] === false) redirect('/dashboard')
   const tenantId = session?.user?.tenantId as string
   const userRole = (session?.user as { role?: string })?.role ?? 'member'
 

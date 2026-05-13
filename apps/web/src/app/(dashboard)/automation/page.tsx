@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { FOLLOW_UP_CADENCES, MAX_FOLLOW_UP_STEPS } from '@/lib/verticals'
@@ -28,6 +29,8 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default async function AutomationPage() {
   const session = await auth()
+  const modules = (session?.user?.modules as Record<string, boolean> | undefined) ?? {}
+  if (modules['automation'] === false) redirect('/dashboard')
   const tenantId = session?.user?.tenantId
   const vertical = session?.user?.vertical || 'sales_crm'
 

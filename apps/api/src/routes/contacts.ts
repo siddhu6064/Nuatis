@@ -1,12 +1,28 @@
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
+import { isModuleEnabled } from '../lib/modules.js'
 
 const router = Router()
+
+// CRM module gate
+async function requireCrm(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authed = req as AuthenticatedRequest
+  const enabled = await isModuleEnabled(authed.tenantId, 'crm')
+  if (!enabled) {
+    res.status(403).json({
+      error: 'CRM module is not enabled for your workspace. Enable it in Settings → Modules.',
+    })
+    return
+  }
+  next()
+}
+
+router.use(requireAuth, requireCrm)
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

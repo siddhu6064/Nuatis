@@ -1,8 +1,24 @@
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { isModuleEnabled } from '../lib/modules.js'
 
 const router = Router()
+
+// CPQ module gate
+async function requireCpq(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authed = req as AuthenticatedRequest
+  const enabled = await isModuleEnabled(authed.tenantId, 'cpq')
+  if (!enabled) {
+    res.status(403).json({
+      error: 'CPQ module is not enabled for your workspace. Enable it in Settings → Modules.',
+    })
+    return
+  }
+  next()
+}
+
+router.use(requireAuth, requireCpq)
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

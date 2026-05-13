@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
@@ -7,8 +7,25 @@ import { createEvent, updateEvent, deleteEvent } from '../services/scheduling.js
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { logActivity } from '../lib/activity.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { isModuleEnabled } from '../lib/modules.js'
 
 const router = Router()
+
+// Appointments module gate
+async function requireAppointments(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authed = req as AuthenticatedRequest
+  const enabled = await isModuleEnabled(authed.tenantId, 'appointments')
+  if (!enabled) {
+    res.status(403).json({
+      error:
+        'Appointments module is not enabled for your workspace. Enable it in Settings → Modules.',
+    })
+    return
+  }
+  next()
+}
+
+router.use(requireAuth, requireAppointments)
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
