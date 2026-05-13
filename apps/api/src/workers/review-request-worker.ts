@@ -100,7 +100,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
 
   // 8. Resolve message template
   const defaultTemplate =
-    'Hi {{first_name}}, thank you for your recent visit! We would love your feedback. Leave us a review here: {{review_url}}'
+    'Hi {{first_name}}, thank you for your recent visit! We would love your feedback. Leave us a review here: {{review_url}}\n\nReply STOP to opt out.'
   const template = (tenant.review_message_template as string | null) ?? defaultTemplate
   const businessName = (tenant.name as string | null) ?? ''
 

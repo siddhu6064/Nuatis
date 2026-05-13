@@ -1,14 +1,11 @@
 'use client'
 
-const VERTICALS_LIST = [
-  { slug: 'sales_crm', label: 'Sales CRM' },
-  { slug: 'dental', label: 'Dental practice' },
-  { slug: 'salon', label: 'Hair salon' },
-  { slug: 'restaurant', label: 'Restaurant' },
-  { slug: 'contractor', label: 'Contractor' },
-  { slug: 'law_firm', label: 'Law firm' },
-  { slug: 'real_estate', label: 'Real estate' },
-]
+import { VERTICALS } from '@nuatis/shared'
+
+const VERTICALS_LIST = Object.entries(VERTICALS).map(([slug, config]) => ({
+  slug,
+  label: config.label,
+}))
 
 const VERTICAL_ICONS: Record<string, string> = {
   sales_crm: '📊',

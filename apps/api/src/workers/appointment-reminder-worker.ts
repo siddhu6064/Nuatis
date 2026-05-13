@@ -75,7 +75,7 @@ export async function scan(): Promise<void> {
         `[appointment-reminder] sending 24h reminder: appointment=${appt.id} contact=${contact.phone} at=${appt.start_time}`
       )
 
-      const text = `Reminder: You have an appointment '${appt.title}' tomorrow at ${time}. Reply CANCEL to cancel. - ${businessName}`
+      const text = `Reminder: You have an appointment '${appt.title}' tomorrow at ${time}. Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
       const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
         contactId: appt.contact_id,
         tenantId: appt.tenant_id,
@@ -102,7 +102,7 @@ export async function scan(): Promise<void> {
         `[appointment-reminder] sending 1h reminder: appointment=${appt.id} contact=${contact.phone} at=${appt.start_time}`
       )
 
-      const text = `Your appointment '${appt.title}' is in 1 hour at ${time}. See you soon! - ${businessName}`
+      const text = `Your appointment '${appt.title}' is in 1 hour at ${time}. See you soon! Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
       const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
         contactId: appt.contact_id,
         tenantId: appt.tenant_id,

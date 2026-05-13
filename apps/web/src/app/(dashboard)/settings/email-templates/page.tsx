@@ -1,16 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { VERTICALS as VERTICALS_CONFIG } from '@nuatis/shared'
 
-const VERTICALS = [
-  { value: 'dental', label: 'Dental' },
-  { value: 'salon', label: 'Salon' },
-  { value: 'contractor', label: 'Contractor' },
-  { value: 'medspa', label: 'Med Spa' },
-  { value: 'fitness', label: 'Fitness' },
-  { value: 'auto', label: 'Auto' },
-  { value: 'hvac', label: 'HVAC' },
-]
+const VERTICALS = Object.entries(VERTICALS_CONFIG).map(([slug, config]) => ({
+  value: slug,
+  label: config.label,
+}))
 
 const MERGE_TAGS = [
   '{{first_name}}',

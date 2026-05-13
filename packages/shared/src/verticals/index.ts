@@ -126,7 +126,7 @@ export const VERTICALS: Record<string, VerticalConfig> = {
         days_after: 1,
         channel: 'sms',
         template:
-          "Hi {name}, thank you for calling {business}! If you'd like to schedule a demo, reply or call us anytime.",
+          "Hi {name}, thank you for calling {business}! If you'd like to schedule a demo, reply or call us anytime.\n\nReply STOP to opt out.",
       },
       {
         days_after: 3,
@@ -870,6 +870,7 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     label: 'Gym & Fitness Studio',
     inventory_label: 'Equipment / Supps',
     staff_label: 'Trainers / Coaches',
+    compliance_tier: 'tcpa',
     fields: [
       {
         key: 'fitness_goal',
@@ -1311,6 +1312,7 @@ export const VERTICALS: Record<string, VerticalConfig> = {
     label: 'Spa & Wellness',
     inventory_label: 'Oils & Supplies',
     staff_label: 'Therapists',
+    compliance_tier: 'tcpa',
     fields: [
       {
         key: 'skin_type',
