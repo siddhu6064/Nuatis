@@ -92,7 +92,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     } else {
       res
         .status(400)
-        .json({ error: 'escalation_phone must be in E.164 format (e.g. +15125551234)' })
+        .json({ error: 'Escalation phone must be a valid E.164 number (e.g. +15551234567)' })
       return
     }
   }

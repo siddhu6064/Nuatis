@@ -302,18 +302,18 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-              Escalation Phone Number
+              Transfer calls to
             </label>
             <input
               type="tel"
               value={form.escalation_phone}
               onChange={(e) => setForm({ ...form, escalation_phone: e.target.value })}
-              placeholder="+15125551234"
+              placeholder="+1 (555) 000-0000"
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
             <p className="text-[11px] text-gray-400 mt-1">
-              E.164 format (e.g. +15125551234). This number is called when Maya transfers to a
-              human.
+              When a caller asks to speak with someone, Maya transfers the call here. Must be in
+              E.164 format (e.g. +15551234567). Leave blank to disable transfers.
             </p>
           </div>
         </div>
