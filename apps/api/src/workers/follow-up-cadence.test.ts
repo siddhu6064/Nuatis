@@ -24,7 +24,12 @@ process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 process.env['TELNYX_API_KEY'] = 'test-telnyx-key'
 
 const fetchMock = jest.fn<typeof fetch>(async () => {
-  return { ok: true, status: 200, text: async () => '' } as unknown as Response
+  return {
+    ok: true,
+    status: 200,
+    text: async () => '',
+    json: async () => ({}),
+  } as unknown as Response
 })
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).fetch = fetchMock
@@ -65,6 +70,7 @@ describe('follow-up-cadence scanner', () => {
         follow_up_last_sent: null,
         created_at: twoDaysAgo,
         is_archived: false,
+        sms_opt_in: true,
       },
     ]
 

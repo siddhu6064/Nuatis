@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { VERTICALS, type FollowUpStep } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { sendSms } from '../lib/sms.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { sendTemplatedEmail } from '../lib/email-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
@@ -14,31 +15,6 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
-}
-
-async function sendSms(from: string, to: string, text: string): Promise<boolean> {
-  const apiKey = process.env['TELNYX_API_KEY']
-  if (!apiKey) return false
-
-  try {
-    const res = await fetch('https://api.telnyx.com/v2/messages', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to, text }),
-    })
-    if (!res.ok) {
-      const body = await res.text()
-      console.error(`[follow-up-cadence] SMS failed (${res.status}): ${body}`)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.error('[follow-up-cadence] SMS error:', err)
-    return false
-  }
 }
 
 function interpolate(template: string, vars: Record<string, string>): string {
@@ -136,7 +112,11 @@ export async function scan(): Promise<void> {
 
         if (currentStep.channel === 'sms' && contact.phone && telnyxNumber) {
           const text = interpolate(currentStep.template, vars)
-          sent = await sendSms(telnyxNumber, contact.phone, text)
+          const { success } = await sendSms(telnyxNumber, contact.phone, text, {
+            contactId: contact.id,
+            tenantId: contact.tenant_id,
+          })
+          sent = success
         } else if (currentStep.channel === 'email' && contact.email) {
           const subject = currentStep.subject
             ? interpolate(currentStep.subject, vars)

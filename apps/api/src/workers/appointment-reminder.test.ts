@@ -22,6 +22,7 @@ const fetchMock = jest.fn<typeof fetch>(async () => {
     ok: true,
     status: 200,
     text: async () => '',
+    json: async () => ({}),
   } as unknown as Response
 })
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +34,9 @@ const { scan } = await import('./appointment-reminder-worker.js')
 
 function seedBase(): void {
   store.tables['tenants'] = [{ id: TENANT_ID, name: 'Test Clinic' }]
-  store.tables['contacts'] = [{ id: CONTACT_ID, phone: '+15551112222' }]
+  store.tables['contacts'] = [
+    { id: CONTACT_ID, tenant_id: TENANT_ID, phone: '+15551112222', sms_opt_in: true },
+  ]
   store.tables['locations'] = [
     { id: randomUUID(), tenant_id: TENANT_ID, telnyx_number: '+15550000000', is_primary: true },
   ]

@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { sendSms } from '../lib/sms.js'
 
 const QUEUE_NAME = 'appointment-reminder'
 
@@ -18,31 +19,6 @@ function formatTime(isoDate: string): string {
     minute: '2-digit',
     hour12: true,
   })
-}
-
-async function sendSms(from: string, to: string, text: string): Promise<boolean> {
-  const apiKey = process.env['TELNYX_API_KEY']
-  if (!apiKey) return false
-
-  try {
-    const res = await fetch('https://api.telnyx.com/v2/messages', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to, text }),
-    })
-    if (!res.ok) {
-      const body = await res.text()
-      console.error(`[appointment-reminder] SMS failed (${res.status}): ${body}`)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.error('[appointment-reminder] SMS error:', err)
-    return false
-  }
 }
 
 export async function scan(): Promise<void> {
@@ -100,7 +76,10 @@ export async function scan(): Promise<void> {
       )
 
       const text = `Reminder: You have an appointment '${appt.title}' tomorrow at ${time}. Reply CANCEL to cancel. - ${businessName}`
-      const sent = await sendSms(location.telnyx_number, contact.phone, text)
+      const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
+        contactId: appt.contact_id,
+        tenantId: appt.tenant_id,
+      })
 
       if (sent) {
         await supabase.from('appointments').update({ reminder_24h_sent: true }).eq('id', appt.id)
@@ -124,7 +103,10 @@ export async function scan(): Promise<void> {
       )
 
       const text = `Your appointment '${appt.title}' is in 1 hour at ${time}. See you soon! - ${businessName}`
-      const sent = await sendSms(location.telnyx_number, contact.phone, text)
+      const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
+        contactId: appt.contact_id,
+        tenantId: appt.tenant_id,
+      })
 
       if (sent) {
         await supabase.from('appointments').update({ reminder_1h_sent: true }).eq('id', appt.id)
