@@ -4,6 +4,7 @@
     "slug": "nuatis-crm",
     "version": "0.0.1",
     "orientation": "portrait",
+    "owner": "nuatis",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "nuatis",
@@ -15,18 +16,23 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.nuatis.crm"
+      "bundleIdentifier": "com.nuatis.crm",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E0E0E"
       },
-      "package": "com.nuatis.crm"
+      "package": "com.nuatis.crm",
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "extra": {
-      "apiUrl": "http://localhost:3001"
+      "apiUrl": "http://localhost:3001",
+      "eas": {
+        "projectId": "12d55e0d-0ffe-430c-97cc-305bae7645d6"
+      }
     }
   }
 }

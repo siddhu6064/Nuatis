@@ -84,7 +84,10 @@ export default function UpgradePage() {
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-gray-500 mb-4">Suite starts at $99/mo</p>
+        <p className="text-sm font-semibold text-gray-900 mb-1">Founding Member Pricing</p>
+        <p className="text-sm text-gray-500 mb-4">
+          Contact us to lock in your rate before public launch.
+        </p>
         <button
           onClick={handleUpgrade}
           disabled={upgrading}
@@ -92,9 +95,6 @@ export default function UpgradePage() {
         >
           {upgrading ? 'Upgrading...' : 'Upgrade to Suite'}
         </button>
-        <p className="text-xs text-gray-400 mt-3">
-          Pricing is placeholder. Stripe billing will be configured during Phase 6.
-        </p>
       </div>
     </div>
   )
