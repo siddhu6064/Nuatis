@@ -27,9 +27,32 @@ const METHOD_ACTION: Record<string, string> = {
   DELETE: 'delete',
 }
 
+const SUB_ACTIONS = new Set([
+  'accept',
+  'decline',
+  'send',
+  'test',
+  'subscribe',
+  'public',
+  'inbound',
+  'search',
+  'export',
+  'import',
+  'preview',
+  'upload',
+])
+
 function extractResourceType(path: string): string {
   const match = path.match(/^\/api\/([^/]+)/)
   return match?.[1] ?? 'unknown'
+}
+
+function extractResourceId(path: string): string | null {
+  const segments = path.split('/').filter(Boolean)
+  // segments[0] = 'api', segments[1] = resource_type, segments[2] = potential id
+  const candidate = segments[2]
+  if (candidate && !SUB_ACTIONS.has(candidate)) return candidate
+  return null
 }
 
 export async function logAuditEvent(event: AuditEvent): Promise<void> {
@@ -76,6 +99,7 @@ export function auditLoggerMiddleware(req: Request, res: Response, next: NextFun
       userId: (req as unknown as Record<string, unknown>)['userId'] as string | undefined,
       action,
       resourceType: extractResourceType(req.path),
+      resourceId: extractResourceId(req.path) ?? undefined,
       details: { method: req.method, path: req.path, status: res.statusCode },
       ipAddress: req.ip ?? req.socket.remoteAddress,
       userAgent: req.headers['user-agent'],
