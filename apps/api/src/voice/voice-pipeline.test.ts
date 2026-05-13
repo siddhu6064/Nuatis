@@ -147,11 +147,8 @@ describe('Tenant Config Resolution', () => {
 describe('Gemini Session Setup', () => {
   it('builds system prompt with business name and vertical template', () => {
     const salesTemplate = VERTICALS['sales_crm']?.system_prompt_template ?? ''
-    expect(salesTemplate).toContain('{{business_name}}')
-
-    const interpolated = salesTemplate.replace(/\{\{business_name\}\}/g, 'Acme Corp')
-    expect(interpolated).toContain('Acme Corp')
-    expect(interpolated).not.toContain('{{business_name}}')
+    // sales_crm uses a fixed Nuatis product prompt — no {{business_name}} placeholder
+    expect(salesTemplate).toContain('Nuatis')
   })
 
   it('uses fallback prompt when business name is null', () => {

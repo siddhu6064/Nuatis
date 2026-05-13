@@ -110,7 +110,11 @@ describe.each(EXPECTED_SLUGS)('vertical: %s', (slug) => {
     expect(intents.length).toBeLessThanOrEqual(8)
   })
 
-  it('system_prompt_template references {{business_name}}', () => {
-    expect(config.system_prompt_template).toContain('{{business_name}}')
+  it('system_prompt_template references {{business_name}} or is Nuatis-specific (sales_crm)', () => {
+    if (slug === 'sales_crm') {
+      expect(config.system_prompt_template).toContain('Nuatis')
+    } else {
+      expect(config.system_prompt_template).toContain('{{business_name}}')
+    }
   })
 })
