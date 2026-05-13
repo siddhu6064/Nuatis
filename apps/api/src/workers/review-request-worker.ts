@@ -63,7 +63,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
   // 4. Fetch contact
   const { data: contact, error: contactError } = await supabase
     .from('contacts')
-    .select('first_name, last_name, phone')
+    .select('full_name, phone')
     .eq('id', contactId)
     .single()
 
@@ -104,9 +104,13 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
   const template = (tenant.review_message_template as string | null) ?? defaultTemplate
   const businessName = (tenant.name as string | null) ?? ''
 
+  const nameParts = (contact.full_name ?? '').split(' ')
+  const firstName = nameParts[0] ?? 'there'
+  const lastName = nameParts.slice(1).join(' ')
+
   const resolvedMessage = template
-    .replace(/\{\{first_name\}\}/g, contact.first_name ?? '')
-    .replace(/\{\{last_name\}\}/g, contact.last_name ?? '')
+    .replace(/\{\{first_name\}\}/g, firstName)
+    .replace(/\{\{last_name\}\}/g, lastName)
     .replace(/\{\{business_name\}\}/g, businessName)
     .replace(/\{\{review_url\}\}/g, trackingUrl)
 
@@ -161,7 +165,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
   // 14. Notify owner
   await notifyOwner(tenantId, 'review_sent', {
     pushTitle: 'Review Request Sent',
-    pushBody: `Review request sent to ${contact.first_name}`,
+    pushBody: `Review request sent to ${firstName}`,
   })
 }
 
