@@ -1,5 +1,4 @@
 import { auth } from '@/lib/auth/authjs'
-import { FOLLOW_UP_CADENCES } from '@/lib/verticals'
 import FollowUpEditor from './FollowUpEditor'
 
 const VERTICAL_LABELS: Record<string, string> = {
@@ -17,7 +16,6 @@ export default async function FollowUpsPage() {
   const vertical = session?.user?.vertical || 'sales_crm'
   const businessName = session?.user?.businessName || 'Your Business'
 
-  const cadence = FOLLOW_UP_CADENCES[vertical] ?? []
   const verticalLabel = VERTICAL_LABELS[vertical] ?? vertical
 
   return (
@@ -28,7 +26,6 @@ export default async function FollowUpsPage() {
       </div>
 
       <FollowUpEditor
-        cadence={cadence}
         verticalLabel={verticalLabel}
         businessName={businessName}
         telnyxNumber="+15127376388"

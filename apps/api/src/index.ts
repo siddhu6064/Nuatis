@@ -58,6 +58,7 @@ import chatSettingsRouter from './routes/chat-settings.js'
 import dataExportRouter from './routes/data-export.js'
 import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
 import auditLogRouter from './routes/audit-log.js'
+import followUpTemplatesRouter from './routes/follow-up-templates.js'
 import mobileAuthRouter from './routes/mobile-auth.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
@@ -152,6 +153,7 @@ app.use('/api/settings/data-export', dataExportRouter)
 app.use('/api/settings/calendar', calendarSettingsRouter)
 app.use('/api/calendar', calendarCallbackRouter) // PUBLIC callback
 app.use('/api/audit-log', auditLogRouter)
+app.use('/api/follow-up-templates', followUpTemplatesRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
