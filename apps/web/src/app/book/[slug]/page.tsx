@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { formatTime } from '@nuatis/shared'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,13 +47,6 @@ interface ConfirmResponse {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatTime(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const ampm = h! >= 12 ? 'PM' : 'AM'
-  const h12 = h === 0 ? 12 : h! > 12 ? h! - 12 : h!
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
-}
 
 function formatPrice(cents: number): string {
   return `$${Number(cents).toFixed(2)}`

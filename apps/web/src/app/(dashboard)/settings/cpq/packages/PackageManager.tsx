@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { VERTICALS as VERTICALS_CONFIG } from '@nuatis/shared'
 
 interface PackageItem {
   service_id: string
@@ -25,25 +26,11 @@ interface Service {
   unit_price: number
 }
 
-const VERTICALS = [
-  'dental',
-  'salon',
-  'contractor',
-  'law_firm',
-  'real_estate',
-  'restaurant',
-  'sales_crm',
-]
+const VERTICALS = Object.keys(VERTICALS_CONFIG)
 
-const VERTICAL_LABELS: Record<string, string> = {
-  dental: 'Dental',
-  salon: 'Salon',
-  contractor: 'Contractor',
-  law_firm: 'Law Firm',
-  real_estate: 'Real Estate',
-  restaurant: 'Restaurant',
-  sales_crm: 'Sales CRM',
-}
+const VERTICAL_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(VERTICALS_CONFIG).map(([slug, config]) => [slug, config.label])
+)
 
 export default function PackageManager() {
   const [packages, setPackages] = useState<Package[]>([])

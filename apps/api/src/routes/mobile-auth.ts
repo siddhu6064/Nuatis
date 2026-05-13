@@ -38,7 +38,11 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Validate password via Supabase Auth
     const supabaseUrl = process.env['SUPABASE_URL']!
-    const anonKey = process.env['SUPABASE_ANON_KEY'] ?? process.env['SUPABASE_SERVICE_ROLE_KEY']!
+    const anonKey = process.env['SUPABASE_ANON_KEY']
+    if (!anonKey) {
+      res.status(500).json({ error: 'Server configuration error: SUPABASE_ANON_KEY not set' })
+      return
+    }
     const authClient = createClient(supabaseUrl, anonKey)
     const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
       email,
@@ -46,8 +50,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     })
 
     if (authError || !authData?.session) {
-      // TODO: If SUPABASE_ANON_KEY is not set and service role key is used above,
-      // signInWithPassword may not work correctly. In that case this returns 401.
       res.status(401).json({ error: 'Invalid credentials' })
       return
     }

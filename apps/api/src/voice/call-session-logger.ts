@@ -56,6 +56,7 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
         ended_at: new Date().toISOString(),
         duration_seconds: params.duration,
         first_response_ms: params.firstResponseMs,
+        latency_ms: params.firstResponseMs,
         outcome,
         tool_calls_made: params.toolCallsMade,
         booked_appointment: params.bookedAppointment,

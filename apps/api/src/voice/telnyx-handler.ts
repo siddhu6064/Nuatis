@@ -632,7 +632,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       }
 
       const duration = callStartTime ? Math.round((Date.now() - callStartTime) / 1000) : 0
-      // TODO: persist latency_ms to voice_sessions table once latency_ms column is added
       const latencyMs =
         firstAudioReceivedAt && firstAudioSentAt ? firstAudioSentAt - firstAudioReceivedAt : null
       logCall({

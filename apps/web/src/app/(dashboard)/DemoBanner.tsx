@@ -1,28 +1,35 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { VERTICALS as VERTICALS_CONFIG } from '@nuatis/shared'
 
 const DEMO_TENANT_IDS = [
   '0d9a00b9-ce40-4702-a99c-ed23f11fdb08', // old demo
   '018323e5-4866-486e-bc90-15cfeb910fc4', // new demo
 ]
 
-const VERTICALS = [
-  { slug: 'sales_crm', label: 'Sales CRM', icon: '📊' },
-  { slug: 'dental', label: 'Dental', icon: '🦷' },
-  { slug: 'salon', label: 'Salon', icon: '✂️' },
-  { slug: 'restaurant', label: 'Restaurant', icon: '🍽️' },
-  { slug: 'contractor', label: 'Contractor', icon: '🔧' },
-  { slug: 'law_firm', label: 'Law Firm', icon: '⚖️' },
-  { slug: 'real_estate', label: 'Real Estate', icon: '🏠' },
-  { slug: 'spa', label: 'Spa', icon: '💆' },
-  { slug: 'gym', label: 'Gym', icon: '🏋️' },
-  { slug: 'nail_bar', label: 'Nail Bar', icon: '💅' },
-  { slug: 'pet_grooming', label: 'Pet Grooming', icon: '🐾' },
-  { slug: 'tattoo', label: 'Tattoo Studio', icon: '🎨' },
-  { slug: 'car_wash', label: 'Car Wash', icon: '🚗' },
-  { slug: 'laundry', label: 'Laundry', icon: '👕' },
-]
+const VERTICAL_ICONS: Record<string, string> = {
+  sales_crm: '📊',
+  dental: '🦷',
+  salon: '✂️',
+  restaurant: '🍽️',
+  contractor: '🔧',
+  law_firm: '⚖️',
+  real_estate: '🏠',
+  spa: '💆',
+  gym: '🏋️',
+  nail_bar: '💅',
+  pet_grooming: '🐾',
+  tattoo: '🎨',
+  car_wash: '🚗',
+  laundry: '👕',
+}
+
+const VERTICALS = Object.entries(VERTICALS_CONFIG).map(([slug, config]) => ({
+  slug,
+  label: config.label,
+  icon: VERTICAL_ICONS[slug] ?? '🏢',
+}))
 
 interface DemoInfo {
   tenantId: string

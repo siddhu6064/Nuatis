@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { formatDate, formatBytes } from '@nuatis/shared'
 
 type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -26,23 +27,6 @@ const STATUS_STYLES: Record<ExportStatus, { bg: string; text: string; label: str
   processing: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Processing' },
   completed: { bg: 'bg-green-50', text: 'text-green-700', label: 'Completed' },
   failed: { bg: 'bg-red-50', text: 'text-red-600', label: 'Failed' },
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
 }
 
 export default function DataExportPage() {

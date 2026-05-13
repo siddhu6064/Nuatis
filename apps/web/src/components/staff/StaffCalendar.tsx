@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import ShiftSlideOver from './ShiftSlideOver'
 import type { DayKey, Shift, StaffMember } from './types'
+import { formatTime } from '@nuatis/shared'
 
 function startOfWeek(d: Date): Date {
   const copy = new Date(d)
@@ -24,15 +25,6 @@ function addDays(d: Date, n: number): Date {
   const copy = new Date(d)
   copy.setDate(copy.getDate() + n)
   return copy
-}
-
-function formatTime(t: string): string {
-  const [hStr, mStr] = t.split(':')
-  const h = parseInt(hStr ?? '0', 10)
-  const m = parseInt(mStr ?? '0', 10)
-  const period = h >= 12 ? 'pm' : 'am'
-  const hh = h % 12 === 0 ? 12 : h % 12
-  return m === 0 ? `${hh}${period}` : `${hh}:${String(m).padStart(2, '0')}${period}`
 }
 
 const DAY_COLS: Array<{ key: DayKey; label: string }> = [

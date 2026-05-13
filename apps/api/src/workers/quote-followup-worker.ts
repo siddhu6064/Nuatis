@@ -80,7 +80,7 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
 
   const shareUrl = `${API_BASE_URL}/quotes/view/${shareToken}`
 
-  await fetch('https://api.telnyx.com/v2/messages', {
+  const response = await fetch('https://api.telnyx.com/v2/messages', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -89,6 +89,12 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
       text: `Hi ${contactName}, just following up — your quote ${quoteNumber} from ${businessName} is ready for review: ${shareUrl}`,
     }),
   })
+
+  if (!response.ok) {
+    const body = await response.text()
+    console.error('[quote-followup] Telnyx error:', response.status, body)
+    throw new Error(`Telnyx SMS failed: ${response.status}`)
+  }
 
   console.info(
     `[quote-followup] sent 48h follow-up SMS for quote=${quoteNumber} to=${contactPhone}`

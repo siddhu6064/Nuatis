@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { formatDate } from '@nuatis/shared'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,14 +65,6 @@ const PLACEHOLDER_TYPES: FieldType[] = ['text', 'email', 'phone', 'number']
 
 function generateFieldId(): string {
   return `field_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString()
-  } catch {
-    return iso
-  }
 }
 
 function exportCsv(form: IntakeForm, submissions: Submission[]) {
