@@ -37,13 +37,18 @@ export async function sendSms(
       }
     }
 
+    const body: Record<string, string> = { from, to, text }
+    if (process.env['TELNYX_MESSAGING_PROFILE_ID']) {
+      body['messaging_profile_id'] = process.env['TELNYX_MESSAGING_PROFILE_ID']
+    }
+
     const res = await fetch('https://api.telnyx.com/v2/messages', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from, to, text }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {

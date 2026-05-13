@@ -9,6 +9,7 @@ import {
   checkOutlookAvailability,
 } from '../lib/outlook-calendar.js'
 import { callSessionState } from './post-call.js'
+import { sendSms } from '../lib/sms.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 
 export interface ToolCallContext {
@@ -986,35 +987,16 @@ const handlers: Record<string, ToolHandler> = {
       }
 
       // 2. Fire-and-forget SMS to the business owner before transferring
+      // No contactId/tenantId — owner alert, intentional TCPA bypass
       if (fromNumber) {
         const smsText = `Incoming call transfer from Maya AI. Caller: ${context.callerId || 'unknown'}. Reason: ${reason}. Connecting now.`
-
-        void fetch('https://api.telnyx.com/v2/messages', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: fromNumber,
-            to: escalationPhone,
-            text: smsText,
-          }),
+        void sendSms(fromNumber, escalationPhone, smsText).then(({ success }) => {
+          if (success) {
+            console.info('[tool-handlers] escalate_to_human: SMS sent to owner')
+          } else {
+            console.error('[tool-handlers] escalate_to_human: SMS to owner failed')
+          }
         })
-          .then((res) => {
-            if (res.ok) {
-              console.info('[tool-handlers] escalate_to_human: SMS sent to owner')
-            } else {
-              res.text().then((body) => {
-                console.error(
-                  `[tool-handlers] escalate_to_human: SMS failed (${res.status}): ${body}`
-                )
-              })
-            }
-          })
-          .catch((err) => {
-            console.error('[tool-handlers] escalate_to_human: SMS error:', err)
-          })
       } else {
         console.warn('[tool-handlers] escalate_to_human: no Telnyx number — skipping SMS')
       }
