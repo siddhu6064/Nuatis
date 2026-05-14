@@ -53,7 +53,7 @@ describe('transcribeRecording', () => {
     mockFetch.mockReset()
   })
 
-  test('uses gemini-2.5-flash-preview-04-17 as transcription model', async () => {
+  test('uses gemini-2.5-flash as transcription model', async () => {
     mockAudioDownload()
     mockGeminiSuccess()
 
@@ -62,7 +62,7 @@ describe('transcribeRecording', () => {
     // First call = audio download, second call = Gemini generateContent
     expect(mockFetch).toHaveBeenCalledTimes(2)
     const geminiUrl = String(mockFetch.mock.calls[1]?.[0])
-    expect(geminiUrl).toContain('gemini-2.5-flash-preview-04-17')
+    expect(geminiUrl).toContain('gemini-2.5-flash')
   })
 
   test('calls v1beta generateContent endpoint not v1', async () => {
