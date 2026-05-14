@@ -65,6 +65,7 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [movingContact, setMovingContact] = useState<string | null>(null)
+  const [isDefaultFallback, setIsDefaultFallback] = useState(false)
 
   // Fetch pipelines list on mount — filtered to current vertical (passed from server component)
   useEffect(() => {
@@ -77,25 +78,31 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
           const payload = (await res.json()) as { pipelines?: Pipeline[] } | Pipeline[]
           const data: Pipeline[] = Array.isArray(payload) ? payload : (payload.pipelines ?? [])
 
-          // Filter: keep default + pipelines matching current vertical
+          // Filter: vertical-specific match wins; fall back to is_default only if no match
           const verticalLabel = toTitle(vertical)
-          const filtered = data.filter(
-            (p) => p.is_default || p.name.toLowerCase().includes(verticalLabel.toLowerCase())
+          const verticalMatches = data.filter((p) =>
+            p.name.toLowerCase().includes(verticalLabel.toLowerCase())
           )
+          const filtered =
+            verticalMatches.length > 0 ? verticalMatches : data.filter((p) => p.is_default)
+          const finalFiltered = filtered.length > 0 ? filtered : data
+          const usingDefault = verticalMatches.length === 0 && filtered.length > 0
 
-          setPipelines(filtered)
+          setIsDefaultFallback(usingDefault)
+          setPipelines(finalFiltered)
 
           // Auto-select: prefer vertical-specific pipeline, fall back to default
           const paramId = searchParams.get('pipeline')
-          if (paramId && filtered.find((p) => p.id === paramId)) {
+          if (paramId && finalFiltered.find((p) => p.id === paramId)) {
             setActivePipelineId(paramId)
           } else {
-            const verticalPipeline = filtered.find((p) => !p.is_default)
-            const def = verticalPipeline ?? filtered.find((p) => p.is_default) ?? filtered[0]
+            const verticalPipeline = finalFiltered.find((p) => !p.is_default)
+            const def =
+              verticalPipeline ?? finalFiltered.find((p) => p.is_default) ?? finalFiltered[0]
             if (def) setActivePipelineId(def.id)
           }
 
-          if (filtered.length === 0) setLoading(false)
+          if (finalFiltered.length === 0) setLoading(false)
         } else {
           setLoading(false)
         }
@@ -221,6 +228,13 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
             </button>
           ))}
         </div>
+      )}
+
+      {/* Fallback note — shown when no vertical-specific pipeline exists */}
+      {isDefaultFallback && !loading && (
+        <p className="text-xs text-ink4 mb-3 shrink-0">
+          No pipeline configured for this vertical yet.
+        </p>
       )}
 
       {/* Loading */}

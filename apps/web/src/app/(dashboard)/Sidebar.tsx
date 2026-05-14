@@ -84,7 +84,6 @@ const NAV_GROUPS: NavGroup[] = [
       },
       { href: '/deals', label: 'Deals', icon: '◆', suiteOnly: true, requireModule: 'deals' },
       { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
-      { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
       { href: '/reports', label: 'Reports', icon: '📊', suiteOnly: true },
     ],
   },
@@ -133,6 +132,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
       { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },
       { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
+      { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
       {
         href: '/settings/cpq',
         label: 'Quote Settings',
