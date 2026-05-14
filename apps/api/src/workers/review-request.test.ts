@@ -23,7 +23,7 @@ jest.unstable_mockModule('../lib/activity.js', () => ({ logActivity }))
 
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
-process.env['API_URL'] = 'http://mock-api.local'
+process.env['API_BASE_URL'] = 'http://mock-api.local'
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000rr00001'
 const CONTACT_ID = 'cccccccc-0000-0000-0000-00000rr00001'

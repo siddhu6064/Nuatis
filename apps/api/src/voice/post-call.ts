@@ -285,7 +285,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
         })
 
         const trackingToken = crypto.randomUUID()
-        const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+        const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
         const trackedHtml = injectTrackingPixel(html, trackingToken, apiUrl)
 
         // Resolve provider: tenant's default OAuth account, or fall back to Resend

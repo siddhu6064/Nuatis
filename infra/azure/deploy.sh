@@ -69,3 +69,48 @@ echo ""
 echo "Next steps:"
 echo "  1. Run ./update-env.sh to set environment variables"
 echo "  2. Run ./custom-domain.sh to configure api.nuatis.com"
+
+# ── nuatis-web (Next.js) ──────────────────────────────────────
+
+echo "==> Building and pushing web image via ACR"
+az acr build \
+  --registry "$CONTAINER_REGISTRY" \
+  --image "nuatis-web:${IMAGE_TAG}" \
+  --file apps/web/Dockerfile \
+  .
+
+echo "==> Deploying Container App: nuatis-web"
+if az containerapp show --name nuatis-web --resource-group "$RESOURCE_GROUP" --output none 2>/dev/null; then
+  echo "    (nuatis-web already exists — updating image)"
+  az containerapp update \
+    --name nuatis-web \
+    --resource-group "$RESOURCE_GROUP" \
+    --image "${LOGIN_SERVER}/nuatis-web:${IMAGE_TAG}" \
+    --output none
+else
+  az containerapp create \
+    --name nuatis-web \
+    --resource-group "$RESOURCE_GROUP" \
+    --environment "$ENVIRONMENT_NAME" \
+    --image "${LOGIN_SERVER}/nuatis-web:${IMAGE_TAG}" \
+    --registry-server "$LOGIN_SERVER" \
+    --registry-username "$CONTAINER_REGISTRY" \
+    --registry-password "$ACR_PASSWORD" \
+    --target-port 3000 \
+    --ingress external \
+    --min-replicas 1 \
+    --max-replicas 3 \
+    --cpu 0.5 \
+    --memory 1.0Gi \
+    --env-vars NODE_ENV=production \
+    --output none
+fi
+
+WEB_FQDN=$(az containerapp show \
+  --name nuatis-web \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.configuration.ingress.fqdn" -o tsv)
+
+echo ""
+echo "==> nuatis-web deployed!"
+echo "    FQDN: https://${WEB_FQDN}"

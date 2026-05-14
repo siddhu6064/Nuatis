@@ -26,7 +26,7 @@ export function getOutlookCalendarAuthUrl(tenantId: string): string {
   const clientId = process.env['OUTLOOK_CLIENT_ID']
   if (!clientId) throw new Error('OUTLOOK_CLIENT_ID not set')
 
-  const apiUrl = process.env['API_URL'] || 'http://localhost:3001'
+  const apiUrl = process.env['API_BASE_URL'] || 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/calendar/outlook/callback`
 
   const state = Buffer.from(JSON.stringify({ tenantId }))

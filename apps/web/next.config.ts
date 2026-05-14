@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 
 const config: NextConfig = {
+  output: 'standalone',
+
   // Transpile shared package from monorepo
   transpilePackages: ['@nuatis/shared'],
 

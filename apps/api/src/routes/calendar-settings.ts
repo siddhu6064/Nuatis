@@ -290,7 +290,7 @@ calendarCallbackRouter.get(
     }
 
     try {
-      const apiUrl = process.env['API_URL'] || 'http://localhost:3001'
+      const apiUrl = process.env['API_BASE_URL'] || 'http://localhost:3001'
       const redirectUri = `${apiUrl}/api/calendar/outlook/callback`
 
       // Exchange code for tokens

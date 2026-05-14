@@ -7,7 +7,7 @@ import { notifyOwner } from '../lib/notifications.js'
 
 const QUEUE_NAME = 'review-request'
 
-const API_URL = process.env['API_URL'] || 'http://localhost:3001'
+const API_URL = process.env['API_BASE_URL'] || 'http://localhost:3001'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

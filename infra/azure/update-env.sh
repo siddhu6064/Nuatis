@@ -2,9 +2,48 @@
 set -euo pipefail
 
 RESOURCE_GROUP="nuatis-prod"
+
+# === Web container env vars (added by audit fix) ===
+WEB_APP_NAME="nuatis-web"
+
+echo "─── Web container (${WEB_APP_NAME}) ────────────────────────────────"
+echo "Setting environment variables for ${WEB_APP_NAME}..."
+echo "(Press Enter to skip any variable and keep its current value)"
+echo ""
+
+read -rp "NEXT_PUBLIC_SUPABASE_URL: " NEXT_PUBLIC_SUPABASE_URL
+read -rp "NEXT_PUBLIC_SUPABASE_ANON_KEY: " NEXT_PUBLIC_SUPABASE_ANON_KEY
+read -rp "SUPABASE_SERVICE_ROLE_KEY (web): " WEB_SUPABASE_SERVICE_ROLE_KEY
+read -rp "NEXTAUTH_SECRET (same as AUTH_SECRET): " NEXTAUTH_SECRET
+read -rp "API_BACKEND_URL (internal Container App URL for nuatis-api): " API_BACKEND_URL
+read -rp "NEXT_PUBLIC_API_URL [https://api.nuatis.com]: " NEXT_PUBLIC_API_URL
+NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://api.nuatis.com}"
+
+WEB_ENV_ARGS="NODE_ENV=production "
+[ -n "$NEXT_PUBLIC_SUPABASE_URL" ] && WEB_ENV_ARGS+="NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL "
+[ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] && WEB_ENV_ARGS+="NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY "
+[ -n "$WEB_SUPABASE_SERVICE_ROLE_KEY" ] && WEB_ENV_ARGS+="SUPABASE_SERVICE_ROLE_KEY=$WEB_SUPABASE_SERVICE_ROLE_KEY "
+[ -n "$NEXTAUTH_SECRET" ] && WEB_ENV_ARGS+="NEXTAUTH_SECRET=$NEXTAUTH_SECRET "
+[ -n "$API_BACKEND_URL" ] && WEB_ENV_ARGS+="API_BACKEND_URL=$API_BACKEND_URL "
+WEB_ENV_ARGS+="NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL "
+
+echo ""
+echo "==> Updating environment variables for ${WEB_APP_NAME}..."
+# shellcheck disable=SC2086
+az containerapp update \
+  --name "$WEB_APP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --set-env-vars $WEB_ENV_ARGS \
+  --output none
+
+echo "==> ${WEB_APP_NAME} environment variables updated."
+echo ""
+
+# === nuatis-api: API container env vars ===
 CONTAINER_APP_NAME="nuatis-api"
 
 # Prompt for values or read from env
+echo "─── API container (${CONTAINER_APP_NAME}) ──────────────────────────"
 echo "Setting environment variables for ${CONTAINER_APP_NAME}..."
 echo "(Press Enter to skip any variable and keep its current value)"
 echo ""
@@ -26,6 +65,19 @@ read -rp "ADMIN_API_KEY: " ADMIN_API_KEY
 read -rp "VOICE_WS_URL [wss://api.nuatis.com/voice/stream]: " VOICE_WS_URL
 VOICE_WS_URL="${VOICE_WS_URL:-wss://api.nuatis.com/voice/stream}"
 
+# === Added by audit fix — missing from original ===
+read -rp "VAPID_PUBLIC_KEY: " VAPID_PUBLIC_KEY
+read -rp "VAPID_PRIVATE_KEY: " VAPID_PRIVATE_KEY
+read -rp "VAPID_EMAIL: " VAPID_EMAIL
+read -rp "MS_OAUTH_CLIENT_ID: " MS_OAUTH_CLIENT_ID
+read -rp "MS_OAUTH_CLIENT_SECRET: " MS_OAUTH_CLIENT_SECRET
+read -rp "EXPO_PUSH_ACCESS_TOKEN: " EXPO_PUSH_ACCESS_TOKEN
+read -rp "TELNYX_MESSAGING_PROFILE_ID: " TELNYX_MESSAGING_PROFILE_ID
+read -rp "ESCALATION_PHONE_DEFAULT: " ESCALATION_PHONE_DEFAULT
+read -rp "TELNYX_SIP_CONNECTION_ID: " TELNYX_SIP_CONNECTION_ID
+read -rp "SCANNERS_ENABLED [true]: " SCANNERS_ENABLED
+SCANNERS_ENABLED="${SCANNERS_ENABLED:-true}"
+
 # Build --set-env-vars args (skip empty)
 ENV_ARGS=""
 [ -n "$SUPABASE_URL" ] && ENV_ARGS+="SUPABASE_URL=$SUPABASE_URL "
@@ -44,8 +96,19 @@ ENV_ARGS=""
 [ -n "$ADMIN_API_KEY" ] && ENV_ARGS+="ADMIN_API_KEY=$ADMIN_API_KEY "
 ENV_ARGS+="VOICE_WS_URL=$VOICE_WS_URL "
 ENV_ARGS+="NODE_ENV=production "
-ENV_ARGS+="SCANNERS_ENABLED=true "
 ENV_ARGS+="PORT=3001 "
+
+# === Added by audit fix ===
+[ -n "$VAPID_PUBLIC_KEY" ] && ENV_ARGS+="VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY "
+[ -n "$VAPID_PRIVATE_KEY" ] && ENV_ARGS+="VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY "
+[ -n "$VAPID_EMAIL" ] && ENV_ARGS+="VAPID_EMAIL=$VAPID_EMAIL "
+[ -n "$MS_OAUTH_CLIENT_ID" ] && ENV_ARGS+="MS_OAUTH_CLIENT_ID=$MS_OAUTH_CLIENT_ID "
+[ -n "$MS_OAUTH_CLIENT_SECRET" ] && ENV_ARGS+="MS_OAUTH_CLIENT_SECRET=$MS_OAUTH_CLIENT_SECRET "
+[ -n "$EXPO_PUSH_ACCESS_TOKEN" ] && ENV_ARGS+="EXPO_PUSH_ACCESS_TOKEN=$EXPO_PUSH_ACCESS_TOKEN "
+[ -n "$TELNYX_MESSAGING_PROFILE_ID" ] && ENV_ARGS+="TELNYX_MESSAGING_PROFILE_ID=$TELNYX_MESSAGING_PROFILE_ID "
+[ -n "$ESCALATION_PHONE_DEFAULT" ] && ENV_ARGS+="ESCALATION_PHONE_DEFAULT=$ESCALATION_PHONE_DEFAULT "
+[ -n "$TELNYX_SIP_CONNECTION_ID" ] && ENV_ARGS+="TELNYX_SIP_CONNECTION_ID=$TELNYX_SIP_CONNECTION_ID "
+ENV_ARGS+="SCANNERS_ENABLED=$SCANNERS_ENABLED "
 
 echo ""
 echo "==> Updating environment variables..."

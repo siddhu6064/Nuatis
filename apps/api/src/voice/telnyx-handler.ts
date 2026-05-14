@@ -327,6 +327,18 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let preCallContactId: string | null = null
     let preCallContextSuffix = ''
 
+    // Azure Container Apps kills idle WebSocket connections after 4 minutes.
+    // Ping every 30 seconds to keep the connection alive during call pauses.
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === ws.OPEN) {
+        ws.ping()
+      }
+    }, 30_000)
+
+    ws.on('close', () => {
+      clearInterval(pingInterval)
+    })
+
     ws.on('message', async (data: Buffer) => {
       let event: TelnyxEvent
       try {

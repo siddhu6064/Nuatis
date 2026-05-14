@@ -81,7 +81,7 @@ router.get('/gmail/auth-url', requireAuth, (req: Request, res: Response): void =
     return
   }
 
-  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+  const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/gmail/callback`
 
   const state = Buffer.from(JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }))
@@ -140,7 +140,7 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
     const clientSecret = process.env['GOOGLE_EMAIL_CLIENT_SECRET']
     if (!clientId || !clientSecret) throw new Error('Google OAuth env vars not set')
 
-    const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+    const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
     const redirectUri = `${apiUrl}/api/email-integrations/gmail/callback`
 
     // Exchange code for tokens
@@ -231,7 +231,7 @@ router.get('/outlook/auth-url', requireAuth, (req: Request, res: Response): void
     return
   }
 
-  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+  const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/outlook/callback`
 
   const state = Buffer.from(JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }))
@@ -285,7 +285,7 @@ router.get('/outlook/callback', async (req: Request, res: Response): Promise<voi
     const clientSecret = process.env['OUTLOOK_CLIENT_SECRET']
     if (!clientId || !clientSecret) throw new Error('Outlook OAuth env vars not set')
 
-    const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+    const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
     const redirectUri = `${apiUrl}/api/email-integrations/outlook/callback`
 
     // Exchange code for tokens at Microsoft token endpoint
@@ -432,7 +432,7 @@ router.post('/send/:contactId', requireAuth, async (req: Request, res: Response)
 
     // Generate a tracking token for the pixel
     const trackingToken = crypto.randomUUID()
-    const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001'
+    const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
 
     // Inject tracking pixel into HTML body
     const trackedHtml = injectTrackingPixel(bodyHtml, trackingToken, apiUrl)
