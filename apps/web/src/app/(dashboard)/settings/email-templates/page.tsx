@@ -152,10 +152,8 @@ export default function EmailTemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Email Templates</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage reusable email templates for your team
-          </p>
+          <h1 className="text-xl font-bold text-ink">Email Templates</h1>
+          <p className="text-sm text-ink3 mt-0.5">Manage reusable email templates for your team</p>
         </div>
         <button
           onClick={openCreate}
@@ -167,11 +165,11 @@ export default function EmailTemplatesPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="text-sm text-gray-400 py-8 text-center">Loading templates…</div>
+        <div className="text-sm text-ink4 py-8 text-center">Loading templates…</div>
       ) : error ? (
         <div className="text-sm text-red-500 py-8 text-center">{error}</div>
       ) : templates.length === 0 ? (
-        <div className="rounded-xl border border-gray-100 bg-white px-5 py-10 text-center text-sm text-gray-400">
+        <div className="rounded-xl border border-border-brand bg-white px-5 py-10 text-center text-sm text-ink4">
           No email templates yet. Click <strong>+ Create Template</strong> to add one.
         </div>
       ) : (
@@ -179,11 +177,11 @@ export default function EmailTemplatesPage() {
           {templates.map((t) => (
             <div
               key={t.id}
-              className="rounded-xl border border-gray-100 bg-white px-5 py-4 flex items-start justify-between gap-4"
+              className="rounded-xl border border-border-brand bg-white px-5 py-4 flex items-start justify-between gap-4"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="font-medium text-gray-900 text-sm">{t.name}</span>
+                  <span className="font-medium text-ink text-sm">{t.name}</span>
                   {t.vertical && (
                     <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                       {VERTICALS.find((v) => v.value === t.vertical)?.label ?? t.vertical}
@@ -195,19 +193,19 @@ export default function EmailTemplatesPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">{t.subject}</p>
+                <p className="text-xs text-ink3 truncate">{t.subject}</p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => openEdit(t)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg transition-colors"
                 >
                   Edit
                 </button>
                 {deleteConfirm === t.id ? (
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500">Are you sure?</span>
+                    <span className="text-xs text-ink3">Are you sure?</span>
                     <button
                       onClick={() => handleDelete(t.id)}
                       disabled={deleting}
@@ -217,7 +215,7 @@ export default function EmailTemplatesPage() {
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(null)}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg transition-colors"
                     >
                       Cancel
                     </button>
@@ -227,7 +225,7 @@ export default function EmailTemplatesPage() {
                     onClick={() => setDeleteConfirm(t.id)}
                     disabled={t.is_default}
                     title={t.is_default ? 'Default templates cannot be deleted' : 'Delete template'}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Delete
                   </button>
@@ -242,44 +240,44 @@ export default function EmailTemplatesPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl mx-4">
-            <h2 className="text-base font-semibold text-gray-900 mb-5">
+            <h2 className="text-base font-semibold text-ink mb-5">
               {editingTemplate ? 'Edit Template' : 'Create Template'}
             </h2>
 
             <div className="space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Name</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Welcome Email"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               {/* Subject */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Subject</label>
                 <input
                   type="text"
                   value={form.subject}
                   onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
                   placeholder="e.g. Welcome to {{business_name}}!"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               {/* Vertical */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Vertical <span className="text-gray-400 font-normal">(optional)</span>
+                <label className="block text-xs font-medium text-ink2 mb-1">
+                  Vertical <span className="text-ink4 font-normal">(optional)</span>
                 </label>
                 <select
                   value={form.vertical}
                   onChange={(e) => setForm((prev) => ({ ...prev, vertical: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   <option value="">— Any vertical —</option>
                   {VERTICALS.map((v) => (
@@ -292,7 +290,7 @@ export default function EmailTemplatesPage() {
 
               {/* Body */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Body</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Body</label>
 
                 {/* Merge tag buttons */}
                 <div className="flex flex-wrap gap-1 mb-2">
@@ -301,7 +299,7 @@ export default function EmailTemplatesPage() {
                       key={tag}
                       type="button"
                       onClick={() => insertTag(tag)}
-                      className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100 transition-colors font-mono"
+                      className="rounded border border-border-brand bg-bg px-2 py-0.5 text-xs text-ink3 hover:bg-bg2 transition-colors font-mono"
                     >
                       {tag}
                     </button>
@@ -313,7 +311,7 @@ export default function EmailTemplatesPage() {
                   value={form.body}
                   onChange={(e) => setForm((prev) => ({ ...prev, body: e.target.value }))}
                   placeholder="Write your email body here…"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
             </div>
@@ -323,7 +321,7 @@ export default function EmailTemplatesPage() {
               <button
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
               >
                 Cancel
               </button>

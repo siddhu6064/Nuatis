@@ -28,7 +28,7 @@ export default async function OnboardingPage() {
   const completed = tenantRes.data?.onboarding_completed ?? false
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-bg px-4 py-12">
       <OnboardingWizard
         initialStep={currentStep}
         completed={completed}

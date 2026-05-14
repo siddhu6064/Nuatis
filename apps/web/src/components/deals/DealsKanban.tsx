@@ -252,14 +252,14 @@ export default function DealsKanban() {
     }
   }
 
-  if (loading) return <div className="px-8 py-8 text-center text-sm text-gray-400">Loading...</div>
+  if (loading) return <div className="px-8 py-8 text-center text-sm text-ink4">Loading...</div>
 
   return (
     <div className="px-8 py-8 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Deals</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-ink">Deals</h1>
+          <p className="text-sm text-ink3 mt-0.5">
             {deals.filter((d) => !d.is_closed_won && !d.is_closed_lost).length} active deals
             {' \u00B7 '}
             {formatValue(
@@ -273,7 +273,7 @@ export default function DealsKanban() {
         <div className="flex items-center gap-3">
           <Link
             href="/settings/pipelines"
-            className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+            className="text-xs text-ink3 hover:text-ink2 underline underline-offset-2"
           >
             Manage Pipelines
           </Link>
@@ -289,7 +289,7 @@ export default function DealsKanban() {
 
       {/* Pipeline tab bar */}
       {pipelines.length > 0 && (
-        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-gray-100 pb-0">
+        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-border-brand pb-0">
           {pipelines.map((p) => (
             <button
               key={p.id}
@@ -297,7 +297,7 @@ export default function DealsKanban() {
               className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
                 activePipelineId === p.id
                   ? 'border-teal-600 text-teal-700 bg-teal-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'border-transparent text-ink3 hover:text-ink2 hover:bg-bg'
               }`}
             >
               {p.name}
@@ -308,8 +308,8 @@ export default function DealsKanban() {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shrink-0">
-          <p className="text-xs text-gray-400 mb-3">
+        <div className="bg-white rounded-xl border border-border-brand p-4 mb-4 shrink-0">
+          <p className="text-xs text-ink4 mb-3">
             Deals track individual opportunities. A contact can have multiple deals.
           </p>
           <div className="grid grid-cols-2 gap-3 mb-3">
@@ -319,20 +319,20 @@ export default function DealsKanban() {
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Deal title *"
               autoFocus
-              className="text-sm border border-gray-200 rounded px-3 py-2 col-span-2"
+              className="text-sm border border-border-brand rounded px-3 py-2 col-span-2"
             />
             <input
               type="number"
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
               placeholder="Value ($)"
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
             <input
               type="date"
               value={newCloseDate}
               onChange={(e) => setNewCloseDate(e.target.value)}
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
             <input
               type="number"
@@ -341,7 +341,7 @@ export default function DealsKanban() {
               placeholder="Probability (%)"
               min="0"
               max="100"
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
           </div>
 
@@ -353,7 +353,7 @@ export default function DealsKanban() {
               onChange={(e) => handleContactSearch(e.target.value)}
               onFocus={() => contactResults.length > 0 && setContactDropOpen(true)}
               placeholder="Search contacts... (optional)"
-              className="w-full text-sm border border-gray-200 rounded px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded px-3 py-2"
             />
             {selectedContact && (
               <button
@@ -363,13 +363,13 @@ export default function DealsKanban() {
                   setContactSearch('')
                   setContactResults([])
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink4 hover:text-ink3 text-lg leading-none"
               >
                 ×
               </button>
             )}
             {contactDropOpen && contactResults.length > 0 && (
-              <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {contactResults.map((c) => (
                   <li
                     key={c.id}
@@ -379,10 +379,10 @@ export default function DealsKanban() {
                       setContactResults([])
                       setContactDropOpen(false)
                     }}
-                    className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                    className="px-3 py-2 text-sm hover:bg-bg cursor-pointer"
                   >
-                    <span className="font-medium text-gray-800">{c.full_name}</span>
-                    {c.email && <span className="ml-2 text-xs text-gray-400">{c.email}</span>}
+                    <span className="font-medium text-ink">{c.full_name}</span>
+                    {c.email && <span className="ml-2 text-xs text-ink4">{c.email}</span>}
                   </li>
                 ))}
               </ul>
@@ -390,10 +390,7 @@ export default function DealsKanban() {
           </div>
 
           <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setShowCreate(false)}
-              className="px-3 py-1.5 text-xs text-gray-500"
-            >
+            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-xs text-ink3">
               Cancel
             </button>
             <button
@@ -421,18 +418,18 @@ export default function DealsKanban() {
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: stage.color }}
                   />
-                  <span className="text-xs font-semibold text-gray-700 truncate">{stage.name}</span>
-                  <span className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-ink2 truncate">{stage.name}</span>
+                  <span className="ml-auto text-xs font-medium text-ink4 bg-bg2 px-1.5 py-0.5 rounded-full">
                     {cards.length}
                   </span>
                 </div>
                 {stageValue > 0 && (
-                  <p className="text-[10px] text-gray-400 mb-2">{formatValue(stageValue)}</p>
+                  <p className="text-[10px] text-ink4 mb-2">{formatValue(stageValue)}</p>
                 )}
 
                 <div className="flex flex-col gap-2 flex-1">
                   {cards.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center">
+                    <div className="rounded-xl border border-dashed border-border-brand px-4 py-6 text-center">
                       <p className="text-xs text-gray-300">No deals</p>
                     </div>
                   ) : (
@@ -441,17 +438,15 @@ export default function DealsKanban() {
                       return (
                         <div
                           key={deal.id}
-                          className="bg-white rounded-xl border border-gray-100 px-4 py-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                          className="bg-white rounded-xl border border-border-brand px-4 py-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                           onClick={() => router.push(`/deals/${deal.id}`)}
                         >
-                          <p className="text-sm font-medium text-gray-900 truncate mb-1">
-                            {deal.title}
-                          </p>
+                          <p className="text-sm font-medium text-ink truncate mb-1">{deal.title}</p>
                           <p className="text-sm font-semibold text-teal-600 mb-1">
                             {formatValue(Number(deal.value))}
                           </p>
                           {(deal.contact_name || deal.company_name) && (
-                            <p className="text-[11px] text-gray-400 truncate mb-1">
+                            <p className="text-[11px] text-ink4 truncate mb-1">
                               {deal.contact_name}
                               {deal.contact_name && deal.company_name ? ' \u00B7 ' : ''}
                               {deal.company_name}
@@ -460,7 +455,7 @@ export default function DealsKanban() {
                           <div className="flex items-center gap-2">
                             {deal.close_date && (
                               <span
-                                className={`text-[10px] ${dateStatus === 'overdue' ? 'text-red-600 font-medium' : dateStatus === 'soon' ? 'text-amber-600' : 'text-gray-400'}`}
+                                className={`text-[10px] ${dateStatus === 'overdue' ? 'text-red-600 font-medium' : dateStatus === 'soon' ? 'text-amber-600' : 'text-ink4'}`}
                               >
                                 {new Date(deal.close_date).toLocaleDateString('en-US', {
                                   month: 'short',
@@ -468,7 +463,7 @@ export default function DealsKanban() {
                                 })}
                               </span>
                             )}
-                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">
+                            <span className="text-[10px] text-ink4 bg-bg2 px-1 py-0.5 rounded">
                               {deal.probability}%
                             </span>
                           </div>
@@ -480,7 +475,7 @@ export default function DealsKanban() {
                               void moveDeal(deal.id, e.target.value)
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="mt-2 w-full text-[10px] border border-gray-200 rounded px-1 py-0.5 text-gray-500"
+                            className="mt-2 w-full text-[10px] border border-border-brand rounded px-1 py-0.5 text-ink3"
                           >
                             {stages.map((s) => (
                               <option key={s.id} value={s.id}>

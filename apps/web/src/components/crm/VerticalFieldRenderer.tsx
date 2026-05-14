@@ -47,13 +47,13 @@ interface FieldInputProps {
 
 function FieldInput({ field, value, onChange, readOnly }: FieldInputProps) {
   const baseInput = `
-    w-full px-3 py-2 text-sm border border-gray-300 rounded-lg
+    w-full px-3 py-2 text-sm border border-border-brand rounded-lg
     focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent
-    disabled:bg-gray-50 disabled:text-gray-500
+    disabled:bg-bg disabled:text-ink3
   `.trim()
 
   const label = (
-    <label className="block text-sm font-medium text-gray-700 mb-1">
+    <label className="block text-sm font-medium text-ink2 mb-1">
       {field.label}
       {field.required && <span className="text-red-500 ml-1">*</span>}
     </label>
@@ -150,10 +150,10 @@ function FieldInput({ field, value, onChange, readOnly }: FieldInputProps) {
             checked={typeof value === 'boolean' ? value : false}
             onChange={(e) => onChange(e.target.checked)}
             disabled={readOnly}
-            className="w-4 h-4 text-teal-600 border-gray-300 rounded
+            className="w-4 h-4 text-teal-600 border-border-brand rounded
                        focus:ring-teal-500"
           />
-          <label htmlFor={`field-${field.key}`} className="text-sm font-medium text-gray-700">
+          <label htmlFor={`field-${field.key}`} className="text-sm font-medium text-ink2">
             {field.label}
           </label>
         </div>

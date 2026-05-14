@@ -131,13 +131,13 @@ export default function InboxList() {
   ]
 
   if (loading) {
-    return <div className="py-12 text-center text-sm text-gray-400">Loading inbox...</div>
+    return <div className="py-12 text-center text-sm text-ink4">Loading inbox...</div>
   }
 
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex gap-1 mb-4 border-b border-gray-100">
+      <div className="flex gap-1 mb-4 border-b border-border-brand">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -145,14 +145,14 @@ export default function InboxList() {
             className={`px-3 py-2 text-sm font-medium transition-colors relative ${
               activeTab === tab.key
                 ? 'text-teal-700 border-b-2 border-teal-600'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-ink3 hover:text-ink2'
             }`}
           >
             {tab.label}
             {tab.count > 0 && (
               <span
                 className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+                  activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-bg2 text-ink3'
                 }`}
               >
                 {tab.count}
@@ -174,17 +174,17 @@ export default function InboxList() {
       {totalVisible === 0 ? (
         <div className="py-12 text-center">
           <span className="text-3xl">{'\u2713'}</span>
-          <p className="text-sm font-medium text-gray-600 mt-2">No unread messages</p>
-          <p className="text-xs text-gray-400 mt-1">All caught up</p>
+          <p className="text-sm font-medium text-ink3 mt-2">No unread messages</p>
+          <p className="text-xs text-ink4 mt-1">All caught up</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-50">
+        <div className="bg-white rounded-xl border border-border-brand divide-y divide-gray-50">
           {/* SMS threads */}
           {visibleSms.map((t) => (
             <button
               key={`sms-${t.contact_id}`}
               onClick={() => router.push(`/contacts/${t.contact_id}?tab=messages`)}
-              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
             >
               <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                 <span className="text-teal-700 text-xs font-bold">
@@ -198,19 +198,17 @@ export default function InboxList() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900 truncate">
-                    {t.contact_name}
-                  </span>
+                  <span className="text-sm font-medium text-ink truncate">{t.contact_name}</span>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[9px] bg-bg2 text-ink3 px-1.5 py-0.5 rounded font-medium">
                       SMS
                     </span>
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-ink4">
                       {t.last_message_at ? timeAgo(t.last_message_at) : ''}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 truncate mt-0.5">
+                <p className="text-xs text-ink3 truncate mt-0.5">
                   {t.last_message.slice(0, 60)}
                   {t.last_message.length > 60 ? '...' : ''}
                 </p>
@@ -236,27 +234,25 @@ export default function InboxList() {
               <button
                 key={`chat-${s.id}`}
                 onClick={() => router.push(`/inbox?chat=${s.id}`)}
-                className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
               >
                 <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                   <span className="text-blue-700 text-xs font-bold">{initials || 'W'}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900 truncate">
-                      {visitorLabel}
-                    </span>
+                    <span className="text-sm font-medium text-ink truncate">{visitorLabel}</span>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-medium">
                         Chat
                       </span>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-ink4">
                         {s.last_message_at ? timeAgo(s.last_message_at) : ''}
                       </span>
                     </div>
                   </div>
                   {s.last_message && (
-                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                    <p className="text-xs text-ink3 truncate mt-0.5">
                       {s.last_message.slice(0, 60)}
                       {s.last_message.length > 60 ? '...' : ''}
                     </p>

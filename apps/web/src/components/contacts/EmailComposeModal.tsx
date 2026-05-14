@@ -147,12 +147,9 @@ export default function EmailComposeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Compose Email</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-          >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Compose Email</h2>
+          <button onClick={onClose} className="text-ink4 hover:text-ink3 text-lg leading-none">
             &times;
           </button>
         </div>
@@ -160,7 +157,7 @@ export default function EmailComposeModal({
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
           {accounts.length === 0 ? (
-            <div className="text-sm text-gray-600 py-2">
+            <div className="text-sm text-ink3 py-2">
               No email accounts connected.{' '}
               <a
                 href="/settings/integrations"
@@ -173,11 +170,11 @@ export default function EmailComposeModal({
             <>
               {/* Template picker */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Template</label>
+                <label className="block text-xs font-medium text-ink3 mb-1">Template</label>
                 <select
                   value={selectedTemplateId}
                   onChange={(e) => void handleTemplateChange(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   <option value="">No template</option>
                   {templates.map((t) => (
@@ -186,18 +183,16 @@ export default function EmailComposeModal({
                     </option>
                   ))}
                 </select>
-                {loadingPreview && (
-                  <p className="text-xs text-gray-400 mt-1">Loading template...</p>
-                )}
+                {loadingPreview && <p className="text-xs text-ink4 mt-1">Loading template...</p>}
               </div>
 
               {/* From */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+                <label className="block text-xs font-medium text-ink3 mb-1">From</label>
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -210,36 +205,36 @@ export default function EmailComposeModal({
 
               {/* To */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+                <label className="block text-xs font-medium text-ink3 mb-1">To</label>
                 <input
                   type="email"
                   value={contactEmail || `${contactName} (no email on file)`}
                   readOnly
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-600 cursor-not-allowed"
+                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-bg text-ink3 cursor-not-allowed"
                 />
               </div>
 
               {/* Subject */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                <label className="block text-xs font-medium text-ink3 mb-1">Subject</label>
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="Enter subject..."
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
               {/* Body */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Body</label>
+                <label className="block text-xs font-medium text-ink3 mb-1">Body</label>
                 <textarea
                   rows={8}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Write your message..."
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
               </div>
 
@@ -250,10 +245,10 @@ export default function EmailComposeModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100">
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border-brand">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm font-medium text-ink3 hover:text-ink rounded-lg hover:bg-bg"
           >
             Cancel
           </button>

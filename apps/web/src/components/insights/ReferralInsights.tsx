@@ -33,29 +33,29 @@ export default function ReferralInsights() {
 
   return (
     <div className="mt-10">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Referrals</h2>
+      <h2 className="text-lg font-bold text-ink mb-4">Referrals</h2>
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Total Referred Contacts</p>
-          <p className="text-2xl font-bold text-gray-900">{data.total_referred}</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Total Referred Contacts</p>
+          <p className="text-2xl font-bold text-ink">{data.total_referred}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Referral Conversion Rate</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Referral Conversion Rate</p>
           <p className="text-2xl font-bold text-teal-600">{data.referral_conversion_rate}%</p>
-          <p className="text-[11px] text-gray-400 mt-1">Referred contacts with appointments</p>
+          <p className="text-[11px] text-ink4 mt-1">Referred contacts with appointments</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Top Sources</p>
-          <p className="text-2xl font-bold text-gray-900">{data.top_sources.length}</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Top Sources</p>
+          <p className="text-2xl font-bold text-ink">{data.top_sources.length}</p>
         </div>
       </div>
 
       {/* Top Sources chart */}
       {data.top_sources.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Top Referral Sources</h3>
+        <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+          <h3 className="text-sm font-semibold text-ink2 mb-3">Top Referral Sources</h3>
           <ResponsiveContainer width="100%" height={Math.max(200, data.top_sources.length * 36)}>
             <BarChart data={data.top_sources} layout="vertical" margin={{ left: 80 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -72,13 +72,13 @@ export default function ReferralInsights() {
 
       {/* Top Referrers table */}
       {data.top_referrers.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Top Referrers</h3>
+        <div className="bg-white rounded-xl border border-border-brand p-5">
+          <h3 className="text-sm font-semibold text-ink2 mb-3">Top Referrers</h3>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-400 pb-2">Contact</th>
-                <th className="text-left text-xs font-medium text-gray-400 pb-2">Referrals</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left text-xs font-medium text-ink4 pb-2">Contact</th>
+                <th className="text-left text-xs font-medium text-ink4 pb-2">Referrals</th>
               </tr>
             </thead>
             <tbody>
@@ -92,7 +92,7 @@ export default function ReferralInsights() {
                       {r.contact_name}
                     </Link>
                   </td>
-                  <td className="py-2 text-gray-600">{r.referral_count}</td>
+                  <td className="py-2 text-ink3">{r.referral_count}</td>
                 </tr>
               ))}
             </tbody>

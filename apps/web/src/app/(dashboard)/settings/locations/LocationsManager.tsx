@@ -63,14 +63,12 @@ export default function LocationsManager({
       {locations.map((loc) => (
         <div
           key={loc.id}
-          className={`bg-white rounded-xl border p-5 ${loc.is_primary ? 'border-teal-200' : 'border-gray-100'}`}
+          className={`bg-white rounded-xl border p-5 ${loc.is_primary ? 'border-teal-200' : 'border-border-brand'}`}
         >
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  {loc.name || 'Unnamed Location'}
-                </h3>
+                <h3 className="text-sm font-semibold text-ink">{loc.name || 'Unnamed Location'}</h3>
                 {loc.is_primary && (
                   <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-medium">
                     PRIMARY
@@ -78,7 +76,7 @@ export default function LocationsManager({
                 )}
               </div>
               {loc.address && (
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-ink4 mt-0.5">
                   {[loc.address, loc.city, loc.state].filter(Boolean).join(', ')}
                 </p>
               )}
@@ -102,7 +100,7 @@ export default function LocationsManager({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+          <div className="flex items-center gap-4 mt-3 text-xs text-ink3">
             <span>Phone: {loc.telnyx_number || '—'}</span>
             <span>Maya: {loc.maya_enabled ? '✓ Enabled' : '✗ Disabled'}</span>
             <span>Calendar: {loc.calendar_connected ? '✓ Connected' : '✗ Not connected'}</span>
@@ -111,13 +109,13 @@ export default function LocationsManager({
       ))}
 
       {adding ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
+        <div className="bg-white rounded-xl border border-border-brand p-5 space-y-3">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Location name"
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             autoFocus
           />
           <input
@@ -125,7 +123,7 @@ export default function LocationsManager({
             value={newAddress}
             onChange={(e) => setNewAddress(e.target.value)}
             placeholder="Address (optional)"
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           <div className="flex gap-2">
             <button
@@ -137,7 +135,7 @@ export default function LocationsManager({
             </button>
             <button
               onClick={() => setAdding(false)}
-              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+              className="px-4 py-2 text-sm text-ink3 hover:text-ink2"
             >
               Cancel
             </button>
@@ -146,7 +144,7 @@ export default function LocationsManager({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-teal-300 hover:text-teal-600 transition-colors"
+          className="w-full py-3 border-2 border-dashed border-border-brand rounded-xl text-sm text-ink4 hover:border-teal-300 hover:text-teal-600 transition-colors"
         >
           + Add Location
         </button>

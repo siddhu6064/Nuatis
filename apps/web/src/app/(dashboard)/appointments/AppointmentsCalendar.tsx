@@ -187,13 +187,13 @@ export default function AppointmentsCalendar({
   return (
     <div className="px-8 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Appointments</h1>
+        <h1 className="text-xl font-bold text-ink">Appointments</h1>
         <div className="flex items-center gap-3">
           {staff.length > 0 && (
             <select
               value={staffFilter}
               onChange={(e) => setStaffFilter(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="all">All Staff</option>
               {staff.map((s) => (
@@ -215,7 +215,7 @@ export default function AppointmentsCalendar({
 
       <div className="flex flex-wrap gap-4 mb-4">
         {(Object.entries(STATUS_COLOR) as [AppointmentStatus, string][]).map(([status, color]) => (
-          <span key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span key={status} className="flex items-center gap-1.5 text-xs text-ink3">
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm"
               style={{ backgroundColor: color }}
@@ -226,7 +226,7 @@ export default function AppointmentsCalendar({
       </div>
 
       <div
-        className={`rbc-wrapper bg-white rounded-xl border border-gray-100 overflow-hidden${
+        className={`rbc-wrapper bg-white rounded-xl border border-border-brand overflow-hidden${
           loading ? ' opacity-60 pointer-events-none' : ''
         }`}
       >

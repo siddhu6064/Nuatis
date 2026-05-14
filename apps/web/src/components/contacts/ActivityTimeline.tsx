@@ -25,9 +25,9 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   sms: { icon: '\u{1F4AC}', color: 'text-teal-600 bg-teal-50' },
   appointment: { icon: '\u{1F4C5}', color: 'text-green-600 bg-green-50' },
   quote: { icon: '\u{1F4C4}', color: 'text-orange-600 bg-orange-50' },
-  stage_change: { icon: '\u2192', color: 'text-gray-600 bg-gray-50' },
+  stage_change: { icon: '\u2192', color: 'text-ink3 bg-bg' },
   task: { icon: '\u2713', color: 'text-indigo-600 bg-indigo-50' },
-  system: { icon: '\u2699\uFE0F', color: 'text-gray-500 bg-gray-50' },
+  system: { icon: '\u2699\uFE0F', color: 'text-ink3 bg-bg' },
 }
 
 function timeAgo(dateStr: string): string {
@@ -86,13 +86,13 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
   )
 
   if (loading && items.length === 0) {
-    return <div className="py-8 text-center text-sm text-gray-400">Loading activity...</div>
+    return <div className="py-8 text-center text-sm text-ink4">Loading activity...</div>
   }
 
   if (items.length === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-gray-400">No activity yet</p>
+        <p className="text-sm text-ink4">No activity yet</p>
         <p className="text-xs text-gray-300 mt-1">
           Activity will appear here as you interact with this contact
         </p>
@@ -113,10 +113,8 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
           {config.icon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="font-medium text-gray-600 capitalize">
-              {item.type.replace('_', ' ')}
-            </span>
+          <div className="flex items-center gap-2 text-xs text-ink4">
+            <span className="font-medium text-ink3 capitalize">{item.type.replace('_', ' ')}</span>
             <span>{timeAgo(item.created_at)}</span>
             {item.actor_type === 'ai' && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700">
@@ -124,7 +122,7 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
               </span>
             )}
             {item.actor_type === 'user' && item.actor_name && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg2 text-ink3">
                 {item.actor_name}
               </span>
             )}
@@ -135,11 +133,9 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
             )}
             {isPinned && <span className="text-amber-500">{'\u{1F4CC}'}</span>}
           </div>
-          {item.body && (
-            <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{item.body}</p>
-          )}
+          {item.body && <p className="text-sm text-ink2 mt-0.5 whitespace-pre-wrap">{item.body}</p>}
           {item.type === 'email' && item.metadata && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-ink4">
               {item.metadata.direction === 'outbound' &&
                 item.metadata.source !== 'bcc' &&
                 !item.body?.startsWith('Opened') &&

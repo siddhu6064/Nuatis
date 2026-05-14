@@ -355,9 +355,7 @@ export default function Sidebar() {
     return [
       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
       indent ? 'pl-6' : '',
-      active
-        ? 'bg-teal-50 text-teal-700 font-medium'
-        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
+      active ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg hover:text-ink',
     ]
       .join(' ')
       .trim()
@@ -366,16 +364,16 @@ export default function Sidebar() {
   return (
     <aside className="w-56 bg-white border-r border-border-brand flex flex-col shrink-0">
       {/* Brand */}
-      <div className="px-5 py-5 border-b border-gray-100">
+      <div className="px-5 py-5 border-b border-border-brand">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shrink-0">
             <span className="text-white text-sm font-bold">N</span>
           </div>
           <div>
             <p className="font-display font-bold text-[22px] tracking-tight text-ink leading-none">
-              Nu<span className="text-accent">atis</span>
+              Nu<span className="text-teal-brand">atis</span>
             </p>
-            <p className="text-[10px] text-gray-400 mt-0.5 leading-none">
+            <p className="text-[10px] text-ink4 mt-0.5 leading-none">
               {isMayaOnly ? 'Maya AI' : 'Front Office AI'}
             </p>
           </div>
@@ -419,9 +417,9 @@ export default function Sidebar() {
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
-                className="w-full flex items-center justify-between px-3 py-1 rounded hover:bg-gray-50 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between px-3 py-1 rounded hover:bg-bg transition-colors cursor-pointer"
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-gray-400">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-ink4">
                   {group.label}
                 </span>
                 <Chevron open={open} />
@@ -471,15 +469,15 @@ export default function Sidebar() {
       </nav>
 
       {/* User footer */}
-      <div className="px-4 py-4 border-t border-gray-100 relative" ref={popoverRef}>
+      <div className="px-4 py-4 border-t border-border-brand relative" ref={popoverRef}>
         {/* Popover */}
         {popoverOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-2 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
+          <div className="absolute bottom-full left-2 right-2 mb-2 bg-white rounded-xl border border-border-brand shadow-lg z-50 overflow-hidden">
             <div className="px-4 py-3">
-              <p className="text-xs font-semibold text-gray-900 truncate">{userName || 'User'}</p>
-              <p className="text-[10px] text-gray-400 truncate mt-0.5">{userEmail}</p>
+              <p className="text-xs font-semibold text-ink truncate">{userName || 'User'}</p>
+              <p className="text-[10px] text-ink4 truncate mt-0.5">{userEmail}</p>
             </div>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border-brand" />
             <button
               type="button"
               onClick={() => void signOut({ callbackUrl: '/api/auth/signin' })}
@@ -506,7 +504,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => setPopoverOpen((prev) => !prev)}
-          className="w-full flex items-center gap-2.5 rounded-lg hover:bg-gray-50 transition-colors p-1 -mx-1"
+          className="w-full flex items-center gap-2.5 rounded-lg hover:bg-bg transition-colors p-1 -mx-1"
         >
           <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
             <span className="text-teal-700 text-xs font-bold">
@@ -514,8 +512,8 @@ export default function Sidebar() {
             </span>
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-xs font-medium text-gray-900 truncate">{userName || 'User'}</p>
-            <p className="text-[10px] text-gray-400 truncate">{userEmail}</p>
+            <p className="text-xs font-medium text-ink truncate">{userName || 'User'}</p>
+            <p className="text-[10px] text-ink4 truncate">{userEmail}</p>
           </div>
         </button>
       </div>

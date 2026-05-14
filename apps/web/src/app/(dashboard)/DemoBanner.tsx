@@ -105,7 +105,7 @@ export default function DemoBanner() {
         {open && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-border-brand rounded-xl shadow-lg z-20 overflow-hidden">
               {VERTICALS.map((v) => (
                 <button
                   key={v.slug}
@@ -113,7 +113,7 @@ export default function DemoBanner() {
                   className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
                     v.slug === info.vertical
                       ? 'bg-teal-50 text-teal-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      : 'text-ink2 hover:bg-bg'
                   }`}
                 >
                   <span>{v.icon}</span>
@@ -124,7 +124,16 @@ export default function DemoBanner() {
           </>
         )}
       </div>
-      <span className="text-xs text-amber-600 ml-auto">Switch vertical for demo</span>
+      <span className="text-xs text-amber-600 ml-auto hidden sm:inline">
+        Switch vertical for demo
+      </span>
+      <span className="font-mono text-[11px] tracking-wide ml-auto sm:ml-2 whitespace-nowrap">
+        <span className="text-[#7a7468]">📞&nbsp;Call </span>
+        <a href="tel:+15127376322" className="text-[#0d9488] hover:underline">
+          +1 512 737 6322
+        </a>
+        <span className="text-[#7a7468]"> to see Maya in action</span>
+      </span>
     </div>
   )
 }

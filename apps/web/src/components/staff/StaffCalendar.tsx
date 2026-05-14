@@ -131,30 +131,30 @@ export default function StaffCalendar() {
         <div className="flex items-center gap-2">
           <button
             onClick={goPrev}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
           >
             ‹ Prev
           </button>
           <button
             onClick={goToday}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
           >
             This Week
           </button>
           <button
             onClick={goNext}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
           >
             Next ›
           </button>
-          <span className="ml-3 text-sm font-medium text-gray-700">{headerLabel}</span>
+          <span className="ml-3 text-sm font-medium text-ink2">{headerLabel}</span>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-ink3">
           <input
             type="checkbox"
             checked={showWeekends}
             onChange={(e) => setShowWeekends(e.target.checked)}
-            className="rounded border-gray-300"
+            className="rounded border-border-brand"
           />
           Show weekends
         </label>
@@ -162,13 +162,13 @@ export default function StaffCalendar() {
 
       {/* Grid */}
       {loading ? (
-        <div className="py-20 text-center text-sm text-gray-400">Loading...</div>
+        <div className="py-20 text-center text-sm text-ink4">Loading...</div>
       ) : staff.filter((m) => m.is_active).length === 0 ? (
-        <div className="py-20 text-center text-sm text-gray-400">
+        <div className="py-20 text-center text-sm text-ink4">
           No active staff. Add team members in the Roster tab to schedule shifts.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+        <div className="bg-white rounded-xl border border-border-brand overflow-x-auto">
           <div
             className="grid"
             style={{
@@ -176,7 +176,7 @@ export default function StaffCalendar() {
             }}
           >
             {/* Header row */}
-            <div className="px-3 py-2 border-b border-gray-100 text-xs font-medium text-gray-400">
+            <div className="px-3 py-2 border-b border-border-brand text-xs font-medium text-ink4">
               Staff
             </div>
             {dayColumns.map((c, i) => {
@@ -184,10 +184,10 @@ export default function StaffCalendar() {
               return (
                 <div
                   key={c.key}
-                  className="px-3 py-2 border-b border-l border-gray-100 text-xs font-medium text-gray-500"
+                  className="px-3 py-2 border-b border-l border-border-brand text-xs font-medium text-ink3"
                 >
                   <div>{c.label}</div>
-                  <div className="text-[10px] text-gray-400">
+                  <div className="text-[10px] text-ink4">
                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 </div>
@@ -205,8 +205,8 @@ export default function StaffCalendar() {
                       style={{ backgroundColor: m.color_hex }}
                     />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{m.role}</p>
+                      <p className="text-sm font-medium text-ink truncate">{m.name}</p>
+                      <p className="text-[10px] text-ink4 truncate">{m.role}</p>
                     </div>
                   </div>
                   {dayColumns.map((c, i) => {

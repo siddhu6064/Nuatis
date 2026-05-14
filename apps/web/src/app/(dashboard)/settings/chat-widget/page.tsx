@@ -36,7 +36,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-gray-200'
+        checked ? 'bg-teal-600' : 'bg-bg3'
       }`}
     >
       <span
@@ -115,7 +115,7 @@ export default function ChatWidgetSettingsPage() {
   if (loading) {
     return (
       <div className="px-8 py-8 max-w-2xl">
-        <p className="text-sm text-gray-400">Loading settings...</p>
+        <p className="text-sm text-ink4">Loading settings...</p>
       </div>
     )
   }
@@ -124,20 +124,20 @@ export default function ChatWidgetSettingsPage() {
     <div className="px-8 py-8 max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Chat Widget</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-ink mb-1">Chat Widget</h1>
+        <p className="text-sm text-ink3">
           Embed a live chat widget on your website to capture leads and answer questions.
         </p>
       </div>
 
       {/* Enable / Disable */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">
+            <h2 className="text-sm font-semibold text-ink">
               Widget {form.enabled ? 'Enabled' : 'Disabled'}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-ink4 mt-0.5">
               {form.enabled
                 ? 'The chat widget is visible on your website'
                 : 'The chat widget is hidden from visitors'}
@@ -148,18 +148,18 @@ export default function ChatWidgetSettingsPage() {
       </div>
 
       {/* Appearance */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-5">
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-5">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-0.5">Appearance</h2>
-          <p className="text-xs text-gray-400">Customize the look of the chat button</p>
+          <h2 className="text-sm font-semibold text-ink mb-0.5">Appearance</h2>
+          <p className="text-xs text-ink4">Customize the look of the chat button</p>
         </div>
 
         {/* Color */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1.5">Widget Color</label>
+          <label className="block text-xs font-medium text-ink2 mb-1.5">Widget Color</label>
           <div className="flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-lg border border-gray-200 shrink-0 cursor-pointer overflow-hidden"
+              className="w-9 h-9 rounded-lg border border-border-brand shrink-0 cursor-pointer overflow-hidden"
               style={{ backgroundColor: form.color }}
             >
               <input
@@ -176,30 +176,30 @@ export default function ChatWidgetSettingsPage() {
               onChange={(e) => setForm({ ...form, color: e.target.value })}
               placeholder="#0d9488"
               maxLength={7}
-              className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono"
+              className="w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono"
             />
-            <span className="text-xs text-gray-400">Hex color value</span>
+            <span className="text-xs text-ink4">Hex color value</span>
           </div>
         </div>
 
         {/* Greeting */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1.5">Greeting Message</label>
+          <label className="block text-xs font-medium text-ink2 mb-1.5">Greeting Message</label>
           <textarea
             value={form.greeting}
             onChange={(e) => setForm({ ...form, greeting: e.target.value })}
             rows={3}
             placeholder="Hi there! How can we help you today?"
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
+            className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
           />
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-[11px] text-ink4 mt-1">
             This message appears when a visitor first opens the chat widget.
           </p>
         </div>
 
         {/* Position */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">Widget Position</label>
+          <label className="block text-xs font-medium text-ink2 mb-2">Widget Position</label>
           <div className="flex gap-3">
             {(
               [
@@ -212,7 +212,7 @@ export default function ChatWidgetSettingsPage() {
                 className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border cursor-pointer transition-colors text-sm ${
                   form.position === opt.value
                     ? 'border-teal-500 bg-teal-50 text-teal-800 font-medium'
-                    : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                    : 'border-border-brand hover:bg-bg text-ink2'
                 }`}
               >
                 <input
@@ -231,22 +231,22 @@ export default function ChatWidgetSettingsPage() {
       </div>
 
       {/* Embed Code */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-0.5">Embed Code</h2>
-          <p className="text-xs text-gray-400">
+          <h2 className="text-sm font-semibold text-ink mb-0.5">Embed Code</h2>
+          <p className="text-xs text-ink4">
             Paste this snippet before the closing{' '}
-            <code className="font-mono text-gray-600">&lt;/body&gt;</code> tag of your website.
+            <code className="font-mono text-ink3">&lt;/body&gt;</code> tag of your website.
           </p>
         </div>
 
         <div className="flex items-start gap-3">
-          <code className="flex-1 min-w-0 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono text-gray-800 break-all leading-relaxed">
+          <code className="flex-1 min-w-0 px-4 py-3 bg-bg border border-border-brand rounded-lg text-xs font-mono text-ink break-all leading-relaxed">
             {embedCode}
           </code>
           <button
             onClick={copyEmbed}
-            className="shrink-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="shrink-0 px-3 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors"
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>

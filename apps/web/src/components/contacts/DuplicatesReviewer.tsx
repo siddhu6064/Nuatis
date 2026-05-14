@@ -20,7 +20,7 @@ interface DupPair {
 const CONFIDENCE_BADGE: Record<string, string> = {
   '100': 'bg-green-100 text-green-700',
   '80': 'bg-amber-100 text-amber-700',
-  '70': 'bg-gray-100 text-gray-600',
+  '70': 'bg-bg2 text-ink3',
 }
 
 function badgeClass(confidence: number): string {
@@ -123,15 +123,15 @@ export default function DuplicatesReviewer() {
   })
 
   if (loading) {
-    return <div className="py-12 text-center text-sm text-gray-400">Scanning for duplicates...</div>
+    return <div className="py-12 text-center text-sm text-ink4">Scanning for duplicates...</div>
   }
 
   if (visiblePairs.length === 0) {
     return (
       <div className="py-12 text-center">
         <span className="text-3xl">{'\u2713'}</span>
-        <p className="text-sm font-medium text-gray-600 mt-2">No duplicate contacts found</p>
-        <p className="text-xs text-gray-400 mt-1">Your contact list looks clean</p>
+        <p className="text-sm font-medium text-ink3 mt-2">No duplicate contacts found</p>
+        <p className="text-xs text-ink4 mt-1">Your contact list looks clean</p>
       </div>
     )
   }
@@ -149,7 +149,7 @@ export default function DuplicatesReviewer() {
 
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-ink3 mb-4">
         {visiblePairs.length} potential duplicate pairs found
       </p>
 
@@ -157,23 +157,23 @@ export default function DuplicatesReviewer() {
         {visiblePairs.map((pair) => {
           const key = [pair.contact_a.id, pair.contact_b.id].sort().join(':')
           return (
-            <div key={key} className="border border-gray-200 rounded-xl p-4">
+            <div key={key} className="border border-border-brand rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass(pair.confidence)}`}
                 >
                   {pair.confidence}% match
                 </span>
-                <span className="text-[10px] text-gray-400">{pair.match_reason}</span>
+                <span className="text-[10px] text-ink4">{pair.match_reason}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-3">
                 {[pair.contact_a, pair.contact_b].map((c) => (
-                  <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-sm font-medium text-gray-900">{c.full_name}</p>
-                    <p className="text-xs text-gray-500">{c.phone ?? 'No phone'}</p>
-                    <p className="text-xs text-gray-500">{c.email ?? 'No email'}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">
+                  <div key={c.id} className="bg-bg rounded-lg p-3">
+                    <p className="text-sm font-medium text-ink">{c.full_name}</p>
+                    <p className="text-xs text-ink3">{c.phone ?? 'No phone'}</p>
+                    <p className="text-xs text-ink3">{c.email ?? 'No email'}</p>
+                    <p className="text-[10px] text-ink4 mt-1">
                       Created{' '}
                       {new Date(c.created_at).toLocaleDateString('en-US', {
                         month: 'short',
@@ -194,7 +194,7 @@ export default function DuplicatesReviewer() {
                 </button>
                 <button
                   onClick={() => dismiss(pair)}
-                  className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                  className="px-3 py-1.5 text-xs text-ink3 hover:text-ink2"
                 >
                   Not a duplicate
                 </button>
@@ -208,14 +208,12 @@ export default function DuplicatesReviewer() {
       {mergeModal && primary && secondary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMergeModal(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Merge Contacts</h3>
+          <div className="relative bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-sm font-bold text-ink mb-4">Merge Contacts</h3>
 
             {/* Primary selector */}
             <div className="mb-4">
-              <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">
-                Keep as primary
-              </p>
+              <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Keep as primary</p>
               <div className="flex gap-2">
                 {[mergeModal.contact_a, mergeModal.contact_b].map((c) => (
                   <button
@@ -224,7 +222,7 @@ export default function DuplicatesReviewer() {
                     className={`flex-1 px-3 py-2 rounded-lg text-xs text-left border transition-colors ${
                       primaryId === c.id
                         ? 'border-teal-500 bg-teal-50 text-teal-700'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        : 'border-border-brand text-ink3 hover:bg-bg'
                     }`}
                   >
                     <span className="font-medium">{c.full_name}</span>
@@ -253,7 +251,7 @@ export default function DuplicatesReviewer() {
 
                 return (
                   <div key={field} className="flex items-center gap-3 text-xs">
-                    <span className="w-14 text-gray-400 capitalize">{field}</span>
+                    <span className="w-14 text-ink4 capitalize">{field}</span>
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input
                         type="radio"
@@ -262,7 +260,7 @@ export default function DuplicatesReviewer() {
                         onChange={() => setFieldChoices({ ...fieldChoices, [field]: 'primary' })}
                         className="w-3 h-3 text-teal-600"
                       />
-                      <span className="text-gray-700">{pVal ?? '\u2014'}</span>
+                      <span className="text-ink2">{pVal ?? '\u2014'}</span>
                     </label>
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input
@@ -272,22 +270,19 @@ export default function DuplicatesReviewer() {
                         onChange={() => setFieldChoices({ ...fieldChoices, [field]: 'secondary' })}
                         className="w-3 h-3 text-teal-600"
                       />
-                      <span className="text-gray-700">{sVal ?? '\u2014'}</span>
+                      <span className="text-ink2">{sVal ?? '\u2014'}</span>
                     </label>
                   </div>
                 )
               })}
               <div className="flex items-center gap-3 text-xs">
-                <span className="w-14 text-gray-400">Tags</span>
-                <span className="text-gray-500 italic">Merge both</span>
+                <span className="w-14 text-ink4">Tags</span>
+                <span className="text-ink3 italic">Merge both</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-              <button
-                onClick={() => setMergeModal(null)}
-                className="px-4 py-2 text-xs text-gray-500"
-              >
+            <div className="flex items-center gap-2 pt-3 border-t border-border-brand">
+              <button onClick={() => setMergeModal(null)} className="px-4 py-2 text-xs text-ink3">
                 Cancel
               </button>
               <button

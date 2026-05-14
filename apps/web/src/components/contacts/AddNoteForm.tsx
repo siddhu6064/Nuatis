@@ -66,7 +66,7 @@ export default function AddNoteForm({ contactId, onNoteAdded }: Props) {
     return (
       <button
         onClick={() => setExpanded(true)}
-        className="w-full text-left px-4 py-3 text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg border border-dashed border-gray-200 transition-colors"
+        className="w-full text-left px-4 py-3 text-sm text-ink4 hover:text-ink3 hover:bg-bg rounded-lg border border-dashed border-border-brand transition-colors"
       >
         Add a note...
       </button>
@@ -74,7 +74,7 @@ export default function AddNoteForm({ contactId, onNoteAdded }: Props) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-3" onKeyDown={handleKeyDown}>
+    <div className="border border-border-brand rounded-lg p-3" onKeyDown={handleKeyDown}>
       <textarea
         ref={textareaRef}
         value={body}
@@ -82,22 +82,20 @@ export default function AddNoteForm({ contactId, onNoteAdded }: Props) {
         rows={3}
         maxLength={5000}
         placeholder="Write a note..."
-        className="w-full text-sm text-gray-700 placeholder-gray-300 border-0 focus:ring-0 resize-none p-0"
+        className="w-full text-sm text-ink2 placeholder-gray-300 border-0 focus:ring-0 resize-none p-0"
       />
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-brand">
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs text-ink3 cursor-pointer">
             <input
               type="checkbox"
               checked={pinned}
               onChange={(e) => setPinned(e.target.checked)}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
             />
             Pin note
           </label>
-          {body.length > 4000 && (
-            <span className="text-[10px] text-gray-400">{body.length}/5000</span>
-          )}
+          {body.length > 4000 && <span className="text-[10px] text-ink4">{body.length}/5000</span>}
         </div>
         <div className="flex items-center gap-2">
           {error && <span className="text-xs text-red-500">{error}</span>}
@@ -108,7 +106,7 @@ export default function AddNoteForm({ contactId, onNoteAdded }: Props) {
               setPinned(false)
               setError(null)
             }}
-            className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+            className="px-3 py-1.5 text-xs text-ink3 hover:text-ink2"
           >
             Cancel
           </button>

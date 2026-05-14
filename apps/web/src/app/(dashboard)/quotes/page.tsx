@@ -19,12 +19,12 @@ interface QuoteWithViews extends Quote {
 }
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
-  draft: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Draft' },
+  draft: { bg: 'bg-bg2', text: 'text-ink3', label: 'Draft' },
   sent: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Sent' },
   viewed: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Viewed' },
   accepted: { bg: 'bg-green-50', text: 'text-green-700', label: 'Accepted' },
   declined: { bg: 'bg-red-50', text: 'text-red-600', label: 'Declined' },
-  expired: { bg: 'bg-gray-100', text: 'text-gray-400', label: 'Expired' },
+  expired: { bg: 'bg-bg2', text: 'text-ink4', label: 'Expired' },
 }
 
 export default async function QuotesPage() {
@@ -66,8 +66,8 @@ export default async function QuotesPage() {
     <div className="px-8 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Quotes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{quotes?.length ?? 0} total</p>
+          <h1 className="text-xl font-bold text-ink">Quotes</h1>
+          <p className="text-sm text-ink3 mt-0.5">{quotes?.length ?? 0} total</p>
         </div>
         <Link
           href="/quotes/new"
@@ -78,13 +78,13 @@ export default async function QuotesPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100">
+      <div className="bg-white rounded-xl border border-border-brand">
         {!quotes || quotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+            <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
               <span className="text-gray-300 text-xl">◫</span>
             </div>
-            <p className="text-sm font-medium text-gray-400">No quotes yet</p>
+            <p className="text-sm font-medium text-ink4">No quotes yet</p>
             <p className="text-xs text-gray-300 mt-1">
               Create your first quote to send proposals to customers
             </p>
@@ -95,14 +95,14 @@ export default async function QuotesPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Quote #</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Contact</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Title</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Total</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Status</th>
-                <th className="text-center text-xs font-medium text-gray-400 px-6 py-3">Views</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Date</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Quote #</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Contact</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Title</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Total</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Status</th>
+                <th className="text-center text-xs font-medium text-ink4 px-6 py-3">Views</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Date</th>
               </tr>
             </thead>
             <tbody>
@@ -121,11 +121,9 @@ export default async function QuotesPage() {
                         {q.quote_number}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {q.contacts?.full_name ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{q.title}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 text-sm text-ink2">{q.contacts?.full_name ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink2">{q.title}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-ink">
                       ${Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4">
@@ -151,7 +149,7 @@ export default async function QuotesPage() {
                     <td className="px-6 py-4 text-center">
                       {q.status !== 'draft' ? (
                         <span
-                          className={`inline-flex items-center gap-1 text-xs ${q.view_count > 0 ? 'text-gray-600' : 'text-gray-300'}`}
+                          className={`inline-flex items-center gap-1 text-xs ${q.view_count > 0 ? 'text-ink3' : 'text-gray-300'}`}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -172,7 +170,7 @@ export default async function QuotesPage() {
                         <span className="text-xs text-gray-200">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-400">
+                    <td className="px-6 py-4 text-sm text-ink4">
                       {new Date(q.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',

@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: BookingSettings = {
   advanceDays: 30,
   confirmationMessage: '',
   googleReviewUrl: '',
-  accentColor: '#2563eb',
+  accentColor: '#0d9488',
   availableServices: [],
 }
 
@@ -126,7 +126,7 @@ export default function BookingSettingsPage() {
   if (loading) {
     return (
       <div className="px-8 py-8 max-w-2xl">
-        <p className="text-sm text-gray-400">Loading settings...</p>
+        <p className="text-sm text-ink4">Loading settings...</p>
       </div>
     )
   }
@@ -134,35 +134,33 @@ export default function BookingSettingsPage() {
   const bookingUrl = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/book/${settings.slug}`
 
   const inputCls =
-    'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+    'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
   const narrowInputCls =
-    'w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+    'w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
   return (
     <div className="px-8 py-8 max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Online Booking</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-ink mb-1">Online Booking</h1>
+        <p className="text-sm text-ink3">
           Configure your public booking page so clients can schedule appointments directly.
         </p>
       </div>
 
       {/* Enable Toggle */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-900">Enable Online Booking</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Make your booking page publicly accessible
-            </p>
+            <p className="text-sm font-medium text-ink">Enable Online Booking</p>
+            <p className="text-xs text-ink4 mt-0.5">Make your booking page publicly accessible</p>
           </div>
           <button
             role="switch"
             aria-checked={settings.enabled}
             onClick={() => setSettings((s) => ({ ...s, enabled: !s.enabled }))}
             className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
-              settings.enabled ? 'bg-teal-600' : 'bg-gray-200'
+              settings.enabled ? 'bg-teal-600' : 'bg-bg3'
             }`}
           >
             <span
@@ -175,12 +173,10 @@ export default function BookingSettingsPage() {
       </div>
 
       {/* Slug + URL Preview */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">
-            Booking Page URL Slug
-          </label>
-          <p className="text-xs text-gray-400 mb-2">
+          <label className="block text-sm font-medium text-ink mb-1">Booking Page URL Slug</label>
+          <p className="text-xs text-ink4 mb-2">
             Lowercase letters, numbers, and hyphens. Between 3 and 50 characters.
           </p>
           <input
@@ -192,7 +188,7 @@ export default function BookingSettingsPage() {
           />
           {slugError && <p className="text-xs text-red-600 mt-1">{slugError}</p>}
           {settings.slug && !slugError && (
-            <p className="text-xs text-gray-400 mt-1.5 break-all">
+            <p className="text-xs text-ink4 mt-1.5 break-all">
               Preview: <span className="text-teal-600 font-mono">{bookingUrl}</span>
             </p>
           )}
@@ -201,11 +197,9 @@ export default function BookingSettingsPage() {
 
       {/* Service Picker */}
       {settings.availableServices.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <p className="text-sm font-medium text-gray-900 mb-1">Available Services</p>
-          <p className="text-xs text-gray-400 mb-4">
-            Choose which services clients can book online.
-          </p>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <p className="text-sm font-medium text-ink mb-1">Available Services</p>
+          <p className="text-xs text-ink4 mb-4">Choose which services clients can book online.</p>
           <div className="space-y-2">
             {settings.availableServices.map((svc) => (
               <label key={svc.id} className="flex items-center gap-3 cursor-pointer group">
@@ -213,14 +207,12 @@ export default function BookingSettingsPage() {
                   type="checkbox"
                   checked={settings.serviceIds.includes(svc.id)}
                   onChange={() => toggleService(svc.id)}
-                  className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="h-4 w-4 rounded border-border-brand text-teal-600 focus:ring-teal-500"
                 />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                <span className="text-sm text-ink2 group-hover:text-ink">
                   {svc.name}
                   {svc.durationMinutes != null && (
-                    <span className="ml-1.5 text-xs text-gray-400">
-                      ({svc.durationMinutes} min)
-                    </span>
+                    <span className="ml-1.5 text-xs text-ink4">({svc.durationMinutes} min)</span>
                   )}
                 </span>
               </label>
@@ -230,14 +222,14 @@ export default function BookingSettingsPage() {
       )}
 
       {/* Scheduling Rules */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-5">
-        <p className="text-sm font-semibold text-gray-900">Scheduling Rules</p>
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-5">
+        <p className="text-sm font-semibold text-ink">Scheduling Rules</p>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">
+          <label className="block text-sm font-medium text-ink mb-1">
             Buffer Between Appointments (minutes)
           </label>
-          <p className="text-xs text-gray-400 mb-2">Between 5 and 60 minutes.</p>
+          <p className="text-xs text-ink4 mb-2">Between 5 and 60 minutes.</p>
           <input
             type="number"
             value={settings.bufferMinutes}
@@ -255,10 +247,10 @@ export default function BookingSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">
+          <label className="block text-sm font-medium text-ink mb-1">
             Advance Booking Window (days)
           </label>
-          <p className="text-xs text-gray-400 mb-2">
+          <p className="text-xs text-ink4 mb-2">
             How many days ahead clients can schedule. Between 1 and 90.
           </p>
           <input
@@ -279,11 +271,9 @@ export default function BookingSettingsPage() {
       </div>
 
       {/* Confirmation Message */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <label className="block text-sm font-medium text-gray-900 mb-1">Confirmation Message</label>
-        <p className="text-xs text-gray-400 mb-2">
-          Shown to the client after they complete a booking.
-        </p>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <label className="block text-sm font-medium text-ink mb-1">Confirmation Message</label>
+        <p className="text-xs text-ink4 mb-2">Shown to the client after they complete a booking.</p>
         <textarea
           value={settings.confirmationMessage}
           onChange={(e) => setSettings((s) => ({ ...s, confirmationMessage: e.target.value }))}
@@ -294,9 +284,9 @@ export default function BookingSettingsPage() {
       </div>
 
       {/* Google Review URL */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <label className="block text-sm font-medium text-gray-900 mb-1">Google Review URL</label>
-        <p className="text-xs text-gray-400 mb-2">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <label className="block text-sm font-medium text-ink mb-1">Google Review URL</label>
+        <p className="text-xs text-ink4 mb-2">
           Optionally shown on the booking confirmation page to encourage reviews.
         </p>
         <input
@@ -309,24 +299,24 @@ export default function BookingSettingsPage() {
       </div>
 
       {/* Accent Color */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <label className="block text-sm font-medium text-gray-900 mb-1">Accent Color</label>
-        <p className="text-xs text-gray-400 mb-2">Hex code used on your public booking page.</p>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <label className="block text-sm font-medium text-ink mb-1">Accent Color</label>
+        <p className="text-xs text-ink4 mb-2">Hex code used on your public booking page.</p>
         <div className="flex items-center gap-3">
           <input
             type="text"
             value={settings.accentColor}
             onChange={(e) => setSettings((s) => ({ ...s, accentColor: e.target.value }))}
-            placeholder="#2563eb"
+            placeholder="#0d9488"
             className={`w-36 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono ${
               settings.accentColor && !isValidHex(settings.accentColor)
                 ? 'border-red-300 focus:ring-red-500'
-                : 'border-gray-200'
+                : 'border-border-brand'
             }`}
           />
           {isValidHex(settings.accentColor) && (
             <span
-              className="inline-block h-8 w-8 rounded-md border border-gray-200 shadow-sm"
+              className="inline-block h-8 w-8 rounded-md border border-border-brand shadow-sm"
               style={{ backgroundColor: settings.accentColor }}
               title={settings.accentColor}
             />

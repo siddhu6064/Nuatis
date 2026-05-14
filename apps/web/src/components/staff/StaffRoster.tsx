@@ -106,7 +106,7 @@ export default function StaffRoster() {
           <button
             onClick={() => setShowAll(false)}
             className={`px-3 py-1.5 rounded-lg ${
-              !showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-500 hover:bg-gray-50'
+              !showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'
             }`}
           >
             Active
@@ -114,7 +114,7 @@ export default function StaffRoster() {
           <button
             onClick={() => setShowAll(true)}
             className={`px-3 py-1.5 rounded-lg ${
-              showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-500 hover:bg-gray-50'
+              showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'
             }`}
           >
             All
@@ -130,10 +130,10 @@ export default function StaffRoster() {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-gray-400">Loading...</div>
+        <div className="py-20 text-center text-sm text-ink4">Loading...</div>
       ) : members.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-sm text-gray-400">No team members yet.</p>
+          <p className="text-sm text-ink4">No team members yet.</p>
           <button
             onClick={() => setSlideOver({ open: true })}
             className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -147,7 +147,7 @@ export default function StaffRoster() {
             <button
               key={m.id}
               onClick={() => setSlideOver({ open: true, member: m })}
-              className={`text-left bg-white rounded-xl border border-gray-100 p-5 hover:border-gray-200 transition-colors ${
+              className={`text-left bg-white rounded-xl border border-border-brand p-5 hover:border-border-brand transition-colors ${
                 !m.is_active ? 'opacity-60' : ''
               }`}
             >
@@ -157,8 +157,8 @@ export default function StaffRoster() {
                   style={{ backgroundColor: m.color_hex }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{m.name}</p>
-                  <p className="text-sm text-gray-500 truncate">{m.role}</p>
+                  <p className="font-semibold text-ink truncate">{m.name}</p>
+                  <p className="text-sm text-ink3 truncate">{m.role}</p>
                 </div>
                 <div
                   onClick={(e) => {
@@ -168,7 +168,7 @@ export default function StaffRoster() {
                   role="switch"
                   aria-checked={m.is_active}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                    m.is_active ? 'bg-teal-600' : 'bg-gray-200'
+                    m.is_active ? 'bg-teal-600' : 'bg-bg3'
                   }`}
                 >
                   <span
@@ -178,10 +178,10 @@ export default function StaffRoster() {
                   />
                 </div>
               </div>
-              <div className="space-y-1 text-xs text-gray-500">
+              <div className="space-y-1 text-xs text-ink3">
                 {m.email && <p className="truncate">{m.email}</p>}
                 {m.phone && <p className="truncate">{m.phone}</p>}
-                <p className="text-gray-400 pt-1">{summarizeAvailability(m.availability)}</p>
+                <p className="text-ink4 pt-1">{summarizeAvailability(m.availability)}</p>
               </div>
             </button>
           ))}

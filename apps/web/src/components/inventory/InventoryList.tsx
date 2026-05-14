@@ -107,8 +107,8 @@ export default function InventoryList({ pageTitle }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{pageTitle}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <h1 className="text-xl font-bold text-ink">{pageTitle}</h1>
+          <p className="text-sm text-ink4 mt-0.5">
             Track stock, unit costs, and reorder thresholds
           </p>
         </div>
@@ -128,17 +128,17 @@ export default function InventoryList({ pageTitle }: Props) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name or SKU..."
-          className="w-full max-w-sm px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+          className="w-full max-w-sm px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center text-sm text-gray-400">Loading...</div>
+          <div className="py-20 text-center text-sm text-ink4">Loading...</div>
         ) : items.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-ink4">
               No {pageTitle.toLowerCase()} yet. Add your first item to track stock levels and get
               low-stock alerts.
             </p>
@@ -152,14 +152,14 @@ export default function InventoryList({ pageTitle }: Props) {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Name</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">SKU</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Quantity</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Unit</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Unit Cost</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Supplier</th>
-                <th className="text-right text-xs font-medium text-gray-400 px-6 py-3">Actions</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Name</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">SKU</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Quantity</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Unit</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Unit Cost</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Supplier</th>
+                <th className="text-right text-xs font-medium text-ink4 px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -175,8 +175,8 @@ export default function InventoryList({ pageTitle }: Props) {
                       flash ? 'bg-yellow-50' : 'hover:bg-gray-50/50'
                     }`}
                   >
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{item.sku ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-ink">{item.name}</td>
+                    <td className="px-6 py-4 text-sm text-ink3">{item.sku ?? '—'}</td>
                     <td className="px-6 py-4 text-sm">
                       <span
                         className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${qtyClass(qty, thr)}`}
@@ -184,11 +184,11 @@ export default function InventoryList({ pageTitle }: Props) {
                         {qty}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{item.unit}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-ink3">{item.unit}</td>
+                    <td className="px-6 py-4 text-sm text-ink3">
                       {item.unit_cost != null ? `$${Number(item.unit_cost).toFixed(2)}` : '—'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{item.supplier ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink3">{item.supplier ?? '—'}</td>
                     <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
                       <button
                         onClick={() => setSlideOver({ open: true, item })}
@@ -227,15 +227,15 @@ export default function InventoryList({ pageTitle }: Props) {
       {confirmDelete && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelete(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md p-5">
-            <h3 className="text-base font-semibold text-gray-900 mb-1">Delete item?</h3>
-            <p className="text-sm text-gray-500 mb-5">
+          <div className="relative bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-md p-5">
+            <h3 className="text-base font-semibold text-ink mb-1">Delete item?</h3>
+            <p className="text-sm text-ink3 mb-5">
               Remove <strong>{confirmDelete.name}</strong>? This soft-deletes the record.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
               >
                 Cancel
               </button>

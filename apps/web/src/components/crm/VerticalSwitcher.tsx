@@ -3,20 +3,53 @@
 import { useState } from 'react'
 import { VERTICALS } from '@nuatis/shared'
 
-const VERTICALS_LIST = Object.entries(VERTICALS).map(([slug, config]) => ({
-  slug,
-  label: config.label,
-}))
-
 const VERTICAL_ICONS: Record<string, string> = {
   sales_crm: '📊',
   dental: '🦷',
+  medical: '🩺',
+  veterinary: '🐾',
   salon: '✂️',
   restaurant: '🍽️',
   contractor: '🔧',
   law_firm: '⚖️',
   real_estate: '🏠',
+  spa: '💆',
+  gym: '🏋️',
+  nail_bar: '💅',
+  pet_grooming: '🐩',
+  tattoo: '🎨',
+  car_wash: '🚗',
+  laundry: '👕',
 }
+
+const GROUPS: { label: string; slugs: string[] }[] = [
+  {
+    label: 'SERVICES',
+    slugs: [
+      'salon',
+      'restaurant',
+      'contractor',
+      'gym',
+      'nail_bar',
+      'pet_grooming',
+      'tattoo',
+      'car_wash',
+      'laundry',
+    ],
+  },
+  {
+    label: 'HEALTHCARE',
+    slugs: ['dental', 'medical', 'veterinary'],
+  },
+  {
+    label: 'PROFESSIONAL',
+    slugs: ['law_firm', 'real_estate', 'sales_crm'],
+  },
+]
+
+const VERTICALS_MAP = Object.fromEntries(
+  Object.entries(VERTICALS).map(([slug, config]) => [slug, config.label])
+)
 
 interface VerticalSwitcherProps {
   currentSlug: string
@@ -25,7 +58,7 @@ interface VerticalSwitcherProps {
 
 export function VerticalSwitcher({ currentSlug, onSwitch }: VerticalSwitcherProps) {
   const [open, setOpen] = useState(false)
-  const current = VERTICALS_LIST.find((v) => v.slug === currentSlug)
+  const currentLabel = VERTICALS_MAP[currentSlug] ?? currentSlug
 
   return (
     <div className="relative">
@@ -37,7 +70,7 @@ export function VerticalSwitcher({ currentSlug, onSwitch }: VerticalSwitcherProp
                    transition-colors"
       >
         <span className="text-base">{VERTICAL_ICONS[currentSlug] ?? '🏢'}</span>
-        <span>{current?.label ?? currentSlug}</span>
+        <span>{currentLabel}</span>
         <span className="text-xs bg-amber-200 text-amber-700 px-1.5 py-0.5 rounded font-semibold ml-1">
           DEMO
         </span>
@@ -57,36 +90,64 @@ export function VerticalSwitcher({ currentSlug, onSwitch }: VerticalSwitcherProp
           {/* Backdrop */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200
-                          rounded-xl shadow-lg z-20 overflow-hidden"
+            className="absolute top-full left-0 mt-1 bg-white border border-border-brand
+                       rounded-xl shadow-lg z-20 overflow-hidden
+                       w-[calc(100vw-2rem)] sm:min-w-[580px] sm:w-auto"
           >
-            <div className="px-3 py-2 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                Switch vertical
-              </p>
+            {/* 3-column grid */}
+            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border-brand">
+              {GROUPS.map((group) => (
+                <div key={group.label} className="flex-1 min-w-0">
+                  {/* Category label */}
+                  <div className="px-3 pt-3 pb-1.5 border-b border-border-brand">
+                    <p
+                      className="font-mono text-[10px] uppercase tracking-widest"
+                      style={{ color: '#7a7468' }}
+                    >
+                      {group.label}
+                    </p>
+                  </div>
+                  {/* Items */}
+                  {group.slugs.map((slug) => {
+                    const label = VERTICALS_MAP[slug] ?? slug
+                    const active = slug === currentSlug
+                    return (
+                      <button
+                        key={slug}
+                        onClick={() => {
+                          onSwitch(slug)
+                          setOpen(false)
+                        }}
+                        className={`
+                          w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left
+                          transition-colors
+                          ${active ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink2 hover:bg-bg'}
+                        `}
+                      >
+                        <span>{VERTICAL_ICONS[slug] ?? '🏢'}</span>
+                        <span className="truncate">{label}</span>
+                        {active && (
+                          <span className="ml-auto text-teal-500 text-xs shrink-0">✓</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
-            {VERTICALS_LIST.map((v) => (
-              <button
-                key={v.slug}
-                onClick={() => {
-                  onSwitch(v.slug)
-                  setOpen(false)
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left
-                  transition-colors
-                  ${
-                    v.slug === currentSlug
-                      ? 'bg-teal-50 text-teal-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }
-                `}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border-brand bg-bg">
+              <span className="font-mono text-[10px] tracking-wide" style={{ color: '#7a7468' }}>
+                16 industries · More on the way
+              </span>
+              <a
+                href="mailto:sid@nuatis.com"
+                className="font-mono text-[10px] tracking-wide text-[#0d9488] hover:underline"
               >
-                <span>{VERTICAL_ICONS[v.slug] ?? '🏢'}</span>
-                <span>{v.label}</span>
-                {v.slug === currentSlug && <span className="ml-auto text-teal-500 text-xs">✓</span>}
-              </button>
-            ))}
+                Don&apos;t see yours? Tell us →
+              </a>
+            </div>
           </div>
         </>
       )}

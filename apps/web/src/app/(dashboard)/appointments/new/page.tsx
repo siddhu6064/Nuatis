@@ -39,15 +39,15 @@ export default async function NewAppointmentPage() {
   return (
     <div className="px-8 py-8">
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
-          <Link href="/appointments" className="hover:text-gray-600 transition-colors">
+        <div className="flex items-center gap-2 text-sm text-ink4 mb-3">
+          <Link href="/appointments" className="hover:text-ink3 transition-colors">
             Appointments
           </Link>
           <span>›</span>
-          <span className="text-gray-600">New Appointment</span>
+          <span className="text-ink3">New Appointment</span>
         </div>
-        <h1 className="text-xl font-bold text-gray-900">New Appointment</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Schedule a new appointment</p>
+        <h1 className="text-xl font-bold text-ink">New Appointment</h1>
+        <p className="text-sm text-ink3 mt-0.5">Schedule a new appointment</p>
       </div>
 
       <AddAppointmentForm contacts={contactsRes.data ?? []} staff={staffRes.data ?? []} />

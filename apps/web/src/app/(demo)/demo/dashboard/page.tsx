@@ -66,16 +66,16 @@ export default function DemoDashboardPage() {
   const demoValues = DEMO_DATA[activeSlug] ?? {}
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-bg">
       {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-border-brand px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center">
             <span className="text-white text-xs font-bold">N</span>
           </div>
-          <span className="font-semibold text-gray-900">Nuatis</span>
+          <span className="font-semibold text-ink">Nuatis</span>
           <span className="text-gray-300 mx-1">·</span>
-          <span className="text-sm text-gray-500">Demo</span>
+          <span className="text-sm text-ink3">Demo</span>
         </div>
         <VerticalSwitcher currentSlug={activeSlug} onSwitch={setActiveSlug} />
       </div>
@@ -83,11 +83,11 @@ export default function DemoDashboardPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Contact card header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-white rounded-xl border border-border-brand p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">Jane Smith</h1>
-              <p className="text-sm text-gray-500 mt-0.5">jane@example.com · +1 (512) 555-0100</p>
+              <h1 className="text-lg font-semibold text-ink">Jane Smith</h1>
+              <p className="text-sm text-ink3 mt-0.5">jane@example.com · +1 (512) 555-0100</p>
             </div>
             <span
               className="text-xs bg-teal-50 text-teal-700 border border-teal-200
@@ -98,8 +98,8 @@ export default function DemoDashboardPage() {
           </div>
 
           {/* Dynamic vertical fields */}
-          <div className="border-t border-gray-100 pt-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+          <div className="border-t border-border-brand pt-4">
+            <p className="text-xs font-semibold text-ink4 uppercase tracking-wide mb-3">
               {vertical.label} details
             </p>
             <VerticalFieldRenderer
@@ -112,17 +112,15 @@ export default function DemoDashboardPage() {
         </div>
 
         {/* Pipeline stages */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Pipeline
-          </p>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <p className="text-xs font-semibold text-ink4 uppercase tracking-wide mb-3">Pipeline</p>
           <div className="flex gap-2 flex-wrap">
             {vertical.pipeline_stages.map((stage: PipelineStageConfig, i: number) => (
               <div
                 key={stage.name}
                 className={`
                   px-3 py-1.5 rounded-full text-xs font-medium border
-                  ${i === 0 ? 'border-2 text-white' : 'bg-gray-50 text-gray-600 border-gray-200'}
+                  ${i === 0 ? 'border-2 text-white' : 'bg-bg text-ink3 border-border-brand'}
                 `}
                 style={i === 0 ? { backgroundColor: stage.color, borderColor: stage.color } : {}}
               >

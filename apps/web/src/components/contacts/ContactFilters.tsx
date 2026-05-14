@@ -149,9 +149,9 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
   )
 
   return (
-    <div className="w-72 bg-white border-l border-gray-100 p-4 overflow-y-auto shrink-0">
+    <div className="w-72 bg-white border-l border-border-brand p-4 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-700">
+        <h3 className="text-sm font-semibold text-ink2">
           Filters{activeCount > 0 ? ` (${activeCount})` : ''}
         </h3>
         <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
               Clear all
             </button>
           )}
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">
+          <button onClick={onClose} className="text-ink4 hover:text-ink3 text-sm">
             &times;
           </button>
         </div>
@@ -171,18 +171,18 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Pipeline Stage */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Pipeline Stage</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Pipeline Stage</p>
         <div className="space-y-1">
           {stages.map((stage) => (
             <label
               key={stage.id}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="checkbox"
                 checked={filters.pipeline_stage_id.includes(stage.id)}
                 onChange={() => toggleArrayItem('pipeline_stage_id', stage.id)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               <span
                 className="w-2 h-2 rounded-full shrink-0"
@@ -196,18 +196,18 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Source */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Source</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Source</p>
         <div className="space-y-1">
           {SOURCE_OPTIONS.map((s) => (
             <label
               key={s.value}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="checkbox"
                 checked={filters.source.includes(s.value)}
                 onChange={() => toggleArrayItem('source', s.value)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {s.label}
             </label>
@@ -217,12 +217,12 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Last Contacted */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Last Contacted</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Last Contacted</p>
         <div className="space-y-1">
           {LAST_CONTACTED_PRESETS.map((p) => (
             <label
               key={p.label}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="radio"
@@ -231,7 +231,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                   filters.last_contacted_from === p.from && filters.last_contacted_to === p.to
                 }
                 onChange={() => update({ last_contacted_from: p.from, last_contacted_to: p.to })}
-                className="border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {p.label}
             </label>
@@ -241,19 +241,19 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Created Date */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Created</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Created</p>
         <div className="space-y-1">
           {CREATED_PRESETS.map((p) => (
             <label
               key={p.label}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="radio"
                 name="created"
                 checked={filters.created_from === p.from && filters.created_to === p.to}
                 onChange={() => update({ created_from: p.from, created_to: p.to })}
-                className="border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {p.label}
             </label>
@@ -263,7 +263,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Tags */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Tags</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Tags</p>
         {filters.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-1.5">
             {filters.tags.map((tag) => (
@@ -287,10 +287,10 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           placeholder="Add tag..."
-          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 placeholder-gray-300"
+          className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
         />
         {tagInput && tagSuggestions.length > 0 && (
-          <div className="mt-1 border border-gray-200 rounded bg-white max-h-24 overflow-y-auto">
+          <div className="mt-1 border border-border-brand rounded bg-white max-h-24 overflow-y-auto">
             {tagSuggestions.slice(0, 5).map((t) => (
               <button
                 key={t}
@@ -298,7 +298,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                   toggleArrayItem('tags', t)
                   setTagInput('')
                 }}
-                className="block w-full text-left text-xs px-2 py-1 hover:bg-gray-50 text-gray-600"
+                className="block w-full text-left text-xs px-2 py-1 hover:bg-bg text-ink3"
               >
                 {t}
               </button>
@@ -309,12 +309,12 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Has Open Quote */}
       <div className="mb-4">
-        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
           <input
             type="checkbox"
             checked={filters.has_open_quote}
             onChange={(e) => update({ has_open_quote: e.target.checked })}
-            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+            className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
           />
           Has open quote
         </label>
@@ -322,7 +322,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Referral Source */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Referral Source</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Referral Source</p>
         <div className="relative">
           <input
             type="text"
@@ -332,13 +332,13 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
               update({ referral_source: e.target.value })
             }}
             placeholder="e.g. Google, Instagram..."
-            className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 placeholder-gray-300"
+            className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
           />
           {referralInput &&
             referralSources.filter(
               (s) => s.toLowerCase().includes(referralInput.toLowerCase()) && s !== referralInput
             ).length > 0 && (
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-24 overflow-y-auto">
+              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-border-brand rounded shadow-lg z-10 max-h-24 overflow-y-auto">
                 {referralSources
                   .filter(
                     (s) =>
@@ -352,7 +352,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                         setReferralInput(s)
                         update({ referral_source: s })
                       }}
-                      className="block w-full text-left text-xs px-2 py-1 hover:bg-gray-50 text-gray-600"
+                      className="block w-full text-left text-xs px-2 py-1 hover:bg-bg text-ink3"
                     >
                       {s}
                     </button>
@@ -364,12 +364,12 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Has Referral Source */}
       <div className="mb-4">
-        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
           <input
             type="checkbox"
             checked={filters.has_referral_source}
             onChange={(e) => update({ has_referral_source: e.target.checked })}
-            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+            className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
           />
           Has referral source
         </label>
@@ -377,7 +377,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Lifecycle Stage */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Lifecycle Stage</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Lifecycle Stage</p>
         <div className="space-y-1">
           {[
             { value: 'subscriber', label: 'Subscriber' },
@@ -391,13 +391,13 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
           ].map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="checkbox"
                 checked={filters.lifecycle_stage.includes(opt.value)}
                 onChange={() => toggleArrayItem('lifecycle_stage', opt.value)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {opt.label}
             </label>
@@ -407,15 +407,15 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Grade */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Lead Grade</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Lead Grade</p>
         <div className="space-y-1">
           {['A', 'B', 'C', 'D', 'F'].map((g) => (
-            <label key={g} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <label key={g} className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filters.grade.includes(g)}
                 onChange={() => toggleArrayItem('grade', g)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {g}
             </label>
@@ -425,11 +425,11 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Assigned To */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Assigned To</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Assigned To</p>
         <select
           value={filters.assigned_to}
           onChange={(e) => update({ assigned_to: e.target.value })}
-          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+          className="w-full text-xs border border-border-brand rounded px-2 py-1.5 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
         >
           <option value="">Any</option>
           <option value="unassigned">Unassigned</option>
@@ -443,19 +443,19 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       {/* Territory */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Territory</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Territory</p>
         <input
           type="text"
           value={filters.territory}
           onChange={(e) => update({ territory: e.target.value })}
           placeholder="e.g. North, South..."
-          className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 placeholder-gray-300"
+          className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
         />
       </div>
 
       {/* Sort */}
       <div className="mb-4">
-        <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Sort By</p>
+        <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Sort By</p>
         <div className="space-y-1">
           {[
             { value: 'created_at', label: 'Date Added' },
@@ -465,7 +465,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
           ].map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"
+              className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
             >
               <input
                 type="radio"
@@ -477,7 +477,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                     sort_dir: opt.value === 'lead_score' ? 'desc' : filters.sort_dir,
                   })
                 }
-                className="border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
               />
               {opt.label}
             </label>
@@ -491,7 +491,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
               className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
                 filters.sort_dir === dir
                   ? 'border-teal-500 bg-teal-50 text-teal-700 font-medium'
-                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  : 'border-border-brand text-ink3 hover:bg-bg'
               }`}
             >
               {dir === 'asc' ? 'Ascending' : 'Descending'}

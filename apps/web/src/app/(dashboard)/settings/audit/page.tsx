@@ -35,14 +35,14 @@ export default async function AuditLogPage() {
   return (
     <div className="px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Audit Log</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Recent API activity for your account</p>
+        <h1 className="text-xl font-bold text-ink">Audit Log</h1>
+        <p className="text-sm text-ink3 mt-0.5">Recent API activity for your account</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100">
+      <div className="bg-white rounded-xl border border-border-brand">
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-sm font-medium text-gray-400">No audit entries yet</p>
+            <p className="text-sm font-medium text-ink4">No audit entries yet</p>
             <p className="text-xs text-gray-300 mt-1">
               API activity will appear here as you use the platform
             </p>
@@ -50,26 +50,26 @@ export default async function AuditLogPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Time</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Action</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Resource</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">ID</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">IP</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Time</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Action</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Resource</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">ID</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">IP</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((entry) => {
                 const badge = ACTION_BADGES[entry.action] ?? {
-                  bg: 'bg-gray-100',
-                  text: 'text-gray-600',
+                  bg: 'bg-bg2',
+                  text: 'text-ink3',
                 }
                 return (
                   <tr
                     key={entry.id}
                     className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50"
                   >
-                    <td className="px-6 py-3 text-xs text-gray-500">
+                    <td className="px-6 py-3 text-xs text-ink3">
                       {new Date(entry.created_at).toLocaleString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -85,11 +85,11 @@ export default async function AuditLogPage() {
                         {entry.action}
                       </span>
                     </td>
-                    <td className="px-6 py-3 text-sm text-gray-700">{entry.resource_type}</td>
-                    <td className="px-6 py-3 text-xs text-gray-400 font-mono truncate max-w-[120px]">
+                    <td className="px-6 py-3 text-sm text-ink2">{entry.resource_type}</td>
+                    <td className="px-6 py-3 text-xs text-ink4 font-mono truncate max-w-[120px]">
                       {entry.resource_id ?? '—'}
                     </td>
-                    <td className="px-6 py-3 text-xs text-gray-400">{entry.ip_address ?? '—'}</td>
+                    <td className="px-6 py-3 text-xs text-ink4">{entry.ip_address ?? '—'}</td>
                   </tr>
                 )
               })}

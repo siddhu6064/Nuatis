@@ -67,10 +67,10 @@ export default function ProductsPage() {
               <span className="text-white text-lg font-bold">N</span>
             </div>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-ink mb-4">
             AI-powered tools for small businesses
           </h1>
-          <p className="text-lg text-gray-500 max-w-xl mx-auto">
+          <p className="text-lg text-ink3 max-w-xl mx-auto">
             From voice AI to expense tracking &mdash; tools that work while you sleep.
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function ProductsPage() {
           {PRODUCTS.map((p) => (
             <div
               key={p.name}
-              className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col hover:border-teal-200 transition-colors"
+              className="bg-white rounded-2xl border border-border-brand p-6 flex flex-col hover:border-teal-200 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <span className="text-3xl">{p.icon}</span>
@@ -92,9 +92,9 @@ export default function ProductsPage() {
                   {p.status}
                 </span>
               </div>
-              <h2 className="text-lg font-bold text-gray-900 mb-1">{p.name}</h2>
-              <p className="text-sm text-gray-500 mb-4">{p.tagline}</p>
-              <ul className="text-sm text-gray-600 space-y-1.5 mb-6 flex-1">
+              <h2 className="text-lg font-bold text-ink mb-1">{p.name}</h2>
+              <p className="text-sm text-ink3 mb-4">{p.tagline}</p>
+              <ul className="text-sm text-ink3 space-y-1.5 mb-6 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-center gap-2">
                     <span className="text-teal-500 text-xs">&#10003;</span> {f}
@@ -102,7 +102,7 @@ export default function ProductsPage() {
                 ))}
               </ul>
               {p.disabled ? (
-                <span className="block text-center py-2.5 text-sm text-gray-300 bg-gray-50 rounded-lg cursor-not-allowed">
+                <span className="block text-center py-2.5 text-sm text-gray-300 bg-bg rounded-lg cursor-not-allowed">
                   {p.cta}
                 </span>
               ) : p.external ? (
@@ -128,15 +128,15 @@ export default function ProductsPage() {
       </section>
 
       {/* About */}
-      <section className="py-16 px-6 bg-gray-50">
+      <section className="py-16 px-6 bg-bg">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-xl font-bold text-gray-900 mb-3">About Nuatis LLC</h2>
-          <p className="text-sm text-gray-500 leading-relaxed">
+          <h2 className="text-xl font-bold text-ink mb-3">About Nuatis LLC</h2>
+          <p className="text-sm text-ink3 leading-relaxed">
             Solo-founded and Texas-based, Nuatis builds AI tools that make enterprise-grade
             technology accessible to every small business. Our mission: let business owners focus on
             what they do best while AI handles the rest.
           </p>
-          <p className="text-xs text-gray-400 mt-4">
+          <p className="text-xs text-ink4 mt-4">
             Built by{' '}
             <a
               href="https://github.com/siddhu6064"

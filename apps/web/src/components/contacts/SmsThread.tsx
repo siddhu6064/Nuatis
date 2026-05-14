@@ -128,8 +128,7 @@ export default function SmsThread({ contactId, contactName }: Props) {
     .join('')
     .toUpperCase()
 
-  if (loading)
-    return <div className="py-6 text-center text-sm text-gray-400">Loading messages...</div>
+  if (loading) return <div className="py-6 text-center text-sm text-ink4">Loading messages...</div>
 
   return (
     <div className="flex flex-col h-[500px]">
@@ -137,7 +136,7 @@ export default function SmsThread({ contactId, contactName }: Props) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-ink4">
               No messages yet &mdash; send the first message below
             </p>
           </div>
@@ -150,11 +149,11 @@ export default function SmsThread({ contactId, contactName }: Props) {
               <div key={msg.id}>
                 {showDateSep && (
                   <div className="flex items-center gap-2 my-3">
-                    <div className="flex-1 h-px bg-gray-100" />
-                    <span className="text-[10px] text-gray-400 font-medium">
+                    <div className="flex-1 h-px bg-bg2" />
+                    <span className="text-[10px] text-ink4 font-medium">
                       {formatDateSep(msg.created_at)}
                     </span>
-                    <div className="flex-1 h-px bg-gray-100" />
+                    <div className="flex-1 h-px bg-bg2" />
                   </div>
                 )}
                 <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} mb-1`}>
@@ -162,15 +161,15 @@ export default function SmsThread({ contactId, contactName }: Props) {
                     className={`flex items-end gap-1.5 max-w-[75%] ${isInbound ? '' : 'flex-row-reverse'}`}
                   >
                     {isInbound && (
-                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mb-0.5">
-                        <span className="text-[9px] font-bold text-gray-500">{initials}</span>
+                      <div className="w-6 h-6 rounded-full bg-bg3 flex items-center justify-center shrink-0 mb-0.5">
+                        <span className="text-[9px] font-bold text-ink3">{initials}</span>
                       </div>
                     )}
                     <div>
                       <div
                         className={`px-3 py-2 rounded-2xl text-sm ${
                           isInbound
-                            ? 'bg-gray-100 text-gray-800 rounded-bl-md'
+                            ? 'bg-bg2 text-ink rounded-bl-md'
                             : 'bg-teal-600 text-white rounded-br-md'
                         } ${msg.status === 'failed' ? 'opacity-60 border border-red-300' : ''}`}
                       >
@@ -179,11 +178,9 @@ export default function SmsThread({ contactId, contactName }: Props) {
                       <div
                         className={`flex items-center gap-1 mt-0.5 ${isInbound ? '' : 'justify-end'}`}
                       >
-                        <span className="text-[9px] text-gray-400">
-                          {formatTime(msg.created_at)}
-                        </span>
+                        <span className="text-[9px] text-ink4">{formatTime(msg.created_at)}</span>
                         {msg.status === 'sending' && (
-                          <span className="text-[9px] text-gray-400">Sending...</span>
+                          <span className="text-[9px] text-ink4">Sending...</span>
                         )}
                         {msg.status === 'failed' && (
                           <span className="text-[9px] text-red-500">Failed</span>
@@ -199,7 +196,7 @@ export default function SmsThread({ contactId, contactName }: Props) {
       </div>
 
       {/* Send input */}
-      <div className="border-t border-gray-100 px-4 py-3">
+      <div className="border-t border-border-brand px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -208,7 +205,7 @@ export default function SmsThread({ contactId, contactName }: Props) {
             maxLength={320}
             rows={1}
             placeholder="Send a message..."
-            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+            className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
           />
           <button
             onClick={() => void handleSend()}
@@ -219,7 +216,7 @@ export default function SmsThread({ contactId, contactName }: Props) {
           </button>
         </div>
         {input.length > 280 && (
-          <p className="text-[10px] text-gray-400 mt-1 text-right">{input.length}/320</p>
+          <p className="text-[10px] text-ink4 mt-1 text-right">{input.length}/320</p>
         )}
       </div>
     </div>

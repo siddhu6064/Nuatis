@@ -57,7 +57,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-gray-200'
+        checked ? 'bg-teal-600' : 'bg-bg3'
       }`}
     >
       <span
@@ -152,7 +152,7 @@ export default function ReviewAutomationPage() {
   if (loading) {
     return (
       <div className="px-8 py-8 max-w-2xl">
-        <p className="text-sm text-gray-400">Loading settings...</p>
+        <p className="text-sm text-ink4">Loading settings...</p>
       </div>
     )
   }
@@ -161,18 +161,18 @@ export default function ReviewAutomationPage() {
     <div className="px-8 py-8 max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Google Review Automation</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-ink mb-1">Google Review Automation</h1>
+        <p className="text-sm text-ink3">
           Automatically send review request messages to customers after a job is completed.
         </p>
       </div>
 
       {/* Enable / Disable */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5">
+      <div className="rounded-xl border border-border-brand bg-white p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-900">Enable Google Review Automation</p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-sm font-medium text-ink">Enable Google Review Automation</p>
+            <p className="text-xs text-ink4 mt-0.5">
               Automatically send review requests when a job is marked complete.
             </p>
           </div>
@@ -184,14 +184,14 @@ export default function ReviewAutomationPage() {
       </div>
 
       {/* Delay */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Send review request after</p>
+      <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
+        <p className="text-sm font-semibold text-ink">Send review request after</p>
         <select
           value={settings.delayMinutes}
           onChange={(e) =>
             setSettings((prev) => ({ ...prev, delayMinutes: parseInt(e.target.value) }))
           }
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
         >
           {DELAY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -202,23 +202,23 @@ export default function ReviewAutomationPage() {
       </div>
 
       {/* Google Review URL */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Google Review URL</p>
+      <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
+        <p className="text-sm font-semibold text-ink">Google Review URL</p>
         <input
           type="url"
           value={settings.googleReviewUrl}
           onChange={(e) => setSettings((prev) => ({ ...prev, googleReviewUrl: e.target.value }))}
           placeholder="https://g.page/your-business/review"
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-ink4">
           Find your Google review link in Google Business Profile → Share → Copy link
         </p>
       </div>
 
       {/* Message Template */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Message Template</p>
+      <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
+        <p className="text-sm font-semibold text-ink">Message Template</p>
 
         {/* Merge tag buttons */}
         <div className="flex flex-wrap gap-2">
@@ -227,7 +227,7 @@ export default function ReviewAutomationPage() {
               key={tag}
               type="button"
               onClick={() => insertMergeTag(tag)}
-              className="px-2.5 py-1 text-xs font-mono bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 transition-colors"
+              className="px-2.5 py-1 text-xs font-mono bg-bg2 text-ink3 rounded-md hover:bg-bg3 transition-colors"
             >
               {tag}
             </button>
@@ -249,39 +249,38 @@ export default function ReviewAutomationPage() {
           value={settings.messageTemplate}
           onChange={(e) => setSettings((prev) => ({ ...prev, messageTemplate: e.target.value }))}
           rows={5}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y font-normal"
+          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y font-normal"
           placeholder="Enter your review request message…"
         />
       </div>
 
       {/* Preview */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Preview</p>
-        <div className="px-4 py-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+      <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
+        <p className="text-sm font-semibold text-ink">Preview</p>
+        <div className="px-4 py-3 bg-bg rounded-lg">
+          <p className="text-sm text-ink2 whitespace-pre-wrap leading-relaxed">
             {renderPreview(settings.messageTemplate) || (
-              <span className="text-gray-400 italic">No template entered yet.</span>
+              <span className="text-ink4 italic">No template entered yet.</span>
             )}
           </p>
         </div>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-ink4">
           Showing sample data: Jane Smith, Your Business, https://g.page/...
         </p>
       </div>
 
       {/* Stats */}
-      <div className="rounded-xl border border-gray-100 bg-white p-5">
+      <div className="rounded-xl border border-border-brand bg-white p-5">
         {stats ? (
-          <p className="text-sm text-gray-600">
-            <span className="font-medium text-gray-900">{stats.sent.toLocaleString()}</span> review
+          <p className="text-sm text-ink3">
+            <span className="font-medium text-ink">{stats.sent.toLocaleString()}</span> review
             requests sent ·{' '}
-            <span className="font-medium text-gray-900">{stats.clicked.toLocaleString()}</span>{' '}
-            clicked{' '}
-            <span className="text-gray-400">({stats.clickRate.toFixed(1)}% click rate)</span> — last
-            30 days
+            <span className="font-medium text-ink">{stats.clicked.toLocaleString()}</span> clicked{' '}
+            <span className="text-ink4">({stats.clickRate.toFixed(1)}% click rate)</span> — last 30
+            days
           </p>
         ) : (
-          <p className="text-sm text-gray-400">No stats available yet.</p>
+          <p className="text-sm text-ink4">No stats available yet.</p>
         )}
       </div>
 

@@ -24,7 +24,7 @@ const OUTCOME_BADGES: Record<string, { label: string; bg: string; text: string }
   inquiry_answered: { label: 'Inquiry', bg: 'bg-blue-50', text: 'text-blue-700' },
   escalated: { label: 'Escalated', bg: 'bg-amber-50', text: 'text-amber-700' },
   abandoned: { label: 'Abandoned', bg: 'bg-red-50', text: 'text-red-600' },
-  general: { label: 'General', bg: 'bg-gray-100', text: 'text-gray-600' },
+  general: { label: 'General', bg: 'bg-bg2', text: 'text-ink3' },
 }
 
 function formatPhone(phone: string | null): string {
@@ -166,11 +166,11 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
 
   if (calls.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+      <div className="rounded-xl border border-border-brand bg-white flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
           <span className="text-gray-300 text-xl">◉</span>
         </div>
-        <p className="text-sm font-medium text-gray-400">
+        <p className="text-sm font-medium text-ink4">
           {hasFilters ? 'No calls match your filters' : 'No calls yet'}
         </p>
         <p className="text-xs text-gray-300 mt-1">
@@ -184,7 +184,7 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
 
   return (
     <div>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-ink4 mb-4">
         Showing {calls.length} of {total} calls
       </p>
 
@@ -194,15 +194,15 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
           return (
             <div key={bucket.key}>
               <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h2 className="text-xs font-semibold text-ink3 uppercase tracking-wider">
                   {bucket.label}
                 </h2>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-ink4">
                   · {bucketTotal} call{bucketTotal !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-50">
+              <div className="bg-white rounded-xl border border-border-brand divide-y divide-gray-50">
                 {bucket.groups.map((group) => {
                   const expandKey = `${bucket.key}:${group.groupKey}`
                   const isOpen = expanded.has(expandKey)
@@ -226,17 +226,15 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-ink truncate">
                             {group.displayName}
                           </p>
                           {group.phone && group.displayName !== formatPhone(group.phone) && (
-                            <p className="text-xs text-gray-400 truncate">
-                              {formatPhone(group.phone)}
-                            </p>
+                            <p className="text-xs text-ink4 truncate">{formatPhone(group.phone)}</p>
                           )}
                         </div>
 
-                        <span className="shrink-0 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
+                        <span className="shrink-0 text-xs font-medium text-ink3 bg-bg2 rounded-full px-2 py-0.5">
                           {group.calls.length} call{group.calls.length !== 1 ? 's' : ''}
                         </span>
 
@@ -255,7 +253,7 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                           })}
                         </div>
 
-                        <span className="shrink-0 text-xs text-gray-400">
+                        <span className="shrink-0 text-xs text-ink4">
                           {new Date(group.lastCallAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
@@ -263,7 +261,7 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                         </span>
 
                         <span
-                          className={`shrink-0 text-gray-400 text-lg leading-none transition-transform duration-150 ${
+                          className={`shrink-0 text-ink4 text-lg leading-none transition-transform duration-150 ${
                             isOpen ? 'rotate-90' : ''
                           }`}
                         >
@@ -272,8 +270,8 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                       </button>
 
                       {isOpen && (
-                        <div className="border-t border-gray-100 bg-gray-50/40">
-                          <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] text-[10px] font-medium text-gray-400 uppercase tracking-wide px-6 py-1.5 border-b border-gray-100">
+                        <div className="border-t border-border-brand bg-gray-50/40">
+                          <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] text-[10px] font-medium text-ink4 uppercase tracking-wide px-6 py-1.5 border-b border-border-brand">
                             <span>Date / Time</span>
                             <span className="w-28 text-center">Outcome</span>
                             <span className="w-14 text-right">Duration</span>
@@ -297,12 +295,12 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                                   href={`/calls/${call.id}`}
                                   className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center px-6 py-2.5 hover:bg-gray-100/60 transition-colors"
                                 >
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-ink3">
                                     {new Date(call.started_at).toLocaleDateString('en-US', {
                                       month: 'short',
                                       day: 'numeric',
                                     })}{' '}
-                                    <span className="text-gray-400">
+                                    <span className="text-ink4">
                                       {new Date(call.started_at).toLocaleTimeString('en-US', {
                                         hour: 'numeric',
                                         minute: '2-digit',
@@ -315,16 +313,16 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                                   >
                                     {badge!.label}
                                   </span>
-                                  <span className="w-14 text-right text-xs text-gray-500">
+                                  <span className="w-14 text-right text-xs text-ink3">
                                     {formatDuration(call.duration_seconds)}
                                   </span>
-                                  <span className="w-8 text-right text-xs text-gray-400 uppercase">
+                                  <span className="w-8 text-right text-xs text-ink4 uppercase">
                                     {call.language_detected ?? '--'}
                                   </span>
-                                  <span className="w-14 text-right text-xs text-gray-400">
+                                  <span className="w-14 text-right text-xs text-ink4">
                                     {formatLatency(call.first_response_ms)}
                                   </span>
-                                  <span className="w-12 text-right text-xs text-gray-400">
+                                  <span className="w-12 text-right text-xs text-ink4">
                                     {call.call_quality_mos != null
                                       ? Number(call.call_quality_mos).toFixed(2)
                                       : '--'}

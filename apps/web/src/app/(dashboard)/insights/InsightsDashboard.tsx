@@ -135,12 +135,23 @@ interface FunnelStage {
   drop_off_pct: number
 }
 
+const CHART_COLORS = [
+  '#0d9488', // teal (Maya/primary)
+  '#6366f1', // indigo (CRM)
+  '#f59e0b', // amber (Automation)
+  '#10b981', // emerald (Scheduling)
+  '#8b5cf6', // violet (Pipeline)
+  '#ef4444', // red (CPQ)
+  '#0ea5e9', // sky (Inventory)
+  '#f97316', // orange (Staff/Insights)
+]
+
 const OUTCOME_COLORS: Record<string, string> = {
   booking_made: '#10b981',
-  inquiry_answered: '#3b82f6',
+  inquiry_answered: '#6366f1',
   escalated: '#f59e0b',
   abandoned: '#ef4444',
-  general: '#9ca3af',
+  general: '#a8a29a',
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -159,8 +170,8 @@ const LANG_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 }
 
-const LANG_COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ef4444', '#9ca3af']
-const SOURCE_COLORS = ['#0d9488', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#9ca3af']
+const LANG_COLORS = CHART_COLORS
+const SOURCE_COLORS = CHART_COLORS
 
 function StatCard({
   label,
@@ -174,25 +185,16 @@ function StatCard({
   color?: string
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color ?? 'text-gray-900'}`}>{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 mt-1">{sub}</p>}
+    <div className="bg-white rounded-xl border border-border-brand p-4">
+      <p className="text-xs text-ink4 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color ?? 'text-ink'}`}>{value}</p>
+      {sub && <p className="text-[11px] text-ink4 mt-1">{sub}</p>}
     </div>
   )
 }
 
-const FUNNEL_COLORS = ['#9ca3af', '#3b82f6', '#f59e0b', '#10b981']
-const STAGE_COLORS = [
-  '#6366f1',
-  '#3b82f6',
-  '#0d9488',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-]
+const FUNNEL_COLORS = ['#a8a29a', '#6366f1', '#f59e0b', '#10b981']
+const STAGE_COLORS = CHART_COLORS
 
 function formatCurrency(value: number): string {
   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
@@ -525,7 +527,7 @@ export default function InsightsDashboard({
         : stats.avgLatency < 2000
           ? 'text-amber-600'
           : 'text-red-600'
-      : 'text-gray-400'
+      : 'text-ink4'
   const mosLabel =
     stats.avgMos != null
       ? stats.avgMos >= 4.0
@@ -571,17 +573,6 @@ export default function InsightsDashboard({
   interface ReportDataRow {
     [key: string]: string | number | null
   }
-
-  const CHART_COLORS = [
-    '#3b82f6',
-    '#22c55e',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#f97316',
-  ]
 
   const [pinnedReports, setPinnedReports] = useState<PinnedReport[]>([])
   const [pinnedReportData, setPinnedReportData] = useState<Record<string, ReportDataRow[]>>({})
@@ -698,8 +689,8 @@ export default function InsightsDashboard({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Insights</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Last 30 days performance</p>
+        <h1 className="text-xl font-bold text-ink">Insights</h1>
+        <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
       </div>
 
       {/* Section 1: Call Performance Stats */}
@@ -729,10 +720,10 @@ export default function InsightsDashboard({
       </div>
 
       {/* Section 2: Call Volume Chart */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Call Volume</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Call Volume</h2>
         {stats.dailyVolume.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">No call data yet</p>
+          <p className="text-sm text-ink4 py-8 text-center">No call data yet</p>
         ) : (
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={stats.dailyVolume}>
@@ -743,7 +734,7 @@ export default function InsightsDashboard({
               <Line
                 type="monotone"
                 dataKey="calls"
-                stroke="#3b82f6"
+                stroke="#0d9488"
                 strokeWidth={2}
                 dot={false}
                 name="Calls"
@@ -764,10 +755,10 @@ export default function InsightsDashboard({
 
       {/* Section 3: Outcomes + Peak Hours */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Call Outcomes</h2>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Call Outcomes</h2>
           {stats.outcomeData.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+            <p className="text-sm text-ink4 py-8 text-center">No data</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -790,25 +781,25 @@ export default function InsightsDashboard({
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Peak Hours</h2>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Peak Hours</h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={stats.peakHours}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
               <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="calls" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="calls" fill="#0d9488" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Section 4: Pipeline Funnel */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Pipeline Distribution</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Pipeline Distribution</h2>
         {stats.stageDistribution.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">No pipeline data</p>
+          <p className="text-sm text-ink4 py-8 text-center">No pipeline data</p>
         ) : (
           <>
             <ResponsiveContainer width="100%" height={200}>
@@ -831,7 +822,7 @@ export default function InsightsDashboard({
                 <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+            <div className="flex items-center gap-4 mt-3 text-xs text-ink3">
               <span>
                 Conversion rate:{' '}
                 <strong className="text-teal-600">
@@ -906,20 +897,20 @@ export default function InsightsDashboard({
       </div>
 
       {/* Section 5b: Revenue Forecast */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">Revenue Forecast</h2>
-        <p className="text-xs text-gray-400 mb-4">Based on current booking trends</p>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-2">Revenue Forecast</h2>
+        <p className="text-xs text-ink4 mb-4">Based on current booking trends</p>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <p className="text-xs text-gray-400">Projected Monthly Bookings</p>
-            <p className="text-xl font-bold text-gray-900">{stats.projectedMonthlyBookings}</p>
+            <p className="text-xs text-ink4">Projected Monthly Bookings</p>
+            <p className="text-xl font-bold text-ink">{stats.projectedMonthlyBookings}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Avg Appointment Value</p>
-            <p className="text-xl font-bold text-gray-900">${stats.avgApptValue}</p>
+            <p className="text-xs text-ink4">Avg Appointment Value</p>
+            <p className="text-xl font-bold text-ink">${stats.avgApptValue}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Projected Monthly Revenue</p>
+            <p className="text-xs text-ink4">Projected Monthly Revenue</p>
             <p className="text-xl font-bold text-teal-600">
               ${stats.projectedRevenue.toLocaleString()}
             </p>
@@ -933,10 +924,10 @@ export default function InsightsDashboard({
 
       {/* Section 6: Language + Source */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Languages</h2>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Languages</h2>
           {stats.langData.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+            <p className="text-sm text-ink4 py-8 text-center">No data</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -958,10 +949,10 @@ export default function InsightsDashboard({
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Contact Sources</h2>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Contact Sources</h2>
           {stats.sourceData.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+            <p className="text-sm text-ink4 py-8 text-center">No data</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -985,28 +976,28 @@ export default function InsightsDashboard({
       </div>
 
       {/* Section 7: Follow-up Performance */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Follow-up Performance</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Follow-up Performance</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <p className="text-xs text-gray-400">Active Sequences</p>
-            <p className="text-lg font-bold text-gray-900">{stats.activeSeq}</p>
+            <p className="text-xs text-ink4">Active Sequences</p>
+            <p className="text-lg font-bold text-ink">{stats.activeSeq}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Completed</p>
-            <p className="text-lg font-bold text-gray-900">{stats.completedSeq}</p>
+            <p className="text-xs text-ink4">Completed</p>
+            <p className="text-lg font-bold text-ink">{stats.completedSeq}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Step 1</p>
-            <p className="text-lg font-bold text-gray-900">{stats.stepDist['step_1']}</p>
+            <p className="text-xs text-ink4">Step 1</p>
+            <p className="text-lg font-bold text-ink">{stats.stepDist['step_1']}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Step 2</p>
-            <p className="text-lg font-bold text-gray-900">{stats.stepDist['step_2']}</p>
+            <p className="text-xs text-ink4">Step 2</p>
+            <p className="text-lg font-bold text-ink">{stats.stepDist['step_2']}</p>
           </div>
         </div>
         {/* Horizontal stacked bar */}
-        <div className="h-4 rounded-full bg-gray-100 overflow-hidden flex">
+        <div className="h-4 rounded-full bg-bg2 overflow-hidden flex">
           {stats.stepDist['step_1']! > 0 && (
             <div
               className="bg-blue-400 h-full"
@@ -1035,7 +1026,7 @@ export default function InsightsDashboard({
             />
           )}
         </div>
-        <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400">
+        <div className="flex items-center gap-4 mt-2 text-[10px] text-ink4">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Step 1
           </span>
@@ -1049,40 +1040,40 @@ export default function InsightsDashboard({
       </div>
 
       {/* Section 8: Quote Performance */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Quote Performance</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Quote Performance</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div>
-            <p className="text-xs text-gray-400">Total Quotes</p>
-            <p className="text-lg font-bold text-gray-900">{stats.totalQuotes}</p>
+            <p className="text-xs text-ink4">Total Quotes</p>
+            <p className="text-lg font-bold text-ink">{stats.totalQuotes}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Win Rate</p>
+            <p className="text-xs text-ink4">Win Rate</p>
             <p
-              className={`text-lg font-bold ${stats.winRate > 50 ? 'text-green-600' : stats.winRate < 30 ? 'text-red-600' : 'text-gray-900'}`}
+              className={`text-lg font-bold ${stats.winRate > 50 ? 'text-green-600' : stats.winRate < 30 ? 'text-red-600' : 'text-ink'}`}
             >
               {stats.winRate}%
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Open Rate</p>
+            <p className="text-xs text-ink4">Open Rate</p>
             <p
               className={`text-lg font-bold ${stats.quoteOpenRate > 70 ? 'text-green-600' : stats.quoteOpenRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}
             >
               {stats.quoteOpenRate}%
             </p>
             {stats.avgTimeToFirstViewHours != null && (
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-[11px] text-ink4 mt-0.5">
                 Avg time to open: {stats.avgTimeToFirstViewHours}h
               </p>
             )}
           </div>
           <div>
-            <p className="text-xs text-gray-400">Avg Deal Size</p>
-            <p className="text-lg font-bold text-gray-900">${stats.avgDealSize.toLocaleString()}</p>
+            <p className="text-xs text-ink4">Avg Deal Size</p>
+            <p className="text-lg font-bold text-ink">${stats.avgDealSize.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Revenue Won</p>
+            <p className="text-xs text-ink4">Revenue Won</p>
             <p className="text-lg font-bold text-teal-600">${stats.totalRevWon.toLocaleString()}</p>
           </div>
         </div>
@@ -1090,7 +1081,7 @@ export default function InsightsDashboard({
         {/* Quote funnel */}
         {stats.totalQuotes > 0 && (
           <div className="mb-6">
-            <p className="text-xs text-gray-400 mb-2">Quote Funnel</p>
+            <p className="text-xs text-ink4 mb-2">Quote Funnel</p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={stats.funnelData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1115,7 +1106,7 @@ export default function InsightsDashboard({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400">
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-ink4">
               {stats.funnelData.slice(1).map((stage, i) => {
                 const prev = stats.funnelData[i]!.count
                 const pct = prev > 0 ? ((stage.count / prev) * 100).toFixed(0) : '0'
@@ -1132,7 +1123,7 @@ export default function InsightsDashboard({
         {/* Quote volume trend */}
         {stats.quoteTrend.length > 0 && (
           <div className="mb-6">
-            <p className="text-xs text-gray-400 mb-2">Quote Volume</p>
+            <p className="text-xs text-ink4 mb-2">Quote Volume</p>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={stats.quoteTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1142,7 +1133,7 @@ export default function InsightsDashboard({
                 <Line
                   type="monotone"
                   dataKey="created"
-                  stroke="#3b82f6"
+                  stroke="#0d9488"
                   strokeWidth={2}
                   dot={false}
                   name="Created"
@@ -1163,7 +1154,7 @@ export default function InsightsDashboard({
 
         {/* Top Packages */}
         <div className="mb-6">
-          <p className="text-xs text-gray-400 mb-2">Top Packages</p>
+          <p className="text-xs text-ink4 mb-2">Top Packages</p>
           {stats.topPackages.length === 0 ? (
             <p className="text-sm text-gray-300 text-center py-4">
               No packages added to quotes yet
@@ -1176,13 +1167,13 @@ export default function InsightsDashboard({
                   className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 w-4">{i + 1}.</span>
-                    <span className="text-sm text-gray-900">{pkg.package_name}</span>
+                    <span className="text-xs text-ink4 w-4">{i + 1}.</span>
+                    <span className="text-sm text-ink">{pkg.package_name}</span>
                     <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
                       {pkg.vertical}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 text-xs text-ink3">
                     <span>{pkg.quote_count} quotes</span>
                     <span>${pkg.total_revenue.toLocaleString()}</span>
                     <span className={pkg.win_rate > 50 ? 'text-green-600' : ''}>
@@ -1215,13 +1206,13 @@ export default function InsightsDashboard({
           {/* Header + pipeline selector */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Pipeline Forecast</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Deal pipeline revenue projections</p>
+              <h2 className="text-base font-semibold text-ink">Pipeline Forecast</h2>
+              <p className="text-xs text-ink4 mt-0.5">Deal pipeline revenue projections</p>
             </div>
             <select
               value={selectedPipelineId}
               onChange={(e) => setSelectedPipelineId(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="text-sm border border-border-brand rounded-lg px-3 py-1.5 text-ink2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1232,8 +1223,8 @@ export default function InsightsDashboard({
           </div>
 
           {forecastLoading ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-              <p className="text-sm text-gray-400">Loading forecast...</p>
+            <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+              <p className="text-sm text-ink4">Loading forecast...</p>
             </div>
           ) : forecastData ? (
             <>
@@ -1258,7 +1249,7 @@ export default function InsightsDashboard({
                       ? 'text-green-600'
                       : forecastData.summary.win_rate < 30
                         ? 'text-red-600'
-                        : 'text-gray-900'
+                        : 'text-ink'
                   }
                 />
                 <StatCard
@@ -1292,8 +1283,8 @@ export default function InsightsDashboard({
 
               {/* Monthly Forecast Bar Chart */}
               {monthlyForecast.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">
+                <div className="bg-white rounded-xl border border-border-brand p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-4">
                     Monthly Forecast (next 3 months)
                   </h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -1324,8 +1315,8 @@ export default function InsightsDashboard({
 
               {/* Pipeline Funnel */}
               {funnelData.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Pipeline Funnel</h3>
+                <div className="bg-white rounded-xl border border-border-brand p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-4">Pipeline Funnel</h3>
                   <ResponsiveContainer width="100%" height={Math.max(160, funnelData.length * 44)}>
                     <BarChart data={funnelData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1351,7 +1342,7 @@ export default function InsightsDashboard({
                     </BarChart>
                   </ResponsiveContainer>
                   {/* Drop-off annotations */}
-                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-gray-400">
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-ink4">
                     {funnelData.slice(1).map((stage, i) => (
                       <span key={stage.stage}>
                         {funnelData[i]!.stage} → {stage.stage}:{' '}
@@ -1363,8 +1354,8 @@ export default function InsightsDashboard({
               )}
             </>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-              <p className="text-sm text-gray-400">No forecast data available</p>
+            <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+              <p className="text-sm text-ink4">No forecast data available</p>
             </div>
           )}
         </div>
@@ -1374,7 +1365,7 @@ export default function InsightsDashboard({
       {pinnedReports.length > 0 ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Custom Reports</h2>
+            <h2 className="text-base font-semibold text-ink">Custom Reports</h2>
             <a href="/reports" className="text-sm text-teal-600 hover:text-teal-700 font-medium">
               Manage Reports →
             </a>
@@ -1389,7 +1380,7 @@ export default function InsightsDashboard({
               return (
                 <div
                   key={report.id}
-                  className="bg-white rounded-xl border border-gray-100 p-5 cursor-pointer hover:border-teal-200 hover:shadow-sm transition-all relative group"
+                  className="bg-white rounded-xl border border-border-brand p-5 cursor-pointer hover:border-teal-200 hover:shadow-sm transition-all relative group"
                   onClick={() => router.push(`/reports/${report.id}`)}
                 >
                   {/* Reorder buttons */}
@@ -1400,7 +1391,7 @@ export default function InsightsDashboard({
                     <button
                       disabled={idx === 0}
                       onClick={() => handleReorder(report.id, 'up')}
-                      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                      className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
                       title="Move up"
                     >
                       ↑
@@ -1408,14 +1399,14 @@ export default function InsightsDashboard({
                     <button
                       disabled={idx === pinnedReports.length - 1}
                       onClick={() => handleReorder(report.id, 'down')}
-                      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                      className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
                       title="Move down"
                     >
                       ↓
                     </button>
                   </div>
 
-                  <p className="text-sm font-semibold text-gray-900 mb-3 pr-8">{report.name}</p>
+                  <p className="text-sm font-semibold text-ink mb-3 pr-8">{report.name}</p>
 
                   {data.length === 0 ? (
                     <p className="text-xs text-gray-300 py-8 text-center">No data</p>
@@ -1472,7 +1463,7 @@ export default function InsightsDashboard({
                     </ResponsiveContainer>
                   ) : report.chart_type === 'number' ? (
                     <div className="flex items-center justify-center h-[200px]">
-                      <p className="text-5xl font-bold text-gray-900">
+                      <p className="text-5xl font-bold text-ink">
                         {String(data[0]?.[valueKey] ?? '--')}
                       </p>
                     </div>
@@ -1480,12 +1471,9 @@ export default function InsightsDashboard({
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-gray-100">
+                          <tr className="border-b border-border-brand">
                             {keys.map((k) => (
-                              <th
-                                key={k}
-                                className="text-left text-gray-400 font-medium py-1.5 pr-3"
-                              >
+                              <th key={k} className="text-left text-ink4 font-medium py-1.5 pr-3">
                                 {k}
                               </th>
                             ))}
@@ -1495,7 +1483,7 @@ export default function InsightsDashboard({
                           {data.slice(0, 3).map((row, i) => (
                             <tr key={i} className="border-b border-gray-50 last:border-0">
                               {keys.map((k) => (
-                                <td key={k} className="py-1.5 pr-3 text-gray-700">
+                                <td key={k} className="py-1.5 pr-3 text-ink2">
                                   {String(row[k] ?? '')}
                                 </td>
                               ))}
@@ -1511,7 +1499,7 @@ export default function InsightsDashboard({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-400 text-center py-4">
+        <p className="text-sm text-ink4 text-center py-4">
           <a href="/reports" className="hover:text-teal-600 transition-colors">
             Pin custom reports to see them here →
           </a>
@@ -1520,12 +1508,12 @@ export default function InsightsDashboard({
 
       {/* Section 10: Territory Performance */}
       {!territoryLoading && hasTerritoryData && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Territory Performance</h2>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Territory Performance</h2>
 
           {/* Bar chart: contacts by territory */}
           <div className="mb-6">
-            <p className="text-xs text-gray-400 mb-2">Contacts by Territory</p>
+            <p className="text-xs text-ink4 mb-2">Contacts by Territory</p>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={territoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1557,19 +1545,19 @@ export default function InsightsDashboard({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-gray-400 font-medium py-2 pr-4">Territory</th>
-                  <th className="text-right text-gray-400 font-medium py-2 pr-4">Contacts</th>
-                  <th className="text-right text-gray-400 font-medium py-2 pr-4">Customers</th>
-                  <th className="text-right text-gray-400 font-medium py-2">Conversion</th>
+                <tr className="border-b border-border-brand">
+                  <th className="text-left text-ink4 font-medium py-2 pr-4">Territory</th>
+                  <th className="text-right text-ink4 font-medium py-2 pr-4">Contacts</th>
+                  <th className="text-right text-ink4 font-medium py-2 pr-4">Customers</th>
+                  <th className="text-right text-ink4 font-medium py-2">Conversion</th>
                 </tr>
               </thead>
               <tbody>
                 {territoryData.map((row) => (
                   <tr key={row.territory} className="border-b border-gray-50 last:border-0">
-                    <td className="py-2 pr-4 text-gray-900 font-medium">{row.territory}</td>
-                    <td className="py-2 pr-4 text-right text-gray-600">{row.contacts_count}</td>
-                    <td className="py-2 pr-4 text-right text-gray-600">{row.customers_count}</td>
+                    <td className="py-2 pr-4 text-ink font-medium">{row.territory}</td>
+                    <td className="py-2 pr-4 text-right text-ink3">{row.contacts_count}</td>
+                    <td className="py-2 pr-4 text-right text-ink3">{row.customers_count}</td>
                     <td className="py-2 text-right">
                       <span
                         className={
@@ -1577,7 +1565,7 @@ export default function InsightsDashboard({
                             ? 'text-green-600 font-medium'
                             : row.conversion_rate >= 25
                               ? 'text-amber-600'
-                              : 'text-gray-500'
+                              : 'text-ink3'
                         }
                       >
                         {row.conversion_rate.toFixed(1)}%

@@ -46,7 +46,7 @@ const OUTCOME_BADGES: Record<string, { label: string; bg: string; text: string }
   inquiry_answered: { label: 'Inquiry', bg: 'bg-blue-50', text: 'text-blue-700' },
   escalated: { label: 'Escalated', bg: 'bg-amber-50', text: 'text-amber-700' },
   abandoned: { label: 'Abandoned', bg: 'bg-red-50', text: 'text-red-600' },
-  general: { label: 'General', bg: 'bg-gray-100', text: 'text-gray-600' },
+  general: { label: 'General', bg: 'bg-bg2', text: 'text-ink3' },
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -113,7 +113,7 @@ export default async function CallDetailPage({ params }: Props) {
       {/* Back link */}
       <Link
         href="/calls"
-        className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-6"
+        className="inline-flex items-center gap-1 text-sm text-ink4 hover:text-ink3 transition-colors mb-6"
       >
         <span>&larr;</span> Back to Call Log
       </Link>
@@ -130,7 +130,7 @@ export default async function CallDetailPage({ params }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-ink">
                 {call.contacts?.full_name || call.caller_name || formatPhone(call.caller_phone)}
               </h1>
               <span
@@ -140,9 +140,9 @@ export default async function CallDetailPage({ params }: Props) {
               </span>
             </div>
             {(call.contacts?.full_name || call.caller_name) && (
-              <p className="text-sm text-gray-500 mt-0.5">{formatPhone(call.caller_phone)}</p>
+              <p className="text-sm text-ink3 mt-0.5">{formatPhone(call.caller_phone)}</p>
             )}
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-ink4 mt-1">
               {new Date(call.started_at).toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'long',
@@ -164,29 +164,27 @@ export default async function CallDetailPage({ params }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Duration</p>
-          <p className="text-lg font-semibold text-gray-900">
-            {formatDuration(call.duration_seconds)}
-          </p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Duration</p>
+          <p className="text-lg font-semibold text-ink">{formatDuration(call.duration_seconds)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">First Response</p>
-          <p className="text-lg font-semibold text-gray-900">
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">First Response</p>
+          <p className="text-lg font-semibold text-ink">
             {call.first_response_ms != null ? `${call.first_response_ms}ms` : '--'}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Language</p>
-          <p className="text-lg font-semibold text-gray-900">
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Language</p>
+          <p className="text-lg font-semibold text-ink">
             {call.language_detected
               ? (LANG_NAMES[call.language_detected] ?? call.language_detected.toUpperCase())
               : '--'}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Call Quality</p>
-          <p className="text-lg font-semibold text-gray-900">
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Call Quality</p>
+          <p className="text-lg font-semibold text-ink">
             {call.call_quality_mos != null
               ? `${Number(call.call_quality_mos).toFixed(2)} MOS`
               : '--'}
@@ -195,25 +193,23 @@ export default async function CallDetailPage({ params }: Props) {
       </div>
 
       {/* Tool calls timeline */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Tool Calls</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6 mb-8">
+        <h2 className="text-sm font-semibold text-ink mb-4">Tool Calls</h2>
         {toolCalls.length === 0 ? (
-          <p className="text-sm text-gray-400">No tool calls during this session</p>
+          <p className="text-sm text-ink4">No tool calls during this session</p>
         ) : (
           <div className="space-y-0">
             {toolCalls.map((tc, i) => (
               <div key={i} className="flex items-start gap-3 relative">
                 {/* Vertical line */}
                 {i < toolCalls.length - 1 && (
-                  <div className="absolute left-[7px] top-4 w-px h-full bg-gray-100" />
+                  <div className="absolute left-[7px] top-4 w-px h-full bg-bg2" />
                 )}
                 {/* Dot */}
                 <div className="w-[15px] h-[15px] rounded-full border-2 border-teal-500 bg-white shrink-0 mt-0.5 relative z-10" />
                 <div className="pb-4 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {TOOL_LABELS[tc.name] ?? tc.name}
-                  </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-sm font-medium text-ink">{TOOL_LABELS[tc.name] ?? tc.name}</p>
+                  <p className="text-xs text-ink4">
                     {new Date(tc.timestamp).toLocaleTimeString('en-US', {
                       hour: 'numeric',
                       minute: '2-digit',
@@ -229,7 +225,7 @@ export default async function CallDetailPage({ params }: Props) {
 
         {/* Booking / escalation details */}
         {call.booked_appointment && call.appointment_id && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-border-brand">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
                 Appointment Booked
@@ -244,84 +240,82 @@ export default async function CallDetailPage({ params }: Props) {
           </div>
         )}
         {call.escalated && call.escalation_reason && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-border-brand">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700">
                 Escalated
               </span>
-              <span className="text-xs text-gray-500">{call.escalation_reason}</span>
+              <span className="text-xs text-ink3">{call.escalation_reason}</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Call Recording */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">Call Recording</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6 mb-8">
+        <h2 className="text-sm font-semibold text-ink mb-2">Call Recording</h2>
         {call.recording_url ? (
           <div>
             <audio controls src={call.recording_url} className="w-full" />
             {call.recording_duration_seconds != null && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink4 mt-1">
                 Duration: {Math.floor(call.recording_duration_seconds / 60)}m{' '}
                 {call.recording_duration_seconds % 60}s
               </p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-gray-400">Recording not available</p>
+          <p className="text-sm text-ink4">Recording not available</p>
         )}
       </div>
 
       {/* Transcript */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">Transcript</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6 mb-8">
+        <h2 className="text-sm font-semibold text-ink mb-2">Transcript</h2>
         {call.transcript ? (
-          <pre className="text-sm text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">
+          <pre className="text-sm text-ink3 whitespace-pre-wrap font-sans leading-relaxed">
             {call.transcript}
           </pre>
         ) : call.recording_url ? (
-          <p className="text-sm text-gray-400">Transcript processing&hellip;</p>
+          <p className="text-sm text-ink4">Transcript processing&hellip;</p>
         ) : (
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-ink4">
             No recording or transcript available &mdash; audio-only mode
           </p>
         )}
       </div>
 
       {/* Call metadata */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Call Metadata</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Call Metadata</h2>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
           <div>
-            <dt className="text-xs text-gray-400">Stream ID</dt>
-            <dd className="text-sm text-gray-600 font-mono truncate">{call.stream_id ?? '--'}</dd>
+            <dt className="text-xs text-ink4">Stream ID</dt>
+            <dd className="text-sm text-ink3 font-mono truncate">{call.stream_id ?? '--'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-400">Call Control ID</dt>
-            <dd className="text-sm text-gray-600 font-mono truncate">
-              {call.call_control_id ?? '--'}
-            </dd>
+            <dt className="text-xs text-ink4">Call Control ID</dt>
+            <dd className="text-sm text-ink3 font-mono truncate">{call.call_control_id ?? '--'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-400">Hangup Source</dt>
-            <dd className="text-sm text-gray-600">{call.hangup_source ?? '--'}</dd>
+            <dt className="text-xs text-ink4">Hangup Source</dt>
+            <dd className="text-sm text-ink3">{call.hangup_source ?? '--'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-400">Hangup Cause</dt>
-            <dd className="text-sm text-gray-600">{call.hangup_cause ?? '--'}</dd>
+            <dt className="text-xs text-ink4">Hangup Cause</dt>
+            <dd className="text-sm text-ink3">{call.hangup_cause ?? '--'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-400">Direction</dt>
-            <dd className="text-sm text-gray-600 capitalize">{call.direction ?? '--'}</dd>
+            <dt className="text-xs text-ink4">Direction</dt>
+            <dd className="text-sm text-ink3 capitalize">{call.direction ?? '--'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-400">Status</dt>
-            <dd className="text-sm text-gray-600 capitalize">{call.status ?? '--'}</dd>
+            <dt className="text-xs text-ink4">Status</dt>
+            <dd className="text-sm text-ink3 capitalize">{call.status ?? '--'}</dd>
           </div>
           {call.contact_id && (
             <div>
-              <dt className="text-xs text-gray-400">Contact</dt>
+              <dt className="text-xs text-ink4">Contact</dt>
               <dd>
                 <Link
                   href="/contacts"
@@ -334,7 +328,7 @@ export default async function CallDetailPage({ params }: Props) {
           )}
           {call.appointment_id && (
             <div>
-              <dt className="text-xs text-gray-400">Appointment</dt>
+              <dt className="text-xs text-ink4">Appointment</dt>
               <dd>
                 <Link
                   href="/appointments"

@@ -44,7 +44,7 @@ export default function CallFilters({ outcome, fromDate, toDate, hasFilters }: P
       <select
         value={outcome ?? ''}
         onChange={(e) => router.push(buildUrl({ outcome: e.target.value || null }))}
-        className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
       >
         {OUTCOMES.map((o) => (
           <option key={o.value} value={o.value}>
@@ -58,7 +58,7 @@ export default function CallFilters({ outcome, fromDate, toDate, hasFilters }: P
         value={fromDate ?? ''}
         onChange={(e) => router.push(buildUrl({ from_date: e.target.value || null }))}
         placeholder="From date"
-        className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
       />
 
       <input
@@ -66,7 +66,7 @@ export default function CallFilters({ outcome, fromDate, toDate, hasFilters }: P
         value={toDate ?? ''}
         onChange={(e) => router.push(buildUrl({ to_date: e.target.value || null }))}
         placeholder="To date"
-        className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
       />
 
       {hasFilters && (

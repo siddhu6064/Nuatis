@@ -20,10 +20,10 @@ function SubmitButton() {
 export default function AddContactForm() {
   return (
     <div className="max-w-lg">
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
         <form action={createContact} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-ink2 mb-1.5">
               Full Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -32,27 +32,27 @@ export default function AddContactForm() {
               required
               autoFocus
               placeholder="Jane Smith"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Email</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Email</label>
             <input
               name="email"
               type="email"
               placeholder="jane@example.com"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Phone</label>
             <input
               name="phone"
               type="tel"
               placeholder="(555) 000-0000"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
           </div>
 
@@ -60,7 +60,7 @@ export default function AddContactForm() {
             <SubmitButton />
             <Link
               href="/contacts"
-              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="px-4 py-2 text-sm text-ink3 hover:text-ink2 transition-colors"
             >
               Cancel
             </Link>

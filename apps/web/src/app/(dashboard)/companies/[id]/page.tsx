@@ -7,7 +7,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="px-8 py-8 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/companies" className="text-gray-400 hover:text-gray-600 text-sm">
+        <Link href="/companies" className="text-ink4 hover:text-ink3 text-sm">
           &larr; Companies
         </Link>
       </div>

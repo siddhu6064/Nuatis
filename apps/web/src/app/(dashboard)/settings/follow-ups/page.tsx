@@ -21,8 +21,8 @@ export default async function FollowUpsPage() {
   return (
     <div className="px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900">Follow-up Templates</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Configured for: {verticalLabel}</p>
+        <h1 className="text-xl font-bold text-ink">Follow-up Templates</h1>
+        <p className="text-sm text-ink3 mt-0.5">Configured for: {verticalLabel}</p>
       </div>
 
       <FollowUpEditor

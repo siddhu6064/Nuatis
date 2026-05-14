@@ -40,7 +40,7 @@ interface DistributionStats {
 
 const GRADE_COLORS: Record<string, string> = {
   A: '#16a34a',
-  B: '#2563eb',
+  B: '#0d9488',
   C: '#ca8a04',
   D: '#ea580c',
   F: '#dc2626',
@@ -107,14 +107,14 @@ function AddRuleModal({ onClose, onSave, authHeaders }: AddRuleModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-5">Add Custom Rule</h2>
+        <h2 className="text-base font-semibold text-ink mb-5">Add Custom Rule</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-sm font-medium text-ink2 mb-1">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as Category)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -125,41 +125,41 @@ function AddRuleModal({ onClose, onSave, authHeaders }: AddRuleModalProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
+            <label className="block text-sm font-medium text-ink2 mb-1">Label</label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. Attended Webinar"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             {ruleKey && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink4 mt-1">
                 Key: <span className="font-mono">{ruleKey}</span>
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
+            <label className="block text-sm font-medium text-ink2 mb-1">Points</label>
             <input
               type="number"
               value={points}
               onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
-              className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description <span className="text-gray-400 font-normal">(optional)</span>
+            <label className="block text-sm font-medium text-ink2 mb-1">
+              Description <span className="text-ink4 font-normal">(optional)</span>
             </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="When does this rule apply?"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -169,7 +169,7 @@ function AddRuleModal({ onClose, onSave, authHeaders }: AddRuleModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm text-ink3 border border-border-brand rounded-lg hover:bg-bg"
             >
               Cancel
             </button>
@@ -255,7 +255,7 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
         aria-checked={rule.active}
         onClick={() => void handleToggle()}
         className={`mt-0.5 relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 ${
-          rule.active ? 'bg-teal-600' : 'bg-gray-200'
+          rule.active ? 'bg-teal-600' : 'bg-bg3'
         }`}
       >
         <span
@@ -267,8 +267,8 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
 
       {/* Label + description */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{rule.label}</p>
-        {rule.description && <p className="text-xs text-gray-400 mt-0.5">{rule.description}</p>}
+        <p className="text-sm font-medium text-ink">{rule.label}</p>
+        {rule.description && <p className="text-xs text-ink4 mt-0.5">{rule.description}</p>}
       </div>
 
       {/* Points */}
@@ -277,10 +277,10 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
         value={points}
         onChange={(e) => handlePointsChange(parseInt(e.target.value) || 0)}
         onBlur={() => void savePoints(points)}
-        className="w-20 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        className="w-20 px-2 py-1 text-sm text-right border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         title="Points"
       />
-      <span className="text-xs text-gray-400 self-center">pts</span>
+      <span className="text-xs text-ink4 self-center">pts</span>
 
       {/* Delete (custom rules only) */}
       {rule.is_custom && (
@@ -400,7 +400,7 @@ export default function LeadScoringSettingsPage() {
   if (loading) {
     return (
       <div className="px-8 py-8 max-w-3xl">
-        <p className="text-sm text-gray-400">Loading lead scoring settings...</p>
+        <p className="text-sm text-ink4">Loading lead scoring settings...</p>
       </div>
     )
   }
@@ -419,34 +419,34 @@ export default function LeadScoringSettingsPage() {
     <div className="px-8 py-8 max-w-3xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Lead Scoring</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-ink mb-1">Lead Scoring</h1>
+        <p className="text-sm text-ink3">
           Configure how contacts are scored and graded automatically.
         </p>
       </div>
 
       {/* Score Distribution */}
-      <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
-        <p className="text-sm font-semibold text-gray-900">Score Distribution</p>
+      <div className="rounded-xl border border-border-brand bg-white p-6 space-y-4">
+        <p className="text-sm font-semibold text-ink">Score Distribution</p>
 
         {/* Summary stats */}
         {stats && (
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-gray-900">{stats.total.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Total Contacts</p>
+            <div className="bg-bg rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-ink">{stats.total.toLocaleString()}</p>
+              <p className="text-xs text-ink3 mt-0.5">Total Contacts</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-gray-900">
+            <div className="bg-bg rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-ink">
                 {typeof stats.average === 'number' ? stats.average.toFixed(1) : '—'}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Average Score</p>
+              <p className="text-xs text-ink3 mt-0.5">Average Score</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-gray-900">
+            <div className="bg-bg rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-ink">
                 {typeof stats.median === 'number' ? stats.median : '—'}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Median Score</p>
+              <p className="text-xs text-ink3 mt-0.5">Median Score</p>
             </div>
           </div>
         )}
@@ -472,7 +472,7 @@ export default function LeadScoringSettingsPage() {
         {/* Grade legend */}
         <div className="flex items-center gap-4 flex-wrap">
           {(['A', 'B', 'C', 'D', 'F'] as const).map((g) => (
-            <span key={g} className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span key={g} className="flex items-center gap-1.5 text-xs text-ink3">
               <span
                 className="inline-block w-3 h-3 rounded-sm"
                 style={{ backgroundColor: GRADE_COLORS[g] }}
@@ -484,9 +484,9 @@ export default function LeadScoringSettingsPage() {
       </div>
 
       {/* Rules Editor */}
-      <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
+      <div className="rounded-xl border border-border-brand bg-white p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-gray-900">Scoring Rules</p>
+          <p className="text-sm font-semibold text-ink">Scoring Rules</p>
           <button
             onClick={() => setShowAddModal(true)}
             className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
@@ -496,7 +496,7 @@ export default function LeadScoringSettingsPage() {
         </div>
 
         {/* Category tabs */}
-        <div className="flex items-center gap-1 border-b border-gray-100">
+        <div className="flex items-center gap-1 border-b border-border-brand">
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
@@ -504,12 +504,12 @@ export default function LeadScoringSettingsPage() {
               className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
                 activeTab === cat
                   ? 'border-teal-600 text-teal-700 font-medium'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                  : 'border-transparent text-ink3 hover:text-ink'
               }`}
             >
               {CATEGORY_LABELS[cat]}
               {rules[cat].length > 0 && (
-                <span className="ml-1.5 text-xs text-gray-400">({rules[cat].length})</span>
+                <span className="ml-1.5 text-xs text-ink4">({rules[cat].length})</span>
               )}
             </button>
           ))}
@@ -517,7 +517,7 @@ export default function LeadScoringSettingsPage() {
 
         {/* Rules list */}
         {activeRules.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">No rules in this category yet.</p>
+          <p className="text-sm text-ink4 py-4 text-center">No rules in this category yet.</p>
         ) : (
           <div>
             {activeRules.map((rule) => (
@@ -545,17 +545,17 @@ export default function LeadScoringSettingsPage() {
       )}
 
       {/* Re-score All */}
-      <div className="rounded-xl border border-gray-100 bg-white p-6 flex items-center justify-between">
+      <div className="rounded-xl border border-border-brand bg-white p-6 flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-900">Re-score All Contacts</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-sm font-medium text-ink">Re-score All Contacts</p>
+          <p className="text-xs text-ink4 mt-0.5">
             Recalculate scores and grades for every contact based on the current rules.
           </p>
         </div>
         <button
           onClick={() => void handleRescoreAll()}
           disabled={rescoring}
-          className="px-4 py-2 text-sm font-medium bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 text-sm font-medium bg-white text-ink2 border border-border-brand rounded-lg hover:bg-bg disabled:opacity-50 transition-colors"
         >
           {rescoring ? 'Re-scoring...' : 'Re-score All'}
         </button>

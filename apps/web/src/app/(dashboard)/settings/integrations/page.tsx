@@ -175,15 +175,15 @@ function IntegrationsContent() {
   return (
     <div className="px-8 py-8 max-w-2xl space-y-8">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Integrations</h1>
-        <p className="text-sm text-gray-500">Connect external services to your workspace</p>
+        <h1 className="text-xl font-bold text-ink mb-1">Integrations</h1>
+        <p className="text-sm text-ink3">Connect external services to your workspace</p>
       </div>
 
       {/* Email Accounts */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Email Accounts</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h2 className="text-base font-semibold text-ink">Email Accounts</h2>
+          <p className="text-sm text-ink3 mt-0.5">
             Connect an email account to send and track emails from within the CRM
           </p>
         </div>
@@ -192,7 +192,7 @@ function IntegrationsContent() {
           <button
             onClick={() => connectProvider('gmail')}
             disabled={connectingProvider === 'gmail'}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GmailIcon />
             {connectingProvider === 'gmail' ? 'Redirecting…' : 'Connect Gmail'}
@@ -201,20 +201,20 @@ function IntegrationsContent() {
           <button
             onClick={() => connectProvider('outlook')}
             disabled={connectingProvider === 'outlook'}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <OutlookIcon />
             {connectingProvider === 'outlook' ? 'Redirecting…' : 'Connect Outlook'}
           </button>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100">
+        <div className="bg-white rounded-xl border border-border-brand">
           {accountsLoading ? (
-            <div className="px-6 py-4 text-sm text-gray-400">Loading accounts…</div>
+            <div className="px-6 py-4 text-sm text-ink4">Loading accounts…</div>
           ) : accounts.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-gray-400">No email accounts connected yet.</div>
+            <div className="px-6 py-4 text-sm text-ink4">No email accounts connected yet.</div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-border-brand">
               {accounts.map((account) => (
                 <li key={account.id} className="px-6 py-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
@@ -222,8 +222,8 @@ function IntegrationsContent() {
                       {account.provider === 'gmail' ? <GmailIcon /> : <OutlookIcon />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{account.email}</p>
-                      <p className="text-xs text-gray-400">{providerLabel(account.provider)}</p>
+                      <p className="text-sm font-medium text-ink truncate">{account.email}</p>
+                      <p className="text-xs text-ink4">{providerLabel(account.provider)}</p>
                     </div>
                     {account.is_default && (
                       <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100">
@@ -248,35 +248,35 @@ function IntegrationsContent() {
       {/* BCC Email Logging */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">BCC Email Logging</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h2 className="text-base font-semibold text-ink">BCC Email Logging</h2>
+          <p className="text-sm text-ink3 mt-0.5">
             Log emails sent from any client by adding a unique BCC address
           </p>
         </div>
 
         {bccLoading ? (
-          <div className="text-sm text-gray-400">Loading…</div>
+          <div className="text-sm text-ink4">Loading…</div>
         ) : bccAddress ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <code className="flex-1 min-w-0 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-800 truncate">
+              <code className="flex-1 min-w-0 px-4 py-2.5 bg-bg border border-border-brand rounded-lg text-sm font-mono text-ink truncate">
                 {bccAddress}
               </code>
               <button
                 onClick={copyBcc}
-                className="shrink-0 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="shrink-0 px-3 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors"
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-ink4">
               Add this address to the BCC field of any email you send — it will automatically be
               logged under the matching contact in your CRM.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink3">
               Generate a unique BCC address to start logging emails automatically.
             </p>
             <button

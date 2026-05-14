@@ -27,7 +27,7 @@ const STATUS_STYLE: Record<SubscriptionStatus, string> = {
   past_due: 'bg-red-50 text-red-600',
   canceled: 'bg-red-50 text-red-600',
   unpaid: 'bg-red-50 text-red-600',
-  paused: 'bg-gray-100 text-gray-500',
+  paused: 'bg-bg2 text-ink3',
 }
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -48,8 +48,8 @@ const PLAN_LABEL: Record<SubscriptionPlan, string> = {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between py-4 border-b border-gray-50 last:border-0">
-      <p className="text-sm text-gray-500 w-40 shrink-0">{label}</p>
-      <div className="text-sm text-gray-900 text-right">{value}</div>
+      <p className="text-sm text-ink3 w-40 shrink-0">{label}</p>
+      <div className="text-sm text-ink text-right">{value}</div>
     </div>
   )
 }
@@ -72,15 +72,15 @@ export default async function SettingsPage() {
   return (
     <div className="px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your account and subscription</p>
+        <h1 className="text-xl font-bold text-ink">Settings</h1>
+        <p className="text-sm text-ink3 mt-0.5">Manage your account and subscription</p>
       </div>
 
       <div className="max-w-xl space-y-6">
         {/* Business Profile */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">Business Profile</h2>
-          <p className="text-xs text-gray-400 mb-4">Your business details — read-only for now</p>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-1">Business Profile</h2>
+          <p className="text-xs text-ink4 mb-4">Your business details — read-only for now</p>
 
           <Row label="Business name" value={tenant?.name ?? '—'} />
           <Row
@@ -90,14 +90,14 @@ export default async function SettingsPage() {
           <Row label="Owner email" value={email} />
           <Row
             label="Tenant ID"
-            value={<span className="text-[11px] font-mono text-gray-400">{tenantId ?? '—'}</span>}
+            value={<span className="text-[11px] font-mono text-ink4">{tenantId ?? '—'}</span>}
           />
         </div>
 
         {/* Subscription */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">Subscription</h2>
-          <p className="text-xs text-gray-400 mb-4">Your current plan and billing status</p>
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <h2 className="text-sm font-semibold text-ink mb-1">Subscription</h2>
+          <p className="text-xs text-ink4 mb-4">Your current plan and billing status</p>
 
           <Row
             label="Status"
@@ -112,12 +112,9 @@ export default async function SettingsPage() {
           <Row label="Plan" value={PLAN_LABEL[plan]} />
           <Row
             label="Billing"
-            value={<span className="text-gray-400">Billing management coming soon</span>}
+            value={<span className="text-ink4">Billing management coming soon</span>}
           />
-          <Row
-            label="Voice AI"
-            value={<span className="text-gray-400">Available in Phase 2</span>}
-          />
+          <Row label="Voice AI" value={<span className="text-ink4">Available in Phase 2</span>} />
         </div>
       </div>
     </div>

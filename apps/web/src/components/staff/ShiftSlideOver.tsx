@@ -141,32 +141,26 @@ export default function ShiftSlideOver({
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-gray-200 shadow-xl overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-border-brand shadow-xl overflow-y-auto">
+        <div className="px-5 py-4 border-b border-border-brand flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-ink">
               {isEdit ? 'Edit shift' : 'Add shift'}
             </h2>
-            {staffName && !isEdit && (
-              <p className="text-xs text-gray-400 mt-0.5">for {staffName}</p>
-            )}
+            {staffName && !isEdit && <p className="text-xs text-ink4 mt-0.5">for {staffName}</p>}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700"
-            aria-label="Close"
-          >
+          <button onClick={onClose} className="text-ink4 hover:text-ink2" aria-label="Close">
             ✕
           </button>
         </div>
 
         <div className="px-5 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Staff member *</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Staff member *</label>
             <select
               value={selectedStaffId}
               onChange={(e) => setSelectedStaffId(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white"
             >
               <option value="">— Select —</option>
               {staffList.map((m) => (
@@ -178,43 +172,43 @@ export default function ShiftSlideOver({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Date *</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Date *</label>
             <input
               type="date"
               value={shiftDate}
               onChange={(e) => setShiftDate(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Start *</label>
+              <label className="block text-xs font-medium text-ink3 mb-1.5">Start *</label>
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">End *</label>
+              <label className="block text-xs font-medium text-ink3 mb-1.5">End *</label>
               <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Notes</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
             />
           </div>
 
@@ -238,7 +232,7 @@ export default function ShiftSlideOver({
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
               >
                 Cancel
               </button>
@@ -255,13 +249,13 @@ export default function ShiftSlideOver({
 
         {confirmDel && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm p-5 mx-4">
-              <h3 className="text-base font-semibold text-gray-900 mb-1">Delete shift?</h3>
-              <p className="text-sm text-gray-500 mb-5">This cannot be undone.</p>
+            <div className="bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-sm p-5 mx-4">
+              <h3 className="text-base font-semibold text-ink mb-1">Delete shift?</h3>
+              <p className="text-sm text-ink3 mb-5">This cannot be undone.</p>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setConfirmDel(false)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
                 >
                   Cancel
                 </button>

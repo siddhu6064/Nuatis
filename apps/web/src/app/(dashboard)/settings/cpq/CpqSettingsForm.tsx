@@ -62,18 +62,18 @@ export default function CpqSettingsForm() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading settings...</p>
+    return <p className="text-sm text-ink4">Loading settings...</p>
   }
 
   const inputCls =
-    'w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+    'w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Maximum Discount %</label>
-          <p className="text-xs text-gray-400 mb-2">
+          <label className="block text-sm font-medium text-ink mb-1">Maximum Discount %</label>
+          <p className="text-xs text-ink4 mb-2">
             The highest discount percentage allowed on any quote
           </p>
           <input
@@ -93,10 +93,10 @@ export default function CpqSettingsForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">
+          <label className="block text-sm font-medium text-ink mb-1">
             Require Approval Above %
           </label>
-          <p className="text-xs text-gray-400 mb-2">
+          <p className="text-xs text-ink4 mb-2">
             Quotes with discounts above this threshold require owner approval before sending. Must
             be less than or equal to max discount.
           </p>
@@ -118,8 +118,8 @@ export default function CpqSettingsForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Deposit Percentage</label>
-          <p className="text-xs text-gray-400 mb-2">
+          <label className="block text-sm font-medium text-ink mb-1">Deposit Percentage</label>
+          <p className="text-xs text-ink4 mb-2">
             Set to 0 to disable deposits. When enabled, clients will see the required deposit amount
             on their quote. Payment collection coming soon.
           </p>
@@ -138,7 +138,7 @@ export default function CpqSettingsForm() {
               max="100"
               step="1"
             />
-            <span className="text-sm text-gray-500">%</span>
+            <span className="text-sm text-ink3">%</span>
           </div>
           {settings.deposit_pct > 0 && (
             <p className="text-xs text-teal-600 mt-2">

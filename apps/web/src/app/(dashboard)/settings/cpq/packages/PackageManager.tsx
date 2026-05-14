@@ -207,13 +207,13 @@ export default function PackageManager() {
     return acc
   }, {})
 
-  if (loading) return <p className="text-sm text-gray-400">Loading packages...</p>
+  if (loading) return <p className="text-sm text-ink4">Loading packages...</p>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{packages.length} active packages</p>
+          <p className="text-sm text-ink3">{packages.length} active packages</p>
         </div>
         <button
           onClick={openCreate}
@@ -233,8 +233,8 @@ export default function PackageManager() {
 
       {/* Package list grouped by vertical */}
       {Object.keys(grouped).length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <p className="text-sm text-gray-400">No packages yet</p>
+        <div className="bg-white rounded-xl border border-border-brand p-12 text-center">
+          <p className="text-sm text-ink4">No packages yet</p>
           <p className="text-xs text-gray-300 mt-1">
             Create bundled service packages to offer discounted pricing
           </p>
@@ -242,39 +242,39 @@ export default function PackageManager() {
       ) : (
         Object.entries(grouped).map(([vertical, pkgs]) => (
           <div key={vertical}>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-ink3 uppercase tracking-wide mb-2">
               {VERTICAL_LABELS[vertical] ?? vertical}
             </h3>
             <div className="space-y-2">
               {pkgs.map((pkg, idx) => (
                 <div
                   key={pkg.id}
-                  className="bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between"
+                  className="bg-white rounded-xl border border-border-brand p-4 flex items-center justify-between"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">{pkg.name}</p>
+                      <p className="text-sm font-medium text-ink">{pkg.name}</p>
                       {pkg.bundle_discount_pct != null && Number(pkg.bundle_discount_pct) > 0 && (
                         <span className="text-[10px] font-medium bg-green-50 text-green-700 px-1.5 py-0.5 rounded">
                           {Number(pkg.bundle_discount_pct).toFixed(0)}% off
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-ink4 mt-0.5">
                       {(pkg.items as PackageItem[]).length} services &middot;{' '}
-                      <span className="font-medium text-gray-600">
+                      <span className="font-medium text-ink3">
                         ${Number(pkg.bundle_price).toFixed(2)}
                       </span>
                     </p>
                     {pkg.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{pkg.description}</p>
+                      <p className="text-xs text-ink4 mt-0.5">{pkg.description}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 ml-4">
                     <button
                       onClick={() => movePackage(pkg.id, 'up')}
                       disabled={idx === 0}
-                      className="text-gray-300 hover:text-gray-600 disabled:opacity-30 p-1 text-xs"
+                      className="text-gray-300 hover:text-ink3 disabled:opacity-30 p-1 text-xs"
                       title="Move up"
                     >
                       ▲
@@ -282,14 +282,14 @@ export default function PackageManager() {
                     <button
                       onClick={() => movePackage(pkg.id, 'down')}
                       disabled={idx === pkgs.length - 1}
-                      className="text-gray-300 hover:text-gray-600 disabled:opacity-30 p-1 text-xs"
+                      className="text-gray-300 hover:text-ink3 disabled:opacity-30 p-1 text-xs"
                       title="Move down"
                     >
                       ▼
                     </button>
                     <button
                       onClick={() => openEdit(pkg)}
-                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                      className="text-xs text-ink3 hover:text-ink2 px-2 py-1"
                     >
                       Edit
                     </button>
@@ -311,17 +311,17 @@ export default function PackageManager() {
       {showForm && (
         <div className="fixed inset-0 bg-black/30 flex items-start justify-center z-50 pt-20 overflow-y-auto">
           <div className="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl mb-20">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
+            <h3 className="text-sm font-semibold text-ink mb-4">
               {editingId ? 'Edit Package' : 'New Package'}
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Vertical</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Vertical</label>
                 <select
                   value={formVertical}
                   onChange={(e) => setFormVertical(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {VERTICALS.map((v) => (
                     <option key={v} value={v}>
@@ -332,36 +332,36 @@ export default function PackageManager() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Name</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. New Patient Package"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-ink2 mb-1">
                   Description (optional)
                 </label>
                 <textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
               {/* Service picker */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-ink2 mb-2">
                   Services ({formItems.length} selected)
                 </label>
-                <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                <div className="border border-border-brand rounded-lg max-h-48 overflow-y-auto">
                   {services.length === 0 ? (
-                    <p className="px-3 py-4 text-xs text-gray-400 text-center">No services found</p>
+                    <p className="px-3 py-4 text-xs text-ink4 text-center">No services found</p>
                   ) : (
                     services.map((svc) => {
                       const selected = formItems.find((i) => i.service_id === svc.id)
@@ -375,10 +375,10 @@ export default function PackageManager() {
                               type="checkbox"
                               checked={!!selected}
                               onChange={() => toggleServiceInForm(svc.id)}
-                              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                              className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
                             />
-                            <span className="text-gray-700">{svc.name}</span>
-                            <span className="text-gray-400 ml-auto">
+                            <span className="text-ink2">{svc.name}</span>
+                            <span className="text-ink4 ml-auto">
                               ${Number(svc.unit_price).toFixed(2)}
                             </span>
                           </label>
@@ -389,7 +389,7 @@ export default function PackageManager() {
                               onChange={(e) =>
                                 updateFormItemQty(svc.id, parseInt(e.target.value) || 1)
                               }
-                              className="w-14 px-2 py-1 text-xs border border-gray-200 rounded ml-2 text-center"
+                              className="w-14 px-2 py-1 text-xs border border-border-brand rounded ml-2 text-center"
                               min="1"
                             />
                           )}
@@ -399,19 +399,19 @@ export default function PackageManager() {
                   )}
                 </div>
                 {listPriceTotal > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-ink3 mt-1">
                     List price total: ${listPriceTotal.toFixed(2)}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Bundle Price</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Bundle Price</label>
                 <input
                   type="number"
                   value={formBundlePrice}
                   onChange={(e) => setFormBundlePrice(parseFloat(e.target.value) || 0)}
-                  className="w-40 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-40 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   min="0"
                   step="0.01"
                 />
@@ -427,7 +427,7 @@ export default function PackageManager() {
             <div className="flex items-center gap-2 mt-6 justify-end">
               <button
                 onClick={resetForm}
-                className="text-xs text-gray-500 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
               >
                 Cancel
               </button>

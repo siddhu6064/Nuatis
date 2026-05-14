@@ -140,33 +140,33 @@ export default function MayaOnboardingWizard({
                     ? 'bg-teal-100 text-teal-700'
                     : step === s.num
                       ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-400'
+                      : 'bg-bg2 text-ink4'
                 }`}
               >
                 {step > s.num ? '✓' : s.num}
               </div>
-              <span className="text-[10px] text-gray-400 mt-1">{s.label}</span>
+              <span className="text-[10px] text-ink4 mt-1">{s.label}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`h-px w-8 mx-1 mt-[-12px] ${step > s.num ? 'bg-teal-400' : 'bg-gray-200'}`}
+                className={`h-px w-8 mx-1 mt-[-12px] ${step > s.num ? 'bg-teal-400' : 'bg-bg3'}`}
               />
             )}
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+      <div className="bg-white rounded-xl border border-border-brand p-8 shadow-sm">
         {/* Step 1: Business Info */}
         {step === 1 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Welcome to Maya AI!</h1>
-            <p className="text-sm text-gray-500 mb-6">Your AI receptionist is almost ready.</p>
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg mb-4">
+            <h1 className="text-xl font-semibold text-ink mb-1">Welcome to Maya AI!</h1>
+            <p className="text-sm text-ink3 mb-6">Your AI receptionist is almost ready.</p>
+            <div className="flex items-center gap-3 p-4 bg-bg rounded-lg mb-4">
               <span className="text-2xl">{VERTICAL_ICONS[vertical] ?? '🏢'}</span>
               <div>
-                <p className="text-sm font-semibold text-gray-900">{businessName}</p>
-                <p className="text-xs text-gray-500">{VERTICAL_LABELS[vertical] ?? vertical}</p>
+                <p className="text-sm font-semibold text-ink">{businessName}</p>
+                <p className="text-xs text-ink3">{VERTICAL_LABELS[vertical] ?? vertical}</p>
               </div>
             </div>
             <button
@@ -181,8 +181,8 @@ export default function MayaOnboardingWizard({
         {/* Step 2: Phone */}
         {step === 2 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Get your phone number</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-1">Get your phone number</h1>
+            <p className="text-sm text-ink3 mb-6">
               Maya needs a number to answer calls for {businessName}.
             </p>
             {phone ? (
@@ -190,7 +190,7 @@ export default function MayaOnboardingWizard({
                 <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
                   <span className="text-green-600 text-lg">✓</span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{formatPhone(phone)}</p>
+                    <p className="text-sm font-semibold text-ink">{formatPhone(phone)}</p>
                     <p className="text-xs text-green-600">Number provisioned</p>
                   </div>
                 </div>
@@ -206,7 +206,7 @@ export default function MayaOnboardingWizard({
                 <select
                   value={areaCode}
                   onChange={(e) => setAreaCode(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {AREA_CODES.map((ac) => (
                     <option key={ac.code} value={ac.code}>
@@ -224,10 +224,7 @@ export default function MayaOnboardingWizard({
                 >
                   {loading ? 'Provisioning...' : 'Get My Number'}
                 </button>
-                <button
-                  onClick={goNext}
-                  className="w-full text-sm text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
                   Skip for now
                 </button>
               </div>
@@ -238,15 +235,15 @@ export default function MayaOnboardingWizard({
         {/* Step 3: Calendar */}
         {step === 3 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Connect Google Calendar</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-1">Connect Google Calendar</h1>
+            <p className="text-sm text-ink3 mb-6">
               Maya will check availability and book appointments in real-time.
             </p>
             {calendarConnected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
                   <span className="text-green-600 text-lg">✓</span>
-                  <p className="text-sm font-semibold text-gray-900">Google Calendar connected</p>
+                  <p className="text-sm font-semibold text-ink">Google Calendar connected</p>
                 </div>
                 <button
                   onClick={goNext}
@@ -263,10 +260,7 @@ export default function MayaOnboardingWizard({
                 >
                   Connect Google Calendar
                 </button>
-                <button
-                  onClick={goNext}
-                  className="w-full text-sm text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
                   Skip for now
                 </button>
               </div>
@@ -278,8 +272,8 @@ export default function MayaOnboardingWizard({
         {step >= 4 && (
           <div className="text-center">
             <div className="text-5xl mb-4">🎉</div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">Maya is ready!</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-2">Maya is ready!</h1>
+            <p className="text-sm text-ink3 mb-6">
               {phone
                 ? `Call ${formatPhone(phone)} to test Maya.`
                 : 'Set up a phone number from Settings to start receiving calls.'}
@@ -296,8 +290,8 @@ export default function MayaOnboardingWizard({
             >
               Go to Call Log
             </button>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500">
+            <div className="p-3 bg-bg rounded-lg">
+              <p className="text-xs text-ink3">
                 Want a full CRM with pipeline, automation, and quotes?
               </p>
               <button
@@ -313,7 +307,7 @@ export default function MayaOnboardingWizard({
         {step > 1 && step < 4 && (
           <button
             onClick={() => setStep((s) => Math.max(s - 1, 1))}
-            className="mt-4 text-sm text-gray-400 hover:text-gray-600"
+            className="mt-4 text-sm text-ink4 hover:text-ink3"
           >
             &larr; Back
           </button>

@@ -68,8 +68,8 @@ export default async function CallsPage({ searchParams }: Props) {
   return (
     <div className="px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Call Log</h1>
-        <p className="text-sm text-gray-500 mt-0.5">View all inbound calls handled by Maya</p>
+        <h1 className="text-xl font-bold text-ink">Call Log</h1>
+        <p className="text-sm text-ink3 mt-0.5">View all inbound calls handled by Maya</p>
       </div>
 
       <CallFilters outcome={outcome} fromDate={fromDate} toDate={toDate} hasFilters={hasFilters} />
@@ -80,19 +80,19 @@ export default async function CallsPage({ searchParams }: Props) {
         <div className="flex items-center justify-between mt-6">
           <Link
             href={`/calls?page=${page - 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
-            className={`px-3 py-1.5 text-sm rounded-lg border border-gray-200 ${
-              page <= 1 ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-50'
+            className={`px-3 py-1.5 text-sm rounded-lg border border-border-brand ${
+              page <= 1 ? 'text-gray-300 pointer-events-none' : 'text-ink3 hover:bg-bg'
             }`}
           >
             Previous
           </Link>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-ink4">
             Page {page} of {pages}
           </span>
           <Link
             href={`/calls?page=${page + 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
-            className={`px-3 py-1.5 text-sm rounded-lg border border-gray-200 ${
-              page >= pages ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-50'
+            className={`px-3 py-1.5 text-sm rounded-lg border border-border-brand ${
+              page >= pages ? 'text-gray-300 pointer-events-none' : 'text-ink3 hover:bg-bg'
             }`}
           >
             Next

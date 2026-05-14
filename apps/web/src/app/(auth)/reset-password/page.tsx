@@ -77,20 +77,20 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center">
             <span className="text-white font-bold text-base">N</span>
           </div>
           <span className="font-display font-bold text-[22px] tracking-tight text-ink">
-            Nu<span className="text-accent">atis</span>
+            Nu<span className="text-teal-brand">atis</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-          <h1 className="text-lg font-semibold text-gray-900 mb-1">Reset password</h1>
-          <p className="text-sm text-gray-400 mb-6">Choose a new password for your account.</p>
+        <div className="bg-white rounded-2xl border border-border-brand shadow-sm p-8">
+          <h1 className="text-lg font-semibold text-ink mb-1">Reset password</h1>
+          <p className="text-sm text-ink4 mb-6">Choose a new password for your account.</p>
 
           {tokenError ? (
             <div className="space-y-4">
@@ -106,13 +106,11 @@ export default function ResetPasswordPage() {
               </a>
             </div>
           ) : !sessionReady ? (
-            <p className="text-sm text-gray-400">Verifying reset link…</p>
+            <p className="text-sm text-ink4">Verifying reset link…</p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  New password
-                </label>
+                <label className="block text-xs font-medium text-ink3 mb-1.5">New password</label>
                 <input
                   type="password"
                   value={password}
@@ -120,15 +118,15 @@ export default function ResetPasswordPage() {
                   required
                   autoFocus
                   placeholder="At least 8 characters"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm
-                             text-gray-900 placeholder-gray-300 outline-none
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-border-brand text-sm
+                             text-ink placeholder-gray-300 outline-none
                              focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10
                              transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                <label className="block text-xs font-medium text-ink3 mb-1.5">
                   Confirm password
                 </label>
                 <input
@@ -137,8 +135,8 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm
-                             text-gray-900 placeholder-gray-300 outline-none
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-border-brand text-sm
+                             text-ink placeholder-gray-300 outline-none
                              focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10
                              transition-colors"
                 />

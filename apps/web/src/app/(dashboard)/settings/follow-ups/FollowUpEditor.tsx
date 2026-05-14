@@ -143,14 +143,14 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
   const anyDirty = steps.some((s) => s._dirty)
 
   if (loading) {
-    return <div className="text-sm text-gray-400 py-8 text-center">Loading templates…</div>
+    return <div className="text-sm text-ink4 py-8 text-center">Loading templates…</div>
   }
 
   return (
     <div className="max-w-2xl space-y-6">
       {/* Variables reference */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
-        <p className="text-xs font-medium text-gray-500 mb-2">Available variables</p>
+      <div className="bg-white rounded-xl border border-border-brand p-4">
+        <p className="text-xs font-medium text-ink3 mb-2">Available variables</p>
         <div className="flex flex-wrap gap-2">
           {VARIABLES.map((v) => (
             <span
@@ -165,35 +165,35 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
       </div>
 
       {/* Cadence timeline */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">
           Follow-up Cadence &mdash; {verticalLabel}
         </h2>
 
         {steps.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            No follow-up cadence configured for this vertical.
-          </p>
+          <p className="text-sm text-ink4">No follow-up cadence configured for this vertical.</p>
         ) : (
           <div className="space-y-0">
             {steps.map((step, i) => (
               <button key={i} onClick={() => setSelectedStep(i)} className="w-full text-left">
                 <div className="flex items-start gap-3 relative">
                   {i < steps.length - 1 && (
-                    <div className="absolute left-[7px] top-4 w-px h-full bg-gray-100" />
+                    <div className="absolute left-[7px] top-4 w-px h-full bg-bg2" />
                   )}
                   <div
                     className={`w-[15px] h-[15px] rounded-full border-2 shrink-0 mt-0.5 relative z-10 ${
-                      selectedStep === i ? 'border-teal-500 bg-teal-50' : 'border-gray-300 bg-white'
+                      selectedStep === i
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-border-brand bg-white'
                     }`}
                   />
                   <div
                     className={`flex-1 pb-5 px-3 py-2 rounded-lg transition-colors ${
-                      selectedStep === i ? 'bg-gray-50' : 'hover:bg-gray-50/50'
+                      selectedStep === i ? 'bg-bg' : 'hover:bg-gray-50/50'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-medium text-gray-900">Day {step.days_after}</p>
+                      <p className="text-sm font-medium text-ink">Day {step.days_after}</p>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
                           step.channel === 'sms'
@@ -209,12 +209,12 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
                         </span>
                       )}
                       {!step._is_enabled && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-bg2 text-ink3">
                           Disabled
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2">{step._body}</p>
+                    <p className="text-xs text-ink3 line-clamp-2">{step._body}</p>
                     {step.channel === 'sms' && step._body.length > 160 && (
                       <p className="text-[10px] text-amber-600 mt-1">
                         {step._body.length}/160 chars (may split into multiple SMS)
@@ -230,10 +230,10 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
 
       {/* Selected step editor */}
       {current && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-gray-900">Step {selectedStep + 1} Edit</h2>
+              <h2 className="text-sm font-semibold text-ink">Step {selectedStep + 1} Edit</h2>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
                   current.channel === 'sms'
@@ -256,14 +256,14 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
                   type="checkbox"
                   checked={current._is_enabled}
                   onChange={(e) => updateStep(selectedStep, { _is_enabled: e.target.checked })}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
                 />
-                <span className="text-xs text-gray-600">Enabled</span>
+                <span className="text-xs text-ink3">Enabled</span>
               </label>
               {current.is_customized && (
                 <button
                   onClick={() => void resetStep(selectedStep)}
-                  className="text-xs text-gray-500 hover:text-red-600 underline underline-offset-2 transition-colors"
+                  className="text-xs text-ink3 hover:text-red-600 underline underline-offset-2 transition-colors"
                 >
                   Reset to default
                 </button>
@@ -274,27 +274,27 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {/* Subject (email only) */}
           {current.channel === 'email' && (
             <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+              <label className="block text-xs font-medium text-ink3 mb-1">Subject</label>
               <input
                 type="text"
                 value={current._subject}
                 onChange={(e) => updateStep(selectedStep, { _subject: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
           )}
 
           {/* Body textarea */}
           <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Body</label>
+            <label className="block text-xs font-medium text-ink3 mb-1">Body</label>
             <textarea
               rows={5}
               value={current._body}
               onChange={(e) => updateStep(selectedStep, { _body: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
             />
             {current.channel === 'sms' && (
-              <p className="text-[10px] text-gray-400 mt-1">{current._body.length} characters</p>
+              <p className="text-[10px] text-ink4 mt-1">{current._body.length} characters</p>
             )}
             {current.channel === 'sms' && !current._body.toUpperCase().includes('STOP') && (
               <p className="text-[10px] text-red-500 mt-1">
@@ -305,7 +305,7 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
 
           {/* Preview */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
+            <label className="block text-xs font-medium text-ink3 mb-1">
               Preview (with sample data)
             </label>
             <div

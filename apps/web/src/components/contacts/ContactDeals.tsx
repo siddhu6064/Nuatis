@@ -36,12 +36,12 @@ export default function ContactDeals({ contactId }: Props) {
     void fetchDeals().finally(() => setLoading(false))
   }, [fetchDeals])
 
-  if (loading) return <div className="py-4 text-center text-sm text-gray-400">Loading deals...</div>
+  if (loading) return <div className="py-4 text-center text-sm text-ink4">Loading deals...</div>
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-700">Deals</h3>
+        <h3 className="text-sm font-semibold text-ink2">Deals</h3>
         <Link
           href={`/deals?contact_id=${contactId}`}
           className="text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -51,17 +51,17 @@ export default function ContactDeals({ contactId }: Props) {
       </div>
 
       {deals.length === 0 ? (
-        <p className="text-xs text-gray-400 py-2">No deals linked to this contact</p>
+        <p className="text-xs text-ink4 py-2">No deals linked to this contact</p>
       ) : (
         <div className="space-y-2">
           {deals.map((deal) => (
             <Link
               key={deal.id}
               href={`/deals/${deal.id}`}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border-brand hover:bg-bg transition-colors"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{deal.title}</p>
+                <p className="text-sm font-medium text-ink truncate">{deal.title}</p>
                 <p className="text-xs text-teal-600 font-semibold">
                   ${Number(deal.value).toLocaleString()}
                 </p>
@@ -80,7 +80,7 @@ export default function ContactDeals({ contactId }: Props) {
               {(deal.is_closed_won || deal.is_closed_lost) && (
                 <span
                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                    deal.is_closed_won ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    deal.is_closed_won ? 'bg-green-100 text-green-700' : 'bg-bg2 text-ink3'
                   }`}
                 >
                   {deal.is_closed_won ? 'Won' : 'Lost'}

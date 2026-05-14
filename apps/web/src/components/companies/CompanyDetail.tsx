@@ -125,20 +125,20 @@ export default function CompanyDetail({ companyId }: Props) {
   }
 
   if (loading || !company) {
-    return <div className="py-12 text-center text-sm text-gray-400">Loading...</div>
+    return <div className="py-12 text-center text-sm text-ink4">Loading...</div>
   }
 
   return (
     <div>
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         {editing ? (
           <div className="space-y-2 mb-3">
             <input
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full text-lg font-bold border border-gray-200 rounded px-2 py-1"
+              className="w-full text-lg font-bold border border-border-brand rounded px-2 py-1"
             />
             <div className="grid grid-cols-3 gap-2">
               <input
@@ -146,21 +146,21 @@ export default function CompanyDetail({ companyId }: Props) {
                 value={editDomain}
                 onChange={(e) => setEditDomain(e.target.value)}
                 placeholder="Domain"
-                className="text-sm border border-gray-200 rounded px-2 py-1"
+                className="text-sm border border-border-brand rounded px-2 py-1"
               />
               <input
                 type="text"
                 value={editIndustry}
                 onChange={(e) => setEditIndustry(e.target.value)}
                 placeholder="Industry"
-                className="text-sm border border-gray-200 rounded px-2 py-1"
+                className="text-sm border border-border-brand rounded px-2 py-1"
               />
               <input
                 type="text"
                 value={editWebsite}
                 onChange={(e) => setEditWebsite(e.target.value)}
                 placeholder="Website"
-                className="text-sm border border-gray-200 rounded px-2 py-1"
+                className="text-sm border border-border-brand rounded px-2 py-1"
               />
             </div>
             <div className="flex gap-2">
@@ -170,7 +170,7 @@ export default function CompanyDetail({ companyId }: Props) {
               >
                 Save
               </button>
-              <button onClick={() => setEditing(false)} className="px-3 py-1 text-xs text-gray-500">
+              <button onClick={() => setEditing(false)} className="px-3 py-1 text-xs text-ink3">
                 Cancel
               </button>
             </div>
@@ -178,7 +178,7 @@ export default function CompanyDetail({ companyId }: Props) {
         ) : (
           <>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-gray-900">{company.name}</h2>
+              <h2 className="text-lg font-bold text-ink">{company.name}</h2>
               <button
                 onClick={() => setEditing(true)}
                 className="text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -186,7 +186,7 @@ export default function CompanyDetail({ companyId }: Props) {
                 Edit
               </button>
             </div>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-ink3">
               {company.domain && <span>{company.domain}</span>}
               {company.industry && <span>{company.industry}</span>}
               {company.website && (
@@ -209,11 +209,9 @@ export default function CompanyDetail({ companyId }: Props) {
       </div>
 
       {/* Contacts */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <div className="bg-white rounded-xl border border-border-brand p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Contacts ({company.contacts.length})
-          </h3>
+          <h3 className="text-sm font-semibold text-ink2">Contacts ({company.contacts.length})</h3>
           <button
             onClick={() => {
               setLinkOpen((o) => !o)
@@ -235,16 +233,16 @@ export default function CompanyDetail({ companyId }: Props) {
               value={linkSearch}
               onChange={(e) => handleLinkSearch(e.target.value)}
               placeholder="Search contacts by name…"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
             {linkResults.length > 0 && (
-              <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+              <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg max-h-56 overflow-y-auto">
                 {linkResults.map((r) => (
                   <button
                     key={r.id}
                     disabled={linkBusy}
                     onClick={() => void linkContact(r.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left disabled:opacity-50"
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-bg text-left disabled:opacity-50"
                   >
                     <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                       <span className="text-teal-700 text-[10px] font-bold">
@@ -252,8 +250,8 @@ export default function CompanyDetail({ companyId }: Props) {
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{r.full_name}</p>
-                      <p className="text-xs text-gray-400 truncate">{r.email ?? r.phone ?? ''}</p>
+                      <p className="text-sm font-medium text-ink truncate">{r.full_name}</p>
+                      <p className="text-xs text-ink4 truncate">{r.email ?? r.phone ?? ''}</p>
                     </div>
                   </button>
                 ))}
@@ -263,16 +261,11 @@ export default function CompanyDetail({ companyId }: Props) {
         )}
 
         {company.contacts.length === 0 ? (
-          <p className="text-xs text-gray-400 py-4 text-center">
-            No contacts linked to this company
-          </p>
+          <p className="text-xs text-ink4 py-4 text-center">No contacts linked to this company</p>
         ) : (
           <div className="space-y-2">
             {company.contacts.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50"
-              >
+              <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg">
                 <Link href={`/contacts/${c.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                     <span className="text-teal-700 text-xs font-bold">
@@ -280,8 +273,8 @@ export default function CompanyDetail({ companyId }: Props) {
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
-                    <p className="text-xs text-gray-400">{c.email ?? c.phone ?? ''}</p>
+                    <p className="text-sm font-medium text-ink truncate">{c.full_name}</p>
+                    <p className="text-xs text-ink4">{c.email ?? c.phone ?? ''}</p>
                   </div>
                   {c.pipeline_stage && (
                     <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700">
@@ -292,7 +285,7 @@ export default function CompanyDetail({ companyId }: Props) {
                 <button
                   disabled={unlinkingId === c.id}
                   onClick={() => void unlinkContact(c.id)}
-                  className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 ml-2 shrink-0"
+                  className="text-xs text-ink4 hover:text-red-500 disabled:opacity-50 ml-2 shrink-0"
                 >
                   Unlink
                 </button>

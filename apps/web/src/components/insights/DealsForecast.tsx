@@ -35,21 +35,21 @@ export default function DealsForecast() {
 
   return (
     <div className="mt-10">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Pipeline Forecast</h2>
+      <h2 className="text-lg font-bold text-ink mb-4">Pipeline Forecast</h2>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Pipeline Value</p>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Pipeline Value</p>
+          <p className="text-2xl font-bold text-ink">
             ${data.total_pipeline_value.toLocaleString()}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Weighted Forecast</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Weighted Forecast</p>
           <p className="text-2xl font-bold text-teal-600">
             ${data.weighted_pipeline_value.toLocaleString()}
           </p>
-          <p className="text-[11px] text-gray-400 mt-1">Probability-adjusted</p>
+          <p className="text-[11px] text-ink4 mt-1">Probability-adjusted</p>
         </div>
         <div className="bg-white rounded-xl border border-green-100 p-4">
           <p className="text-xs text-green-600 mb-1">Won This Month</p>
@@ -58,15 +58,15 @@ export default function DealsForecast() {
             ${data.won_this_month.value.toLocaleString()}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Lost This Month</p>
-          <p className="text-2xl font-bold text-gray-500">{data.lost_this_month.count}</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Lost This Month</p>
+          <p className="text-2xl font-bold text-ink3">{data.lost_this_month.count}</p>
         </div>
       </div>
 
       {data.deals_by_stage.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Deals by Stage</h3>
+        <div className="bg-white rounded-xl border border-border-brand p-5">
+          <h3 className="text-sm font-semibold text-ink2 mb-3">Deals by Stage</h3>
           <ResponsiveContainer width="100%" height={Math.max(180, data.deals_by_stage.length * 40)}>
             <BarChart data={data.deals_by_stage} layout="vertical" margin={{ left: 100 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} />

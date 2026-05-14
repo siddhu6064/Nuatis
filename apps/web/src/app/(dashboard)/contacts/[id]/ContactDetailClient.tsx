@@ -224,7 +224,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
   const lifecycleBadgeClass = (stage: LifecycleStage | null): string => {
     switch (stage) {
       case 'subscriber':
-        return 'bg-gray-100 text-gray-700'
+        return 'bg-bg2 text-ink2'
       case 'lead':
         return 'bg-blue-100 text-blue-700'
       case 'marketing_qualified':
@@ -238,9 +238,9 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       case 'evangelist':
         return 'bg-emerald-100 text-emerald-700'
       case 'other':
-        return 'bg-gray-100 text-gray-700'
+        return 'bg-bg2 text-ink2'
       default:
-        return 'bg-gray-100 text-gray-500'
+        return 'bg-bg2 text-ink3'
     }
   }
 
@@ -261,7 +261,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       case 'F':
         return 'bg-red-100 text-red-700'
       default:
-        return 'bg-gray-100 text-gray-500'
+        return 'bg-bg2 text-ink3'
     }
   }
 
@@ -355,7 +355,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
             </button>
             <button
               onClick={() => void handleDismissEnrichment()}
-              className="text-xs text-gray-500 hover:underline"
+              className="text-xs text-ink3 hover:underline"
             >
               Dismiss
             </button>
@@ -367,18 +367,18 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       <div className="mb-4">
         <button
           onClick={() => setShowEmailModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg"
         >
           Send Email
         </button>
       </div>
 
       {/* Referral info */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Referral Info</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h2 className="text-sm font-semibold text-ink2 mb-3">Referral Info</h2>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-400 text-xs">Referral Source</span>
+            <span className="text-ink4 text-xs">Referral Source</span>
             {editingReferral ? (
               <div className="relative">
                 <input
@@ -398,15 +398,15 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                   }}
                   placeholder="e.g. Google, Instagram, Friend"
                   autoFocus
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 mt-0.5"
+                  className="w-full text-sm border border-border-brand rounded px-2 py-1 mt-0.5"
                 />
                 {showReferralSuggestions && filteredSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-32 overflow-y-auto">
+                  <div className="absolute top-full left-0 w-full mt-1 bg-white border border-border-brand rounded shadow-lg z-10 max-h-32 overflow-y-auto">
                     {filteredSuggestions.slice(0, 5).map((s) => (
                       <button
                         key={s}
                         onMouseDown={() => void saveReferralSource(s)}
-                        className="block w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 text-gray-600"
+                        className="block w-full text-left text-xs px-2 py-1.5 hover:bg-bg text-ink3"
                       >
                         {s}
                       </button>
@@ -416,7 +416,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
               </div>
             ) : (
               <p
-                className="text-gray-700 cursor-pointer hover:text-teal-600 mt-0.5"
+                className="text-ink2 cursor-pointer hover:text-teal-600 mt-0.5"
                 onClick={() => setEditingReferral(true)}
               >
                 {referralSource || '\u2014'}
@@ -424,7 +424,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
             )}
           </div>
           <div>
-            <span className="text-gray-400 text-xs">Referred By</span>
+            <span className="text-ink4 text-xs">Referred By</span>
             {referredByName && referredById ? (
               <div className="flex items-center gap-1.5 mt-0.5">
                 <a
@@ -435,21 +435,21 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                 </a>
                 <button
                   onClick={() => void removeReferredBy()}
-                  className="text-gray-400 hover:text-red-500 text-xs"
+                  className="text-ink4 hover:text-red-500 text-xs"
                 >
                   &times;
                 </button>
               </div>
             ) : (
-              <p className="text-gray-700 mt-0.5">{'\u2014'}</p>
+              <p className="text-ink2 mt-0.5">{'\u2014'}</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Lifecycle Stage */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Lifecycle Stage</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h2 className="text-sm font-semibold text-ink2 mb-3">Lifecycle Stage</h2>
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${lifecycleBadgeClass(lifecycleStage)}`}
@@ -461,7 +461,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
             onChange={(e) => {
               if (e.target.value) void handleLifecycleChange(e.target.value as LifecycleStage)
             }}
-            className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="text-sm border border-border-brand rounded px-2 py-1 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
           >
             <option value="" disabled>
               Change stage…
@@ -476,10 +476,10 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       </div>
 
       {/* Lead Score */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Lead Score</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h2 className="text-sm font-semibold text-ink2 mb-3">Lead Score</h2>
         <div className="flex items-center gap-3 mb-2">
-          <span className="text-4xl font-bold text-gray-800">
+          <span className="text-4xl font-bold text-ink">
             {leadScore !== null ? leadScore : '—'}
           </span>
           {leadGrade && (
@@ -490,13 +490,13 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-ink4 mb-3">
           Last updated: {formatRelativeTime(leadScoreUpdatedAt)}
         </p>
         <button
           onClick={() => void handleRecalculate()}
           disabled={recalculating}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {recalculating ? 'Recalculating…' : 'Recalculate'}
         </button>
@@ -504,13 +504,13 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
 
       {/* Compliance */}
       {complianceFields.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+        <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-700">Compliance</h2>
+            <h2 className="text-sm font-semibold text-ink2">Compliance</h2>
             {allComplianceComplete ? (
               <span className="text-xs text-green-600 font-medium">All complete</span>
             ) : (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-ink4">
                 {complianceCompleteCount}/{complianceRequiredFields.length} required complete
               </span>
             )}
@@ -528,7 +528,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
 
               return (
                 <div key={field.key}>
-                  <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                  <label className="flex items-start gap-2 text-sm text-ink2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -542,7 +542,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                           })
                         }
                       }}
-                      className="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
+                      className="mt-0.5 rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4"
                     />
                     <span>
                       {field.label}
@@ -561,7 +561,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                             date: e.target.value,
                           })
                         }
-                        className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                        className="text-sm border border-border-brand rounded px-2 py-1 text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
                       />
                     </div>
                   )}
@@ -578,7 +578,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                           })
                         }
                         placeholder="Notes..."
-                        className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                        className="w-full text-sm border border-border-brand rounded px-2 py-1 text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
                       />
                     </div>
                   )}
@@ -589,7 +589,7 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
           <button
             onClick={() => void saveComplianceFields()}
             disabled={complianceSaving}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {complianceSaving ? 'Saving…' : 'Save Compliance'}
           </button>
@@ -597,8 +597,8 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       )}
 
       {/* Assigned To */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Assigned To</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h2 className="text-sm font-semibold text-ink2 mb-3">Assigned To</h2>
         <div className="flex items-center gap-3">
           {assignedUserId ? (
             <div className="flex items-center gap-2">
@@ -609,17 +609,17 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
                     .toUpperCase()}
                 </span>
               </div>
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-ink2">
                 {tenantUsers.find((u) => u.id === assignedUserId)?.full_name ?? assignedUserId}
               </span>
             </div>
           ) : (
-            <span className="text-sm text-gray-400">Unassigned</span>
+            <span className="text-sm text-ink4">Unassigned</span>
           )}
           <select
             value={assignedUserId ?? ''}
             onChange={(e) => void handleAssigneeChange(e.target.value || null)}
-            className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="text-sm border border-border-brand rounded px-2 py-1 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
           >
             <option value="">Unassigned</option>
             {tenantUsers.map((user) => (
@@ -637,18 +637,18 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
       </div>
 
       {/* Tasks */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         <ContactTasks contactId={contactId} />
       </div>
 
       {/* Deals */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         <ContactDeals contactId={contactId} />
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl border border-gray-100">
-        <div className="flex border-b border-gray-100">
+      <div className="bg-white rounded-xl border border-border-brand">
+        <div className="flex border-b border-border-brand">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -659,14 +659,14 @@ export default function ContactDetailClient({ contactId, contactName }: Props) {
               className={`px-4 py-3 text-sm font-medium transition-colors relative ${
                 activeTab === tab.key
                   ? 'text-teal-700 border-b-2 border-teal-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-ink3 hover:text-ink2'
               }`}
             >
               {tab.label}
               {tab.badge !== undefined && tab.badge > 0 && (
                 <span
                   className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    tab.key === 'messages' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'
+                    tab.key === 'messages' ? 'bg-red-500 text-white' : 'bg-bg3 text-ink3'
                   }`}
                 >
                   {tab.badge > 99 ? '99+' : tab.badge}

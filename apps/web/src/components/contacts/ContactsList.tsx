@@ -350,15 +350,15 @@ export default function ContactsList() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-bold text-ink">Contacts</h1>
+            <p className="text-sm text-ink3 mt-0.5">
               {loading ? '...' : `Showing ${contacts.length} of ${total}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/contacts/duplicates"
-              className="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className="px-3 py-2 text-sm text-ink3 border border-border-brand rounded-lg hover:bg-bg"
             >
               Duplicates
             </Link>
@@ -367,7 +367,7 @@ export default function ContactsList() {
               className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
                 showFilters || filterCount > 0
                   ? 'border-teal-200 bg-teal-50 text-teal-700'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  : 'border-border-brand text-ink3 hover:bg-bg'
               }`}
             >
               <span className="text-xs">&#9776;</span>
@@ -395,7 +395,7 @@ export default function ContactsList() {
             value={filters.q}
             onChange={(e) => updateFilters({ ...filters, q: e.target.value })}
             placeholder="Search by name, phone, email..."
-            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+            className="w-full px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
           />
         </div>
 
@@ -413,10 +413,10 @@ export default function ContactsList() {
             {chips.map((chip) => (
               <span
                 key={chip.label}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-bg2 text-ink3"
               >
                 {chip.label}
-                <button onClick={chip.onRemove} className="text-gray-400 hover:text-gray-600">
+                <button onClick={chip.onRemove} className="text-ink4 hover:text-ink3">
                   &times;
                 </button>
               </span>
@@ -441,21 +441,19 @@ export default function ContactsList() {
         )}
 
         {/* Contacts table */}
-        <div className="bg-white rounded-xl border border-gray-100">
+        <div className="bg-white rounded-xl border border-border-brand">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <p className="text-sm text-gray-400">Loading...</p>
+              <p className="text-sm text-ink4">Loading...</p>
             </div>
           ) : contacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
                 <span className="text-gray-300 text-xl">&#9678;</span>
               </div>
               {hasActiveFilters(filters) ? (
                 <>
-                  <p className="text-sm font-medium text-gray-400">
-                    No contacts match these filters
-                  </p>
+                  <p className="text-sm font-medium text-ink4">No contacts match these filters</p>
                   <button
                     onClick={() => updateFilters(EMPTY_FILTERS)}
                     className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -465,7 +463,7 @@ export default function ContactsList() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-gray-400">No contacts yet</p>
+                  <p className="text-sm font-medium text-ink4">No contacts yet</p>
                   <p className="text-xs text-gray-300 mt-1">
                     Add your first contact to get started
                   </p>
@@ -481,30 +479,24 @@ export default function ContactsList() {
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100">
+                <tr className="border-b border-border-brand">
                   <th className="w-10 px-3 py-3">
                     <input
                       type="checkbox"
                       checked={allPageSelected}
                       onChange={toggleSelectAll}
-                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                      className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
                     />
                   </th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Name</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Email</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Phone</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Stage</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
-                    Lifecycle
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Score</th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
-                    Assigned
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">
-                    Territory
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-400 px-4 py-3">Added</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Name</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Email</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Phone</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Stage</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Lifecycle</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Score</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Assigned</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Territory</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Added</th>
                 </tr>
               </thead>
               <tbody>
@@ -520,7 +512,7 @@ export default function ContactsList() {
                         type="checkbox"
                         checked={selectedIds.has(contact.id)}
                         onChange={() => toggleSelect(contact.id)}
-                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                        className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
                       />
                     </td>
                     <td
@@ -533,13 +525,11 @@ export default function ContactsList() {
                             {contact.full_name?.charAt(0)?.toUpperCase() ?? '?'}
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {contact.full_name}
-                        </span>
+                        <span className="text-sm font-medium text-ink">{contact.full_name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">{contact.email ?? '\u2014'}</td>
-                    <td className="px-4 py-4 text-sm text-gray-500">{contact.phone ?? '\u2014'}</td>
+                    <td className="px-4 py-4 text-sm text-ink3">{contact.email ?? '\u2014'}</td>
+                    <td className="px-4 py-4 text-sm text-ink3">{contact.phone ?? '\u2014'}</td>
                     <td className="px-4 py-4">
                       {contact.pipeline_stage ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
@@ -554,15 +544,15 @@ export default function ContactsList() {
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                             {
-                              subscriber: 'bg-gray-100 text-gray-600',
+                              subscriber: 'bg-bg2 text-ink3',
                               lead: 'bg-blue-50 text-blue-700',
                               marketing_qualified: 'bg-purple-50 text-purple-700',
                               sales_qualified: 'bg-orange-50 text-orange-700',
                               opportunity: 'bg-yellow-50 text-yellow-700',
                               customer: 'bg-green-50 text-green-700',
                               evangelist: 'bg-emerald-50 text-emerald-700',
-                              other: 'bg-gray-100 text-gray-600',
-                            }[contact.lifecycle_stage] ?? 'bg-gray-100 text-gray-600'
+                              other: 'bg-bg2 text-ink3',
+                            }[contact.lifecycle_stage] ?? 'bg-bg2 text-ink3'
                           }`}
                         >
                           {contact.lifecycle_stage
@@ -578,7 +568,7 @@ export default function ContactsList() {
                       {contact.lead_score != null || contact.lead_grade ? (
                         <div className="flex items-center gap-1.5">
                           {contact.lead_score != null && (
-                            <span className="text-sm text-gray-700">{contact.lead_score}</span>
+                            <span className="text-sm text-ink2">{contact.lead_score}</span>
                           )}
                           {contact.lead_grade && (
                             <span
@@ -589,7 +579,7 @@ export default function ContactsList() {
                                   C: 'bg-yellow-50 text-yellow-700',
                                   D: 'bg-orange-50 text-orange-700',
                                   F: 'bg-red-50 text-red-700',
-                                }[contact.lead_grade] ?? 'bg-gray-100 text-gray-600'
+                                }[contact.lead_grade] ?? 'bg-bg2 text-ink3'
                               }`}
                             >
                               {contact.lead_grade}
@@ -608,9 +598,7 @@ export default function ContactsList() {
                               {contact.assigned_user_name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <span className="text-xs text-gray-600">
-                            {contact.assigned_user_name}
-                          </span>
+                          <span className="text-xs text-ink3">{contact.assigned_user_name}</span>
                         </div>
                       ) : contact.assigned_to_user_id &&
                         tenantUsers.find((u) => u.id === contact.assigned_to_user_id) ? (
@@ -623,7 +611,7 @@ export default function ContactsList() {
                                 .toUpperCase()}
                             </span>
                           </div>
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-ink3">
                             {
                               tenantUsers.find((u) => u.id === contact.assigned_to_user_id)!
                                 .full_name
@@ -634,10 +622,10 @@ export default function ContactsList() {
                         <span className="text-sm text-gray-300">{'\u2014'}</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
+                    <td className="px-4 py-4 text-sm text-ink3">
                       {contact.territory ?? <span className="text-gray-300">{'\u2014'}</span>}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-400">
+                    <td className="px-4 py-4 text-sm text-ink4">
                       {new Date(contact.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',

@@ -26,7 +26,7 @@ const PRIORITY_BORDER: Record<string, string> = {
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
   medium: 'bg-amber-100 text-amber-700',
-  low: 'bg-gray-100 text-gray-500',
+  low: 'bg-bg2 text-ink3',
 }
 
 function startOfDay(d: Date): Date {
@@ -151,12 +151,12 @@ export default function TasksDashboard() {
     title: string,
     icon: string,
     sectionTasks: Task[],
-    countColor = 'bg-gray-100 text-gray-600'
+    countColor = 'bg-bg2 text-ink3'
   ) => (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
         <span>{icon}</span>
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+        <h3 className="text-sm font-semibold text-ink2">{title}</h3>
         {sectionTasks.length > 0 && (
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${countColor}`}>
             {sectionTasks.length}
@@ -164,7 +164,7 @@ export default function TasksDashboard() {
         )}
       </div>
       {sectionTasks.length === 0 ? (
-        <p className="text-xs text-gray-400 pl-7">No tasks</p>
+        <p className="text-xs text-ink4 pl-7">No tasks</p>
       ) : (
         <div className="space-y-1">
           {sectionTasks.map((task) => (
@@ -176,9 +176,9 @@ export default function TasksDashboard() {
                 type="checkbox"
                 checked={false}
                 onChange={() => void completeTask(task.id)}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
               />
-              <span className="text-sm text-gray-700 flex-1">{task.title}</span>
+              <span className="text-sm text-ink2 flex-1">{task.title}</span>
               {task.contacts?.full_name && (
                 <Link
                   href={`/contacts/${task.contact_id}`}
@@ -188,7 +188,7 @@ export default function TasksDashboard() {
                 </Link>
               )}
               {task.due_date && (
-                <span className="text-[10px] text-gray-400">{formatDue(task.due_date)}</span>
+                <span className="text-[10px] text-ink4">{formatDue(task.due_date)}</span>
               )}
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_BADGE[task.priority] ?? ''}`}
@@ -206,8 +206,8 @@ export default function TasksDashboard() {
     <div className="px-8 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{tasks.length} active</p>
+          <h1 className="text-xl font-bold text-ink">Tasks</h1>
+          <p className="text-sm text-ink3 mt-0.5">{tasks.length} active</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -225,9 +225,7 @@ export default function TasksDashboard() {
             key={tab}
             onClick={() => setFilter(tab)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              filter === tab
-                ? 'bg-teal-50 text-teal-700'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              filter === tab ? 'bg-teal-50 text-teal-700' : 'text-ink3 hover:bg-bg hover:text-ink2'
             }`}
           >
             {tab === 'all' ? 'All' : tab === 'mine' ? 'Mine' : 'Unassigned'}
@@ -237,7 +235,7 @@ export default function TasksDashboard() {
 
       {/* Add task modal */}
       {showAdd && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div className="bg-white rounded-xl border border-border-brand p-4 mb-6">
           <input
             type="text"
             value={newTitle}
@@ -255,28 +253,25 @@ export default function TasksDashboard() {
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+              className="text-xs border border-border-brand rounded px-2 py-1.5"
             />
             <input
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+              className="text-xs border border-border-brand rounded px-2 py-1.5"
             />
             <select
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+              className="text-xs border border-border-brand rounded px-2 py-1.5"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
             <div className="flex-1" />
-            <button
-              onClick={() => setShowAdd(false)}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
+            <button onClick={() => setShowAdd(false)} className="text-xs text-ink3 hover:text-ink2">
               Cancel
             </button>
             <button
@@ -291,7 +286,7 @@ export default function TasksDashboard() {
       )}
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-gray-400">Loading tasks...</div>
+        <div className="py-12 text-center text-sm text-ink4">Loading tasks...</div>
       ) : (
         <>
           {renderSection('Overdue', '\u{1F534}', overdue, 'bg-red-100 text-red-700')}

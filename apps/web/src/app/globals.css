@@ -11,12 +11,16 @@
   --ink: #1a1814;
   --ink2: #3d3a34;
   --ink3: #7a7468;
-  --accent: #1d4ed8;
-  --accent2: #1e40af;
+  --ink4: #a8a29a;
+  --accent: #0d9488;
   --teal: #0d9488;
+  --teal-light: #ccfbf1;
+  --teal-mid: #99f6e4;
+  --teal-dark: #0f766e;
   --amber: #d97706;
   --border: #dedad2;
-  --white: #ffffff;
+  --dark-bg: #12110e;
+  --dark-alt: #1a1714;
 }
 
 html,

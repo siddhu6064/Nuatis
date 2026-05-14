@@ -150,17 +150,17 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       )}
 
       {/* 1. Maya Status */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
               className={`w-3 h-3 rounded-full ${form.maya_enabled ? 'bg-green-500' : 'bg-gray-300'}`}
             />
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-ink">
                 Maya is {form.maya_enabled ? 'active' : 'paused'}
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-ink4 mt-0.5">
                 {form.maya_enabled
                   ? 'Maya is answering incoming calls'
                   : 'Maya will not answer calls while paused'}
@@ -171,7 +171,7 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
             onClick={toggleMaya}
             disabled={toggling}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
-              form.maya_enabled ? 'bg-teal-600' : 'bg-gray-200'
+              form.maya_enabled ? 'bg-teal-600' : 'bg-bg3'
             }`}
           >
             <span
@@ -191,31 +191,29 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       </div>
 
       {/* 2. Greeting & Personality */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-1">Greeting &amp; Personality</h2>
-        <p className="text-xs text-gray-400 mb-4">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-1">Greeting &amp; Personality</h2>
+        <p className="text-xs text-ink4 mb-4">
           Customize how Maya introduces herself and her tone of voice
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
-              Custom Greeting
-            </label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Custom Greeting</label>
             <input
               type="text"
               value={form.maya_greeting}
               onChange={(e) => setForm({ ...form, maya_greeting: e.target.value })}
               placeholder="e.g. Welcome to Riverside Dental! How can I help you today?"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-ink4 mt-1">
               Leave blank to use the default greeting for your business type
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Personality</label>
+            <label className="block text-xs font-medium text-ink2 mb-2">Personality</label>
             <div className="space-y-2">
               {PERSONALITIES.map((p) => (
                 <label
@@ -223,7 +221,7 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
                     form.maya_personality === p.value
                       ? 'border-teal-500 bg-teal-50'
-                      : 'border-gray-100 hover:bg-gray-50'
+                      : 'border-border-brand hover:bg-bg'
                   }`}
                 >
                   <input
@@ -235,13 +233,13 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
                     className="text-teal-600 focus:ring-teal-500"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{p.label}</p>
-                    <p className="text-xs text-gray-400">{p.desc}</p>
+                    <p className="text-sm font-medium text-ink">{p.label}</p>
+                    <p className="text-xs text-ink4">{p.desc}</p>
                   </div>
                 </label>
               ))}
             </div>
-            <p className="text-[11px] text-gray-400 mt-2">
+            <p className="text-[11px] text-ink4 mt-2">
               Professional is recommended for medical and legal businesses
             </p>
           </div>
@@ -249,40 +247,40 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       </div>
 
       {/* 3. Business Hours */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-1">Business Hours</h2>
-        <p className="text-xs text-gray-400 mb-4">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-1">Business Hours</h2>
+        <p className="text-xs text-ink4 mb-4">
           Maya uses these hours to schedule appointments and inform callers
         </p>
 
         <div className="space-y-2">
           <div className="flex items-start justify-between py-2 border-b border-gray-50">
-            <p className="text-sm text-gray-500">Mon&ndash;Fri</p>
-            <p className="text-sm text-gray-900">{settings.business_hours.mon_fri}</p>
+            <p className="text-sm text-ink3">Mon&ndash;Fri</p>
+            <p className="text-sm text-ink">{settings.business_hours.mon_fri}</p>
           </div>
           <div className="flex items-start justify-between py-2 border-b border-gray-50">
-            <p className="text-sm text-gray-500">Saturday</p>
-            <p className="text-sm text-gray-900 capitalize">{settings.business_hours.sat}</p>
+            <p className="text-sm text-ink3">Saturday</p>
+            <p className="text-sm text-ink capitalize">{settings.business_hours.sat}</p>
           </div>
           <div className="flex items-start justify-between py-2">
-            <p className="text-sm text-gray-500">Sunday</p>
-            <p className="text-sm text-gray-900 capitalize">{settings.business_hours.sun}</p>
+            <p className="text-sm text-ink3">Sunday</p>
+            <p className="text-sm text-ink capitalize">{settings.business_hours.sun}</p>
           </div>
         </div>
 
-        <p className="text-[11px] text-gray-400 mt-3">
+        <p className="text-[11px] text-ink4 mt-3">
           Business hours are set per your vertical configuration. Contact support to update.
         </p>
       </div>
 
       {/* 4. Call Handling */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-1">Call Handling</h2>
-        <p className="text-xs text-gray-400 mb-4">Configure appointment booking and escalation</p>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-1">Call Handling</h2>
+        <p className="text-xs text-ink4 mb-4">Configure appointment booking and escalation</p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-ink2 mb-1.5">
               Default Appointment Duration
             </label>
             <select
@@ -290,7 +288,7 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
               onChange={(e) =>
                 setForm({ ...form, appointment_duration_default: parseInt(e.target.value, 10) })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {DURATIONS.map((d) => (
                 <option key={d} value={d}>
@@ -301,17 +299,15 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
-              Transfer calls to
-            </label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Transfer calls to</label>
             <input
               type="tel"
               value={form.escalation_phone}
               onChange={(e) => setForm({ ...form, escalation_phone: e.target.value })}
               placeholder="+1 (555) 000-0000"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-ink4 mt-1">
               When a caller asks to speak with someone, Maya transfers the call here. Must be in
               E.164 format (e.g. +15551234567). Leave blank to disable transfers.
             </p>
@@ -320,9 +316,9 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       </div>
 
       {/* 5. Languages */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-1">Languages</h2>
-        <p className="text-xs text-gray-400 mb-4">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-1">Languages</h2>
+        <p className="text-xs text-ink4 mb-4">
           Maya will respond in whichever language the caller speaks, if it&apos;s in this list
         </p>
 
@@ -330,7 +326,7 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
           {LANGUAGES.map((lang) => (
             <label
               key={lang.code}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -338,18 +334,18 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
                 onChange={() => toggleLanguage(lang.code)}
                 className="rounded text-teal-600 focus:ring-teal-500"
               />
-              <span className="text-sm text-gray-900">{lang.label}</span>
+              <span className="text-sm text-ink">{lang.label}</span>
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-gray-400 mt-2">At least one language must be selected</p>
+        <p className="text-[11px] text-ink4 mt-2">At least one language must be selected</p>
       </div>
 
       {/* 6. Phone Number (read-only) */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-1">Phone Number</h2>
-        <p className="text-xs text-gray-400 mb-4">This is the number callers dial to reach Maya</p>
-        <p className="text-lg font-semibold text-gray-900">{formatPhone(settings.telnyx_number)}</p>
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-1">Phone Number</h2>
+        <p className="text-xs text-ink4 mb-4">This is the number callers dial to reach Maya</p>
+        <p className="text-lg font-semibold text-ink">{formatPhone(settings.telnyx_number)}</p>
       </div>
 
       {/* 7. Save button */}
@@ -361,7 +357,7 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
         >
           {saving ? 'Saving\u2026' : 'Save Settings'}
         </button>
-        {hasChanges && <p className="text-xs text-gray-400">You have unsaved changes</p>}
+        {hasChanges && <p className="text-xs text-ink4">You have unsaved changes</p>}
       </div>
     </div>
   )

@@ -73,20 +73,19 @@ export default function DealDetail({ dealId }: Props) {
     }
   }
 
-  if (loading || !deal)
-    return <div className="py-12 text-center text-sm text-gray-400">Loading...</div>
+  if (loading || !deal) return <div className="py-12 text-center text-sm text-ink4">Loading...</div>
 
   const isClosed = deal.is_closed_won || deal.is_closed_lost
 
   return (
     <div>
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gray-900">{deal.title}</h2>
+          <h2 className="text-lg font-bold text-ink">{deal.title}</h2>
           {isClosed && (
             <span
-              className={`px-2 py-0.5 rounded text-xs font-bold ${deal.is_closed_won ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+              className={`px-2 py-0.5 rounded text-xs font-bold ${deal.is_closed_won ? 'bg-green-100 text-green-700' : 'bg-bg2 text-ink3'}`}
             >
               {deal.is_closed_won ? 'Won' : 'Lost'}
             </span>
@@ -95,13 +94,13 @@ export default function DealDetail({ dealId }: Props) {
 
         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
           <div>
-            <span className="text-gray-400 text-xs">Value</span>
+            <span className="text-ink4 text-xs">Value</span>
             <p className="text-xl font-bold text-teal-600">
               ${Number(deal.value).toLocaleString()}
             </p>
           </div>
           <div>
-            <span className="text-gray-400 text-xs">Probability</span>
+            <span className="text-ink4 text-xs">Probability</span>
             <div className="flex items-center gap-2 mt-0.5">
               <input
                 type="range"
@@ -111,15 +110,15 @@ export default function DealDetail({ dealId }: Props) {
                 onChange={(e) => void updateDeal({ probability: parseInt(e.target.value) })}
                 className="flex-1 h-1.5 accent-teal-600"
               />
-              <span className="text-sm font-medium text-gray-700 w-8">{deal.probability}%</span>
+              <span className="text-sm font-medium text-ink2 w-8">{deal.probability}%</span>
             </div>
           </div>
           <div>
-            <span className="text-gray-400 text-xs">Stage</span>
+            <span className="text-ink4 text-xs">Stage</span>
             <select
               value={deal.pipeline_stage_id ?? ''}
               onChange={(e) => void updateDeal({ pipeline_stage_id: e.target.value })}
-              className="mt-0.5 w-full text-sm border border-gray-200 rounded px-2 py-1"
+              className="mt-0.5 w-full text-sm border border-border-brand rounded px-2 py-1"
             >
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -129,12 +128,12 @@ export default function DealDetail({ dealId }: Props) {
             </select>
           </div>
           <div>
-            <span className="text-gray-400 text-xs">Close Date</span>
+            <span className="text-ink4 text-xs">Close Date</span>
             <input
               type="date"
               value={deal.close_date ?? ''}
               onChange={(e) => void updateDeal({ close_date: e.target.value || null })}
-              className="mt-0.5 w-full text-sm border border-gray-200 rounded px-2 py-1"
+              className="mt-0.5 w-full text-sm border border-border-brand rounded px-2 py-1"
             />
           </div>
         </div>
@@ -151,7 +150,7 @@ export default function DealDetail({ dealId }: Props) {
             <button
               onClick={() => void updateDeal({ is_closed_lost: true })}
               disabled={saving}
-              className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+              className="px-4 py-1.5 text-xs font-medium text-ink3 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-50"
             >
               Mark Lost
             </button>
@@ -161,8 +160,8 @@ export default function DealDetail({ dealId }: Props) {
 
       {/* Contact + Company */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <span className="text-[10px] font-medium text-gray-400 uppercase">Contact</span>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <span className="text-[10px] font-medium text-ink4 uppercase">Contact</span>
           {deal.contact_id && deal.contact_name ? (
             <Link
               href={`/contacts/${deal.contact_id}`}
@@ -171,11 +170,11 @@ export default function DealDetail({ dealId }: Props) {
               {deal.contact_name}
             </Link>
           ) : (
-            <p className="text-sm text-gray-400 mt-1">{'\u2014'}</p>
+            <p className="text-sm text-ink4 mt-1">{'\u2014'}</p>
           )}
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <span className="text-[10px] font-medium text-gray-400 uppercase">Company</span>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <span className="text-[10px] font-medium text-ink4 uppercase">Company</span>
           {deal.company_id && deal.company_name ? (
             <Link
               href={`/companies/${deal.company_id}`}
@@ -184,14 +183,14 @@ export default function DealDetail({ dealId }: Props) {
               {deal.company_name}
             </Link>
           ) : (
-            <p className="text-sm text-gray-400 mt-1">{'\u2014'}</p>
+            <p className="text-sm text-ink4 mt-1">{'\u2014'}</p>
           )}
         </div>
       </div>
 
       {/* Notes */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Notes</h3>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h3 className="text-sm font-semibold text-ink2 mb-2">Notes</h3>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -200,15 +199,15 @@ export default function DealDetail({ dealId }: Props) {
           }}
           rows={3}
           placeholder="Add notes..."
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 placeholder-gray-300 resize-none"
+          className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 placeholder-gray-300 resize-none"
         />
       </div>
 
       {/* Activity */}
       {deal.contact_id && (
-        <div className="bg-white rounded-xl border border-gray-100">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Activity</h3>
+        <div className="bg-white rounded-xl border border-border-brand">
+          <div className="px-4 py-3 border-b border-border-brand">
+            <h3 className="text-sm font-semibold text-ink2">Activity</h3>
           </div>
           <ActivityTimeline contactId={deal.contact_id} />
         </div>

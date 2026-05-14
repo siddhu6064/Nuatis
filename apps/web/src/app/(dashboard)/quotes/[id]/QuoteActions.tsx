@@ -66,7 +66,7 @@ export default function QuoteActions({
         {/* Download PDF */}
         <button
           onClick={downloadPdf}
-          className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg"
+          className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
         >
           Download PDF
         </button>
@@ -74,7 +74,7 @@ export default function QuoteActions({
         {/* Copy share link */}
         <button
           onClick={copyLink}
-          className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg"
+          className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
         >
           {copied ? 'Copied!' : 'Copy Link'}
         </button>
@@ -116,7 +116,7 @@ export default function QuoteActions({
             <button
               onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
               disabled={loading === 'dup'}
-              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg"
+              className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
             >
               Duplicate
             </button>
@@ -135,7 +135,7 @@ export default function QuoteActions({
             <button
               onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
               disabled={loading === 'dup'}
-              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg"
+              className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
             >
               Duplicate
             </button>
@@ -146,7 +146,7 @@ export default function QuoteActions({
           <button
             onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
             disabled={loading === 'dup'}
-            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg"
+            className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
           >
             Duplicate
           </button>
@@ -157,15 +157,15 @@ export default function QuoteActions({
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-xl">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Reject Quote</h3>
-            <p className="text-xs text-gray-500 mb-3">
+            <h3 className="text-sm font-semibold text-ink mb-3">Reject Quote</h3>
+            <p className="text-xs text-ink3 mb-3">
               Quote has a {discountPct ?? 0}% discount. Provide a reason for rejection (optional).
             </p>
             <textarea
               value={rejectNote}
               onChange={(e) => setRejectNote(e.target.value)}
               placeholder="Reason for rejection..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
               rows={3}
             />
             <div className="flex items-center gap-2 justify-end">
@@ -174,7 +174,7 @@ export default function QuoteActions({
                   setShowRejectModal(false)
                   setRejectNote('')
                 }}
-                className="text-xs text-gray-500 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
               >
                 Cancel
               </button>

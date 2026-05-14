@@ -69,16 +69,16 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-400">Loading quote...</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <p className="text-sm text-ink4">Loading quote...</p>
       </div>
     )
   }
 
   if (!quote) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-500">Quote not found.</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <p className="text-sm text-ink3">Quote not found.</p>
       </div>
     )
   }
@@ -87,25 +87,25 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   const canAct = !acted && !isExpired && (quote.status === 'sent' || quote.status === 'viewed')
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-bg px-4 py-8">
       <div className="max-w-xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center mx-auto mb-3">
             <span className="text-white text-sm font-bold">N</span>
           </div>
-          <h1 className="text-lg font-bold text-gray-900">{quote.business_name}</h1>
+          <h1 className="text-lg font-bold text-ink">{quote.business_name}</h1>
         </div>
 
         {/* Acted confirmation */}
         {acted && (
           <div
-            className={`rounded-xl p-6 text-center mb-6 ${acted === 'accepted' ? 'bg-green-50 border border-green-100' : 'bg-gray-50 border border-gray-200'}`}
+            className={`rounded-xl p-6 text-center mb-6 ${acted === 'accepted' ? 'bg-green-50 border border-green-100' : 'bg-bg border border-border-brand'}`}
           >
-            <p className="text-lg font-semibold text-gray-900 mb-1">
+            <p className="text-lg font-semibold text-ink mb-1">
               {acted === 'accepted' ? 'Quote Accepted!' : 'Quote Declined'}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink3">
               {acted === 'accepted'
                 ? `Thank you! ${quote.business_name} will be in touch.`
                 : `${quote.business_name} has been notified.`}
@@ -124,18 +124,16 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
         )}
 
         {/* Quote card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
+        <div className="bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border-brand">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-400">Quote</p>
-                <p className="text-sm font-mono font-semibold text-gray-900">
-                  {quote.quote_number}
-                </p>
+                <p className="text-xs text-ink4">Quote</p>
+                <p className="text-sm font-mono font-semibold text-ink">{quote.quote_number}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-400">Date</p>
-                <p className="text-sm text-gray-700">
+                <p className="text-xs text-ink4">Date</p>
+                <p className="text-sm text-ink2">
                   {new Date(quote.created_at).toLocaleDateString('en-US', {
                     month: 'long',
                     day: 'numeric',
@@ -145,8 +143,8 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
               </div>
             </div>
             {quote.contacts && (
-              <p className="text-xs text-gray-400 mt-3">
-                For: <span className="text-gray-700">{quote.contacts.full_name}</span>
+              <p className="text-xs text-ink4 mt-3">
+                For: <span className="text-ink2">{quote.contacts.full_name}</span>
               </p>
             )}
           </div>
@@ -172,9 +170,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
                     <div key={`pkg-${item.package_id}`} className="border-l-2 border-indigo-200">
                       <div className="px-6 py-2 bg-indigo-50/50 flex items-center justify-between">
                         <p className="text-sm font-medium text-indigo-800">{pkgName}</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          ${bundleTotal.toFixed(2)}
-                        </p>
+                        <p className="text-sm font-medium text-ink">${bundleTotal.toFixed(2)}</p>
                       </div>
                       <div className="hidden sm:block">
                         {serviceRows.map((si, j) => (
@@ -183,12 +179,12 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
                             className="px-6 pl-10 py-2 flex items-center justify-between"
                           >
                             <div className="flex-1">
-                              <p className="text-xs text-gray-600">{si.description}</p>
-                              <p className="text-[10px] text-gray-400">
+                              <p className="text-xs text-ink3">{si.description}</p>
+                              <p className="text-[10px] text-ink4">
                                 {si.quantity} &times; ${Number(si.unit_price).toFixed(2)}
                               </p>
                             </div>
-                            <p className="text-xs text-gray-500">${Number(si.total).toFixed(2)}</p>
+                            <p className="text-xs text-ink3">${Number(si.total).toFixed(2)}</p>
                           </div>
                         ))}
                         {discountRow && (
@@ -211,12 +207,12 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
                   rendered.push(
                     <div key={i} className="px-6 py-3 flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm text-gray-700">{item.description}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm text-ink2">{item.description}</p>
+                        <p className="text-xs text-ink4">
                           {item.quantity} &times; ${Number(item.unit_price).toFixed(2)}
                         </p>
                       </div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-ink">
                         ${Number(item.total).toFixed(2)}
                       </p>
                     </div>
@@ -228,33 +224,33 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
           </div>
 
           {/* Totals */}
-          <div className="border-t border-gray-100 px-6 py-4 space-y-1">
+          <div className="border-t border-border-brand px-6 py-4 space-y-1">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
+              <span className="text-ink3">Subtotal</span>
               <span>${Number(quote.subtotal).toFixed(2)}</span>
             </div>
             {Number(quote.tax_rate) > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tax ({quote.tax_rate}%)</span>
+                <span className="text-ink3">Tax ({quote.tax_rate}%)</span>
                 <span>${Number(quote.tax_amount).toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-xl font-bold pt-2 border-t border-gray-100">
+            <div className="flex justify-between text-xl font-bold pt-2 border-t border-border-brand">
               <span>Total</span>
               <span className="text-teal-600">${Number(quote.total).toFixed(2)}</span>
             </div>
           </div>
 
           {quote.notes && (
-            <div className="border-t border-gray-100 px-6 py-4">
-              <p className="text-xs text-gray-400 mb-1">Notes</p>
-              <p className="text-sm text-gray-600">{quote.notes}</p>
+            <div className="border-t border-border-brand px-6 py-4">
+              <p className="text-xs text-ink4 mb-1">Notes</p>
+              <p className="text-sm text-ink3">{quote.notes}</p>
             </div>
           )}
 
           {quote.valid_until && !isExpired && (
-            <div className="border-t border-gray-100 px-6 py-3">
-              <p className="text-xs text-gray-400">
+            <div className="border-t border-border-brand px-6 py-3">
+              <p className="text-xs text-ink4">
                 Valid until{' '}
                 {new Date(quote.valid_until).toLocaleDateString('en-US', {
                   month: 'long',
@@ -268,33 +264,31 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
 
         {/* Deposit info card */}
         {quote.deposit_amount != null && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-6">
+          <div className="bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden mt-6">
             <div className="px-6 py-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-base">💳</span>
-                <h3 className="text-sm font-semibold text-gray-900">Deposit Information</h3>
+                <h3 className="text-sm font-semibold text-ink">Deposit Information</h3>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-ink3 mb-4">
                 A {Number(quote.deposit_pct)}% deposit is required to confirm this quote.
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Deposit Due</span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="text-ink3">Deposit Due</span>
+                  <span className="font-semibold text-ink">
                     ${Number(quote.deposit_amount).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Remaining</span>
-                  <span className="text-gray-700">
-                    ${Number(quote.remaining_balance).toFixed(2)}
-                  </span>
+                  <span className="text-ink3">Remaining</span>
+                  <span className="text-ink2">${Number(quote.remaining_balance).toFixed(2)}</span>
                 </div>
-                <p className="text-xs text-gray-400">(due at completion)</p>
+                <p className="text-xs text-ink4">(due at completion)</p>
               </div>
             </div>
             {quote.contacts?.email && (
-              <div className="border-t border-gray-100 px-6 py-3">
+              <div className="border-t border-border-brand px-6 py-3">
                 <a
                   href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Deposit payment — ${quote.title}`)}`}
                   className="block w-full text-center py-2 text-sm text-teal-600 font-medium border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
@@ -319,7 +313,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
             <button
               onClick={decline}
               disabled={acting}
-              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700"
+              className="w-full py-2 text-sm text-ink3 hover:text-ink2"
             >
               Decline
             </button>
@@ -331,7 +325,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
             onClick={() => {
               window.open(`/api/quotes/view/${token}/pdf`, '_blank')
             }}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-ink4 hover:text-ink3"
           >
             Download PDF
           </button>

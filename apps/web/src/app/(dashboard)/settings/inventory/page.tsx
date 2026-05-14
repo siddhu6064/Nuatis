@@ -18,7 +18,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-gray-200'
+        checked ? 'bg-teal-600' : 'bg-bg3'
       }`}
     >
       <span
@@ -76,25 +76,25 @@ export default function InventorySettingsPage() {
 
   return (
     <div className="px-8 py-8 max-w-2xl">
-      <h1 className="text-xl font-bold text-gray-900 mb-1">Inventory Settings</h1>
-      <p className="text-sm text-gray-400 mb-6">
+      <h1 className="text-xl font-bold text-ink mb-1">Inventory Settings</h1>
+      <p className="text-sm text-ink4 mb-6">
         Control how inventory interacts with other parts of Nuatis.
       </p>
 
-      <div className="bg-white rounded-xl border border-gray-100">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Quote fulfillment</h2>
+      <div className="bg-white rounded-xl border border-border-brand">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Quote fulfillment</h2>
         </div>
         <div className="px-5 py-5">
           {loading ? (
-            <p className="text-sm text-gray-400">Loading…</p>
+            <p className="text-sm text-ink4">Loading…</p>
           ) : (
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-ink">
                   Auto-deduct inventory when a quote is accepted
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-ink3 mt-1">
                   When a customer accepts a quote, any quote line items linked to an inventory item
                   will automatically decrement the item quantity. Quantities clamp at zero — they
                   never go negative.

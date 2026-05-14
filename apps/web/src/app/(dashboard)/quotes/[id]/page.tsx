@@ -42,7 +42,7 @@ interface Quote {
 }
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
-  draft: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Draft' },
+  draft: { bg: 'bg-bg2', text: 'text-ink3', label: 'Draft' },
   sent: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Sent' },
   viewed: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Viewed' },
   accepted: { bg: 'bg-green-50', text: 'text-green-700', label: 'Accepted' },
@@ -104,7 +104,7 @@ export default async function QuoteDetailPage({ params }: Props) {
     <div className="px-8 py-8 max-w-3xl">
       <Link
         href="/quotes"
-        className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-ink4 hover:text-ink3 mb-6"
       >
         &larr; Back to Quotes
       </Link>
@@ -113,7 +113,7 @@ export default async function QuoteDetailPage({ params }: Props) {
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900">{quote.quote_number}</h1>
+            <h1 className="text-xl font-bold text-ink">{quote.quote_number}</h1>
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge.bg} ${badge.text}`}
             >
@@ -125,9 +125,9 @@ export default async function QuoteDetailPage({ params }: Props) {
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500 mt-1">{quote.title}</p>
+          <p className="text-sm text-ink3 mt-1">{quote.title}</p>
           {quote.status !== 'draft' && (
-            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <p className="text-xs text-ink4 mt-2 flex items-center gap-1">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-3.5 w-3.5"
@@ -203,45 +203,45 @@ export default async function QuoteDetailPage({ params }: Props) {
 
       {/* Contact */}
       {quote.contacts && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-          <p className="text-sm font-medium text-gray-900">{quote.contacts.full_name}</p>
-          <p className="text-xs text-gray-400">
+        <div className="bg-white rounded-xl border border-border-brand p-4 mb-6">
+          <p className="text-sm font-medium text-ink">{quote.contacts.full_name}</p>
+          <p className="text-xs text-ink4">
             {[quote.contacts.phone, quote.contacts.email].filter(Boolean).join(' · ') || '—'}
           </p>
         </div>
       )}
 
       {/* Line Items */}
-      <div className="bg-white rounded-xl border border-gray-100 mb-6">
+      <div className="bg-white rounded-xl border border-border-brand mb-6">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Description</th>
-              <th className="text-right text-xs font-medium text-gray-400 px-6 py-3">Qty</th>
-              <th className="text-right text-xs font-medium text-gray-400 px-6 py-3">Price</th>
-              <th className="text-right text-xs font-medium text-gray-400 px-6 py-3">Total</th>
+            <tr className="border-b border-border-brand">
+              <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Description</th>
+              <th className="text-right text-xs font-medium text-ink4 px-6 py-3">Qty</th>
+              <th className="text-right text-xs font-medium text-ink4 px-6 py-3">Price</th>
+              <th className="text-right text-xs font-medium text-ink4 px-6 py-3">Total</th>
             </tr>
           </thead>
           <tbody>
             {(items ?? []).map((item) => (
               <tr key={item.id} className="border-b border-gray-50 last:border-0">
-                <td className="px-6 py-3 text-sm text-gray-700">{item.description}</td>
-                <td className="px-6 py-3 text-sm text-gray-500 text-right">{item.quantity}</td>
-                <td className="px-6 py-3 text-sm text-gray-500 text-right">
+                <td className="px-6 py-3 text-sm text-ink2">{item.description}</td>
+                <td className="px-6 py-3 text-sm text-ink3 text-right">{item.quantity}</td>
+                <td className="px-6 py-3 text-sm text-ink3 text-right">
                   ${Number(item.unit_price).toFixed(2)}
                 </td>
-                <td className="px-6 py-3 text-sm text-gray-900 text-right font-medium">
+                <td className="px-6 py-3 text-sm text-ink text-right font-medium">
                   ${Number(item.total).toFixed(2)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="border-t border-gray-100 px-6 py-4">
+        <div className="border-t border-border-brand px-6 py-4">
           <div className="flex justify-end">
             <div className="w-56 space-y-1">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
+                <span className="text-ink3">Subtotal</span>
                 <span>${Number(quote.subtotal).toFixed(2)}</span>
               </div>
               {Number(quote.discount_pct ?? 0) > 0 && (
@@ -254,11 +254,11 @@ export default async function QuoteDetailPage({ params }: Props) {
               )}
               {Number(quote.tax_rate) > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Tax ({quote.tax_rate}%)</span>
+                  <span className="text-ink3">Tax ({quote.tax_rate}%)</span>
                   <span>${Number(quote.tax_amount).toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-lg font-bold border-t border-gray-100 pt-1">
+              <div className="flex justify-between text-lg font-bold border-t border-border-brand pt-1">
                 <span>Total</span>
                 <span className="text-teal-600">${Number(quote.total).toFixed(2)}</span>
               </div>
@@ -268,34 +268,32 @@ export default async function QuoteDetailPage({ params }: Props) {
       </div>
 
       {/* Deposit info */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">Deposit</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-6 mb-6">
+        <h2 className="text-sm font-semibold text-ink mb-2">Deposit</h2>
         {quote.deposit_amount != null ? (
           <div className="space-y-1 text-sm">
-            <p className="text-gray-700">
+            <p className="text-ink2">
               Deposit: {Number(quote.deposit_pct)}% — ${Number(quote.deposit_amount).toFixed(2)}
             </p>
-            <p className="text-gray-700">
-              Remaining: ${Number(quote.remaining_balance).toFixed(2)}
-            </p>
+            <p className="text-ink2">Remaining: ${Number(quote.remaining_balance).toFixed(2)}</p>
           </div>
         ) : (
-          <p className="text-sm text-gray-400">Not configured</p>
+          <p className="text-sm text-ink4">Not configured</p>
         )}
       </div>
 
       {/* Notes */}
       {quote.notes && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">Notes</h2>
-          <p className="text-sm text-gray-600">{quote.notes}</p>
+        <div className="bg-white rounded-xl border border-border-brand p-6 mb-6">
+          <h2 className="text-sm font-semibold text-ink mb-2">Notes</h2>
+          <p className="text-sm text-ink3">{quote.notes}</p>
         </div>
       )}
 
       {/* Activity */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Activity</h2>
-        <div className="space-y-2 text-xs text-gray-500">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <h2 className="text-sm font-semibold text-ink mb-3">Activity</h2>
+        <div className="space-y-2 text-xs text-ink3">
           <p>
             Created:{' '}
             {new Date(quote.created_at).toLocaleString('en-US', {

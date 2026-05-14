@@ -103,7 +103,7 @@ interface Props {
 }
 
 const INP =
-  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+  'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
 export default function AppointmentDrawer({
   appt,
@@ -209,13 +209,13 @@ export default function AppointmentDrawer({
       {/* Panel */}
       <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">
             {isEditing ? 'Edit Appointment' : 'Appointment Details'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-ink4 hover:text-ink3 transition-colors"
             aria-label="Close"
           >
             <svg
@@ -235,7 +235,7 @@ export default function AppointmentDrawer({
             {/* Edit form */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Title</label>
                 <input
                   type="text"
                   value={form.title}
@@ -246,7 +246,7 @@ export default function AppointmentDrawer({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Date</label>
                 <input
                   type="date"
                   value={form.date}
@@ -257,7 +257,7 @@ export default function AppointmentDrawer({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                  <label className="block text-xs font-medium text-ink2 mb-1">Start Time</label>
                   <input
                     type="time"
                     value={form.startTime}
@@ -266,7 +266,7 @@ export default function AppointmentDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                  <label className="block text-xs font-medium text-ink2 mb-1">End Time</label>
                   <input
                     type="time"
                     value={form.endTime}
@@ -277,7 +277,7 @@ export default function AppointmentDrawer({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-xs font-medium text-ink2 mb-1">Status</label>
                 <select
                   value={form.status}
                   onChange={(e) => set('status', e.target.value as AppointmentStatus)}
@@ -292,8 +292,8 @@ export default function AppointmentDrawer({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Notes <span className="text-gray-400 font-normal">(optional)</span>
+                <label className="block text-xs font-medium text-ink2 mb-1">
+                  Notes <span className="text-ink4 font-normal">(optional)</span>
                 </label>
                 <textarea
                   value={form.notes}
@@ -313,14 +313,14 @@ export default function AppointmentDrawer({
 
             {/* Edit footer */}
             {deleteConfirm ? (
-              <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-3">
-                <p className="text-sm text-gray-700 font-medium">Delete this appointment?</p>
-                <p className="text-xs text-gray-500">This cannot be undone.</p>
+              <div className="px-6 py-4 border-t border-border-brand shrink-0 space-y-3">
+                <p className="text-sm text-ink2 font-medium">Delete this appointment?</p>
+                <p className="text-xs text-ink3">This cannot be undone.</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setDeleteConfirm(false)}
                     disabled={deleting}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="flex-1 px-4 py-2 text-sm font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
                   >
                     Keep
                   </button>
@@ -334,7 +334,7 @@ export default function AppointmentDrawer({
                 </div>
               </div>
             ) : (
-              <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
+              <div className="flex gap-2 px-6 py-4 border-t border-border-brand shrink-0">
                 {canDelete && (
                   <button
                     onClick={() => setDeleteConfirm(true)}
@@ -347,7 +347,7 @@ export default function AppointmentDrawer({
                 <button
                   onClick={cancelEdit}
                   disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -366,18 +366,16 @@ export default function AppointmentDrawer({
             {/* Read view */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">
                   Contact
                 </p>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-ink">
                   {localAppt.contacts?.full_name ?? '—'}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                  Status
-                </p>
+                <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">Status</p>
                 <span
                   className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold text-white"
                   style={{ backgroundColor: color }}
@@ -387,34 +385,28 @@ export default function AppointmentDrawer({
               </div>
 
               <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                  Date
-                </p>
-                <p className="text-sm text-gray-700">{start.date}</p>
+                <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">Date</p>
+                <p className="text-sm text-ink2">{start.date}</p>
               </div>
 
               <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                  Time
-                </p>
-                <p className="text-sm text-gray-700">
+                <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">Time</p>
+                <p className="text-sm text-ink2">
                   {start.time} – {endTime}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                  Type
-                </p>
-                <p className="text-sm text-gray-700">{localAppt.title}</p>
+                <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">Type</p>
+                <p className="text-sm text-ink2">{localAppt.title}</p>
               </div>
 
               {localAppt.staff_members && (
                 <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">
                     Staff
                   </p>
-                  <span className="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                  <span className="inline-flex items-center gap-1.5 text-sm text-ink2">
                     <span
                       className="inline-block w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: localAppt.staff_members.color_hex }}
@@ -426,16 +418,16 @@ export default function AppointmentDrawer({
 
               {localAppt.notes && (
                 <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                  <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">
                     Notes
                   </p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{localAppt.notes}</p>
+                  <p className="text-sm text-ink2 whitespace-pre-wrap">{localAppt.notes}</p>
                 </div>
               )}
             </div>
 
             {/* Read footer */}
-            <div className="px-6 py-4 border-t border-gray-100">
+            <div className="px-6 py-4 border-t border-border-brand">
               <button
                 onClick={enterEdit}
                 className="block w-full text-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

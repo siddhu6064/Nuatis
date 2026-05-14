@@ -92,7 +92,7 @@ export default function ModuleSettings({ initialModules, isOwner }: Props) {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
+      <div className="bg-white rounded-xl border border-border-brand divide-y divide-border-brand">
         {MODULES.map((mod) => {
           const enabled = modules[mod.key] !== false
 
@@ -101,13 +101,13 @@ export default function ModuleSettings({ initialModules, isOwner }: Props) {
           return (
             <div key={mod.key} className="px-6 py-4 flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{mod.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{mod.description}</p>
+                <p className="text-sm font-medium text-ink">{mod.label}</p>
+                <p className="text-xs text-ink4 mt-0.5">{mod.description}</p>
                 {hint && <p className="text-[10px] mt-1 text-amber-600">{hint}</p>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span
-                  className={`text-xs font-medium w-5 text-right ${enabled ? 'text-teal-600' : 'text-gray-400'}`}
+                  className={`text-xs font-medium w-5 text-right ${enabled ? 'text-teal-600' : 'text-ink4'}`}
                 >
                   {enabled ? 'On' : 'Off'}
                 </span>

@@ -18,7 +18,7 @@ import {
 } from 'recharts'
 
 const COLORS = [
-  '#3b82f6',
+  '#0d9488',
   '#22c55e',
   '#f59e0b',
   '#ef4444',
@@ -207,7 +207,7 @@ export default function ReportDetailPage() {
   function renderChart() {
     if (!result?.rows?.length) {
       return (
-        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+        <div className="flex items-center justify-center h-48 text-ink4 text-sm">
           No data available for the selected date range.
         </div>
       )
@@ -223,7 +223,7 @@ export default function ReportDetailPage() {
           <div className="text-6xl font-bold text-blue-600">
             {typeof total === 'number' ? total.toLocaleString() : total}
           </div>
-          <div className="text-sm text-gray-500 mt-2">{report?.name}</div>
+          <div className="text-sm text-ink3 mt-2">{report?.name}</div>
         </div>
       )
     }
@@ -234,23 +234,23 @@ export default function ReportDetailPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 text-gray-500 font-medium">Label</th>
-                <th className="text-right py-2 px-3 text-gray-500 font-medium">Value</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left py-2 px-3 text-ink3 font-medium">Label</th>
+                <th className="text-right py-2 px-3 text-ink3 font-medium">Value</th>
                 {sorted[0]?.count !== undefined && (
-                  <th className="text-right py-2 px-3 text-gray-500 font-medium">Count</th>
+                  <th className="text-right py-2 px-3 text-ink3 font-medium">Count</th>
                 )}
               </tr>
             </thead>
             <tbody>
               {sorted.map((row, i) => (
-                <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-2 px-3 text-gray-700">{row.label}</td>
-                  <td className="py-2 px-3 text-right text-gray-900 font-medium tabular-nums">
+                <tr key={i} className="border-b border-border-brand hover:bg-bg">
+                  <td className="py-2 px-3 text-ink2">{row.label}</td>
+                  <td className="py-2 px-3 text-right text-ink font-medium tabular-nums">
                     {row.value.toLocaleString()}
                   </td>
                   {row.count !== undefined && (
-                    <td className="py-2 px-3 text-right text-gray-500 tabular-nums">{row.count}</td>
+                    <td className="py-2 px-3 text-right text-ink3 tabular-nums">{row.count}</td>
                   )}
                 </tr>
               ))}
@@ -293,7 +293,7 @@ export default function ReportDetailPage() {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis />
             <Tooltip formatter={(value) => String(Number(value).toLocaleString())} />
-            <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+            <Line type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={2} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
       )
@@ -307,7 +307,7 @@ export default function ReportDetailPage() {
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis />
           <Tooltip formatter={(value) => String(Number(value).toLocaleString())} />
-          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="value" fill="#0d9488" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     )
@@ -318,7 +318,7 @@ export default function ReportDetailPage() {
   if (loadingReport) {
     return (
       <div className="px-8 py-8 max-w-5xl">
-        <div className="py-16 text-center text-gray-400 text-sm">Loading report…</div>
+        <div className="py-16 text-center text-ink4 text-sm">Loading report…</div>
       </div>
     )
   }
@@ -346,15 +346,15 @@ export default function ReportDetailPage() {
           <div className="flex items-center gap-2 mb-1">
             <button
               onClick={() => router.push('/reports')}
-              className="text-gray-400 hover:text-gray-600 text-sm"
+              className="text-ink4 hover:text-ink3 text-sm"
             >
               ← Reports
             </button>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{report.name}</h1>
-          {report.description && <p className="text-sm text-gray-500 mt-1">{report.description}</p>}
+          <h1 className="text-2xl font-bold text-ink">{report.name}</h1>
+          {report.description && <p className="text-sm text-ink3 mt-1">{report.description}</p>}
           {report.last_run && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-ink4 mt-1">
               Last run{' '}
               {new Date(report.last_run).toLocaleString('en-US', {
                 month: 'short',
@@ -374,7 +374,7 @@ export default function ReportDetailPage() {
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
               report.pinned
                 ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                : 'bg-white text-ink3 border-border-brand hover:bg-bg'
             }`}
           >
             <span>{report.pinned ? '★' : '☆'}</span>
@@ -384,7 +384,7 @@ export default function ReportDetailPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing || loadingData}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-brand text-ink3 text-sm font-medium rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
           >
             {refreshing ? 'Refreshing…' : '↻ Refresh'}
           </button>
@@ -392,7 +392,7 @@ export default function ReportDetailPage() {
           <button
             onClick={handleExportCSV}
             disabled={!result?.rows?.length}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-brand text-ink3 text-sm font-medium rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
           >
             ↓ Export CSV
           </button>
@@ -408,11 +408,11 @@ export default function ReportDetailPage() {
 
       {/* Date Range Selector */}
       <div className="flex items-center gap-3 flex-wrap">
-        <label className="text-sm font-medium text-gray-600">Date Range:</label>
+        <label className="text-sm font-medium text-ink3">Date Range:</label>
         <select
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          className="text-sm border border-border-brand rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
         >
           {DATE_RANGE_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>
@@ -427,23 +427,23 @@ export default function ReportDetailPage() {
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="text-sm border border-border-brand rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
-            <span className="text-gray-400 text-sm">to</span>
+            <span className="text-ink4 text-sm">to</span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="text-sm border border-border-brand rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
           </>
         )}
       </div>
 
       {/* Chart */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
+      <div className="bg-white border border-border-brand rounded-xl p-6">
         {loadingData ? (
-          <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+          <div className="flex items-center justify-center h-48 text-ink4 text-sm">
             Loading chart data…
           </div>
         ) : (
@@ -453,18 +453,18 @@ export default function ReportDetailPage() {
 
       {/* Data Table */}
       {result?.rows && result.rows.length > 0 && report.chart_type !== 'table' && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Data</h2>
+        <div className="bg-white border border-border-brand rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-brand">
+            <h2 className="text-sm font-semibold text-ink2">Data</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-2.5 px-4 text-gray-500 font-medium">Label</th>
-                  <th className="text-right py-2.5 px-4 text-gray-500 font-medium">Value</th>
+                <tr className="bg-bg border-b border-border-brand">
+                  <th className="text-left py-2.5 px-4 text-ink3 font-medium">Label</th>
+                  <th className="text-right py-2.5 px-4 text-ink3 font-medium">Value</th>
                   {result.rows[0]?.count !== undefined && (
-                    <th className="text-right py-2.5 px-4 text-gray-500 font-medium">Count</th>
+                    <th className="text-right py-2.5 px-4 text-ink3 font-medium">Count</th>
                   )}
                 </tr>
               </thead>
@@ -472,13 +472,13 @@ export default function ReportDetailPage() {
                 {[...result.rows]
                   .sort((a, b) => b.value - a.value)
                   .map((row, i) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 px-4 text-gray-700">{row.label}</td>
-                      <td className="py-2.5 px-4 text-right text-gray-900 font-medium tabular-nums">
+                    <tr key={i} className="border-b border-border-brand hover:bg-bg">
+                      <td className="py-2.5 px-4 text-ink2">{row.label}</td>
+                      <td className="py-2.5 px-4 text-right text-ink font-medium tabular-nums">
                         {row.value.toLocaleString()}
                       </td>
                       {row.count !== undefined && (
-                        <td className="py-2.5 px-4 text-right text-gray-500 tabular-nums">
+                        <td className="py-2.5 px-4 text-right text-ink3 tabular-nums">
                           {row.count}
                         </td>
                       )}
@@ -487,9 +487,9 @@ export default function ReportDetailPage() {
               </tbody>
               {result.total !== undefined && (
                 <tfoot>
-                  <tr className="bg-gray-50 border-t-2 border-gray-200">
-                    <td className="py-2.5 px-4 font-semibold text-gray-700">Total</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-gray-900 tabular-nums">
+                  <tr className="bg-bg border-t-2 border-border-brand">
+                    <td className="py-2.5 px-4 font-semibold text-ink2">Total</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-ink tabular-nums">
                       {result.total.toLocaleString()}
                     </td>
                     {result.rows[0]?.count !== undefined && <td />}

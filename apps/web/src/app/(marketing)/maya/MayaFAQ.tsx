@@ -35,17 +35,17 @@ export default function MayaFAQ() {
   return (
     <div className="space-y-2">
       {FAQS.map((faq, i) => (
-        <div key={i} className="border border-gray-100 rounded-lg">
+        <div key={i} className="border border-border-brand rounded-lg">
           <button
             onClick={() => setOpen(open === i ? null : i)}
             className="w-full flex items-center justify-between px-4 py-3 text-left"
           >
-            <span className="text-sm font-medium text-gray-900">{faq.q}</span>
-            <span className="text-gray-400 text-lg ml-2">{open === i ? '−' : '+'}</span>
+            <span className="text-sm font-medium text-ink">{faq.q}</span>
+            <span className="text-ink4 text-lg ml-2">{open === i ? '−' : '+'}</span>
           </button>
           {open === i && (
             <div className="px-4 pb-3">
-              <p className="text-sm text-gray-500 leading-relaxed">{faq.a}</p>
+              <p className="text-sm text-ink3 leading-relaxed">{faq.a}</p>
             </div>
           )}
         </div>

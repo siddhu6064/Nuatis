@@ -45,19 +45,19 @@ export default function UpgradePage() {
   return (
     <div className="px-8 py-8 max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Unlock the Full Nuatis Suite</h1>
-        <p className="text-sm text-gray-500 mt-2">
+        <h1 className="text-2xl font-bold text-ink">Unlock the Full Nuatis Suite</h1>
+        <p className="text-sm text-ink3 mt-2">
           Everything in Maya AI, plus a complete CRM with pipeline, automation, quotes, and
           analytics.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
+      <div className="bg-white rounded-xl border border-border-brand overflow-hidden mb-8">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Feature</th>
-              <th className="text-center text-xs font-medium text-gray-400 px-4 py-3">Maya AI</th>
+            <tr className="border-b border-border-brand">
+              <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Feature</th>
+              <th className="text-center text-xs font-medium text-ink4 px-4 py-3">Maya AI</th>
               <th className="text-center text-xs font-medium text-teal-600 px-4 py-3 bg-teal-50">
                 Suite
               </th>
@@ -66,7 +66,7 @@ export default function UpgradePage() {
           <tbody>
             {FEATURES.map((f) => (
               <tr key={f.name} className="border-b border-gray-50 last:border-0">
-                <td className="px-6 py-3 text-sm text-gray-700">{f.name}</td>
+                <td className="px-6 py-3 text-sm text-ink2">{f.name}</td>
                 <td className="px-4 py-3 text-center">
                   {f.maya ? (
                     <span className="text-green-600">&#10003;</span>
@@ -84,8 +84,8 @@ export default function UpgradePage() {
       </div>
 
       <div className="text-center">
-        <p className="text-sm font-semibold text-gray-900 mb-1">Founding Member Pricing</p>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm font-semibold text-ink mb-1">Founding Member Pricing</p>
+        <p className="text-sm text-ink3 mb-4">
           Contact us to lock in your rate before public launch.
         </p>
         <button

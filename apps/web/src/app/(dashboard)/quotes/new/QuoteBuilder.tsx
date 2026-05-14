@@ -293,17 +293,17 @@ export default function QuoteBuilder({
   }
 
   const inputCls =
-    'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+    'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">New Quote</h1>
+      <h1 className="text-xl font-bold text-ink mb-6">New Quote</h1>
 
       <div className="space-y-6">
         {/* Contact + Title */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+        <div className="bg-white rounded-xl border border-border-brand p-6 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Contact</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Contact</label>
             <select
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
@@ -318,7 +318,7 @@ export default function QuoteBuilder({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Title</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Title</label>
             <input
               type="text"
               value={title}
@@ -330,29 +330,26 @@ export default function QuoteBuilder({
         </div>
 
         {/* Line Items */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Line Items</h2>
+            <h2 className="text-sm font-semibold text-ink">Line Items</h2>
             <div className="flex gap-2">
               {/* Catalog tab selector */}
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden text-xs">
+              <div className="flex items-center border border-border-brand rounded-lg overflow-hidden text-xs">
                 <button
                   onClick={() => setCatalogTab('services')}
-                  className={`px-3 py-1.5 ${catalogTab === 'services' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-3 py-1.5 ${catalogTab === 'services' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
                 >
                   Services
                 </button>
                 <button
                   onClick={() => setCatalogTab('packages')}
-                  className={`px-3 py-1.5 border-l border-gray-200 ${catalogTab === 'packages' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-3 py-1.5 border-l border-border-brand ${catalogTab === 'packages' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
                 >
                   Packages
                 </button>
               </div>
-              <button
-                onClick={addCustom}
-                className="text-xs text-gray-500 font-medium hover:text-gray-700"
-              >
+              <button onClick={addCustom} className="text-xs text-ink3 font-medium hover:text-ink2">
                 + Custom Item
               </button>
             </div>
@@ -360,28 +357,26 @@ export default function QuoteBuilder({
 
           {/* Catalog/Package dropdown */}
           {catalogTab === 'services' && (
-            <div className="mb-4 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+            <div className="mb-4 border border-border-brand rounded-lg max-h-40 overflow-y-auto">
               {services.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => addFromCatalog(s)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between border-b border-gray-50 last:border-0"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-bg flex justify-between border-b border-gray-50 last:border-0"
                 >
-                  <span className="text-gray-700">{s.name}</span>
-                  <span className="text-gray-400">${Number(s.unit_price).toFixed(2)}</span>
+                  <span className="text-ink2">{s.name}</span>
+                  <span className="text-ink4">${Number(s.unit_price).toFixed(2)}</span>
                 </button>
               ))}
               {services.length === 0 && (
-                <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                  No services configured
-                </p>
+                <p className="px-3 py-4 text-xs text-ink4 text-center">No services configured</p>
               )}
             </div>
           )}
           {catalogTab === 'packages' && (
             <div className="mb-4 space-y-2">
               {availablePackages.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">No packages available</p>
+                <p className="text-xs text-ink4 text-center py-4">No packages available</p>
               ) : (
                 availablePackages.map((pkg) => (
                   <div
@@ -389,13 +384,13 @@ export default function QuoteBuilder({
                     className="border border-indigo-100 rounded-lg p-3 flex items-center justify-between bg-indigo-50/30"
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{pkg.name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-ink">{pkg.name}</p>
+                      <p className="text-xs text-ink3">
                         {pkg.resolved_items.length} services &middot;{' '}
-                        <span className="line-through text-gray-400">
+                        <span className="line-through text-ink4">
                           ${pkg.list_price_total.toFixed(2)}
                         </span>{' '}
-                        <span className="font-medium text-gray-700">
+                        <span className="font-medium text-ink2">
                           ${Number(pkg.bundle_price).toFixed(2)}
                         </span>
                       </p>
@@ -419,12 +414,12 @@ export default function QuoteBuilder({
 
           {/* Line items grid with package grouping */}
           {items.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">
+            <p className="text-sm text-ink4 text-center py-8">
               Add line items from your service catalog, packages, or create custom items
             </p>
           ) : (
             <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 text-[10px] font-medium text-gray-400 px-1">
+              <div className="grid grid-cols-12 gap-2 text-[10px] font-medium text-ink4 px-1">
                 <div className="col-span-5">Description</div>
                 <div className="col-span-2">Qty</div>
                 <div className="col-span-2">Price</div>
@@ -466,12 +461,12 @@ export default function QuoteBuilder({
                             key={gi.key}
                             className={`grid grid-cols-12 gap-2 items-center ${gi.unit_price < 0 ? 'italic' : ''}`}
                           >
-                            <div className="col-span-5 text-sm text-gray-600 pl-2 truncate">
+                            <div className="col-span-5 text-sm text-ink3 pl-2 truncate">
                               {gi.description}
                             </div>
-                            <div className="col-span-2 text-sm text-gray-500">{gi.quantity}</div>
+                            <div className="col-span-2 text-sm text-ink3">{gi.quantity}</div>
                             <div
-                              className={`col-span-2 text-sm ${gi.unit_price < 0 ? 'text-green-600' : 'text-gray-500'}`}
+                              className={`col-span-2 text-sm ${gi.unit_price < 0 ? 'text-green-600' : 'text-ink3'}`}
                             >
                               {gi.unit_price < 0 ? '' : '$'}
                               {gi.unit_price < 0
@@ -479,7 +474,7 @@ export default function QuoteBuilder({
                                 : Number(gi.unit_price).toFixed(2)}
                             </div>
                             <div
-                              className={`col-span-2 text-sm font-medium px-1 ${gi.unit_price < 0 ? 'text-green-600' : 'text-gray-700'}`}
+                              className={`col-span-2 text-sm font-medium px-1 ${gi.unit_price < 0 ? 'text-green-600' : 'text-ink2'}`}
                             >
                               {gi.unit_price < 0
                                 ? `-$${Math.abs(gi.quantity * gi.unit_price).toFixed(2)}`
@@ -501,7 +496,7 @@ export default function QuoteBuilder({
                             type="text"
                             value={item.description}
                             onChange={(e) => updateItem(item.key, 'description', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                             placeholder="Description"
                           />
                         </div>
@@ -512,7 +507,7 @@ export default function QuoteBuilder({
                             onChange={(e) =>
                               updateItem(item.key, 'quantity', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                             min="0"
                             step="1"
                           />
@@ -524,12 +519,12 @@ export default function QuoteBuilder({
                             onChange={(e) =>
                               updateItem(item.key, 'unit_price', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                             min="0"
                             step="0.01"
                           />
                         </div>
-                        <div className="col-span-2 text-sm text-gray-700 font-medium px-1">
+                        <div className="col-span-2 text-sm text-ink2 font-medium px-1">
                           ${(item.quantity * item.unit_price).toFixed(2)}
                         </div>
                         <div className="col-span-1 text-right">
@@ -551,8 +546,8 @@ export default function QuoteBuilder({
         </div>
 
         {/* Discount */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-900 cursor-pointer">
+        <div className="bg-white rounded-xl border border-border-brand p-6">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink cursor-pointer">
             <input
               type="checkbox"
               checked={discountEnabled}
@@ -560,7 +555,7 @@ export default function QuoteBuilder({
                 setDiscountEnabled(e.target.checked)
                 if (!e.target.checked) setDiscountValue(0)
               }}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
             />
             Apply discount
           </label>
@@ -568,7 +563,7 @@ export default function QuoteBuilder({
           {discountEnabled && (
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                <label className="flex items-center gap-1.5 text-sm text-ink3 cursor-pointer">
                   <input
                     type="radio"
                     name="discountType"
@@ -581,7 +576,7 @@ export default function QuoteBuilder({
                   />
                   Percentage
                 </label>
-                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                <label className="flex items-center gap-1.5 text-sm text-ink3 cursor-pointer">
                   <input
                     type="radio"
                     name="discountType"
@@ -597,19 +592,17 @@ export default function QuoteBuilder({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  {discountType === 'fixed' && <span className="text-sm text-gray-500">$</span>}
+                  {discountType === 'fixed' && <span className="text-sm text-ink3">$</span>}
                   <input
                     type="number"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className={`w-32 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-teal-500'}`}
+                    className={`w-32 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-border-brand focus:ring-teal-500'}`}
                     min="0"
                     max={discountType === 'percentage' ? 100 : undefined}
                     step={discountType === 'percentage' ? 1 : 0.01}
                   />
-                  {discountType === 'percentage' && (
-                    <span className="text-sm text-gray-500">%</span>
-                  )}
+                  {discountType === 'percentage' && <span className="text-sm text-ink3">%</span>}
                 </div>
                 {discountExceedsMax && (
                   <p className="text-xs text-red-600 mt-1">
@@ -628,12 +621,12 @@ export default function QuoteBuilder({
         </div>
 
         {/* Totals + Options */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex justify-end">
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="text-gray-900">${subtotal.toFixed(2)}</span>
+                <span className="text-ink3">Subtotal</span>
+                <span className="text-ink">${subtotal.toFixed(2)}</span>
               </div>
               {discountEnabled && discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -644,32 +637,32 @@ export default function QuoteBuilder({
                 </div>
               )}
               <div className="flex justify-between text-sm items-center gap-2">
-                <span className="text-gray-500">Tax (%)</span>
+                <span className="text-ink3">Tax (%)</span>
                 <input
                   type="number"
                   value={taxRate}
                   onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                  className="w-20 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-20 px-2 py-1 text-sm text-right border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                   min="0"
                   step="0.1"
                 />
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tax</span>
-                <span className="text-gray-700">${taxAmount.toFixed(2)}</span>
+                <span className="text-ink3">Tax</span>
+                <span className="text-ink2">${taxAmount.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-lg font-bold border-t border-gray-100 pt-2">
-                <span className="text-gray-900">Total</span>
+              <div className="flex justify-between text-lg font-bold border-t border-border-brand pt-2">
+                <span className="text-ink">Total</span>
                 <span className="text-teal-600">${total.toFixed(2)}</span>
               </div>
               {cpqSettings.deposit_pct > 0 && total > 0 && (
                 <>
-                  <div className="border-t border-dashed border-gray-200 mt-2 pt-2 space-y-1">
+                  <div className="border-t border-dashed border-border-brand mt-2 pt-2 space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">
+                      <span className="text-ink4">
                         Deposit Required ({cpqSettings.deposit_pct}%)
                       </span>
-                      <span className="text-gray-400">
+                      <span className="text-ink4">
                         $
                         {(
                           Math.round(((total * cpqSettings.deposit_pct) / 100) * 100) / 100
@@ -677,8 +670,8 @@ export default function QuoteBuilder({
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Remaining Balance</span>
-                      <span className="text-gray-400">
+                      <span className="text-ink4">Remaining Balance</span>
+                      <span className="text-ink4">
                         $
                         {(
                           total -
@@ -697,7 +690,7 @@ export default function QuoteBuilder({
 
           <div className="grid grid-cols-2 gap-4 mt-6">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Valid for</label>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">Valid for</label>
               <select
                 value={validDays}
                 onChange={(e) => setValidDays(parseInt(e.target.value))}
@@ -711,7 +704,7 @@ export default function QuoteBuilder({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">Notes</label>
               <input
                 type="text"
                 value={notes}
@@ -730,7 +723,7 @@ export default function QuoteBuilder({
           <button
             onClick={() => save(false)}
             disabled={saving}
-            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 bg-bg2 text-ink2 text-sm font-medium rounded-lg hover:bg-bg3 disabled:opacity-50 transition-colors"
           >
             Save as Draft
           </button>

@@ -142,34 +142,34 @@ export default function OnboardingWizard({
                     ? 'bg-teal-100 text-teal-700'
                     : step === s.num
                       ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-400'
+                      : 'bg-bg2 text-ink4'
                 }`}
               >
                 {step > s.num ? '✓' : s.num}
               </div>
-              <span className="text-[10px] text-gray-400 mt-1">{s.label}</span>
+              <span className="text-[10px] text-ink4 mt-1">{s.label}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`h-px w-6 mx-1 mt-[-12px] ${step > s.num ? 'bg-teal-400' : 'bg-gray-200'}`}
+                className={`h-px w-6 mx-1 mt-[-12px] ${step > s.num ? 'bg-teal-400' : 'bg-bg3'}`}
               />
             )}
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+      <div className="bg-white rounded-xl border border-border-brand p-8 shadow-sm">
         {/* Step 1: Business Info */}
         {step === 1 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Welcome to Nuatis!</h1>
-            <p className="text-sm text-gray-500 mb-6">Let&apos;s confirm your business details.</p>
+            <h1 className="text-xl font-semibold text-ink mb-1">Welcome to Nuatis!</h1>
+            <p className="text-sm text-ink3 mb-6">Let&apos;s confirm your business details.</p>
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3 p-4 bg-bg rounded-lg">
                 <span className="text-2xl">{VERTICAL_ICONS[vertical] ?? '🏢'}</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{businessName}</p>
-                  <p className="text-xs text-gray-500">{VERTICAL_LABELS[vertical] ?? vertical}</p>
+                  <p className="text-sm font-semibold text-ink">{businessName}</p>
+                  <p className="text-xs text-ink3">{VERTICAL_LABELS[vertical] ?? vertical}</p>
                 </div>
               </div>
               <button
@@ -185,8 +185,8 @@ export default function OnboardingWizard({
         {/* Step 2: Phone Number */}
         {step === 2 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Get your phone number</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-1">Get your phone number</h1>
+            <p className="text-sm text-ink3 mb-6">
               Maya needs a phone number to answer calls for {businessName}.
             </p>
             {phone ? (
@@ -194,7 +194,7 @@ export default function OnboardingWizard({
                 <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
                   <span className="text-green-600 text-lg">✓</span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{formatPhone(phone)}</p>
+                    <p className="text-sm font-semibold text-ink">{formatPhone(phone)}</p>
                     <p className="text-xs text-green-600">Number provisioned</p>
                   </div>
                 </div>
@@ -208,13 +208,11 @@ export default function OnboardingWizard({
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                    Area code
-                  </label>
+                  <label className="block text-xs font-medium text-ink2 mb-1.5">Area code</label>
                   <select
                     value={areaCode}
                     onChange={(e) => setAreaCode(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
                     {AREA_CODES.map((ac) => (
                       <option key={ac.code} value={ac.code}>
@@ -233,10 +231,7 @@ export default function OnboardingWizard({
                 >
                   {loading ? 'Provisioning...' : 'Get My Number'}
                 </button>
-                <button
-                  onClick={goNext}
-                  className="w-full text-sm text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
                   Skip for now
                 </button>
               </div>
@@ -247,15 +242,15 @@ export default function OnboardingWizard({
         {/* Step 3: Calendar */}
         {step === 3 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Connect Google Calendar</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-1">Connect Google Calendar</h1>
+            <p className="text-sm text-ink3 mb-6">
               Let Maya check availability and book appointments in real-time.
             </p>
             {calendarConnected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
                   <span className="text-green-600 text-lg">✓</span>
-                  <p className="text-sm font-semibold text-gray-900">Google Calendar connected</p>
+                  <p className="text-sm font-semibold text-ink">Google Calendar connected</p>
                 </div>
                 <button
                   onClick={goNext}
@@ -275,10 +270,7 @@ export default function OnboardingWizard({
                   </svg>
                   Connect Google Calendar
                 </button>
-                <button
-                  onClick={goNext}
-                  className="w-full text-sm text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
                   Skip for now
                 </button>
               </div>
@@ -289,15 +281,13 @@ export default function OnboardingWizard({
         {/* Step 4: Business Hours */}
         {step === 4 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Business hours</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-1">Business hours</h1>
+            <p className="text-sm text-ink3 mb-6">
               Maya uses these hours to schedule appointments and inform callers.
             </p>
-            <div className="p-4 bg-gray-50 rounded-lg mb-6">
-              <p className="text-sm text-gray-700">
-                {DEFAULT_HOURS[vertical] ?? 'Mon–Fri 9am–5pm'}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
+            <div className="p-4 bg-bg rounded-lg mb-6">
+              <p className="text-sm text-ink2">{DEFAULT_HOURS[vertical] ?? 'Mon–Fri 9am–5pm'}</p>
+              <p className="text-xs text-ink4 mt-2">
                 Default hours for {VERTICAL_LABELS[vertical]}. Contact support to customize.
               </p>
             </div>
@@ -313,16 +303,16 @@ export default function OnboardingWizard({
         {/* Step 5: Test Maya */}
         {step === 5 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Test Maya</h1>
-            <p className="text-sm text-gray-500 mb-6">Call your number to hear Maya in action!</p>
+            <h1 className="text-xl font-semibold text-ink mb-1">Test Maya</h1>
+            <p className="text-sm text-ink3 mb-6">Call your number to hear Maya in action!</p>
             {phone ? (
               <div className="space-y-4">
                 <div className="p-6 bg-teal-50 rounded-lg text-center border border-teal-100">
                   <p className="text-xs text-teal-600 mb-1">Call this number</p>
                   <p className="text-2xl font-bold text-teal-800">{formatPhone(phone)}</p>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">
+                <div className="p-3 bg-bg rounded-lg">
+                  <p className="text-xs text-ink3">
                     Try asking: &quot;What are your business hours?&quot; or &quot;I&apos;d like to
                     book an appointment for Thursday&quot;
                   </p>
@@ -336,7 +326,7 @@ export default function OnboardingWizard({
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-ink4">
                   You&apos;ll need a phone number to test Maya. You can set one up from Settings
                   later.
                 </p>
@@ -355,28 +345,28 @@ export default function OnboardingWizard({
         {step >= 6 && (
           <div className="text-center">
             <div className="text-5xl mb-4">🎉</div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">You&apos;re all set!</h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-xl font-semibold text-ink mb-2">You&apos;re all set!</h1>
+            <p className="text-sm text-ink3 mb-6">
               {businessName} is ready to go. Maya is standing by to handle your calls.
             </p>
             <div className="space-y-2 mb-6 text-left">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-green-600">✓</span>
-                <span className="text-gray-700">
+                <span className="text-ink2">
                   {businessName} ({VERTICAL_LABELS[vertical]})
                 </span>
               </div>
               {phone && (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-green-600">✓</span>
-                  <span className="text-gray-700">Phone: {formatPhone(phone)}</span>
+                  <span className="text-ink2">Phone: {formatPhone(phone)}</span>
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm">
                 <span className={calendarConnected ? 'text-green-600' : 'text-gray-300'}>
                   {calendarConnected ? '✓' : '○'}
                 </span>
-                <span className="text-gray-700">
+                <span className="text-ink2">
                   Google Calendar {calendarConnected ? 'connected' : 'not connected'}
                 </span>
               </div>
@@ -387,7 +377,7 @@ export default function OnboardingWizard({
             >
               Go to Dashboard
             </button>
-            <p className="text-xs text-gray-400 mt-3">
+            <p className="text-xs text-ink4 mt-3">
               You&apos;re on the Starter plan. Upgrade anytime from Settings.
             </p>
           </div>
@@ -397,7 +387,7 @@ export default function OnboardingWizard({
         {step > 1 && step < 6 && (
           <button
             onClick={() => setStep((s) => Math.max(s - 1, 1))}
-            className="mt-4 text-sm text-gray-400 hover:text-gray-600"
+            className="mt-4 text-sm text-ink4 hover:text-ink3"
           >
             &larr; Back
           </button>

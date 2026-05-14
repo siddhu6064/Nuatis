@@ -24,44 +24,36 @@ interface Stage {
 interface Contact {
   id: string
   full_name: string
+  phone: string | null
   email: string | null
+  source: string | null
+  last_contacted: string | null
   pipeline_stage: string | null
   lifecycle_stage: string | null
   lead_score: number | null
   lead_grade: string | null
 }
 
-const gradeColors: Record<string, string> = {
-  A: 'bg-green-100 text-green-700',
-  B: 'bg-blue-100 text-blue-700',
-  C: 'bg-yellow-100 text-yellow-700',
-  D: 'bg-orange-100 text-orange-700',
-  F: 'bg-red-100 text-red-700',
+function toTitle(slug: string): string {
+  return slug
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
-const lifecycleColors: Record<string, string> = {
-  subscriber: 'bg-gray-100 text-gray-600',
-  lead: 'bg-blue-100 text-blue-700',
-  marketing_qualified: 'bg-purple-100 text-purple-700',
-  sales_qualified: 'bg-orange-100 text-orange-700',
-  opportunity: 'bg-yellow-100 text-yellow-700',
-  customer: 'bg-green-100 text-green-700',
-  evangelist: 'bg-emerald-100 text-emerald-700',
-  other: 'bg-gray-100 text-gray-600',
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 2) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }
 
-const lifecycleLabel: Record<string, string> = {
-  subscriber: 'Subscriber',
-  lead: 'Lead',
-  marketing_qualified: 'MQL',
-  sales_qualified: 'SQL',
-  opportunity: 'Opportunity',
-  customer: 'Customer',
-  evangelist: 'Evangelist',
-  other: 'Other',
-}
-
-export default function PipelineContent() {
+export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -74,7 +66,7 @@ export default function PipelineContent() {
   const [loading, setLoading] = useState(true)
   const [movingContact, setMovingContact] = useState<string | null>(null)
 
-  // Fetch pipelines list on mount
+  // Fetch pipelines list on mount — filtered to current vertical (passed from server component)
   useEffect(() => {
     void (async () => {
       try {
@@ -84,16 +76,26 @@ export default function PipelineContent() {
         if (res.ok) {
           const payload = (await res.json()) as { pipelines?: Pipeline[] } | Pipeline[]
           const data: Pipeline[] = Array.isArray(payload) ? payload : (payload.pipelines ?? [])
-          setPipelines(data)
-          // Determine initial active pipeline
+
+          // Filter: keep default + pipelines matching current vertical
+          const verticalLabel = toTitle(vertical)
+          const filtered = data.filter(
+            (p) => p.is_default || p.name.toLowerCase().includes(verticalLabel.toLowerCase())
+          )
+
+          setPipelines(filtered)
+
+          // Auto-select: prefer vertical-specific pipeline, fall back to default
           const paramId = searchParams.get('pipeline')
-          if (paramId && data.find((p) => p.id === paramId)) {
+          if (paramId && filtered.find((p) => p.id === paramId)) {
             setActivePipelineId(paramId)
           } else {
-            const def = data.find((p) => p.is_default) ?? data[0]
+            const verticalPipeline = filtered.find((p) => !p.is_default)
+            const def = verticalPipeline ?? filtered.find((p) => p.is_default) ?? filtered[0]
             if (def) setActivePipelineId(def.id)
           }
-          if (data.length === 0) setLoading(false)
+
+          if (filtered.length === 0) setLoading(false)
         } else {
           setLoading(false)
         }
@@ -102,7 +104,7 @@ export default function PipelineContent() {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [vertical])
 
   // Fetch stages + contacts whenever active pipeline changes
   const fetchBoardData = useCallback(async (pipelineId: string) => {
@@ -179,8 +181,8 @@ export default function PipelineContent() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Pipeline</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-ink">Pipeline</h1>
+          <p className="text-sm text-ink3 mt-0.5">
             {activePipeline?.name ?? 'Contacts'} · {totalContacts} contact
             {totalContacts !== 1 ? 's' : ''}
           </p>
@@ -188,7 +190,7 @@ export default function PipelineContent() {
         <div className="flex items-center gap-3">
           <Link
             href="/settings/pipelines"
-            className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+            className="text-xs text-ink3 hover:text-ink2 underline underline-offset-2"
           >
             Manage Pipelines
           </Link>
@@ -202,9 +204,9 @@ export default function PipelineContent() {
         </div>
       </div>
 
-      {/* Pipeline tab bar */}
-      {pipelines.length > 0 && (
-        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-gray-100 pb-0">
+      {/* Pipeline tab bar — only show when multiple pipelines match */}
+      {pipelines.length > 1 && (
+        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-border-brand pb-0">
           {pipelines.map((p) => (
             <button
               key={p.id}
@@ -212,7 +214,7 @@ export default function PipelineContent() {
               className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
                 activePipelineId === p.id
                   ? 'border-teal-600 text-teal-700 bg-teal-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'border-transparent text-ink3 hover:text-ink2 hover:bg-bg'
               }`}
             >
               {p.name}
@@ -223,103 +225,83 @@ export default function PipelineContent() {
 
       {/* Loading */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-          Loading...
-        </div>
+        <div className="flex-1 flex items-center justify-center text-sm text-ink4">Loading...</div>
       ) : (
         /* Kanban board */
         <div className="overflow-x-auto flex-1">
-          <div className="flex gap-4 h-full pb-4" style={{ minWidth: `${stages.length * 272}px` }}>
+          <div className="flex gap-3 h-full pb-4" style={{ minWidth: `${stages.length * 256}px` }}>
             {stages.map((stage) => {
               const cards = grouped.get(stage.name) ?? []
+              const colColor = stage.color || '#0d9488'
               return (
-                <div key={stage.name} className="w-64 shrink-0 flex flex-col">
+                <div
+                  key={stage.name}
+                  className="w-60 shrink-0 flex flex-col bg-white rounded-lg border border-border-brand overflow-hidden"
+                  style={{ borderLeftColor: colColor, borderLeftWidth: '3px', minHeight: '400px' }}
+                >
                   {/* Column header */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: stage.color }}
-                    />
-                    <span className="text-xs font-semibold text-gray-700 truncate">
+                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-brand bg-[#f9f8f5]">
+                    <span className="text-[13px] font-semibold text-ink truncate flex-1">
                       {stage.name}
                     </span>
-                    <span className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                    <span className="font-mono text-[10px] text-ink3 bg-white border border-border-brand rounded px-1.5 py-0.5 shrink-0 tabular-nums">
                       {cards.length}
                     </span>
                   </div>
 
                   {/* Cards */}
-                  <div className="flex flex-col gap-2 flex-1">
+                  <div className="flex flex-col gap-2 p-2 flex-1">
                     {cards.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center">
-                        <p className="text-xs text-gray-300">No contacts</p>
+                      <div className="rounded border border-dashed border-border-brand px-3 py-5 text-center mt-1">
+                        <p className="text-[11px] text-ink4">No contacts</p>
                       </div>
                     ) : (
                       cards.map((contact) => (
                         <div
                           key={contact.id}
-                          className="bg-white rounded-xl border border-gray-100 px-4 py-3 shadow-sm"
+                          className="bg-white rounded-md border border-border-brand p-3 transition-all duration-100 hover:shadow-sm hover:-translate-y-px cursor-default"
                         >
-                          {/* Avatar + name */}
-                          <div className="flex items-center gap-2.5 mb-1">
-                            <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                              <span className="text-teal-700 text-[10px] font-bold">
-                                {contact.full_name?.charAt(0)?.toUpperCase() ?? '?'}
-                              </span>
-                            </div>
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                          {/* Name + source badge */}
+                          <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                            <Link
+                              href={`/contacts/${contact.id}`}
+                              className="text-[14px] font-semibold text-ink leading-snug hover:text-teal-700 truncate"
+                            >
                               {contact.full_name}
+                            </Link>
+                            {contact.source && (
+                              <span
+                                className={`font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide ${
+                                  contact.source === 'maya' || contact.source === 'call'
+                                    ? 'bg-teal-50 text-teal-600'
+                                    : 'bg-[#f2f0eb] text-[#7a7468]'
+                                }`}
+                              >
+                                {contact.source === 'call' ? 'MAYA' : contact.source.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Phone */}
+                          {contact.phone && (
+                            <p className="font-mono text-[11px] text-ink3 mb-1 truncate">
+                              {contact.phone}
                             </p>
-                          </div>
-
-                          {/* Email */}
-                          {contact.email && (
-                            <p className="text-xs text-gray-400 truncate mb-1.5">{contact.email}</p>
                           )}
 
-                          {/* Lead score + lifecycle badges */}
-                          {(contact.lead_score != null || contact.lifecycle_stage) && (
-                            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                              {contact.lead_score != null && (
-                                <span className="inline-flex items-center gap-0.5">
-                                  <span className="text-[10px] text-gray-400 font-medium">
-                                    {contact.lead_score}
-                                  </span>
-                                  {contact.lead_grade && (
-                                    <span
-                                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${gradeColors[contact.lead_grade] ?? 'bg-gray-100 text-gray-600'}`}
-                                    >
-                                      {contact.lead_grade}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                              {contact.lifecycle_stage && (
-                                <span
-                                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${lifecycleColors[contact.lifecycle_stage] ?? 'bg-gray-100 text-gray-600'}`}
-                                >
-                                  {lifecycleLabel[contact.lifecycle_stage] ??
-                                    contact.lifecycle_stage}
-                                </span>
-                              )}
-                            </div>
+                          {/* Last activity */}
+                          {contact.last_contacted && (
+                            <p className="text-[10px] text-ink4 mb-2">
+                              {relativeTime(contact.last_contacted)}
+                            </p>
                           )}
-
-                          {/* Stage badge */}
-                          <div className="flex items-center gap-1 mb-1">
-                            <span
-                              className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: stage.color }}
-                            />
-                            <span className="text-[11px] text-gray-500">{stage.name}</span>
-                          </div>
 
                           {/* Stage selector */}
                           <select
                             value={contact.pipeline_stage ?? defaultStage}
                             disabled={movingContact === contact.id}
                             onChange={(e) => void moveContact(contact.id, e.target.value)}
-                            className="w-full mt-2 text-xs border border-gray-100 rounded-md px-2 py-1 bg-gray-50 text-gray-600 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50 cursor-pointer"
+                            className="w-full text-[11px] border border-border-brand rounded px-2 py-1 bg-[#f9f8f5] text-ink3 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50 cursor-pointer"
                           >
                             {stages.map((s) => (
                               <option key={s.name} value={s.name}>

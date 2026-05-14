@@ -49,8 +49,8 @@ export default async function VoiceSettingsPage() {
   return (
     <div className="px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900">Voice AI Settings</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Configure how Maya handles your calls</p>
+        <h1 className="text-xl font-bold text-ink">Voice AI Settings</h1>
+        <p className="text-sm text-ink3 mt-0.5">Configure how Maya handles your calls</p>
       </div>
 
       <VoiceSettingsForm settings={settings} />

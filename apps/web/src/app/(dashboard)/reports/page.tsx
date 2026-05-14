@@ -328,8 +328,8 @@ export default function ReportsPage() {
   function renderStep1() {
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Data Source</h3>
-        <p className="text-sm text-gray-500 mb-4">Choose the object you want to report on.</p>
+        <h3 className="text-base font-semibold text-ink mb-1">Data Source</h3>
+        <p className="text-sm text-ink3 mb-4">Choose the object you want to report on.</p>
         <div className="grid grid-cols-2 gap-3">
           {OBJECTS.map((obj) => (
             <button
@@ -340,13 +340,13 @@ export default function ReportsPage() {
               className={`flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-colors ${
                 wizard.object === obj.key
                   ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border-brand hover:border-border-brand'
               }`}
             >
               <span className="text-2xl">{obj.icon}</span>
               <div>
-                <div className="font-medium text-gray-800 text-sm">{obj.label}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{obj.description}</div>
+                <div className="font-medium text-ink text-sm">{obj.label}</div>
+                <div className="text-xs text-ink3 mt-0.5">{obj.description}</div>
               </div>
             </button>
           ))}
@@ -362,8 +362,8 @@ export default function ReportsPage() {
 
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Metric</h3>
-        <p className="text-sm text-gray-500 mb-4">What do you want to measure?</p>
+        <h3 className="text-base font-semibold text-ink mb-1">Metric</h3>
+        <p className="text-sm text-ink3 mb-4">What do you want to measure?</p>
 
         <div className="space-y-3">
           <label className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors border-blue-500 bg-blue-50">
@@ -376,8 +376,8 @@ export default function ReportsPage() {
               className="text-blue-500"
             />
             <div>
-              <div className="font-medium text-sm text-gray-800">Count</div>
-              <div className="text-xs text-gray-500">Number of {getObjectMeta(obj)?.label}</div>
+              <div className="font-medium text-sm text-ink">Count</div>
+              <div className="text-xs text-ink3">Number of {getObjectMeta(obj)?.label}</div>
             </div>
           </label>
 
@@ -389,7 +389,7 @@ export default function ReportsPage() {
                   className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                     wizard.metric_fn === fn
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-border-brand hover:border-border-brand'
                   }`}
                 >
                   <input
@@ -401,14 +401,14 @@ export default function ReportsPage() {
                     className="mt-0.5 text-blue-500"
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-800 capitalize">
+                    <div className="font-medium text-sm text-ink capitalize">
                       {fn === 'avg' ? 'Average' : fn.charAt(0).toUpperCase() + fn.slice(1)}
                     </div>
                     {wizard.metric_fn === fn && (
                       <select
                         value={wizard.metric_field ?? ''}
                         onChange={(e) => setWizard((w) => ({ ...w, metric_field: e.target.value }))}
-                        className="mt-2 block w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        className="mt-2 block w-full text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
                       >
                         <option value="">Select field…</option>
                         {fields.map((f) => (
@@ -434,13 +434,13 @@ export default function ReportsPage() {
 
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Group By</h3>
-        <p className="text-sm text-gray-500 mb-4">How do you want to break it down?</p>
+        <h3 className="text-base font-semibold text-ink mb-1">Group By</h3>
+        <p className="text-sm text-ink3 mb-4">How do you want to break it down?</p>
 
         <select
           value={wizard.group_by ?? ''}
           onChange={(e) => setWizard((w) => ({ ...w, group_by: e.target.value || null }))}
-          className="block w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
           <option value="">No grouping (total only)</option>
           {fields.map((f) => (
@@ -451,7 +451,7 @@ export default function ReportsPage() {
         </select>
 
         {wizard.group_by && (
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-ink4">
             Results will be grouped by{' '}
             <span className="font-medium">
               {fields.find((f) => f.key === wizard.group_by)?.label}
@@ -487,27 +487,23 @@ export default function ReportsPage() {
 
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Filters</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          Narrow down which records to include (optional).
-        </p>
+        <h3 className="text-base font-semibold text-ink mb-1">Filters</h3>
+        <p className="text-sm text-ink3 mb-4">Narrow down which records to include (optional).</p>
 
         {wizard.filters.length === 0 && (
-          <p className="text-sm text-gray-400 mb-4">
-            No filters added — all records will be included.
-          </p>
+          <p className="text-sm text-ink4 mb-4">No filters added — all records will be included.</p>
         )}
 
         <div className="space-y-3 mb-4">
           {wizard.filters.map((filter, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+              className="flex items-center gap-2 p-3 bg-bg rounded-lg border border-border-brand"
             >
               <select
                 value={filter.field}
                 onChange={(e) => updateFilter(i, { field: e.target.value })}
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               >
                 {fields.map((f) => (
                   <option key={f.key} value={f.key}>
@@ -521,7 +517,7 @@ export default function ReportsPage() {
                 onChange={(e) =>
                   updateFilter(i, { operator: e.target.value as ReportFilter['operator'] })
                 }
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               >
                 {Object.entries(OPERATOR_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>
@@ -535,7 +531,7 @@ export default function ReportsPage() {
                 value={filter.value}
                 onChange={(e) => updateFilter(i, { value: e.target.value })}
                 placeholder="Value"
-                className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="flex-1 text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
 
               <button
@@ -561,8 +557,8 @@ export default function ReportsPage() {
   function renderStep5() {
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Date Range</h3>
-        <p className="text-sm text-gray-500 mb-4">Choose the time window for this report.</p>
+        <h3 className="text-base font-semibold text-ink mb-1">Date Range</h3>
+        <p className="text-sm text-ink3 mb-4">Choose the time window for this report.</p>
 
         <div className="flex flex-wrap gap-2 mb-4">
           {DATE_RANGE_PRESETS.map((preset) => (
@@ -572,7 +568,7 @@ export default function ReportsPage() {
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 wizard.date_range === preset.key
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-bg2 text-ink3 hover:bg-bg3'
               }`}
             >
               {preset.label}
@@ -583,21 +579,21 @@ export default function ReportsPage() {
         {wizard.date_range === 'custom' && (
           <div className="flex items-center gap-3 mt-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">From</label>
+              <label className="block text-xs text-ink3 mb-1">From</label>
               <input
                 type="date"
                 value={wizard.date_from}
                 onChange={(e) => setWizard((w) => ({ ...w, date_from: e.target.value }))}
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">To</label>
+              <label className="block text-xs text-ink3 mb-1">To</label>
               <input
                 type="date"
                 value={wizard.date_to}
                 onChange={(e) => setWizard((w) => ({ ...w, date_to: e.target.value }))}
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
           </div>
@@ -609,11 +605,11 @@ export default function ReportsPage() {
   function renderStep6() {
     return (
       <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-1">Chart Type & Name</h3>
-        <p className="text-sm text-gray-500 mb-4">Finalize your report settings.</p>
+        <h3 className="text-base font-semibold text-ink mb-1">Chart Type & Name</h3>
+        <p className="text-sm text-ink3 mb-4">Finalize your report settings.</p>
 
         <div className="mb-5">
-          <label className="block text-xs font-medium text-gray-600 mb-2">Chart Type</label>
+          <label className="block text-xs font-medium text-ink3 mb-2">Chart Type</label>
           <div className="grid grid-cols-3 gap-2">
             {CHART_TYPES.map((ct) => (
               <button
@@ -622,18 +618,18 @@ export default function ReportsPage() {
                 className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
                   wizard.chart_type === ct.key
                     ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-border-brand hover:border-border-brand'
                 }`}
               >
                 <span className="text-xl">{ct.icon}</span>
-                <span className="text-xs text-gray-600 font-medium">{ct.label}</span>
+                <span className="text-xs text-ink3 font-medium">{ct.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
+          <label className="block text-xs font-medium text-ink3 mb-1">
             Report Name <span className="text-red-400">*</span>
           </label>
           <input
@@ -641,20 +637,20 @@ export default function ReportsPage() {
             value={wizard.name}
             onChange={(e) => setWizard((w) => ({ ...w, name: e.target.value }))}
             placeholder="e.g. Contacts by Lifecycle Stage"
-            className="block w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Description <span className="text-gray-400 font-normal">(optional)</span>
+          <label className="block text-xs font-medium text-ink3 mb-1">
+            Description <span className="text-ink4 font-normal">(optional)</span>
           </label>
           <textarea
             value={wizard.description}
             onChange={(e) => setWizard((w) => ({ ...w, description: e.target.value }))}
             placeholder="Briefly describe what this report shows…"
             rows={3}
-            className="block w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
           />
         </div>
       </div>
@@ -683,8 +679,8 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">Build custom reports from your CRM data.</p>
+          <h1 className="text-2xl font-bold text-ink">Reports</h1>
+          <p className="text-sm text-ink3 mt-1">Build custom reports from your CRM data.</p>
         </div>
         <button
           onClick={openWizard}
@@ -696,12 +692,12 @@ export default function ReportsPage() {
 
       {/* Report List */}
       {loading ? (
-        <div className="py-16 text-center text-gray-400 text-sm">Loading reports…</div>
+        <div className="py-16 text-center text-ink4 text-sm">Loading reports…</div>
       ) : reports.length === 0 ? (
         <div className="py-16 text-center">
           <div className="text-4xl mb-3">📊</div>
-          <div className="text-gray-600 font-medium">No reports yet</div>
-          <div className="text-sm text-gray-400 mt-1">Create your first report to get started.</div>
+          <div className="text-ink3 font-medium">No reports yet</div>
+          <div className="text-sm text-ink4 mt-1">Create your first report to get started.</div>
           <button
             onClick={openWizard}
             className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
@@ -718,7 +714,7 @@ export default function ReportsPage() {
             return (
               <div
                 key={report.id}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow"
+                className="bg-white border border-border-brand rounded-xl p-5 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div
@@ -726,21 +722,21 @@ export default function ReportsPage() {
                     onClick={() => router.push(`/reports/${report.id}`)}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-gray-900 text-sm">{report.name}</span>
+                      <span className="font-semibold text-ink text-sm">{report.name}</span>
                       {report.pinned && <span className="text-yellow-400 text-xs">★ Pinned</span>}
                     </div>
                     {report.description && (
-                      <p className="text-xs text-gray-500 mb-2 truncate">{report.description}</p>
+                      <p className="text-xs text-ink3 mb-2 truncate">{report.description}</p>
                     )}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                         {objMeta?.icon} {objMeta?.label}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-bg2 text-ink3 rounded-full text-xs">
                         {chartMeta?.icon} {chartMeta?.label}
                       </span>
                       {report.last_run && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-ink4">
                           Last run {formatDate(report.last_run)}
                         </span>
                       )}
@@ -754,20 +750,20 @@ export default function ReportsPage() {
                       className={`p-1.5 rounded-lg transition-colors text-sm ${
                         report.pinned
                           ? 'text-yellow-500 hover:bg-yellow-50'
-                          : 'text-gray-400 hover:bg-gray-100 hover:text-yellow-500'
+                          : 'text-ink4 hover:bg-bg2 hover:text-yellow-500'
                       }`}
                     >
                       ★
                     </button>
                     <button
                       onClick={() => router.push(`/reports/${report.id}`)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors text-xs font-medium"
+                      className="p-1.5 rounded-lg text-ink4 hover:bg-bg2 hover:text-blue-600 transition-colors text-xs font-medium"
                     >
                       View
                     </button>
                     <button
                       onClick={() => handleDelete(report.id)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors text-xs"
+                      className="p-1.5 rounded-lg text-ink4 hover:bg-red-50 hover:text-red-500 transition-colors text-xs"
                     >
                       Delete
                     </button>
@@ -784,12 +780,12 @@ export default function ReportsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+            <div className="px-6 pt-6 pb-4 border-b border-border-brand">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900">New Report</h2>
+                <h2 className="text-lg font-bold text-ink">New Report</h2>
                 <button
                   onClick={closeWizard}
-                  className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                  className="text-ink4 hover:text-ink3 text-xl leading-none"
                 >
                   ×
                 </button>
@@ -809,19 +805,19 @@ export default function ReportsPage() {
                             ? 'bg-blue-500 text-white'
                             : done
                               ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 text-gray-500'
+                              : 'bg-bg3 text-ink3'
                         }`}
                       >
                         {done ? '✓' : step}
                       </div>
                       {i < STEP_LABELS.length - 1 && (
-                        <div className={`h-0.5 flex-1 ${done ? 'bg-green-400' : 'bg-gray-200'}`} />
+                        <div className={`h-0.5 flex-1 ${done ? 'bg-green-400' : 'bg-bg3'}`} />
                       )}
                     </div>
                   )
                 })}
               </div>
-              <div className="mt-1 text-xs text-gray-400 text-center">
+              <div className="mt-1 text-xs text-ink4 text-center">
                 Step {wizardStep} of {STEP_LABELS.length}: {STEP_LABELS[wizardStep - 1]}
               </div>
             </div>
@@ -837,11 +833,11 @@ export default function ReportsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-t border-border-brand flex items-center justify-between">
               <button
                 onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
                 disabled={wizardStep === 1}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
+                className="px-4 py-2 text-sm font-medium text-ink3 hover:bg-bg2 rounded-lg transition-colors disabled:opacity-40"
               >
                 Back
               </button>
@@ -849,7 +845,7 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={closeWizard}
-                  className="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-ink3 hover:bg-bg2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

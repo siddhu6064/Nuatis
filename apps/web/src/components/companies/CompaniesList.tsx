@@ -73,8 +73,8 @@ export default function CompaniesList() {
     <div className="px-8 py-8">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Companies</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{companies.length} companies</p>
+          <h1 className="text-xl font-bold text-ink">Companies</h1>
+          <p className="text-sm text-ink3 mt-0.5">{companies.length} companies</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -91,12 +91,12 @@ export default function CompaniesList() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search companies..."
-          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+          className="w-full px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
         />
       </div>
 
       {showCreate && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="bg-white rounded-xl border border-border-brand p-4 mb-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
             <input
               type="text"
@@ -104,28 +104,25 @@ export default function CompaniesList() {
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Company name *"
               autoFocus
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
             <input
               type="text"
               value={newDomain}
               onChange={(e) => setNewDomain(e.target.value)}
               placeholder="Domain (acme.com)"
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
             <input
               type="text"
               value={newIndustry}
               onChange={(e) => setNewIndustry(e.target.value)}
               placeholder="Industry"
-              className="text-sm border border-gray-200 rounded px-3 py-2"
+              className="text-sm border border-border-brand rounded px-3 py-2"
             />
           </div>
           <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setShowCreate(false)}
-              className="px-3 py-1.5 text-xs text-gray-500"
-            >
+            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-xs text-ink3">
               Cancel
             </button>
             <button
@@ -139,12 +136,12 @@ export default function CompaniesList() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100">
+      <div className="bg-white rounded-xl border border-border-brand">
         {loading ? (
-          <div className="py-20 text-center text-sm text-gray-400">Loading...</div>
+          <div className="py-20 text-center text-sm text-ink4">Loading...</div>
         ) : companies.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-sm text-gray-400">No companies yet</p>
+            <p className="text-sm text-ink4">No companies yet</p>
             <button
               onClick={() => setShowCreate(true)}
               className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -155,12 +152,12 @@ export default function CompaniesList() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Name</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Domain</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Industry</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Contacts</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Added</th>
+              <tr className="border-b border-border-brand">
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Name</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Domain</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Industry</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Contacts</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Added</th>
                 <th className="px-6 py-3"></th>
               </tr>
             </thead>
@@ -171,15 +168,15 @@ export default function CompaniesList() {
                   className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/companies/${co.id}`)}
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{co.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{co.domain ?? '\u2014'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{co.industry ?? '\u2014'}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-ink">{co.name}</td>
+                  <td className="px-6 py-4 text-sm text-ink3">{co.domain ?? '\u2014'}</td>
+                  <td className="px-6 py-4 text-sm text-ink3">{co.industry ?? '\u2014'}</td>
                   <td className="px-6 py-4">
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700">
                       {co.contact_count}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400">
+                  <td className="px-6 py-4 text-sm text-ink4">
                     {new Date(co.created_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -192,7 +189,7 @@ export default function CompaniesList() {
                         e.stopPropagation()
                         void archiveCompany(co.id)
                       }}
-                      className="text-xs text-gray-400 hover:text-red-500"
+                      className="text-xs text-ink4 hover:text-red-500"
                     >
                       Archive
                     </button>

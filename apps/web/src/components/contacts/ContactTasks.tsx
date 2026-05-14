@@ -24,7 +24,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
   medium: 'bg-amber-100 text-amber-700',
-  low: 'bg-gray-100 text-gray-500',
+  low: 'bg-bg2 text-ink3',
 }
 
 function isOverdue(dueDate: string | null): boolean {
@@ -117,13 +117,13 @@ export default function ContactTasks({ contactId }: Props) {
   }
 
   if (loading) {
-    return <div className="py-4 text-center text-sm text-gray-400">Loading tasks...</div>
+    return <div className="py-4 text-center text-sm text-ink4">Loading tasks...</div>
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
+        <h3 className="text-sm font-semibold text-ink2">Tasks</h3>
         <button
           onClick={() => setAdding(true)}
           className="text-xs text-teal-600 hover:text-teal-700 font-medium"
@@ -133,7 +133,7 @@ export default function ContactTasks({ contactId }: Props) {
       </div>
 
       {adding && (
-        <div className="border border-gray-200 rounded-lg p-3 mb-3">
+        <div className="border border-border-brand rounded-lg p-3 mb-3">
           <input
             type="text"
             value={newTitle}
@@ -146,33 +146,30 @@ export default function ContactTasks({ contactId }: Props) {
               if (e.key === 'Escape') setAdding(false)
             }}
           />
-          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border-brand">
             <input
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1"
+              className="text-xs border border-border-brand rounded px-2 py-1"
             />
             <input
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1"
+              className="text-xs border border-border-brand rounded px-2 py-1"
             />
             <select
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1"
+              className="text-xs border border-border-brand rounded px-2 py-1"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
             <div className="flex-1" />
-            <button
-              onClick={() => setAdding(false)}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
+            <button onClick={() => setAdding(false)} className="text-xs text-ink3 hover:text-ink2">
               Cancel
             </button>
             <button
@@ -186,9 +183,7 @@ export default function ContactTasks({ contactId }: Props) {
         </div>
       )}
 
-      {tasks.length === 0 && !adding && (
-        <p className="text-xs text-gray-400 py-2">No active tasks</p>
-      )}
+      {tasks.length === 0 && !adding && <p className="text-xs text-ink4 py-2">No active tasks</p>}
 
       <div className="space-y-1">
         {tasks.map((task) => (
@@ -200,9 +195,9 @@ export default function ContactTasks({ contactId }: Props) {
               type="checkbox"
               checked={false}
               onChange={() => void completeTask(task.id)}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 cursor-pointer"
+              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="text-sm text-gray-700 flex-1">{task.title}</span>
+            <span className="text-sm text-ink2 flex-1">{task.title}</span>
             <span
               className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_BADGE[task.priority] ?? ''}`}
             >
@@ -210,7 +205,7 @@ export default function ContactTasks({ contactId }: Props) {
             </span>
             {task.due_date && (
               <span
-                className={`text-[10px] ${isOverdue(task.due_date) ? 'text-red-600 font-medium' : 'text-gray-400'}`}
+                className={`text-[10px] ${isOverdue(task.due_date) ? 'text-red-600 font-medium' : 'text-ink4'}`}
               >
                 {formatDue(task.due_date)}
               </span>
@@ -223,7 +218,7 @@ export default function ContactTasks({ contactId }: Props) {
         <div className="mt-3">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-ink4 hover:text-ink3"
           >
             {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
           </button>
@@ -235,9 +230,9 @@ export default function ContactTasks({ contactId }: Props) {
                     type="checkbox"
                     checked
                     readOnly
-                    className="rounded border-gray-300 text-gray-400 w-3.5 h-3.5"
+                    className="rounded border-border-brand text-ink4 w-3.5 h-3.5"
                   />
-                  <span className="text-sm text-gray-400 line-through">{task.title}</span>
+                  <span className="text-sm text-ink4 line-through">{task.title}</span>
                 </div>
               ))}
             </div>

@@ -73,7 +73,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-gray-200'
+        checked ? 'bg-teal-600' : 'bg-bg3'
       }`}
     >
       <span
@@ -152,7 +152,7 @@ export default function NotificationSettingsPage() {
   if (loading) {
     return (
       <div className="px-8 py-8 max-w-3xl">
-        <p className="text-sm text-gray-400">Loading preferences...</p>
+        <p className="text-sm text-ink4">Loading preferences...</p>
       </div>
     )
   }
@@ -161,30 +161,30 @@ export default function NotificationSettingsPage() {
     <div className="px-8 py-8 max-w-3xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Notification Preferences</h1>
-        <p className="text-sm text-gray-500">Choose how you want to be notified for each event.</p>
+        <h1 className="text-xl font-bold text-ink mb-1">Notification Preferences</h1>
+        <p className="text-sm text-ink3">Choose how you want to be notified for each event.</p>
       </div>
 
       {/* Matrix table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
+            <tr className="border-b border-border-brand">
+              <th className="text-left px-6 py-3 text-xs font-semibold text-ink3 uppercase tracking-wide w-full">
                 Event
               </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <th className="px-6 py-3 text-center text-xs font-semibold text-ink3 uppercase tracking-wide whitespace-nowrap">
                 Push
               </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <th className="px-6 py-3 text-center text-xs font-semibold text-ink3 uppercase tracking-wide whitespace-nowrap">
                 <div>SMS</div>
                 <div className="text-[10px] font-normal text-amber-600 normal-case tracking-normal mt-0.5">
                   charges may apply
                 </div>
               </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <th className="px-6 py-3 text-center text-xs font-semibold text-ink3 uppercase tracking-wide whitespace-nowrap">
                 <div>Email</div>
-                <div className="text-[10px] font-normal text-gray-400 normal-case tracking-normal mt-0.5">
+                <div className="text-[10px] font-normal text-ink4 normal-case tracking-normal mt-0.5">
                   coming soon
                 </div>
               </th>
@@ -193,7 +193,7 @@ export default function NotificationSettingsPage() {
           <tbody className="divide-y divide-gray-50">
             {visibleEvents.map(({ key, label }) => (
               <tr key={key} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-3.5 text-sm text-gray-800">{label}</td>
+                <td className="px-6 py-3.5 text-sm text-ink">{label}</td>
                 <td className="px-6 py-3.5 text-center">
                   <div className="flex justify-center">
                     <Toggle
@@ -249,7 +249,7 @@ export default function NotificationSettingsPage() {
           type="button"
           onClick={resetToDefaults}
           disabled={saving}
-          className="px-4 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-white text-ink3 text-sm font-medium rounded-lg border border-border-brand hover:bg-bg disabled:opacity-50 transition-colors"
         >
           Reset to Defaults
         </button>

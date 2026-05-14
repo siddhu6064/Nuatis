@@ -114,20 +114,20 @@ function SignUpForm() {
   }
 
   const inputClass = `
-    w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+    w-full px-3 py-2 border border-border-brand rounded-lg text-sm
     focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent
   `.trim()
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-lg bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+    <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+      <div className="w-full max-w-lg bg-white rounded-xl border border-border-brand p-8 shadow-sm">
         {/* Logo */}
         <div className="flex items-center gap-2 mb-6">
           <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
             <span className="text-white text-sm font-bold">N</span>
           </div>
           <span className="font-display font-bold text-[22px] tracking-tight text-ink">
-            Nu<span className="text-accent">atis</span>
+            Nu<span className="text-teal-brand">atis</span>
           </span>
         </div>
 
@@ -143,16 +143,16 @@ function SignUpForm() {
                     ? 'bg-teal-600 text-white'
                     : step > s
                       ? 'bg-teal-100 text-teal-700'
-                      : 'bg-gray-100 text-gray-400'
+                      : 'bg-bg2 text-ink4'
                 }
               `}
               >
                 {step > s ? '✓' : s}
               </div>
-              {s < 3 && <div className={`h-px w-8 ${step > s ? 'bg-teal-400' : 'bg-gray-200'}`} />}
+              {s < 3 && <div className={`h-px w-8 ${step > s ? 'bg-teal-400' : 'bg-bg3'}`} />}
             </div>
           ))}
-          <span className="ml-2 text-xs text-gray-400">
+          <span className="ml-2 text-xs text-ink4">
             {step === 1 && 'Business info'}
             {step === 2 && 'Business type'}
             {step === 3 && 'Your account'}
@@ -162,35 +162,29 @@ function SignUpForm() {
         {/* ── Step 1: Business name + product ── */}
         {step === 1 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Get started with Nuatis</h1>
-            <p className="text-sm text-gray-500 mb-4">
-              Choose your plan and enter your business name.
-            </p>
+            <h1 className="text-xl font-semibold text-ink mb-1">Get started with Nuatis</h1>
+            <p className="text-sm text-ink3 mb-4">Choose your plan and enter your business name.</p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, product: 'maya_only' }))}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'maya_only' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'maya_only' ? 'border-teal-500 bg-teal-50' : 'border-border-brand hover:border-border-brand'}`}
                 >
-                  <p className="text-sm font-semibold text-gray-900">Maya AI</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Voice receptionist + calendar booking
-                  </p>
+                  <p className="text-sm font-semibold text-ink">Maya AI</p>
+                  <p className="text-xs text-ink3 mt-0.5">Voice receptionist + calendar booking</p>
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, product: 'suite' }))}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'suite' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.product === 'suite' ? 'border-teal-500 bg-teal-50' : 'border-border-brand hover:border-border-brand'}`}
                 >
-                  <p className="text-sm font-semibold text-gray-900">Nuatis Suite</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Full CRM + voice AI + automation</p>
+                  <p className="text-sm font-semibold text-ink">Nuatis Suite</p>
+                  <p className="text-xs text-ink3 mt-0.5">Full CRM + voice AI + automation</p>
                 </button>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Business name
-                </label>
+                <label className="block text-sm font-medium text-ink2 mb-1">Business name</label>
                 <input
                   type="text"
                   value={form.business_name}
@@ -219,10 +213,10 @@ function SignUpForm() {
         {/* ── Step 2: Vertical selector ── */}
         {step === 2 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">
+            <h1 className="text-xl font-semibold text-ink mb-1">
               What type of business is {form.business_name}?
             </h1>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-ink3 mb-6">
               This sets up your CRM fields and AI receptionist for your industry.
             </p>
             <VerticalSelector
@@ -236,8 +230,8 @@ function SignUpForm() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 text-sm
-                           font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 py-2 px-4 border border-border-brand text-ink2 text-sm
+                           font-medium rounded-lg hover:bg-bg transition-colors"
               >
                 ← Back
               </button>
@@ -256,15 +250,11 @@ function SignUpForm() {
         {/* ── Step 3: Account details ── */}
         {step === 3 && (
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Create your account</h1>
-            <p className="text-sm text-gray-500 mb-6">
-              You will be the owner of {form.business_name}.
-            </p>
+            <h1 className="text-xl font-semibold text-ink mb-1">Create your account</h1>
+            <p className="text-sm text-ink3 mb-6">You will be the owner of {form.business_name}.</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your full name
-                </label>
+                <label className="block text-sm font-medium text-ink2 mb-1">Your full name</label>
                 <input
                   type="text"
                   value={form.owner_name}
@@ -275,9 +265,7 @@ function SignUpForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email address
-                </label>
+                <label className="block text-sm font-medium text-ink2 mb-1">Email address</label>
                 <input
                   type="email"
                   value={form.owner_email}
@@ -287,7 +275,7 @@ function SignUpForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-ink2 mb-1">Password</label>
                 <input
                   type="password"
                   value={form.owner_password}
@@ -303,8 +291,8 @@ function SignUpForm() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 text-sm
-                             font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2 px-4 border border-border-brand text-ink2 text-sm
+                             font-medium rounded-lg hover:bg-bg transition-colors"
                 >
                   ← Back
                 </button>
@@ -319,7 +307,7 @@ function SignUpForm() {
                 </button>
               </div>
             </form>
-            <p className="mt-4 text-xs text-center text-gray-400">
+            <p className="mt-4 text-xs text-center text-ink4">
               Already have an account?{' '}
               <a href="/sign-in" className="text-teal-600 hover:underline">
                 Sign in

@@ -51,7 +51,7 @@ export default function StockHealthInsights() {
   if (loading) {
     return (
       <section className="mt-8">
-        <p className="text-sm text-gray-400">Loading stock health…</p>
+        <p className="text-sm text-ink4">Loading stock health…</p>
       </section>
     )
   }
@@ -64,21 +64,21 @@ export default function StockHealthInsights() {
 
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Stock Health</h2>
+      <h2 className="text-lg font-bold text-ink mb-4">Stock Health</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Total SKUs</p>
-          <p className="text-2xl font-bold text-gray-900">{data.total_skus}</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Total SKUs</p>
+          <p className="text-2xl font-bold text-ink">{data.total_skus}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Inventory Value</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Inventory Value</p>
           <p className="text-2xl font-bold text-teal-600">
             ${data.total_value.toLocaleString('en-US', { maximumFractionDigits: 2 })}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Low Stock Items</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Low Stock Items</p>
           <p
             className={`text-2xl font-bold ${data.low_stock_count > 0 ? 'text-red-600' : 'text-green-600'}`}
           >
@@ -88,10 +88,8 @@ export default function StockHealthInsights() {
       </div>
 
       {data.top_items.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">
-            Top 10 items (lowest quantity first)
-          </p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-sm font-medium text-ink2 mb-3">Top 10 items (lowest quantity first)</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />

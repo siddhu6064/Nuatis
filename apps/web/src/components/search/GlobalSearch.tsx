@@ -213,10 +213,10 @@ export default function GlobalSearch() {
       <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-[560px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+      <div className="relative w-full max-w-[560px] bg-white rounded-xl shadow-2xl border border-border-brand overflow-hidden">
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-          <span className="text-gray-400 text-sm">{'\u{1F50D}'}</span>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-brand">
+          <span className="text-ink4 text-sm">{'\u{1F50D}'}</span>
           <input
             ref={inputRef}
             type="text"
@@ -226,23 +226,21 @@ export default function GlobalSearch() {
             placeholder="Search contacts, appointments, quotes..."
             className="flex-1 text-sm border-0 focus:ring-0 p-0 placeholder-gray-400"
           />
-          <kbd className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">ESC</kbd>
+          <kbd className="text-[10px] text-ink4 bg-bg2 px-1.5 py-0.5 rounded">ESC</kbd>
         </div>
 
         {/* Results */}
         <div className="max-h-[400px] overflow-y-auto">
-          {loading && (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">Searching...</div>
-          )}
+          {loading && <div className="px-4 py-6 text-center text-sm text-ink4">Searching...</div>}
 
           {!loading && query.length < 2 && recentSearches.length > 0 && (
             <div className="px-4 py-3">
-              <p className="text-[10px] font-medium text-gray-400 uppercase mb-2">Recent</p>
+              <p className="text-[10px] font-medium text-ink4 uppercase mb-2">Recent</p>
               {recentSearches.map((s) => (
                 <button
                   key={s}
                   onClick={() => setQuery(s)}
-                  className="block w-full text-left text-sm text-gray-600 hover:bg-gray-50 px-2 py-1.5 rounded"
+                  className="block w-full text-left text-sm text-ink3 hover:bg-bg px-2 py-1.5 rounded"
                 >
                   {s}
                 </button>
@@ -251,7 +249,7 @@ export default function GlobalSearch() {
           )}
 
           {!loading && results && results.total === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
+            <div className="px-4 py-8 text-center text-sm text-ink4">
               No results for &ldquo;{query}&rdquo;
             </div>
           )}
@@ -260,7 +258,7 @@ export default function GlobalSearch() {
             <div>
               {results.contacts.length > 0 && (
                 <div>
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-gray-400 uppercase">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-ink4 uppercase">
                     Contacts ({results.contacts.length})
                   </p>
                   {results.contacts.map((c, i) => {
@@ -272,12 +270,12 @@ export default function GlobalSearch() {
                         className={`flex items-center gap-3 w-full text-left px-4 py-2 text-sm transition-colors ${
                           selectedIndex === idx
                             ? 'bg-teal-50 text-teal-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-ink2 hover:bg-bg'
                         }`}
                       >
-                        <span className="text-gray-400">{typeIcon['contact']}</span>
+                        <span className="text-ink4">{typeIcon['contact']}</span>
                         <span className="font-medium flex-1">{c.name}</span>
-                        <span className="text-xs text-gray-400">{c.email || c.phone}</span>
+                        <span className="text-xs text-ink4">{c.email || c.phone}</span>
                       </button>
                     )
                   })}
@@ -286,7 +284,7 @@ export default function GlobalSearch() {
 
               {results.appointments.length > 0 && (
                 <div>
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-gray-400 uppercase">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-ink4 uppercase">
                     Appointments ({results.appointments.length})
                   </p>
                   {results.appointments.map((a, i) => {
@@ -298,12 +296,12 @@ export default function GlobalSearch() {
                         className={`flex items-center gap-3 w-full text-left px-4 py-2 text-sm transition-colors ${
                           selectedIndex === idx
                             ? 'bg-teal-50 text-teal-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-ink2 hover:bg-bg'
                         }`}
                       >
-                        <span className="text-gray-400">{typeIcon['appointment']}</span>
+                        <span className="text-ink4">{typeIcon['appointment']}</span>
                         <span className="font-medium flex-1">{a.title}</span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-ink4">
                           {a.contact_name
                             ? `${a.contact_name}`
                             : new Date(a.start_time).toLocaleDateString('en-US', {
@@ -319,7 +317,7 @@ export default function GlobalSearch() {
 
               {results.quotes.length > 0 && (
                 <div>
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-gray-400 uppercase">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-ink4 uppercase">
                     Quotes ({results.quotes.length})
                   </p>
                   {results.quotes.map((q, i) => {
@@ -331,12 +329,12 @@ export default function GlobalSearch() {
                         className={`flex items-center gap-3 w-full text-left px-4 py-2 text-sm transition-colors ${
                           selectedIndex === idx
                             ? 'bg-teal-50 text-teal-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-ink2 hover:bg-bg'
                         }`}
                       >
-                        <span className="text-gray-400">{typeIcon['quote']}</span>
+                        <span className="text-ink4">{typeIcon['quote']}</span>
                         <span className="font-medium flex-1">{q.title}</span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-ink4">
                           {q.status} &middot; ${Number(q.total).toFixed(2)}
                         </span>
                       </button>
@@ -347,7 +345,7 @@ export default function GlobalSearch() {
 
               {(results.inventory ?? []).length > 0 && (
                 <div>
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-gray-400 uppercase">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-medium text-ink4 uppercase">
                     Inventory ({(results.inventory ?? []).length})
                   </p>
                   {(results.inventory ?? []).map((inv, i) => {
@@ -365,12 +363,12 @@ export default function GlobalSearch() {
                         className={`flex items-center gap-3 w-full text-left px-4 py-2 text-sm transition-colors ${
                           selectedIndex === idx
                             ? 'bg-teal-50 text-teal-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-ink2 hover:bg-bg'
                         }`}
                       >
-                        <span className="text-gray-400">{typeIcon['inventory']}</span>
+                        <span className="text-ink4">{typeIcon['inventory']}</span>
                         <span className="font-medium flex-1">{inv.name}</span>
-                        {inv.sku && <span className="text-xs text-gray-400">{inv.sku}</span>}
+                        {inv.sku && <span className="text-xs text-ink4">{inv.sku}</span>}
                         <span
                           className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${invQtyClass(qty, thr)}`}
                         >

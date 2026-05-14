@@ -41,7 +41,7 @@ export default function TeamScheduleInsights() {
   if (loading) {
     return (
       <section className="mt-8">
-        <p className="text-sm text-gray-400">Loading team schedule…</p>
+        <p className="text-sm text-ink4">Loading team schedule…</p>
       </section>
     )
   }
@@ -49,19 +49,19 @@ export default function TeamScheduleInsights() {
 
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Team Schedule</h2>
+      <h2 className="text-lg font-bold text-ink mb-4">Team Schedule</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Shifts This Week</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Shifts This Week</p>
           <p className="text-2xl font-bold text-blue-600">{data.total_shifts_this_week}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Avg Shift Length</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Avg Shift Length</p>
           <p className="text-2xl font-bold text-amber-600">{data.avg_shift_hours}h</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">Busiest Staff</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-xs text-ink4 mb-1">Busiest Staff</p>
           <p className="text-2xl font-bold text-teal-600 truncate">
             {data.busiest_staff?.name ?? '—'}
           </p>
@@ -69,8 +69,8 @@ export default function TeamScheduleInsights() {
       </div>
 
       {data.by_staff.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">Shifts per staff member</p>
+        <div className="bg-white rounded-xl border border-border-brand p-4">
+          <p className="text-sm font-medium text-ink2 mb-3">Shifts per staff member</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={data.by_staff} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />

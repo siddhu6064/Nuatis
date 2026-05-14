@@ -56,7 +56,7 @@ interface CalendarStatus {
 export default function CalendarSettingsPage() {
   // useSearchParams must be inside a Suspense boundary during prerender (Next 16).
   return (
-    <Suspense fallback={<div className="px-8 py-8 text-sm text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div className="px-8 py-8 text-sm text-ink4">Loading…</div>}>
       <CalendarSettingsContent />
     </Suspense>
   )
@@ -198,26 +198,26 @@ function CalendarSettingsContent() {
     <div className="px-8 py-8 max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Calendar Integration</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-xl font-bold text-ink">Calendar Integration</h1>
+        <p className="text-sm text-ink3 mt-1">
           Calendar integration enables online booking, voice AI scheduling, and appointment
           management. Only one calendar provider can be active at a time.
         </p>
       </div>
 
       {/* Connection Status Card */}
-      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Connection Status</h2>
+      <div className="rounded-xl border border-border-brand bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Connection Status</h2>
         </div>
 
         <div className="px-5 py-5">
           {loading ? (
-            <div className="text-sm text-gray-400">Loading…</div>
+            <div className="text-sm text-ink4">Loading…</div>
           ) : !status?.connected ? (
             <div className="flex items-center gap-3">
               <span className="inline-flex h-2 w-2 rounded-full bg-gray-300" />
-              <span className="text-sm text-gray-500">No calendar connected</span>
+              <span className="text-sm text-ink3">No calendar connected</span>
             </div>
           ) : status.provider === 'google' ? (
             <div className="flex items-center justify-between gap-4">
@@ -225,8 +225,8 @@ function CalendarSettingsContent() {
                 <span className="inline-flex h-2 w-2 rounded-full bg-green-500 shrink-0" />
                 <GoogleCalendarIcon />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">Connected to Google Calendar</p>
-                  {status.email && <p className="text-xs text-gray-400 truncate">{status.email}</p>}
+                  <p className="text-sm font-medium text-ink">Connected to Google Calendar</p>
+                  {status.email && <p className="text-xs text-ink4 truncate">{status.email}</p>}
                 </div>
               </div>
               <button
@@ -242,10 +242,10 @@ function CalendarSettingsContent() {
                 <span className="inline-flex h-2 w-2 rounded-full bg-green-500 shrink-0" />
                 <OutlookCalendarIcon />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-ink">
                     Connected to Microsoft 365 Calendar
                   </p>
-                  {status.email && <p className="text-xs text-gray-400 truncate">{status.email}</p>}
+                  {status.email && <p className="text-xs text-ink4 truncate">{status.email}</p>}
                 </div>
               </div>
               <button
@@ -261,13 +261,13 @@ function CalendarSettingsContent() {
       </div>
 
       {/* Connect Options */}
-      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">
+      <div className="rounded-xl border border-border-brand bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">
             {status?.connected ? 'Switch Provider' : 'Connect a Calendar'}
           </h2>
           {status?.connected && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-ink4 mt-0.5">
               Connecting a new provider will disconnect your current one.
             </p>
           )}
@@ -278,7 +278,7 @@ function CalendarSettingsContent() {
           <button
             onClick={() => handleSwitchAttempt('google')}
             disabled={connecting !== null || disconnecting}
-            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GoogleCalendarIcon />
             {connecting === 'google' ? 'Redirecting…' : 'Connect Google Calendar'}
@@ -293,7 +293,7 @@ function CalendarSettingsContent() {
           <button
             onClick={() => handleSwitchAttempt('outlook')}
             disabled={connecting !== null || disconnecting}
-            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <OutlookCalendarIcon />
             {connecting === 'outlook' ? 'Redirecting…' : 'Connect Microsoft 365 Calendar'}
@@ -310,10 +310,8 @@ function CalendarSettingsContent() {
       {switchConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl mx-4">
-            <h3 className="text-base font-semibold text-gray-900 mb-2">
-              Switch Calendar Provider?
-            </h3>
-            <p className="text-sm text-gray-500 mb-5">
+            <h3 className="text-base font-semibold text-ink mb-2">Switch Calendar Provider?</h3>
+            <p className="text-sm text-ink3 mb-5">
               This will disconnect{' '}
               <strong>
                 {status?.provider ? providerLabel(status.provider) : 'your current calendar'}
@@ -323,7 +321,7 @@ function CalendarSettingsContent() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setSwitchConfirm(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
               >
                 Cancel
               </button>

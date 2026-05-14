@@ -3,7 +3,7 @@ import ContactsList from '@/components/contacts/ContactsList'
 
 export default function ContactsPage() {
   return (
-    <Suspense fallback={<div className="px-8 py-8 text-sm text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="px-8 py-8 text-sm text-ink4">Loading...</div>}>
       <ContactsList />
     </Suspense>
   )

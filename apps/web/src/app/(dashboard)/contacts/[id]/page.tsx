@@ -45,7 +45,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     <div className="px-8 py-8">
       {/* Back link */}
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/contacts" className="text-gray-400 hover:text-gray-600 text-sm">
+        <Link href="/contacts" className="text-ink4 hover:text-ink3 text-sm">
           &larr; Contacts
         </Link>
       </div>
@@ -67,16 +67,16 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       />
 
       {/* Contact Info Card */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Details</h2>
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <h2 className="text-sm font-semibold text-ink2 mb-3">Details</h2>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-400">Source</span>
-            <p className="text-gray-700">{contact.source?.replace('_', ' ') ?? '---'}</p>
+            <span className="text-ink4">Source</span>
+            <p className="text-ink2">{contact.source?.replace('_', ' ') ?? '---'}</p>
           </div>
           <div>
-            <span className="text-gray-400">Added</span>
-            <p className="text-gray-700">
+            <span className="text-ink4">Added</span>
+            <p className="text-ink2">
               {new Date(contact.created_at).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -86,8 +86,8 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           </div>
           {contact.last_contacted && (
             <div>
-              <span className="text-gray-400">Last Contacted</span>
-              <p className="text-gray-700">
+              <span className="text-ink4">Last Contacted</span>
+              <p className="text-ink2">
                 {new Date(contact.last_contacted).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -98,12 +98,12 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           )}
           {contact.tags && contact.tags.length > 0 && (
             <div>
-              <span className="text-gray-400">Tags</span>
+              <span className="text-ink4">Tags</span>
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {contact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600"
+                    className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg2 text-ink3"
                   >
                     {tag}
                   </span>

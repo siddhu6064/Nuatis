@@ -101,7 +101,7 @@ export default function SavedViews({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors group ${
               activeViewId === view.id
                 ? 'bg-teal-100 text-teal-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-bg2 text-ink3 hover:bg-bg3'
             }`}
           >
             {view.name}
@@ -112,7 +112,7 @@ export default function SavedViews({
                   e.stopPropagation()
                   void deleteView(view.id)
                 }}
-                className="hidden group-hover:inline text-gray-400 hover:text-red-500 ml-0.5 cursor-pointer"
+                className="hidden group-hover:inline text-ink4 hover:text-red-500 ml-0.5 cursor-pointer"
               >
                 &times;
               </span>
@@ -138,7 +138,7 @@ export default function SavedViews({
               onChange={(e) => setNewName(e.target.value)}
               placeholder="View name..."
               autoFocus
-              className="text-xs border border-gray-200 rounded-full px-3 py-1.5 w-32"
+              className="text-xs border border-border-brand rounded-full px-3 py-1.5 w-32"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void saveView()
                 if (e.key === 'Escape') setShowSaveInput(false)
@@ -153,7 +153,7 @@ export default function SavedViews({
             </button>
             <button
               onClick={() => setShowSaveInput(false)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-ink4 hover:text-ink3"
             >
               Cancel
             </button>

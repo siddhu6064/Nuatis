@@ -136,16 +136,12 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-gray-200 shadow-xl overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">
+      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-border-brand shadow-xl overflow-y-auto">
+        <div className="px-5 py-4 border-b border-border-brand flex items-center justify-between">
+          <h2 className="text-base font-semibold text-ink">
             {isEdit ? 'Edit team member' : 'Add team member'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700"
-            aria-label="Close"
-          >
+          <button onClick={onClose} className="text-ink4 hover:text-ink2" aria-label="Close">
             ✕
           </button>
         </div>
@@ -153,12 +149,12 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
         <div className="px-5 py-5 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Name *</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
             />
             {fieldErrors['name'] && (
               <p className="text-xs text-red-500 mt-1">{fieldErrors['name']}</p>
@@ -167,13 +163,13 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
 
           {/* Role */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Role *</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Role *</label>
             <input
               type="text"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="e.g. Dentist, Stylist, Agent"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
             />
             {fieldErrors['role'] && (
               <p className="text-xs text-red-500 mt-1">{fieldErrors['role']}</p>
@@ -183,28 +179,28 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
           {/* Email + Phone */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
+              <label className="block text-xs font-medium text-ink3 mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Phone</label>
+              <label className="block text-xs font-medium text-ink3 mb-1.5">Phone</label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
               />
             </div>
           </div>
 
           {/* Color swatches */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Color</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Color</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_SWATCHES.map((c) => (
                 <button
@@ -223,20 +219,20 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
 
           {/* Availability editor */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Availability</label>
+            <label className="block text-xs font-medium text-ink3 mb-2">Availability</label>
             <div className="space-y-2">
               {DAY_KEYS.map((d) => {
                 const e = availability[d] ?? { enabled: false, start: '09:00', end: '17:00' }
                 return (
                   <div key={d} className="flex items-center gap-2">
-                    <div className="w-10 text-sm text-gray-600">{DAY_LABEL[d]}</div>
+                    <div className="w-10 text-sm text-ink3">{DAY_LABEL[d]}</div>
                     <button
                       type="button"
                       onClick={() => setDay(d, { enabled: !e.enabled })}
                       role="switch"
                       aria-checked={Boolean(e.enabled)}
                       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                        e.enabled ? 'bg-teal-600' : 'bg-gray-200'
+                        e.enabled ? 'bg-teal-600' : 'bg-bg3'
                       }`}
                     >
                       <span
@@ -251,18 +247,18 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
                           type="time"
                           value={e.start ?? '09:00'}
                           onChange={(ev) => setDay(d, { start: ev.target.value })}
-                          className="text-sm border border-gray-200 rounded px-2 py-1"
+                          className="text-sm border border-border-brand rounded px-2 py-1"
                         />
-                        <span className="text-xs text-gray-400">to</span>
+                        <span className="text-xs text-ink4">to</span>
                         <input
                           type="time"
                           value={e.end ?? '17:00'}
                           onChange={(ev) => setDay(d, { end: ev.target.value })}
-                          className="text-sm border border-gray-200 rounded px-2 py-1"
+                          className="text-sm border border-border-brand rounded px-2 py-1"
                         />
                       </>
                     ) : (
-                      <span className="text-xs text-gray-400">Off</span>
+                      <span className="text-xs text-ink4">Off</span>
                     )}
                     {fieldErrors[`av_${d}`] && (
                       <span className="text-xs text-red-500 ml-1">{fieldErrors[`av_${d}`]}</span>
@@ -275,12 +271,12 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Notes</label>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
             />
           </div>
 
@@ -293,7 +289,7 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
           <div className="flex justify-end gap-2 pt-2">
             <button
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
             >
               Cancel
             </button>

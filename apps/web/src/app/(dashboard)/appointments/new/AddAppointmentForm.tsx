@@ -36,10 +36,10 @@ function SubmitButton() {
 export default function AddAppointmentForm({ contacts, staff }: Props) {
   return (
     <div className="max-w-lg">
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <div className="bg-white rounded-xl border border-border-brand p-6">
         <form action={createAppointment} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-ink2 mb-1.5">
               Title <span className="text-red-500">*</span>
             </label>
             <input
@@ -48,15 +48,15 @@ export default function AddAppointmentForm({ contacts, staff }: Props) {
               required
               autoFocus
               placeholder="e.g. Checkup, Consultation"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Contact</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Contact</label>
             <select
               name="contact_id"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white text-gray-700"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white text-ink2"
             >
               <option value="">— None —</option>
               {contacts.map((c) => (
@@ -68,50 +68,48 @@ export default function AddAppointmentForm({ contacts, staff }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-ink2 mb-1.5">
               Date <span className="text-red-500">*</span>
             </label>
             <input
               name="date"
               type="date"
               required
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-ink2"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-medium text-ink2 mb-1.5">
                 Start Time <span className="text-red-500">*</span>
               </label>
               <input
                 name="start_time"
                 type="time"
                 required
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700"
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-ink2"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-medium text-ink2 mb-1.5">
                 End Time <span className="text-red-500">*</span>
               </label>
               <input
                 name="end_time"
                 type="time"
                 required
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700"
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-ink2"
               />
             </div>
           </div>
 
           {staff.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Assigned staff
-              </label>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">Assigned staff</label>
               <select
                 name="assigned_staff_id"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white text-gray-700"
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white text-ink2"
               >
                 <option value="">Any available</option>
                 {staff.map((s) => (
@@ -124,12 +122,12 @@ export default function AddAppointmentForm({ contacts, staff }: Props) {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>
+            <label className="block text-xs font-medium text-ink2 mb-1.5">Notes</label>
             <textarea
               name="notes"
               rows={3}
               placeholder="Optional notes…"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
             />
           </div>
 
@@ -137,7 +135,7 @@ export default function AddAppointmentForm({ contacts, staff }: Props) {
             <SubmitButton />
             <Link
               href="/appointments"
-              className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="px-4 py-2 text-sm text-ink3 hover:text-ink2 transition-colors"
             >
               Cancel
             </Link>

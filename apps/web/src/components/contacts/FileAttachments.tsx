@@ -114,7 +114,7 @@ export default function FileAttachments({ contactId }: Props) {
 
   const isImage = (type: string) => type.startsWith('image/')
 
-  if (loading) return <div className="py-6 text-center text-sm text-gray-400">Loading files...</div>
+  if (loading) return <div className="py-6 text-center text-sm text-ink4">Loading files...</div>
 
   return (
     <div>
@@ -123,16 +123,14 @@ export default function FileAttachments({ contactId }: Props) {
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         onClick={() => document.getElementById('file-upload-input')?.click()}
-        className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center hover:border-teal-400 transition-colors cursor-pointer mb-4"
+        className="border-2 border-dashed border-border-brand rounded-lg p-6 text-center hover:border-teal-400 transition-colors cursor-pointer mb-4"
       >
         {uploading ? (
-          <p className="text-sm text-gray-500">Uploading...</p>
+          <p className="text-sm text-ink3">Uploading...</p>
         ) : (
           <>
-            <p className="text-sm text-gray-500">Drop files here or click to upload</p>
-            <p className="text-[10px] text-gray-400 mt-1">
-              JPG, PNG, GIF, WebP, PDF, DOC — max 10MB
-            </p>
+            <p className="text-sm text-ink3">Drop files here or click to upload</p>
+            <p className="text-[10px] text-ink4 mt-1">JPG, PNG, GIF, WebP, PDF, DOC — max 10MB</p>
           </>
         )}
         <input
@@ -151,13 +149,13 @@ export default function FileAttachments({ contactId }: Props) {
 
       {/* File list */}
       {attachments.length === 0 ? (
-        <p className="text-xs text-gray-400 text-center py-4">No files attached</p>
+        <p className="text-xs text-ink4 text-center py-4">No files attached</p>
       ) : (
         <div className="space-y-2">
           {attachments.map((a) => (
             <div
               key={a.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border-brand hover:bg-bg"
             >
               {isImage(a.file_type) && a.signed_url ? (
                 <img
@@ -171,8 +169,8 @@ export default function FileAttachments({ contactId }: Props) {
                 </span>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-700 truncate">{a.original_filename}</p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-sm text-ink2 truncate">{a.original_filename}</p>
+                <p className="text-[10px] text-ink4">
                   {formatSize(a.file_size)} &middot;{' '}
                   {new Date(a.created_at).toLocaleDateString('en-US', {
                     month: 'short',
@@ -192,7 +190,7 @@ export default function FileAttachments({ contactId }: Props) {
               )}
               <button
                 onClick={() => void handleDelete(a.id)}
-                className="text-xs text-gray-400 hover:text-red-500 shrink-0"
+                className="text-xs text-ink4 hover:text-red-500 shrink-0"
               >
                 &times;
               </button>
