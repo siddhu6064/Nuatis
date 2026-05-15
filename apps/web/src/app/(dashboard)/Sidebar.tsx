@@ -593,6 +593,7 @@ export default function Sidebar({
   return (
     <aside
       className={`w-56 bg-white border-r border-border-brand flex flex-col shrink-0 transition-transform duration-200 fixed inset-y-0 left-0 z-30 md:relative md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+      onClick={(e) => e.stopPropagation()}
     >
       {/* Brand */}
       <div className="px-5 py-5 border-b border-border-brand">
