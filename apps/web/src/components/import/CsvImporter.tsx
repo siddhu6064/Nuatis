@@ -62,7 +62,7 @@ export default function CsvImporter() {
 
   // Fetch import history
   const fetchJobs = useCallback(async () => {
-    const res = await fetch('/api/import/contacts/jobs')
+    const res = await fetch('/api/import/contacts/jobs', { credentials: 'include' })
     if (res.ok) {
       const data = (await res.json()) as { jobs: ImportJob[] }
       setJobs(data.jobs)
@@ -82,6 +82,7 @@ export default function CsvImporter() {
     try {
       const res = await fetch('/api/import/contacts/parse', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv: text }),
       })
@@ -160,6 +161,7 @@ export default function CsvImporter() {
 
       const res = await fetch('/api/import/contacts', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rows,

@@ -1,34 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback } from 'react'
 
-interface Stage {
-  id: string
-  name: string
-  color: string
-  position: number
-  probability: number
-}
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Pipeline {
   id: string
   name: string
   is_default: boolean
-  type: string
+  pipeline_type: string
+  stage_count: number
 }
 
-interface PipelineDetail extends Pipeline {
-  stages: Stage[]
-}
-
-interface KanbanContact {
+interface Stage {
   id: string
-  full_name: string
-  phone?: string | null
-  last_contacted?: string | null
-  pipeline_stage?: string | null
+  name: string
+  position: number
+  color: string
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toTitle(slug: string): string {
   return slug
@@ -37,170 +28,407 @@ function toTitle(slug: string): string {
     .join(' ')
 }
 
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+// ── Inline stage editor ───────────────────────────────────────────────────────
 
-function KanbanColumn({ stage, contacts }: { stage: Stage; contacts: KanbanContact[] }) {
+function StageEditor({ pipelineId }: { pipelineId: string }) {
+  const [stages, setStages] = useState<Stage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [addingName, setAddingName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [errMsg, setErrMsg] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/pipelines/${pipelineId}`, { credentials: 'include' })
+    if (res.ok) {
+      const data = (await res.json()) as { stages?: Stage[] }
+      setStages((data.stages ?? []).sort((a, b) => a.position - b.position))
+    }
+    setLoading(false)
+  }, [pipelineId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  function showErr(msg: string) {
+    setErrMsg(msg)
+    setTimeout(() => setErrMsg(null), 3500)
+  }
+
+  async function renameStage(stageId: string) {
+    const name = editingName.trim()
+    if (!name) return
+    const res = await fetch(`/api/pipelines/${pipelineId}/stages/${stageId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      setStages((prev) => prev.map((s) => (s.id === stageId ? { ...s, name } : s)))
+      setEditingId(null)
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showErr(d.error ?? 'Failed to rename stage')
+    }
+  }
+
+  async function deleteStage(stageId: string, stageName: string) {
+    if (!confirm(`Delete stage "${stageName}"?`)) return
+    const res = await fetch(`/api/pipelines/${pipelineId}/stages/${stageId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (res.ok) {
+      setStages((prev) => prev.filter((s) => s.id !== stageId))
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showErr(d.error ?? 'Failed to delete stage')
+    }
+  }
+
+  async function addStage() {
+    const name = addingName.trim()
+    if (!name) return
+    setAdding(true)
+    const res = await fetch(`/api/pipelines/${pipelineId}/stages`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      const stage = (await res.json()) as Stage
+      setStages((prev) => [...prev, stage])
+      setAddingName('')
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showErr(d.error ?? 'Failed to add stage')
+    }
+    setAdding(false)
+  }
+
+  if (loading) {
+    return <p className="text-xs text-ink4 py-3">Loading stages...</p>
+  }
+
   return (
-    <div className="flex-none w-[220px] flex flex-col rounded-lg border border-border-brand bg-white overflow-hidden">
-      <div className="bg-[#f2f0eb] px-3 py-2.5 flex items-center gap-2 border-b border-border-brand">
-        <span
-          className="w-2.5 h-2.5 rounded-full shrink-0"
-          style={{ backgroundColor: stage.color }}
+    <div className="mt-4 pt-4 border-t border-border-brand space-y-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink4">Stages</p>
+
+      {errMsg && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded px-2.5 py-1.5">
+          {errMsg}
+        </p>
+      )}
+
+      {stages.length === 0 ? (
+        <p className="text-xs text-ink4 italic">No stages yet — add one below.</p>
+      ) : (
+        <div className="space-y-1">
+          {stages.map((stage, idx) => (
+            <div key={stage.id} className="flex items-center gap-2.5 py-0.5">
+              <span className="font-mono text-[10px] text-ink4 w-4 shrink-0 text-right">
+                {idx + 1}
+              </span>
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: stage.color || '#0d9488' }}
+              />
+              {editingId === stage.id ? (
+                <input
+                  autoFocus
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void renameStage(stage.id)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  className="flex-1 text-sm border border-teal-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+              ) : (
+                <span className="flex-1 text-sm text-ink">{stage.name}</span>
+              )}
+
+              {editingId === stage.id ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => void renameStage(stage.id)}
+                    className="text-xs font-medium text-teal-600 hover:text-teal-800"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="text-xs text-ink4 hover:text-ink3"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setEditingId(stage.id)
+                      setEditingName(stage.name)
+                    }}
+                    className="text-xs text-ink4 hover:text-teal-600 transition-colors"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => void deleteStage(stage.id, stage.name)}
+                    className="text-xs text-ink4 hover:text-red-600 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add stage row */}
+      <div className="flex items-center gap-2 pt-1">
+        <input
+          value={addingName}
+          onChange={(e) => setAddingName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void addStage()
+          }}
+          placeholder="New stage name"
+          className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
         />
-        <span className="text-[13px] font-semibold text-ink flex-1 truncate">{stage.name}</span>
-        <span className="font-mono text-[10px] text-ink3 bg-white border border-border-brand rounded px-1.5 py-0.5 shrink-0">
-          {contacts.length}
-        </span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px] max-h-[60vh]">
-        {contacts.length === 0 ? (
-          <p className="text-[12px] text-ink4 text-center py-4">No contacts</p>
-        ) : (
-          contacts.map((c) => (
-            <Link
-              key={c.id}
-              href={`/contacts/${c.id}`}
-              className="block bg-[#f9f8f5] border border-border-brand rounded-lg px-3 py-2.5 hover:border-teal-300 transition-colors"
-            >
-              <p className="text-[14px] font-medium text-ink truncate">{c.full_name}</p>
-              {c.phone && (
-                <p className="font-mono text-[11px] text-ink3 mt-0.5 truncate">{c.phone}</p>
-              )}
-              {c.last_contacted && (
-                <p className="font-mono text-[10px] text-ink4 mt-0.5">
-                  {fmtDate(c.last_contacted)}
-                </p>
-              )}
-            </Link>
-          ))
-        )}
+        <button
+          onClick={() => void addStage()}
+          disabled={adding || !addingName.trim()}
+          className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+        >
+          Add stage
+        </button>
       </div>
     </div>
   )
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function PipelinesContent({ vertical }: { vertical: string }) {
-  const [pipeline, setPipeline] = useState<PipelineDetail | null>(null)
-  const [contacts, setContacts] = useState<KanbanContact[]>([])
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    async function init() {
-      try {
-        const plRes = await fetch('/api/pipelines?type=contacts')
-        if (!plRes.ok) throw new Error('Failed to load pipelines')
+  function showToast(type: 'success' | 'error', msg: string) {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 3500)
+  }
 
-        const rawPl = (await plRes.json()) as Pipeline[] | { pipelines?: Pipeline[] } | null
-        const allPipelines: Pipeline[] = Array.isArray(rawPl)
-          ? rawPl
-          : ((rawPl as { pipelines?: Pipeline[] })?.pipelines ?? [])
+  const loadPipelines = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/pipelines?type=contacts', { credentials: 'include' })
+      if (!res.ok) return
+      const raw = (await res.json()) as Pipeline[] | { pipelines?: Pipeline[] }
+      const all: Pipeline[] = Array.isArray(raw) ? raw : (raw.pipelines ?? [])
 
-        const verticalLabel = toTitle(vertical)
-        const match =
-          allPipelines.find(
-            (p) => !p.is_default && p.name.toLowerCase().includes(verticalLabel.toLowerCase())
-          ) ??
-          allPipelines.find((p) => p.is_default) ??
-          allPipelines[0]
-
-        if (!match) {
-          setLoading(false)
-          return
-        }
-
-        const detailRes = await fetch(`/api/pipelines/${match.id}`)
-        if (!detailRes.ok) throw new Error('Failed to load pipeline detail')
-        const detail = (await detailRes.json()) as PipelineDetail
-        setPipeline(detail)
-
-        try {
-          const cRes = await fetch(`/api/contacts?pipeline_id=${match.id}&limit=200`)
-          if (cRes.ok) {
-            const cRaw = (await cRes.json()) as
-              | { contacts?: KanbanContact[] }
-              | KanbanContact[]
-              | null
-            const cList: KanbanContact[] = Array.isArray(cRaw)
-              ? cRaw
-              : ((cRaw as { contacts?: KanbanContact[] })?.contacts ?? [])
-            setContacts(cList)
-          }
-        } catch {
-          /* non-fatal */
-        }
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : 'Failed to load pipeline')
-      } finally {
-        setLoading(false)
-      }
+      // Same vertical filter logic as the Kanban board
+      const verticalLabel = toTitle(vertical)
+      const verticalMatches = all.filter((p) =>
+        p.name.toLowerCase().includes(verticalLabel.toLowerCase())
+      )
+      const filtered =
+        verticalMatches.length > 0 ? verticalMatches : all.filter((p) => p.is_default)
+      setPipelines(filtered.length > 0 ? filtered : all)
+    } finally {
+      setLoading(false)
     }
-    void init()
   }, [vertical])
 
-  if (loading) {
-    return (
-      <div className="px-8 py-8">
-        <p className="text-sm text-ink4">Loading pipeline...</p>
-      </div>
-    )
+  useEffect(() => {
+    void loadPipelines()
+  }, [loadPipelines])
+
+  async function setDefault(pipelineId: string) {
+    const res = await fetch(`/api/pipelines/${pipelineId}/set-default`, {
+      method: 'PUT',
+      credentials: 'include',
+    })
+    if (res.ok) {
+      setPipelines((prev) => prev.map((p) => ({ ...p, is_default: p.id === pipelineId })))
+      showToast('success', 'Default pipeline updated')
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showToast('error', d.error ?? 'Failed to update default')
+    }
   }
 
-  if (loadError || !pipeline) {
-    return (
-      <div className="px-8 py-8 max-w-2xl">
-        <div className="bg-white rounded-xl border border-dashed border-border-brand p-8 text-center">
-          <p className="text-sm text-ink4">
-            {loadError ?? 'No pipeline configured for this vertical yet.'}
-          </p>
-        </div>
-      </div>
-    )
+  async function deletePipeline(pipelineId: string, name: string) {
+    if (!confirm(`Delete pipeline "${name}"? This cannot be undone.`)) return
+    const res = await fetch(`/api/pipelines/${pipelineId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (res.ok) {
+      setPipelines((prev) => prev.filter((p) => p.id !== pipelineId))
+      if (expandedId === pipelineId) setExpandedId(null)
+      showToast('success', 'Pipeline deleted')
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showToast('error', d.error ?? 'Failed to delete pipeline')
+    }
   }
 
-  const stages = [...pipeline.stages].sort((a, b) => a.position - b.position)
-
-  function contactsForStage(stage: Stage): KanbanContact[] {
-    return contacts.filter((c) => c.pipeline_stage === stage.name)
+  async function createPipeline() {
+    const name = newName.trim()
+    if (!name) return
+    setSaving(true)
+    const res = await fetch('/api/pipelines', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pipeline_type: 'contacts' }),
+    })
+    if (res.ok) {
+      setNewName('')
+      setCreating(false)
+      await loadPipelines()
+      showToast('success', 'Pipeline created')
+    } else {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showToast('error', d.error ?? 'Failed to create pipeline')
+    }
+    setSaving(false)
   }
 
   return (
-    <div className="px-8 py-8 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-xl font-bold text-ink">{pipeline.name}</h2>
-          <p className="text-sm text-ink3 mt-0.5">
-            {contacts.length} contact{contacts.length !== 1 ? 's' : ''} in pipeline
-          </p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Link
-            href="/contacts/new"
-            className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            + Add Contact
-          </Link>
-          <Link
-            href="/settings/pipelines/manage"
-            className="text-sm text-ink3 hover:text-ink flex items-center gap-1"
-          >
-            ⚙ Manage
-          </Link>
-        </div>
+    <div className="px-8 py-8 max-w-2xl space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-ink mb-1">Pipelines</h1>
+        <p className="text-sm text-ink3">Manage your pipeline stages and templates.</p>
       </div>
 
-      <div className="overflow-x-auto pb-4 -mx-1 px-1">
-        {stages.length === 0 ? (
-          <p className="text-sm text-ink4">No stages defined for this pipeline.</p>
-        ) : (
-          <div className="flex gap-3" style={{ minWidth: `${stages.length * 236}px` }}>
-            {stages.map((stage) => (
-              <KanbanColumn key={stage.id} stage={stage} contacts={contactsForStage(stage)} />
-            ))}
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
+            toast.type === 'success'
+              ? 'bg-teal-600 text-white'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Pipeline list */}
+      {loading ? (
+        <p className="text-sm text-ink4">Loading pipelines...</p>
+      ) : pipelines.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-border-brand p-8 text-center">
+          <p className="text-sm text-ink4">No pipelines configured for this vertical yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {pipelines.map((pipeline) => (
+            <div key={pipeline.id} className="bg-white rounded-xl border border-border-brand p-5">
+              {/* Card header row */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <h2 className="text-sm font-semibold text-ink">{pipeline.name}</h2>
+                  {pipeline.is_default && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded shrink-0">
+                      Default
+                    </span>
+                  )}
+                  <span className="font-mono text-[10px] text-ink4 shrink-0">
+                    {pipeline.stage_count} stage{pipeline.stage_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {!pipeline.is_default && (
+                    <button
+                      onClick={() => void setDefault(pipeline.id)}
+                      className="text-xs text-ink4 hover:text-ink3 transition-colors"
+                    >
+                      Set default
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      setExpandedId((prev) => (prev === pipeline.id ? null : pipeline.id))
+                    }
+                    className="text-xs font-medium text-teal-600 hover:text-teal-800 transition-colors"
+                  >
+                    {expandedId === pipeline.id ? 'Close' : 'Edit stages'}
+                  </button>
+                  <button
+                    onClick={() => void deletePipeline(pipeline.id, pipeline.name)}
+                    className="text-xs text-ink4 hover:text-red-600 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline stage editor */}
+              {expandedId === pipeline.id && (
+                <StageEditor key={pipeline.id} pipelineId={pipeline.id} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create pipeline */}
+      <div className="bg-white rounded-xl border border-border-brand p-5">
+        {creating ? (
+          <div className="flex items-center gap-3">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void createPipeline()
+                if (e.key === 'Escape') {
+                  setCreating(false)
+                  setNewName('')
+                }
+              }}
+              placeholder="Pipeline name"
+              className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            <button
+              onClick={() => void createPipeline()}
+              disabled={saving || !newName.trim()}
+              className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Creating...' : 'Create'}
+            </button>
+            <button
+              onClick={() => {
+                setCreating(false)
+                setNewName('')
+              }}
+              className="text-sm text-ink4 hover:text-ink3 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="text-sm font-medium text-teal-600 hover:text-teal-800 transition-colors"
+          >
+            + Create Pipeline
+          </button>
         )}
       </div>
     </div>

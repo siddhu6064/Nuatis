@@ -11,15 +11,17 @@ const DEMO_TENANT_IDS = [
 const VERTICAL_ICONS: Record<string, string> = {
   sales_crm: '📊',
   dental: '🦷',
+  medical: '🏥',
+  veterinary: '🐾',
   salon: '✂️',
+  spa: '💆',
   restaurant: '🍽️',
   contractor: '🔧',
   law_firm: '⚖️',
   real_estate: '🏠',
-  spa: '💆',
   gym: '🏋️',
   nail_bar: '💅',
-  pet_grooming: '🐾',
+  pet_grooming: '🐕',
   tattoo: '🎨',
   car_wash: '🚗',
   laundry: '👕',
@@ -30,6 +32,39 @@ const VERTICALS = Object.entries(VERTICALS_CONFIG).map(([slug, config]) => ({
   label: config.label,
   icon: VERTICAL_ICONS[slug] ?? '🏢',
 }))
+
+const GROUPS: { label: string; slugs: string[] }[] = [
+  {
+    label: 'SERVICES',
+    slugs: [
+      'salon',
+      'spa',
+      'restaurant',
+      'contractor',
+      'gym',
+      'nail_bar',
+      'pet_grooming',
+      'tattoo',
+      'car_wash',
+      'laundry',
+    ],
+  },
+  {
+    label: 'HEALTHCARE',
+    slugs: ['dental', 'medical', 'veterinary'],
+  },
+  {
+    label: 'PROFESSIONAL',
+    slugs: ['law_firm', 'real_estate', 'sales_crm'],
+  },
+]
+
+const GROUPED = GROUPS.map((g) => ({
+  label: g.label,
+  items: g.slugs
+    .map((slug) => VERTICALS.find((v) => v.slug === slug))
+    .filter((v): v is (typeof VERTICALS)[0] => v !== undefined),
+})).filter((g) => g.items.length > 0)
 
 interface DemoInfo {
   tenantId: string
@@ -105,21 +140,51 @@ export default function DemoBanner() {
         {open && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-border-brand rounded-xl shadow-lg z-20 overflow-hidden">
-              {VERTICALS.map((v) => (
-                <button
-                  key={v.slug}
-                  onClick={() => switchVertical(v.slug)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
-                    v.slug === info.vertical
-                      ? 'bg-teal-50 text-teal-700 font-medium'
-                      : 'text-ink2 hover:bg-bg'
-                  }`}
+            <div className="absolute top-full left-0 mt-2 bg-white rounded-xl border border-border-brand shadow-lg z-20 p-4 min-w-[560px]">
+              {/* 3-column grid */}
+              <div className="grid grid-cols-3 gap-6">
+                {GROUPED.map((group) => (
+                  <div key={group.label}>
+                    {/* Column label */}
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-ink3 border-b border-border-brand pb-2 mb-3">
+                      {group.label}
+                    </p>
+                    {/* Vertical items */}
+                    <div className="space-y-0.5">
+                      {group.items.map((v) => {
+                        const active = v.slug === info.vertical
+                        return (
+                          <button
+                            key={v.slug}
+                            onClick={() => void switchVertical(v.slug)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-left transition-colors ${
+                              active
+                                ? 'text-teal-700 font-medium border-l-2 border-teal-500 pl-2.5 bg-teal-50'
+                                : 'text-ink2 hover:bg-bg border-l-2 border-transparent pl-2.5'
+                            }`}
+                          >
+                            <span>{v.icon}</span>
+                            <span>{v.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-border-brand pt-3 mt-3 flex items-center justify-between">
+                <span className="font-mono text-[10px] text-ink4">
+                  16 industries · More on the way
+                </span>
+                <a
+                  href="mailto:sid@nuatis.com"
+                  className="font-mono text-[10px] text-teal-600 hover:text-teal-800 transition-colors"
                 >
-                  <span>{v.icon}</span>
-                  <span>{v.label}</span>
-                </button>
-              ))}
+                  Don&apos;t see yours? Tell us →
+                </a>
+              </div>
             </div>
           </>
         )}

@@ -72,10 +72,6 @@ function Toggle({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReviewAutomationPage() {
-  const authHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-
   const [settings, setSettings] = useState<ReviewAutomationSettings>({
     enabled: false,
     delayMinutes: 120,
@@ -89,10 +85,10 @@ export default function ReviewAutomationPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/settings/review-automation`, { headers: authHeaders }).then((r) =>
+      fetch(`/api/settings/review-automation`, { credentials: 'include' }).then((r) =>
         r.ok ? r.json() : null
       ),
-      fetch(`/api/settings/review-automation/stats`, { headers: authHeaders }).then((r) =>
+      fetch(`/api/settings/review-automation/stats`, { credentials: 'include' }).then((r) =>
         r.ok ? r.json() : null
       ),
     ])
@@ -125,7 +121,8 @@ export default function ReviewAutomationPage() {
     try {
       const res = await fetch(`/api/settings/review-automation`, {
         method: 'PUT',
-        headers: authHeaders,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enabled: settings.enabled,
           delayMinutes: settings.delayMinutes,
@@ -273,11 +270,12 @@ export default function ReviewAutomationPage() {
       <div className="rounded-xl border border-border-brand bg-white p-5">
         {stats ? (
           <p className="text-sm text-ink3">
-            <span className="font-medium text-ink">{stats.sent.toLocaleString()}</span> review
-            requests sent ·{' '}
-            <span className="font-medium text-ink">{stats.clicked.toLocaleString()}</span> clicked{' '}
-            <span className="text-ink4">({stats.clickRate.toFixed(1)}% click rate)</span> — last 30
-            days
+            <span className="font-medium text-ink">{(stats.sent ?? 0).toLocaleString()}</span>{' '}
+            review requests sent ·{' '}
+            <span className="font-medium text-ink">{(stats.clicked ?? 0).toLocaleString()}</span>{' '}
+            clicked{' '}
+            <span className="text-ink4">({(stats.clickRate ?? 0).toFixed(1)}% click rate)</span> —
+            last 30 days
           </p>
         ) : (
           <p className="text-sm text-ink4">No stats available yet.</p>

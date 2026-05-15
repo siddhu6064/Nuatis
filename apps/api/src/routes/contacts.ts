@@ -471,6 +471,15 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
   if (Array.isArray(b['tags'])) updates['tags'] = b['tags']
   if (typeof b['pipeline_stage'] === 'string') updates['pipeline_stage'] = b['pipeline_stage']
+  if (typeof b['pipeline_stage_id'] === 'string') {
+    const { data: stageRow } = await supabase
+      .from('pipeline_stages')
+      .select('name')
+      .eq('id', b['pipeline_stage_id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+    if (stageRow) updates['pipeline_stage'] = (stageRow as { name: string }).name
+  }
   if (typeof b['is_archived'] === 'boolean') updates['is_archived'] = b['is_archived']
   if (typeof b['referred_by_contact_id'] === 'string')
     updates['referred_by_contact_id'] = b['referred_by_contact_id']

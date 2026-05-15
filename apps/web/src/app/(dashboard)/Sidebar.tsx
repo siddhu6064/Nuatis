@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { trackEvent } from '@/lib/analytics'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import type { DropResult } from '@hello-pangea/dnd'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,7 +30,6 @@ type GroupState = Record<string, boolean>
 // ── Static nav data ───────────────────────────────────────────────────────────
 
 const TOP_NAV: NavItem[] = [
-  { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
   { href: '/dashboard', label: 'Dashboard', icon: '▦' },
   { href: '/inbox', label: 'Inbox', icon: '◻', suiteOnly: true },
   { href: '/insights', label: 'Insights', icon: '▤', suiteOnly: true, requireModule: 'insights' },
@@ -127,6 +128,8 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'settings',
     label: 'Settings',
     items: [
+      // Setup first — only visible during onboarding
+      { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
       { href: '/settings/voice', label: 'Voice AI', icon: '◇', requireModule: 'maya' },
       { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
@@ -155,7 +158,13 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
+// Settings is always pinned to the bottom — excluded from drag ordering
+const SETTINGS_ID = 'settings'
+const REORDERABLE_IDS = NAV_GROUPS.filter((g) => g.id !== SETTINGS_ID).map((g) => g.id)
+
 const LS_KEY = 'nuatis_sidebar_groups'
+const ORDER_LS_KEY = 'nuatis_sidebar_order'
+const ITEMS_LS_PREFIX = 'nuatis_sidebar_items_'
 
 // ── Group state helpers ───────────────────────────────────────────────────────
 
@@ -177,7 +186,6 @@ function loadGroupState(activePath: string): GroupState {
     const raw = localStorage.getItem(LS_KEY)
     if (raw) {
       const saved = JSON.parse(raw) as GroupState
-      // Merge: keep saved values but force-open any active group
       const merged = { ...saved }
       for (const [id, isActive] of Object.entries(active)) {
         if (isActive) merged[id] = true
@@ -187,7 +195,6 @@ function loadGroupState(activePath: string): GroupState {
   } catch {
     // ignore storage errors
   }
-  // First visit: open active group, close everything else
   return active
 }
 
@@ -196,6 +203,57 @@ function saveGroupState(state: GroupState) {
     localStorage.setItem(LS_KEY, JSON.stringify(state))
   } catch {
     // ignore storage errors
+  }
+}
+
+function loadNavOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(ORDER_LS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as string[]
+      const validSet = new Set(REORDERABLE_IDS)
+      const filtered = parsed.filter((id) => validSet.has(id))
+      const savedSet = new Set(filtered)
+      const missing = REORDERABLE_IDS.filter((id) => !savedSet.has(id))
+      return [...filtered, ...missing]
+    }
+  } catch {
+    // ignore
+  }
+  return REORDERABLE_IDS
+}
+
+function saveNavOrder(order: string[]) {
+  try {
+    localStorage.setItem(ORDER_LS_KEY, JSON.stringify(order))
+  } catch {
+    // ignore
+  }
+}
+
+function loadItemOrder(groupId: string, items: NavItem[]): string[] {
+  const allHrefs = items.map((i) => i.href)
+  try {
+    const raw = localStorage.getItem(ITEMS_LS_PREFIX + groupId)
+    if (raw) {
+      const parsed = JSON.parse(raw) as string[]
+      const validSet = new Set(allHrefs)
+      const filtered = parsed.filter((h) => validSet.has(h))
+      const savedSet = new Set(filtered)
+      const missing = allHrefs.filter((h) => !savedSet.has(h))
+      return [...filtered, ...missing]
+    }
+  } catch {
+    // ignore
+  }
+  return allHrefs
+}
+
+function saveItemOrder(groupId: string, order: string[]) {
+  try {
+    localStorage.setItem(ITEMS_LS_PREFIX + groupId, JSON.stringify(order))
+  } catch {
+    // ignore
   }
 }
 
@@ -230,17 +288,29 @@ export default function Sidebar() {
   const [userEmail, setUserEmail] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
-  // Start all collapsed on SSR; hydrate from localStorage in effect
   const [groupOpen, setGroupOpen] = useState<GroupState>(() =>
     NAV_GROUPS.reduce((acc, g) => ({ ...acc, [g.id]: false }), {} as GroupState)
   )
+  const [navOrder, setNavOrder] = useState<string[]>(REORDERABLE_IDS)
+  const [itemOrders, setItemOrders] = useState<Record<string, string[]>>(() =>
+    NAV_GROUPS.reduce<Record<string, string[]>>((acc, g) => {
+      acc[g.id] = g.items.map((i) => i.href)
+      return acc
+    }, {})
+  )
 
-  // Hydrate group state from localStorage on mount (runs once)
+  // Hydrate from localStorage on mount
   useEffect(() => {
     setGroupOpen(loadGroupState(path))
+    setNavOrder(loadNavOrder())
+    const orders: Record<string, string[]> = {}
+    for (const group of NAV_GROUPS) {
+      orders[group.id] = loadItemOrder(group.id, group.items)
+    }
+    setItemOrders(orders)
   }, []) // intentional: only read storage on initial mount
 
-  // Auto-expand active group on route change (never close others)
+  // Auto-expand active group on route change
   useEffect(() => {
     const active = computeActiveGroups(path)
     setGroupOpen((prev) => {
@@ -351,15 +421,161 @@ export default function Sidebar() {
     })
   }
 
-  function navLinkClass(active: boolean, indent = false) {
+  function handleDragEnd(result: DropResult) {
+    if (!result.destination) return
+    const { source, destination } = result
+
+    // Section reorder
+    if (source.droppableId === 'sidebar-sections') {
+      if (source.index === destination.index) return
+      const next = [...navOrder]
+      const [moved] = next.splice(source.index, 1)
+      next.splice(destination.index, 0, moved!)
+      setNavOrder(next)
+      saveNavOrder(next)
+      return
+    }
+
+    // Item reorder within a section (no cross-section drops)
+    if (source.droppableId.endsWith('-items') && source.droppableId === destination.droppableId) {
+      if (source.index === destination.index) return
+      const groupId = source.droppableId.slice(0, -6) // strip '-items'
+      const group = NAV_GROUPS.find((g) => g.id === groupId)
+      if (!group) return
+
+      const hrefToItem = Object.fromEntries(group.items.map((i) => [i.href, i]))
+      const current = itemOrders[groupId] ?? group.items.map((i) => i.href)
+
+      // Visible hrefs in current order — these match the Draggable indices
+      const visibleHrefs = current.filter((h) => {
+        const item = hrefToItem[h]
+        return item && itemVisible(item)
+      })
+
+      const movedHref = visibleHrefs[source.index]!
+      const targetHref = visibleHrefs[destination.index]!
+
+      // Remove moved item from full list, then re-insert near target
+      const withoutMoved = current.filter((h) => h !== movedHref)
+      const targetPos = withoutMoved.indexOf(targetHref)
+      const insertAt = source.index < destination.index ? targetPos + 1 : targetPos
+      const next = [...withoutMoved]
+      next.splice(insertAt, 0, movedHref)
+
+      setItemOrders((prev) => ({ ...prev, [groupId]: next }))
+      saveItemOrder(groupId, next)
+    }
+  }
+
+  function resetOrder() {
+    setNavOrder(REORDERABLE_IDS)
+    const defaultOrders = NAV_GROUPS.reduce<Record<string, string[]>>((acc, g) => {
+      acc[g.id] = g.items.map((i) => i.href)
+      return acc
+    }, {})
+    setItemOrders(defaultOrders)
+    try {
+      localStorage.removeItem(ORDER_LS_KEY)
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith(ITEMS_LS_PREFIX)) keysToRemove.push(key)
+      }
+      for (const key of keysToRemove) localStorage.removeItem(key)
+    } catch {
+      // ignore
+    }
+  }
+
+  function navLinkClass(active: boolean) {
     return [
       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-      indent ? 'pl-6' : '',
       active ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg hover:text-ink',
     ]
       .join(' ')
       .trim()
   }
+
+  function renderGroupItems(group: NavGroup) {
+    const hrefToItem = Object.fromEntries(group.items.map((i) => [i.href, i]))
+    const current = itemOrders[group.id] ?? group.items.map((i) => i.href)
+    const orderedItems = current
+      .map((h) => hrefToItem[h])
+      .filter((item): item is NavItem => item !== undefined && itemVisible(item))
+    const open = groupOpen[group.id] ?? false
+
+    return (
+      <div
+        style={{
+          maxHeight: open ? '600px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 200ms ease-in-out',
+        }}
+      >
+        <Droppable droppableId={`${group.id}-items`} type="item">
+          {(provided) => (
+            <div ref={provided.innerRef} {...provided.droppableProps} className="mt-0.5">
+              {orderedItems.map((item, index) => {
+                const active = isActive(item)
+                return (
+                  <Draggable key={item.href} draggableId={item.href} index={index}>
+                    {(dragProvided, dragSnapshot) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        className={`group/item flex items-center rounded-lg mb-0.5 transition-colors ${
+                          active ? 'bg-teal-50' : 'hover:bg-bg'
+                        }`}
+                        style={{
+                          opacity: dragSnapshot.isDragging ? 0.8 : 1,
+                          ...dragProvided.draggableProps.style,
+                        }}
+                      >
+                        <span
+                          {...dragProvided.dragHandleProps}
+                          className="pl-2 pr-0.5 shrink-0 text-xs text-ink4 leading-none opacity-0 group-hover/item:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none"
+                          aria-label="Drag to reorder"
+                        >
+                          ⠿
+                        </span>
+                        <Link
+                          href={item.href}
+                          className={`flex-1 flex items-center gap-3 pl-1 pr-3 py-2 text-sm rounded-r-lg transition-colors ${
+                            active ? 'text-teal-700 font-medium' : 'text-ink3 hover:text-ink'
+                          }`}
+                        >
+                          <span className="text-base leading-none">{item.icon}</span>
+                          <span>{item.label}</span>
+                          {item.onboardingOnly && (
+                            <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                              NEW
+                            </span>
+                          )}
+                          {item.href === '/inventory' && lowStockCount > 0 && (
+                            <span
+                              className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0"
+                              aria-label={`${lowStockCount} low-stock item(s)`}
+                            />
+                          )}
+                        </Link>
+                      </div>
+                    )}
+                  </Draggable>
+                )
+              })}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </div>
+    )
+  }
+
+  // Ordered reorderable groups, then settings always last
+  const orderedGroups = navOrder
+    .map((id) => NAV_GROUPS.find((g) => g.id === id))
+    .filter((g): g is NavGroup => g !== undefined)
+  const settingsGroup = NAV_GROUPS.find((g) => g.id === SETTINGS_ID)!
 
   return (
     <aside className="w-56 bg-white border-r border-border-brand flex flex-col shrink-0">
@@ -390,11 +606,6 @@ export default function Sidebar() {
               <Link key={item.href} href={item.href} className={navLinkClass(active)}>
                 <span className="text-base leading-none">{item.icon}</span>
                 <span>{item.label}</span>
-                {item.onboardingOnly && (
-                  <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                    NEW
-                  </span>
-                )}
                 {item.href === '/inbox' && unreadSms > 0 && (
                   <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
                     {unreadSms > 99 ? '99+' : unreadSms}
@@ -405,55 +616,156 @@ export default function Sidebar() {
           })}
         </div>
 
-        {/* Grouped sections */}
-        {NAV_GROUPS.map((group) => {
-          const visibleItems = group.items.filter(itemVisible)
-          if (visibleItems.length === 0) return null
-          const open = groupOpen[group.id] ?? false
+        {/* Single DragDropContext for both section and item reordering */}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          {/* Draggable sections */}
+          <Droppable droppableId="sidebar-sections" type="section">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {orderedGroups.map((group, index) => {
+                  const visibleItems = group.items.filter(itemVisible)
+                  if (visibleItems.length === 0) return null
+                  const open = groupOpen[group.id] ?? false
+                  return (
+                    <Draggable key={group.id} draggableId={group.id} index={index}>
+                      {(dragProvided, dragSnapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className="mt-3 group/section"
+                          style={{
+                            ...dragProvided.draggableProps.style,
+                            opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                          }}
+                        >
+                          {/* Group header row */}
+                          <div className="flex items-center px-1 py-1 rounded hover:bg-bg transition-colors">
+                            {/* Drag handle */}
+                            <span
+                              {...dragProvided.dragHandleProps}
+                              className="text-ink4 text-sm leading-none opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none mr-1 shrink-0"
+                              aria-label="Drag to reorder section"
+                            >
+                              ⠿
+                            </span>
+                            {/* Expand / collapse */}
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(group.id)}
+                              className="flex-1 flex items-center justify-between px-2 py-0 rounded cursor-pointer"
+                            >
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-ink4">
+                                {group.label}
+                              </span>
+                              <Chevron open={open} />
+                            </button>
+                          </div>
 
-          return (
-            <div key={group.id} className="mt-3">
-              {/* Group header */}
-              <button
-                type="button"
-                onClick={() => toggleGroup(group.id)}
-                className="w-full flex items-center justify-between px-3 py-1 rounded hover:bg-bg transition-colors cursor-pointer"
-              >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-ink4">
-                  {group.label}
-                </span>
-                <Chevron open={open} />
-              </button>
+                          {/* Collapsible items with per-section DnD */}
+                          {renderGroupItems(group)}
+                        </div>
+                      )}
+                    </Draggable>
+                  )
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
 
-              {/* Collapsible items */}
-              <div
-                style={{
-                  maxHeight: open ? '600px' : '0',
-                  overflow: 'hidden',
-                  transition: 'max-height 200ms ease-in-out',
-                }}
-              >
-                <div className="mt-0.5 space-y-0.5">
-                  {visibleItems.map((item) => {
-                    const active = isActive(item)
-                    return (
-                      <Link key={item.href} href={item.href} className={navLinkClass(active, true)}>
-                        <span className="text-base leading-none">{item.icon}</span>
-                        <span>{item.label}</span>
-                        {item.href === '/inventory' && lowStockCount > 0 && (
-                          <span
-                            className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0"
-                            aria-label={`${lowStockCount} low-stock item(s)`}
-                          />
-                        )}
-                      </Link>
-                    )
-                  })}
+          {/* Settings — always pinned last, not draggable as a section */}
+          {(() => {
+            const hrefToItem = Object.fromEntries(settingsGroup.items.map((i) => [i.href, i]))
+            const current = itemOrders[SETTINGS_ID] ?? settingsGroup.items.map((i) => i.href)
+            const orderedItems = current
+              .map((h) => hrefToItem[h])
+              .filter((item): item is NavItem => item !== undefined && itemVisible(item))
+            if (orderedItems.length === 0) return null
+            const open = groupOpen[SETTINGS_ID] ?? false
+            return (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(SETTINGS_ID)}
+                  className="w-full flex items-center justify-between px-3 py-1 rounded hover:bg-bg transition-colors cursor-pointer"
+                >
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-ink4">
+                    {settingsGroup.label}
+                  </span>
+                  <Chevron open={open} />
+                </button>
+                <div
+                  style={{
+                    maxHeight: open ? '600px' : '0',
+                    overflow: 'hidden',
+                    transition: 'max-height 200ms ease-in-out',
+                  }}
+                >
+                  <Droppable droppableId="settings-items" type="item">
+                    {(provided) => (
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="mt-0.5">
+                        {orderedItems.map((item, index) => {
+                          const active = isActive(item)
+                          return (
+                            <Draggable key={item.href} draggableId={item.href} index={index}>
+                              {(dragProvided, dragSnapshot) => (
+                                <div
+                                  ref={dragProvided.innerRef}
+                                  {...dragProvided.draggableProps}
+                                  className={`group/item flex items-center rounded-lg mb-0.5 transition-colors ${
+                                    active ? 'bg-teal-50' : 'hover:bg-bg'
+                                  }`}
+                                  style={{
+                                    opacity: dragSnapshot.isDragging ? 0.8 : 1,
+                                    ...dragProvided.draggableProps.style,
+                                  }}
+                                >
+                                  <span
+                                    {...dragProvided.dragHandleProps}
+                                    className="pl-2 pr-0.5 shrink-0 text-xs text-ink4 leading-none opacity-0 group-hover/item:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none"
+                                    aria-label="Drag to reorder"
+                                  >
+                                    ⠿
+                                  </span>
+                                  <Link
+                                    href={item.href}
+                                    className={`flex-1 flex items-center gap-3 pl-1 pr-3 py-2 text-sm rounded-r-lg transition-colors ${
+                                      active
+                                        ? 'text-teal-700 font-medium'
+                                        : 'text-ink3 hover:text-ink'
+                                    }`}
+                                  >
+                                    <span className="text-base leading-none">{item.icon}</span>
+                                    <span>{item.label}</span>
+                                    {item.onboardingOnly && (
+                                      <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                        NEW
+                                      </span>
+                                    )}
+                                  </Link>
+                                </div>
+                              )}
+                            </Draggable>
+                          )
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+
+                  {/* Reset order — inside Settings, always last */}
+                  <button
+                    type="button"
+                    onClick={resetOrder}
+                    className="w-full text-left pl-6 pr-3 py-2 font-mono text-[10px] text-ink4 hover:text-ink3 transition-colors"
+                  >
+                    ↺ Reset order
+                  </button>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })()}
+        </DragDropContext>
 
         {/* Upgrade CTA for maya_only */}
         {isMayaOnly && (

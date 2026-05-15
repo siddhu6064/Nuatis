@@ -36,10 +36,6 @@ export default function DataExportPage() {
   const [historyLoading, setHistoryLoading] = useState(true)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  const authHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 4000)
@@ -47,10 +43,10 @@ export default function DataExportPage() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await fetch(`/api/settings/data-export`, { headers: authHeaders })
+      const res = await fetch(`/api/settings/data-export`, { credentials: 'include' })
       if (res.ok) {
-        const data: ExportJob[] = await res.json()
-        setHistory(data)
+        const raw = (await res.json()) as { history?: ExportJob[] } | ExportJob[]
+        setHistory(Array.isArray(raw) ? raw : ((raw as { history?: ExportJob[] }).history ?? []))
       }
     } catch {
       // silently fail
@@ -78,7 +74,8 @@ export default function DataExportPage() {
     try {
       const res = await fetch(`/api/settings/data-export`, {
         method: 'POST',
-        headers: authHeaders,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tables: selectedTables }),
       })
       if (res.ok) {
@@ -176,7 +173,7 @@ export default function DataExportPage() {
               </tr>
             </thead>
             <tbody>
-              {history.map((job) => {
+              {(Array.isArray(history) ? history : []).map((job) => {
                 const badge = STATUS_STYLES[job.status] ?? STATUS_STYLES.failed
                 const isExpired =
                   job.status === 'completed' &&
