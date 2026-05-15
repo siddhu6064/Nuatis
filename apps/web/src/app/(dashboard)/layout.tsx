@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 overflow-y-auto bg-bg">
-          <div className="flex items-center px-4 pt-4 md:hidden">
+          <div className="relative z-50 flex items-center px-4 pt-4 md:hidden">
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}

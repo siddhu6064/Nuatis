@@ -62,13 +62,13 @@ export default async function DashboardPage() {
   ]
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-6 md:px-8 md:py-8">
       <div className="mb-8">
         <h1 className="text-xl font-bold text-ink">Dashboard</h1>
         <p className="text-sm text-ink3 mt-0.5">Welcome back, Sid.</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {STATS.map(({ label, value, icon, color }) => (
           <div key={label} className="bg-white rounded-xl border border-border-brand p-5">
             <div className="flex items-center justify-between mb-3">
@@ -84,8 +84,8 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-white rounded-xl border border-border-brand p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">Recent Activity</h2>
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
