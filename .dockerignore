@@ -1,0 +1,27 @@
+# Build artifacts
+apps/web/.next
+apps/web/out
+apps/api/dist
+packages/*/dist
+
+# Dependencies
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+
+# Mobile (not deploying via ACR)
+apps/mobile
+
+# Dev artifacts
+coverage
+*.log
+.env
+.env.*
+.env.local
+
+# Tooling
+.claude
+.worktrees
+.git
+*.md
+docs/
