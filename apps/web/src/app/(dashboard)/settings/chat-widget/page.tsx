@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 
-const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001'
+const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? ''
 const webUrl = process.env['NEXT_PUBLIC_WEB_URL'] || 'http://localhost:3000'
 
 interface ChatWidgetSettings {

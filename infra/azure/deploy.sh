@@ -102,7 +102,7 @@ else
     --max-replicas 3 \
     --cpu 0.5 \
     --memory 1.0Gi \
-    --env-vars NODE_ENV=production \
+    --env-vars NODE_ENV=production NEXT_PUBLIC_API_URL=https://api.nuatis.com NEXTAUTH_URL=https://nuatis.com API_BACKEND_URL=https://api.nuatis.com \
     --output none
 fi
 
