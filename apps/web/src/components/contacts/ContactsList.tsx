@@ -126,6 +126,7 @@ export default function ContactsList() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -135,10 +136,11 @@ export default function ContactsList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
 
-  const fetchContacts = useCallback(async (f: FilterState) => {
+  const fetchContacts = useCallback(async (f: FilterState, p: number) => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set('limit', '50')
+    params.set('page', String(p))
     if (f.q) params.set('q', f.q)
     if (f.pipeline_stage_id.length > 0)
       params.set('pipeline_stage_id', f.pipeline_stage_id.join(','))
@@ -173,6 +175,7 @@ export default function ContactsList() {
   const updateFilters = useCallback(
     (newFilters: FilterState) => {
       setFilters(newFilters)
+      setPage(1)
       setActiveViewId(null)
       setSelectedIds(new Set())
       setAllMatchingSelected(false)
@@ -185,11 +188,11 @@ export default function ContactsList() {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => void fetchContacts(filters), 150)
+    debounceRef.current = setTimeout(() => void fetchContacts(filters, page), 150)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [filters, fetchContacts])
+  }, [filters, page, fetchContacts])
 
   useEffect(() => {
     void fetch('/api/users')
@@ -226,6 +229,7 @@ export default function ContactsList() {
       sort_dir: view.sort_dir ?? 'desc',
     }
     setFilters(f)
+    setPage(1)
     setActiveViewId(view.id)
     setSelectedIds(new Set())
     setAllMatchingSelected(false)
@@ -266,7 +270,7 @@ export default function ContactsList() {
 
   const handleBulkComplete = () => {
     clearSelection()
-    void fetchContacts(filters)
+    void fetchContacts(filters, page)
   }
 
   const filterCount = activeFilterCount(filters)
@@ -352,7 +356,11 @@ export default function ContactsList() {
           <div>
             <h1 className="text-xl font-bold text-ink">Contacts</h1>
             <p className="text-sm text-ink3 mt-0.5">
-              {loading ? '...' : `Showing ${contacts.length} of ${total}`}
+              {loading
+                ? '...'
+                : total === 0
+                  ? '0 contacts'
+                  : `Showing ${(page - 1) * 50 + 1}–${Math.min(page * 50, total)} of ${total}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -488,15 +496,90 @@ export default function ContactsList() {
                       className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
                     />
                   </th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Name</th>
+                  {/* Sortable: Name */}
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({
+                          ...filters,
+                          sort_by: 'full_name',
+                          sort_dir:
+                            filters.sort_by === 'full_name' && filters.sort_dir === 'asc'
+                              ? 'desc'
+                              : 'asc',
+                        })
+                      }
+                      className="flex items-center gap-1 hover:text-ink transition-colors"
+                    >
+                      Name
+                      <span className="text-[10px]">
+                        {filters.sort_by === 'full_name'
+                          ? filters.sort_dir === 'asc'
+                            ? '▲'
+                            : '▼'
+                          : '↕'}
+                      </span>
+                    </button>
+                  </th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Email</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Phone</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Stage</th>
+                  {/* Sortable: Stage */}
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({
+                          ...filters,
+                          sort_by: 'pipeline_stage',
+                          sort_dir:
+                            filters.sort_by === 'pipeline_stage' && filters.sort_dir === 'asc'
+                              ? 'desc'
+                              : 'asc',
+                        })
+                      }
+                      className="flex items-center gap-1 hover:text-ink transition-colors"
+                    >
+                      Stage
+                      <span className="text-[10px]">
+                        {filters.sort_by === 'pipeline_stage'
+                          ? filters.sort_dir === 'asc'
+                            ? '▲'
+                            : '▼'
+                          : '↕'}
+                      </span>
+                    </button>
+                  </th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Lifecycle</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Score</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Assigned</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Territory</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Added</th>
+                  {/* Sortable: Added */}
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({
+                          ...filters,
+                          sort_by: 'created_at',
+                          sort_dir:
+                            filters.sort_by === 'created_at' && filters.sort_dir === 'desc'
+                              ? 'asc'
+                              : 'desc',
+                        })
+                      }
+                      className="flex items-center gap-1 hover:text-ink transition-colors"
+                    >
+                      Added
+                      <span className="text-[10px]">
+                        {filters.sort_by === 'created_at'
+                          ? filters.sort_dir === 'desc'
+                            ? '▼'
+                            : '▲'
+                          : '↕'}
+                      </span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -636,6 +719,32 @@ export default function ContactsList() {
                 ))}
               </tbody>
             </table>
+          )}
+          {/* Pagination */}
+          {!loading && total > 50 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border-brand">
+              <p className="text-xs text-ink4">
+                Page {page} of {Math.ceil(total / 50)}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= Math.ceil(total / 50)}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
