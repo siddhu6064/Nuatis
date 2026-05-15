@@ -87,7 +87,8 @@ app.use(helmet())
 app.use(
   cors({
     origin:
-      process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000',
+      process.env['CORS_ORIGIN'] ??
+      (process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000'),
   })
 )
 app.use(express.json())
