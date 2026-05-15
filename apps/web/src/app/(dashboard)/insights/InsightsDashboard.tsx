@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import type { DropResult } from '@hello-pangea/dnd'
 import {
   LineChart,
   Line,
@@ -201,6 +203,20 @@ function formatCurrency(value: number): string {
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
   return `$${value.toFixed(0)}`
 }
+
+const DEFAULT_ORDER = [
+  'call_stats',
+  'call_volume',
+  'outcomes_hours',
+  'pipeline_dist',
+  'roi_summary',
+  'revenue_forecast',
+  'lang_sources',
+  'followup',
+  'quotes',
+]
+
+const LS_KEY = 'nuatis_insights_order'
 
 export default function InsightsDashboard({
   sessions,
@@ -667,7 +683,7 @@ export default function InsightsDashboard({
   }, [selectedPipelineId])
 
   // Compute "Expected This Month" and MoM comparison from forecast data
-  const currentMonth = new Date().toISOString().slice(0, 7) // e.g. "2026-04"
+  const currentMonth = new Date().toISOString().slice(0, 7)
   const monthlyForecast = forecastData?.summary?.monthly_forecast ?? []
   const currentMonthEntry = monthlyForecast.find((m) => m.month === currentMonth)
   const prevMonthStr = (() => {
@@ -685,899 +701,998 @@ export default function InsightsDashboard({
         ).toFixed(0)
       : null
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-ink">Insights</h1>
-        <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
-      </div>
+  // Widget order — DnD reordering
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_ORDER)
 
-      {/* Section 1: Call Performance Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Calls"
-          value={String(stats.totalCalls)}
-          sub={`${stats.bookings} bookings`}
-        />
-        <StatCard
-          label="Avg Response Time"
-          value={stats.avgLatency != null ? `${(stats.avgLatency / 1000).toFixed(1)}s` : '--'}
-          color={latencyColor}
-          sub="first response"
-        />
-        <StatCard
-          label="Booking Rate"
-          value={`${bookingRate}%`}
-          sub={`${stats.bookings} of ${stats.totalCalls} calls`}
-          color="text-teal-600"
-        />
-        <StatCard
-          label="Call Quality"
-          value={stats.avgMos != null ? stats.avgMos.toFixed(2) : '--'}
-          sub={mosLabel}
-        />
-      </div>
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[]
+        const valid = parsed.filter((id) => DEFAULT_ORDER.includes(id))
+        const missing = DEFAULT_ORDER.filter((id) => !valid.includes(id))
+        setWidgetOrder([...valid, ...missing])
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [])
 
-      {/* Section 2: Call Volume Chart */}
-      <div className="bg-white rounded-xl border border-border-brand p-6">
-        <h2 className="text-sm font-semibold text-ink mb-4">Call Volume</h2>
-        {stats.dailyVolume.length === 0 ? (
-          <p className="text-sm text-ink4 py-8 text-center">No call data yet</p>
-        ) : (
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={stats.dailyVolume}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="calls"
-                stroke="#0d9488"
-                strokeWidth={2}
-                dot={false}
-                name="Calls"
-              />
-              <Line
-                type="monotone"
-                dataKey="bookings"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={false}
-                name="Bookings"
-              />
-              <Legend />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+  function handleWidgetDragEnd(result: DropResult) {
+    if (!result.destination) return
+    if (result.source.index === result.destination.index) return
+    const next = [...widgetOrder]
+    const [moved] = next.splice(result.source.index, 1)
+    next.splice(result.destination.index, 0, moved!)
+    setWidgetOrder(next)
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(next))
+    } catch {
+      // ignore storage errors
+    }
+  }
 
-      {/* Section 3: Outcomes + Peak Hours */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Call Outcomes</h2>
-          {stats.outcomeData.length === 0 ? (
-            <p className="text-sm text-ink4 py-8 text-center">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={stats.outcomeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                >
-                  {stats.outcomeData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+  function resetWidgetOrder() {
+    setWidgetOrder(DEFAULT_ORDER)
+    try {
+      localStorage.removeItem(LS_KEY)
+    } catch {
+      // ignore storage errors
+    }
+  }
 
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Peak Hours</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={stats.peakHours}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
-              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="calls" fill="#0d9488" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Section 4: Pipeline Funnel */}
-      <div className="bg-white rounded-xl border border-border-brand p-6">
-        <h2 className="text-sm font-semibold text-ink mb-4">Pipeline Distribution</h2>
-        {stats.stageDistribution.length === 0 ? (
-          <p className="text-sm text-ink4 py-8 text-center">No pipeline data</p>
-        ) : (
-          <>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={stats.stageDistribution} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="stage"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  width={120}
-                />
-                <Tooltip />
-                <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center gap-4 mt-3 text-xs text-ink3">
-              <span>
-                Conversion rate:{' '}
-                <strong className="text-teal-600">
-                  {stats.pipelineTotal > 0
-                    ? ((stats.wonCount / stats.pipelineTotal) * 100).toFixed(1)
-                    : 0}
-                  %
-                </strong>
-              </span>
-              <span>
-                Total: <strong>{stats.pipelineTotal}</strong> contacts in pipeline
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Section 5: ROI Summary */}
-      <div className="bg-gradient-to-r from-teal-600 to-teal-700 rounded-xl p-6 text-white">
-        <h2 className="text-sm font-semibold opacity-80 mb-4">ROI Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div>
-            <p className="text-xs opacity-70">Maya Cost</p>
-            <p className="text-xl font-bold">${stats.totalMayaCost.toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-xs opacity-70">Receptionist Cost</p>
-            <p className="text-xl font-bold">$2,500/mo</p>
-          </div>
-          <div>
-            <p className="text-xs opacity-70">You Saved</p>
-            <p className="text-2xl font-bold">${stats.monthlySavings.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs opacity-70">ROI</p>
-            <p className="text-2xl font-bold">{stats.roiMultiplier}x</p>
-          </div>
-        </div>
-        {stats.bookingTrend.length > 0 && (
-          <ResponsiveContainer width="100%" height={150}>
-            <AreaChart data={stats.bookingTrend}>
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 10, fill: '#fff' }}
-                stroke="rgba(255,255,255,0.3)"
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#fff' }}
-                stroke="rgba(255,255,255,0.3)"
-                allowDecimals={false}
-              />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="ai"
-                stackId="1"
-                fill="rgba(255,255,255,0.4)"
-                stroke="#fff"
-                name="AI Bookings"
-              />
-              <Area
-                type="monotone"
-                dataKey="human"
-                stackId="1"
-                fill="rgba(255,255,255,0.15)"
-                stroke="rgba(255,255,255,0.5)"
-                name="Human Bookings"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {/* Section 5b: Revenue Forecast */}
-      <div className="bg-white rounded-xl border border-border-brand p-6">
-        <h2 className="text-sm font-semibold text-ink mb-2">Revenue Forecast</h2>
-        <p className="text-xs text-ink4 mb-4">Based on current booking trends</p>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <p className="text-xs text-ink4">Projected Monthly Bookings</p>
-            <p className="text-xl font-bold text-ink">{stats.projectedMonthlyBookings}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Avg Appointment Value</p>
-            <p className="text-xl font-bold text-ink">${stats.avgApptValue}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Projected Monthly Revenue</p>
-            <p className="text-xl font-bold text-teal-600">
-              ${stats.projectedRevenue.toLocaleString()}
-            </p>
-          </div>
-        </div>
-        <p className="text-[10px] text-gray-300 mt-3">
-          Estimate based on current booking rate and average appointment value for your vertical.
-          Not a guarantee of future revenue.
-        </p>
-      </div>
-
-      {/* Section 6: Language + Source */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Languages</h2>
-          {stats.langData.length === 0 ? (
-            <p className="text-sm text-ink4 py-8 text-center">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={stats.langData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                >
-                  {stats.langData.map((_, i) => (
-                    <Cell key={i} fill={LANG_COLORS[i % LANG_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Contact Sources</h2>
-          {stats.sourceData.length === 0 ? (
-            <p className="text-sm text-ink4 py-8 text-center">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={stats.sourceData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                >
-                  {stats.sourceData.map((_, i) => (
-                    <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* Section 7: Follow-up Performance */}
-      <div className="bg-white rounded-xl border border-border-brand p-6">
-        <h2 className="text-sm font-semibold text-ink mb-4">Follow-up Performance</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div>
-            <p className="text-xs text-ink4">Active Sequences</p>
-            <p className="text-lg font-bold text-ink">{stats.activeSeq}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Completed</p>
-            <p className="text-lg font-bold text-ink">{stats.completedSeq}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Step 1</p>
-            <p className="text-lg font-bold text-ink">{stats.stepDist['step_1']}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Step 2</p>
-            <p className="text-lg font-bold text-ink">{stats.stepDist['step_2']}</p>
-          </div>
-        </div>
-        {/* Horizontal stacked bar */}
-        <div className="h-4 rounded-full bg-bg2 overflow-hidden flex">
-          {stats.stepDist['step_1']! > 0 && (
-            <div
-              className="bg-blue-400 h-full"
-              style={{
-                width: `${(stats.stepDist['step_1']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
-              }}
-              title={`Step 1: ${stats.stepDist['step_1']}`}
+  function renderWidget(id: string): React.ReactNode {
+    switch (id) {
+      case 'call_stats':
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              label="Total Calls"
+              value={String(stats.totalCalls)}
+              sub={`${stats.bookings} bookings`}
             />
-          )}
-          {stats.stepDist['step_2']! > 0 && (
-            <div
-              className="bg-teal-400 h-full"
-              style={{
-                width: `${(stats.stepDist['step_2']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
-              }}
-              title={`Step 2: ${stats.stepDist['step_2']}`}
+            <StatCard
+              label="Avg Response Time"
+              value={stats.avgLatency != null ? `${(stats.avgLatency / 1000).toFixed(1)}s` : '--'}
+              color={latencyColor}
+              sub="first response"
             />
-          )}
-          {stats.stepDist['completed']! > 0 && (
-            <div
-              className="bg-green-400 h-full"
-              style={{
-                width: `${(stats.stepDist['completed']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
-              }}
-              title={`Completed: ${stats.stepDist['completed']}`}
+            <StatCard
+              label="Booking Rate"
+              value={`${bookingRate}%`}
+              sub={`${stats.bookings} of ${stats.totalCalls} calls`}
+              color="text-teal-600"
             />
-          )}
-        </div>
-        <div className="flex items-center gap-4 mt-2 text-[10px] text-ink4">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Step 1
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-teal-400 inline-block" /> Step 2
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Completed
-          </span>
-        </div>
-      </div>
+            <StatCard
+              label="Call Quality"
+              value={stats.avgMos != null ? stats.avgMos.toFixed(2) : '--'}
+              sub={mosLabel}
+            />
+          </div>
+        )
 
-      {/* Section 8: Quote Performance */}
-      <div className="bg-white rounded-xl border border-border-brand p-6">
-        <h2 className="text-sm font-semibold text-ink mb-4">Quote Performance</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div>
-            <p className="text-xs text-ink4">Total Quotes</p>
-            <p className="text-lg font-bold text-ink">{stats.totalQuotes}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Win Rate</p>
-            <p
-              className={`text-lg font-bold ${stats.winRate > 50 ? 'text-green-600' : stats.winRate < 30 ? 'text-red-600' : 'text-ink'}`}
-            >
-              {stats.winRate}%
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Open Rate</p>
-            <p
-              className={`text-lg font-bold ${stats.quoteOpenRate > 70 ? 'text-green-600' : stats.quoteOpenRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}
-            >
-              {stats.quoteOpenRate}%
-            </p>
-            {stats.avgTimeToFirstViewHours != null && (
-              <p className="text-[11px] text-ink4 mt-0.5">
-                Avg time to open: {stats.avgTimeToFirstViewHours}h
-              </p>
+      case 'call_volume':
+        return (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Call Volume</h2>
+            {stats.dailyVolume.length === 0 ? (
+              <p className="text-sm text-ink4 py-8 text-center">No call data yet</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={stats.dailyVolume}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="calls"
+                    stroke="#0d9488"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Calls"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="bookings"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Bookings"
+                  />
+                  <Legend />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </div>
-          <div>
-            <p className="text-xs text-ink4">Avg Deal Size</p>
-            <p className="text-lg font-bold text-ink">${stats.avgDealSize.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs text-ink4">Revenue Won</p>
-            <p className="text-lg font-bold text-teal-600">${stats.totalRevWon.toLocaleString()}</p>
-          </div>
-        </div>
+        )
 
-        {/* Quote funnel */}
-        {stats.totalQuotes > 0 && (
-          <div className="mb-6">
-            <p className="text-xs text-ink4 mb-2">Quote Funnel</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={stats.funnelData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="stage"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  width={80}
-                />
-                <Tooltip />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {stats.funnelData.map((_, i) => (
-                    <Cell key={i} fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center gap-3 mt-2 text-[10px] text-ink4">
-              {stats.funnelData.slice(1).map((stage, i) => {
-                const prev = stats.funnelData[i]!.count
-                const pct = prev > 0 ? ((stage.count / prev) * 100).toFixed(0) : '0'
-                return (
-                  <span key={stage.stage}>
-                    {stats.funnelData[i]!.stage} → {stage.stage}: {pct}%
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Quote volume trend */}
-        {stats.quoteTrend.length > 0 && (
-          <div className="mb-6">
-            <p className="text-xs text-ink4 mb-2">Quote Volume</p>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={stats.quoteTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="created"
-                  stroke="#0d9488"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Created"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="accepted"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Accepted"
-                />
-                <Legend />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Top Packages */}
-        <div className="mb-6">
-          <p className="text-xs text-ink4 mb-2">Top Packages</p>
-          {stats.topPackages.length === 0 ? (
-            <p className="text-sm text-gray-300 text-center py-4">
-              No packages added to quotes yet
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {stats.topPackages.map((pkg, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-ink4 w-4">{i + 1}.</span>
-                    <span className="text-sm text-ink">{pkg.package_name}</span>
-                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
-                      {pkg.vertical}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-ink3">
-                    <span>{pkg.quote_count} quotes</span>
-                    <span>${pkg.total_revenue.toLocaleString()}</span>
-                    <span className={pkg.win_rate > 50 ? 'text-green-600' : ''}>
-                      {pkg.win_rate}% win
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* AI quote stats */}
-        {stats.aiQuotes > 0 && (
-          <div className="bg-teal-50 rounded-lg p-4">
-            <p className="text-xs text-teal-600 font-medium">AI-Generated Quotes</p>
-            <p className="text-sm text-teal-800 mt-1">
-              Maya auto-generated {stats.aiQuotes} quote{stats.aiQuotes !== 1 ? 's' : ''},{' '}
-              {stats.aiQuotes > 0
-                ? `${((stats.aiAccepted / stats.aiQuotes) * 100).toFixed(0)}% accepted`
-                : '0% accepted'}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Section 9: Pipeline Forecast */}
-      {pipelines.length > 0 && (
-        <div className="space-y-4">
-          {/* Header + pipeline selector */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-ink">Pipeline Forecast</h2>
-              <p className="text-xs text-ink4 mt-0.5">Deal pipeline revenue projections</p>
-            </div>
-            <select
-              value={selectedPipelineId}
-              onChange={(e) => setSelectedPipelineId(e.target.value)}
-              className="text-sm border border-border-brand rounded-lg px-3 py-1.5 text-ink2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              {pipelines.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {forecastLoading ? (
-            <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
-              <p className="text-sm text-ink4">Loading forecast...</p>
-            </div>
-          ) : forecastData ? (
-            <>
-              {/* Stat cards row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  label="Total Pipeline Value"
-                  value={formatCurrency(forecastData.summary.total_pipeline_value)}
-                  sub={`${forecastData.summary.deal_count} deals`}
-                />
-                <StatCard
-                  label="Weighted Forecast"
-                  value={formatCurrency(forecastData.summary.total_weighted_value)}
-                  sub="probability-adjusted"
-                  color="text-teal-600"
-                />
-                <StatCard
-                  label="Win Rate"
-                  value={`${forecastData.summary.win_rate.toFixed(1)}%`}
-                  color={
-                    forecastData.summary.win_rate > 50
-                      ? 'text-green-600'
-                      : forecastData.summary.win_rate < 30
-                        ? 'text-red-600'
-                        : 'text-ink'
-                  }
-                />
-                <StatCard
-                  label="Avg Days to Close"
-                  value={
-                    forecastData.summary.avg_days_to_close > 0
-                      ? `${Math.round(forecastData.summary.avg_days_to_close)}d`
-                      : '--'
-                  }
-                  sub="average sales cycle"
-                />
-              </div>
-
-              {/* Expected This Month card */}
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl p-6 text-white">
-                <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">
-                  Expected This Month
-                </p>
-                <p className="text-4xl font-bold">{formatCurrency(expectedThisMonth)}</p>
-                {momPct !== null && (
-                  <p className="text-sm mt-2 opacity-90">
-                    {Number(momPct) >= 0 ? '↑' : '↓'} {Math.abs(Number(momPct))}% vs last month
-                  </p>
-                )}
-                {currentMonthEntry && (
-                  <p className="text-xs mt-1 opacity-60">
-                    {currentMonthEntry.deal_count} deals closing this month
-                  </p>
-                )}
-              </div>
-
-              {/* Monthly Forecast Bar Chart */}
-              {monthlyForecast.length > 0 && (
-                <div className="bg-white rounded-xl border border-border-brand p-6">
-                  <h3 className="text-sm font-semibold text-ink mb-4">
-                    Monthly Forecast (next 3 months)
-                  </h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={monthlyForecast.slice(0, 3)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        stroke="#9ca3af"
-                        tickFormatter={(v: number) => formatCurrency(v)}
-                      />
-                      <Tooltip
-                        formatter={(value, _name, item) => [
-                          `${formatCurrency(Number(value))} (${(item?.payload as MonthlyForecast | undefined)?.deal_count ?? 0} deals)`,
-                          'Expected Revenue',
-                        ]}
-                      />
-                      <Bar
-                        dataKey="expected_value"
-                        fill="#6366f1"
-                        radius={[4, 4, 0, 0]}
-                        name="Expected Revenue"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Pipeline Funnel */}
-              {funnelData.length > 0 && (
-                <div className="bg-white rounded-xl border border-border-brand p-6">
-                  <h3 className="text-sm font-semibold text-ink mb-4">Pipeline Funnel</h3>
-                  <ResponsiveContainer width="100%" height={Math.max(160, funnelData.length * 44)}>
-                    <BarChart data={funnelData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 11 }}
-                        stroke="#9ca3af"
-                        allowDecimals={false}
-                      />
-                      <YAxis
-                        dataKey="stage"
-                        type="category"
-                        tick={{ fontSize: 11 }}
-                        stroke="#9ca3af"
-                        width={120}
-                      />
-                      <Tooltip formatter={(value) => [value, 'Deals']} />
-                      <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                        {funnelData.map((_, i) => (
-                          <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  {/* Drop-off annotations */}
-                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-ink4">
-                    {funnelData.slice(1).map((stage, i) => (
-                      <span key={stage.stage}>
-                        {funnelData[i]!.stage} → {stage.stage}:{' '}
-                        <span className="text-red-400">-{stage.drop_off_pct.toFixed(0)}%</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
-              <p className="text-sm text-ink4">No forecast data available</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Section 11: Custom Reports */}
-      {pinnedReports.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink">Custom Reports</h2>
-            <a href="/reports" className="text-sm text-teal-600 hover:text-teal-700 font-medium">
-              Manage Reports →
-            </a>
-          </div>
+      case 'outcomes_hours':
+        return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pinnedReports.map((report, idx) => {
-              const data = pinnedReportData[report.id] ?? []
-              const keys = data.length > 0 ? Object.keys(data[0]!) : []
-              const valueKey = keys.find((k) => k !== keys[0]) ?? keys[0] ?? 'value'
-              const labelKey = keys[0] ?? 'label'
+            <div className="bg-white rounded-xl border border-border-brand p-6">
+              <h2 className="text-sm font-semibold text-ink mb-4">Call Outcomes</h2>
+              {stats.outcomeData.length === 0 ? (
+                <p className="text-sm text-ink4 py-8 text-center">No data</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={stats.outcomeData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    >
+                      {stats.outcomeData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="bg-white rounded-xl border border-border-brand p-6">
+              <h2 className="text-sm font-semibold text-ink mb-4">Peak Hours</h2>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats.peakHours}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
+                  <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="calls" fill="#0d9488" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )
 
-              return (
+      case 'pipeline_dist':
+        return (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Pipeline Distribution</h2>
+            {stats.stageDistribution.length === 0 ? (
+              <p className="text-sm text-ink4 py-8 text-center">No pipeline data</p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={stats.stageDistribution} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11 }}
+                      stroke="#9ca3af"
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      dataKey="stage"
+                      type="category"
+                      tick={{ fontSize: 11 }}
+                      stroke="#9ca3af"
+                      width={120}
+                    />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-4 mt-3 text-xs text-ink3">
+                  <span>
+                    Conversion rate:{' '}
+                    <strong className="text-teal-600">
+                      {stats.pipelineTotal > 0
+                        ? ((stats.wonCount / stats.pipelineTotal) * 100).toFixed(1)
+                        : 0}
+                      %
+                    </strong>
+                  </span>
+                  <span>
+                    Total: <strong>{stats.pipelineTotal}</strong> contacts in pipeline
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
+      case 'roi_summary':
+        return (
+          <div className="bg-gradient-to-r from-teal-600 to-teal-700 rounded-xl p-6 text-white">
+            <h2 className="text-sm font-semibold opacity-80 mb-4">ROI Summary</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <p className="text-xs opacity-70">Maya Cost</p>
+                <p className="text-xl font-bold">${stats.totalMayaCost.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">Receptionist Cost</p>
+                <p className="text-xl font-bold">$2,500/mo</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">You Saved</p>
+                <p className="text-2xl font-bold">${stats.monthlySavings.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">ROI</p>
+                <p className="text-2xl font-bold">{stats.roiMultiplier}x</p>
+              </div>
+            </div>
+            {stats.bookingTrend.length > 0 && (
+              <ResponsiveContainer width="100%" height={150}>
+                <AreaChart data={stats.bookingTrend}>
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#fff' }}
+                    stroke="rgba(255,255,255,0.3)"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#fff' }}
+                    stroke="rgba(255,255,255,0.3)"
+                    allowDecimals={false}
+                  />
+                  <Tooltip />
+                  <Area
+                    type="monotone"
+                    dataKey="ai"
+                    stackId="1"
+                    fill="rgba(255,255,255,0.4)"
+                    stroke="#fff"
+                    name="AI Bookings"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="human"
+                    stackId="1"
+                    fill="rgba(255,255,255,0.15)"
+                    stroke="rgba(255,255,255,0.5)"
+                    name="Human Bookings"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        )
+
+      case 'revenue_forecast':
+        return (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-2">Revenue Forecast</h2>
+            <p className="text-xs text-ink4 mb-4">Based on current booking trends</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-ink4">Projected Monthly Bookings</p>
+                <p className="text-xl font-bold text-ink">{stats.projectedMonthlyBookings}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Avg Appointment Value</p>
+                <p className="text-xl font-bold text-ink">${stats.avgApptValue}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Projected Monthly Revenue</p>
+                <p className="text-xl font-bold text-teal-600">
+                  ${stats.projectedRevenue.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-300 mt-3">
+              Estimate based on current booking rate and average appointment value for your
+              vertical. Not a guarantee of future revenue.
+            </p>
+          </div>
+        )
+
+      case 'lang_sources':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border border-border-brand p-6">
+              <h2 className="text-sm font-semibold text-ink mb-4">Languages</h2>
+              {stats.langData.length === 0 ? (
+                <p className="text-sm text-ink4 py-8 text-center">No data</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={stats.langData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    >
+                      {stats.langData.map((_, i) => (
+                        <Cell key={i} fill={LANG_COLORS[i % LANG_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="bg-white rounded-xl border border-border-brand p-6">
+              <h2 className="text-sm font-semibold text-ink mb-4">Contact Sources</h2>
+              {stats.sourceData.length === 0 ? (
+                <p className="text-sm text-ink4 py-8 text-center">No data</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={stats.sourceData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    >
+                      {stats.sourceData.map((_, i) => (
+                        <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        )
+
+      case 'followup':
+        return (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Follow-up Performance</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-ink4">Active Sequences</p>
+                <p className="text-lg font-bold text-ink">{stats.activeSeq}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Completed</p>
+                <p className="text-lg font-bold text-ink">{stats.completedSeq}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Step 1</p>
+                <p className="text-lg font-bold text-ink">{stats.stepDist['step_1']}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Step 2</p>
+                <p className="text-lg font-bold text-ink">{stats.stepDist['step_2']}</p>
+              </div>
+            </div>
+            <div className="h-4 rounded-full bg-bg2 overflow-hidden flex">
+              {stats.stepDist['step_1']! > 0 && (
                 <div
-                  key={report.id}
-                  className="bg-white rounded-xl border border-border-brand p-5 cursor-pointer hover:border-teal-200 hover:shadow-sm transition-all relative group"
-                  onClick={() => router.push(`/reports/${report.id}`)}
+                  className="bg-blue-400 h-full"
+                  style={{
+                    width: `${(stats.stepDist['step_1']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+                  }}
+                  title={`Step 1: ${stats.stepDist['step_1']}`}
+                />
+              )}
+              {stats.stepDist['step_2']! > 0 && (
+                <div
+                  className="bg-teal-400 h-full"
+                  style={{
+                    width: `${(stats.stepDist['step_2']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+                  }}
+                  title={`Step 2: ${stats.stepDist['step_2']}`}
+                />
+              )}
+              {stats.stepDist['completed']! > 0 && (
+                <div
+                  className="bg-green-400 h-full"
+                  style={{
+                    width: `${(stats.stepDist['completed']! / Math.max(stats.activeSeq + stats.completedSeq, 1)) * 100}%`,
+                  }}
+                  title={`Completed: ${stats.stepDist['completed']}`}
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-2 text-[10px] text-ink4">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Step 1
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-teal-400 inline-block" /> Step 2
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Completed
+              </span>
+            </div>
+          </div>
+        )
+
+      case 'quotes':
+        return (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Quote Performance</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div>
+                <p className="text-xs text-ink4">Total Quotes</p>
+                <p className="text-lg font-bold text-ink">{stats.totalQuotes}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Win Rate</p>
+                <p
+                  className={`text-lg font-bold ${stats.winRate > 50 ? 'text-green-600' : stats.winRate < 30 ? 'text-red-600' : 'text-ink'}`}
                 >
-                  {/* Reorder buttons */}
-                  <div
-                    className="absolute top-3 right-3 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      disabled={idx === 0}
-                      onClick={() => handleReorder(report.id, 'up')}
-                      className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
-                      title="Move up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      disabled={idx === pinnedReports.length - 1}
-                      onClick={() => handleReorder(report.id, 'down')}
-                      className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
-                      title="Move down"
-                    >
-                      ↓
-                    </button>
-                  </div>
+                  {stats.winRate}%
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Open Rate</p>
+                <p
+                  className={`text-lg font-bold ${stats.quoteOpenRate > 70 ? 'text-green-600' : stats.quoteOpenRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}
+                >
+                  {stats.quoteOpenRate}%
+                </p>
+                {stats.avgTimeToFirstViewHours != null && (
+                  <p className="text-[11px] text-ink4 mt-0.5">
+                    Avg time to open: {stats.avgTimeToFirstViewHours}h
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Avg Deal Size</p>
+                <p className="text-lg font-bold text-ink">${stats.avgDealSize.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink4">Revenue Won</p>
+                <p className="text-lg font-bold text-teal-600">
+                  ${stats.totalRevWon.toLocaleString()}
+                </p>
+              </div>
+            </div>
 
-                  <p className="text-sm font-semibold text-ink mb-3 pr-8">{report.name}</p>
+            {stats.totalQuotes > 0 && (
+              <div className="mb-6">
+                <p className="text-xs text-ink4 mb-2">Quote Funnel</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={stats.funnelData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11 }}
+                      stroke="#9ca3af"
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      dataKey="stage"
+                      type="category"
+                      tick={{ fontSize: 11 }}
+                      stroke="#9ca3af"
+                      width={80}
+                    />
+                    <Tooltip />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                      {stats.funnelData.map((_, i) => (
+                        <Cell key={i} fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-3 mt-2 text-[10px] text-ink4">
+                  {stats.funnelData.slice(1).map((stage, i) => {
+                    const prev = stats.funnelData[i]!.count
+                    const pct = prev > 0 ? ((stage.count / prev) * 100).toFixed(0) : '0'
+                    return (
+                      <span key={stage.stage}>
+                        {stats.funnelData[i]!.stage} → {stage.stage}: {pct}%
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
-                  {data.length === 0 ? (
-                    <p className="text-xs text-gray-300 py-8 text-center">No data</p>
-                  ) : report.chart_type === 'bar' ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={data}>
+            {stats.quoteTrend.length > 0 && (
+              <div className="mb-6">
+                <p className="text-xs text-ink4 mb-2">Quote Volume</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={stats.quoteTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="created"
+                      stroke="#0d9488"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Created"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="accepted"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Accepted"
+                    />
+                    <Legend />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <p className="text-xs text-ink4 mb-2">Top Packages</p>
+              {stats.topPackages.length === 0 ? (
+                <p className="text-sm text-gray-300 text-center py-4">
+                  No packages added to quotes yet
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {stats.topPackages.map((pkg, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink4 w-4">{i + 1}.</span>
+                        <span className="text-sm text-ink">{pkg.package_name}</span>
+                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
+                          {pkg.vertical}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-ink3">
+                        <span>{pkg.quote_count} quotes</span>
+                        <span>${pkg.total_revenue.toLocaleString()}</span>
+                        <span className={pkg.win_rate > 50 ? 'text-green-600' : ''}>
+                          {pkg.win_rate}% win
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {stats.aiQuotes > 0 && (
+              <div className="bg-teal-50 rounded-lg p-4">
+                <p className="text-xs text-teal-600 font-medium">AI-Generated Quotes</p>
+                <p className="text-sm text-teal-800 mt-1">
+                  Maya auto-generated {stats.aiQuotes} quote{stats.aiQuotes !== 1 ? 's' : ''},{' '}
+                  {stats.aiQuotes > 0
+                    ? `${((stats.aiAccepted / stats.aiQuotes) * 100).toFixed(0)}% accepted`
+                    : '0% accepted'}
+                </p>
+              </div>
+            )}
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  return (
+    <DragDropContext onDragEnd={handleWidgetDragEnd}>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-ink">Insights</h1>
+            <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
+          </div>
+          <button
+            type="button"
+            onClick={resetWidgetOrder}
+            className="text-xs text-ink4 hover:text-ink3 transition-colors px-3 py-1.5 rounded-lg border border-border-brand hover:bg-bg"
+          >
+            Reset layout
+          </button>
+        </div>
+
+        {/* Draggable widget sections */}
+        <Droppable droppableId="insights-widgets" type="widget">
+          {(provided) => (
+            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-6">
+              {widgetOrder.map((id, index) => (
+                <Draggable key={id} draggableId={id} index={index}>
+                  {(dragProvided, dragSnapshot) => (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      className="relative group/widget"
+                      style={{
+                        opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                        ...dragProvided.draggableProps.style,
+                      }}
+                    >
+                      {/* Drag handle — desktop only, visible on hover */}
+                      <span
+                        {...dragProvided.dragHandleProps}
+                        className="hidden md:inline-flex absolute top-0 right-0 z-10 items-center gap-1 px-2 py-1 text-[11px] text-ink4 opacity-0 group-hover/widget:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none bg-white border border-border-brand rounded-bl-lg rounded-tr-xl"
+                        aria-label="Drag to reorder"
+                      >
+                        ⠿
+                      </span>
+                      {renderWidget(id)}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+
+        {/* Pipeline Forecast — conditional, static below draggables */}
+        {pipelines.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-ink">Pipeline Forecast</h2>
+                <p className="text-xs text-ink4 mt-0.5">Deal pipeline revenue projections</p>
+              </div>
+              <select
+                value={selectedPipelineId}
+                onChange={(e) => setSelectedPipelineId(e.target.value)}
+                className="text-sm border border-border-brand rounded-lg px-3 py-1.5 text-ink2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {forecastLoading ? (
+              <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+                <p className="text-sm text-ink4">Loading forecast...</p>
+              </div>
+            ) : forecastData ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    label="Total Pipeline Value"
+                    value={formatCurrency(forecastData.summary.total_pipeline_value)}
+                    sub={`${forecastData.summary.deal_count} deals`}
+                  />
+                  <StatCard
+                    label="Weighted Forecast"
+                    value={formatCurrency(forecastData.summary.total_weighted_value)}
+                    sub="probability-adjusted"
+                    color="text-teal-600"
+                  />
+                  <StatCard
+                    label="Win Rate"
+                    value={`${forecastData.summary.win_rate.toFixed(1)}%`}
+                    color={
+                      forecastData.summary.win_rate > 50
+                        ? 'text-green-600'
+                        : forecastData.summary.win_rate < 30
+                          ? 'text-red-600'
+                          : 'text-ink'
+                    }
+                  />
+                  <StatCard
+                    label="Avg Days to Close"
+                    value={
+                      forecastData.summary.avg_days_to_close > 0
+                        ? `${Math.round(forecastData.summary.avg_days_to_close)}d`
+                        : '--'
+                    }
+                    sub="average sales cycle"
+                  />
+                </div>
+
+                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl p-6 text-white">
+                  <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">
+                    Expected This Month
+                  </p>
+                  <p className="text-4xl font-bold">{formatCurrency(expectedThisMonth)}</p>
+                  {momPct !== null && (
+                    <p className="text-sm mt-2 opacity-90">
+                      {Number(momPct) >= 0 ? '↑' : '↓'} {Math.abs(Number(momPct))}% vs last month
+                    </p>
+                  )}
+                  {currentMonthEntry && (
+                    <p className="text-xs mt-1 opacity-60">
+                      {currentMonthEntry.deal_count} deals closing this month
+                    </p>
+                  )}
+                </div>
+
+                {monthlyForecast.length > 0 && (
+                  <div className="bg-white rounded-xl border border-border-brand p-6">
+                    <h3 className="text-sm font-semibold text-ink mb-4">
+                      Monthly Forecast (next 3 months)
+                    </h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={monthlyForecast.slice(0, 3)}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
-                        <Tooltip />
-                        <Bar dataKey={valueKey} radius={[3, 3, 0, 0]}>
-                          {data.map((_, i) => (
-                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          stroke="#9ca3af"
+                          tickFormatter={(v: number) => formatCurrency(v)}
+                        />
+                        <Tooltip
+                          formatter={(value, _name, item) => [
+                            `${formatCurrency(Number(value))} (${(item?.payload as MonthlyForecast | undefined)?.deal_count ?? 0} deals)`,
+                            'Expected Revenue',
+                          ]}
+                        />
+                        <Bar
+                          dataKey="expected_value"
+                          fill="#6366f1"
+                          radius={[4, 4, 0, 0]}
+                          name="Expected Revenue"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {funnelData.length > 0 && (
+                  <div className="bg-white rounded-xl border border-border-brand p-6">
+                    <h3 className="text-sm font-semibold text-ink mb-4">Pipeline Funnel</h3>
+                    <ResponsiveContainer
+                      width="100%"
+                      height={Math.max(160, funnelData.length * 44)}
+                    >
+                      <BarChart data={funnelData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis
+                          type="number"
+                          tick={{ fontSize: 11 }}
+                          stroke="#9ca3af"
+                          allowDecimals={false}
+                        />
+                        <YAxis
+                          dataKey="stage"
+                          type="category"
+                          tick={{ fontSize: 11 }}
+                          stroke="#9ca3af"
+                          width={120}
+                        />
+                        <Tooltip formatter={(value) => [value, 'Deals']} />
+                        <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                          {funnelData.map((_, i) => (
+                            <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
                           ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : report.chart_type === 'line' ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={data}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey={valueKey}
-                          stroke={CHART_COLORS[0]}
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : report.chart_type === 'pie' ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={data}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={70}
-                          dataKey={valueKey}
-                          nameKey={labelKey}
-                          label={({ name, percent }) =>
-                            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                          }
-                        >
-                          {data.map((_, i) => (
-                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : report.chart_type === 'number' ? (
-                    <div className="flex items-center justify-center h-[200px]">
-                      <p className="text-5xl font-bold text-ink">
-                        {String(data[0]?.[valueKey] ?? '--')}
-                      </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-ink4">
+                      {funnelData.slice(1).map((stage, i) => (
+                        <span key={stage.stage}>
+                          {funnelData[i]!.stage} → {stage.stage}:{' '}
+                          <span className="text-red-400">-{stage.drop_off_pct.toFixed(0)}%</span>
+                        </span>
+                      ))}
                     </div>
-                  ) : report.chart_type === 'table' ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-border-brand">
-                            {keys.map((k) => (
-                              <th key={k} className="text-left text-ink4 font-medium py-1.5 pr-3">
-                                {k}
-                              </th>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+                <p className="text-sm text-ink4">No forecast data available</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Custom Reports */}
+        {pinnedReports.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">Custom Reports</h2>
+              <a href="/reports" className="text-sm text-teal-600 hover:text-teal-700 font-medium">
+                Manage Reports →
+              </a>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pinnedReports.map((report, idx) => {
+                const data = pinnedReportData[report.id] ?? []
+                const keys = data.length > 0 ? Object.keys(data[0]!) : []
+                const valueKey = keys.find((k) => k !== keys[0]) ?? keys[0] ?? 'value'
+                const labelKey = keys[0] ?? 'label'
+
+                return (
+                  <div
+                    key={report.id}
+                    className="bg-white rounded-xl border border-border-brand p-5 cursor-pointer hover:border-teal-200 hover:shadow-sm transition-all relative group"
+                    onClick={() => router.push(`/reports/${report.id}`)}
+                  >
+                    <div
+                      className="absolute top-3 right-3 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        disabled={idx === 0}
+                        onClick={() => handleReorder(report.id, 'up')}
+                        className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        disabled={idx === pinnedReports.length - 1}
+                        onClick={() => handleReorder(report.id, 'down')}
+                        className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                    </div>
+
+                    <p className="text-sm font-semibold text-ink mb-3 pr-8">{report.name}</p>
+
+                    {data.length === 0 ? (
+                      <p className="text-xs text-gray-300 py-8 text-center">No data</p>
+                    ) : report.chart_type === 'bar' ? (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={data}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                          <Tooltip />
+                          <Bar dataKey={valueKey} radius={[3, 3, 0, 0]}>
+                            {data.map((_, i) => (
+                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                             ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.slice(0, 3).map((row, i) => (
-                            <tr key={i} className="border-b border-gray-50 last:border-0">
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : report.chart_type === 'line' ? (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={data}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" />
+                          <Tooltip />
+                          <Line
+                            type="monotone"
+                            dataKey={valueKey}
+                            stroke={CHART_COLORS[0]}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : report.chart_type === 'pie' ? (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={data}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={70}
+                            dataKey={valueKey}
+                            nameKey={labelKey}
+                            label={({ name, percent }) =>
+                              `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                            }
+                          >
+                            {data.map((_, i) => (
+                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : report.chart_type === 'number' ? (
+                      <div className="flex items-center justify-center h-[200px]">
+                        <p className="text-5xl font-bold text-ink">
+                          {String(data[0]?.[valueKey] ?? '--')}
+                        </p>
+                      </div>
+                    ) : report.chart_type === 'table' ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-border-brand">
                               {keys.map((k) => (
-                                <td key={k} className="py-1.5 pr-3 text-ink2">
-                                  {String(row[k] ?? '')}
-                                </td>
+                                <th key={k} className="text-left text-ink4 font-medium py-1.5 pr-3">
+                                  {k}
+                                </th>
                               ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
+                          </thead>
+                          <tbody>
+                            {data.slice(0, 3).map((row, i) => (
+                              <tr key={i} className="border-b border-gray-50 last:border-0">
+                                {keys.map((k) => (
+                                  <td key={k} className="py-1.5 pr-3 text-ink2">
+                                    {String(row[k] ?? '')}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      ) : (
-        <p className="text-sm text-ink4 text-center py-4">
-          <a href="/reports" className="hover:text-teal-600 transition-colors">
-            Pin custom reports to see them here →
-          </a>
-        </p>
-      )}
+        ) : (
+          <p className="text-sm text-ink4 text-center py-4">
+            <a href="/reports" className="hover:text-teal-600 transition-colors">
+              Pin custom reports to see them here →
+            </a>
+          </p>
+        )}
 
-      {/* Section 10: Territory Performance */}
-      {!territoryLoading && hasTerritoryData && (
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Territory Performance</h2>
+        {/* Territory Performance */}
+        {!territoryLoading && hasTerritoryData && (
+          <div className="bg-white rounded-xl border border-border-brand p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Territory Performance</h2>
 
-          {/* Bar chart: contacts by territory */}
-          <div className="mb-6">
-            <p className="text-xs text-ink4 mb-2">Contacts by Territory</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={territoryData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="territory"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  stroke="#9ca3af"
-                  width={100}
-                />
-                <Tooltip />
-                <Bar
-                  dataKey="contacts_count"
-                  fill="#0d9488"
-                  radius={[0, 4, 4, 0]}
-                  name="Contacts"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            <div className="mb-6">
+              <p className="text-xs text-ink4 mb-2">Contacts by Territory</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={territoryData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11 }}
+                    stroke="#9ca3af"
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    dataKey="territory"
+                    type="category"
+                    tick={{ fontSize: 11 }}
+                    stroke="#9ca3af"
+                    width={100}
+                  />
+                  <Tooltip />
+                  <Bar
+                    dataKey="contacts_count"
+                    fill="#0d9488"
+                    radius={[0, 4, 4, 0]}
+                    name="Contacts"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-          {/* Summary table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border-brand">
-                  <th className="text-left text-ink4 font-medium py-2 pr-4">Territory</th>
-                  <th className="text-right text-ink4 font-medium py-2 pr-4">Contacts</th>
-                  <th className="text-right text-ink4 font-medium py-2 pr-4">Customers</th>
-                  <th className="text-right text-ink4 font-medium py-2">Conversion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {territoryData.map((row) => (
-                  <tr key={row.territory} className="border-b border-gray-50 last:border-0">
-                    <td className="py-2 pr-4 text-ink font-medium">{row.territory}</td>
-                    <td className="py-2 pr-4 text-right text-ink3">{row.contacts_count}</td>
-                    <td className="py-2 pr-4 text-right text-ink3">{row.customers_count}</td>
-                    <td className="py-2 text-right">
-                      <span
-                        className={
-                          row.conversion_rate >= 50
-                            ? 'text-green-600 font-medium'
-                            : row.conversion_rate >= 25
-                              ? 'text-amber-600'
-                              : 'text-ink3'
-                        }
-                      >
-                        {row.conversion_rate.toFixed(1)}%
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border-brand">
+                    <th className="text-left text-ink4 font-medium py-2 pr-4">Territory</th>
+                    <th className="text-right text-ink4 font-medium py-2 pr-4">Contacts</th>
+                    <th className="text-right text-ink4 font-medium py-2 pr-4">Customers</th>
+                    <th className="text-right text-ink4 font-medium py-2">Conversion</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {territoryData.map((row) => (
+                    <tr key={row.territory} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-4 text-ink font-medium">{row.territory}</td>
+                      <td className="py-2 pr-4 text-right text-ink3">{row.contacts_count}</td>
+                      <td className="py-2 pr-4 text-right text-ink3">{row.customers_count}</td>
+                      <td className="py-2 text-right">
+                        <span
+                          className={
+                            row.conversion_rate >= 50
+                              ? 'text-green-600 font-medium'
+                              : row.conversion_rate >= 25
+                                ? 'text-amber-600'
+                                : 'text-ink3'
+                          }
+                        >
+                          {row.conversion_rate.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </DragDropContext>
   )
 }
