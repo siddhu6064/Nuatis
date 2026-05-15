@@ -277,7 +277,13 @@ function Chevron({ open }: { open: boolean }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Sidebar() {
+export default function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean
+  onClose?: () => void
+}) {
   const path = usePathname()
   const [onboardingDone, setOnboardingDone] = useState(true)
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
@@ -325,6 +331,11 @@ export default function Sidebar() {
       return changed ? next : prev
     })
   }, [path])
+
+  // Close mobile drawer on navigation
+  useEffect(() => {
+    onClose?.()
+  }, [path, onClose])
 
   useEffect(() => {
     void fetch('/api/sms/unread-count')
@@ -578,7 +589,9 @@ export default function Sidebar() {
   const settingsGroup = NAV_GROUPS.find((g) => g.id === SETTINGS_ID)!
 
   return (
-    <aside className="w-56 bg-white border-r border-border-brand flex flex-col shrink-0">
+    <aside
+      className={`w-56 bg-white border-r border-border-brand flex flex-col shrink-0 transition-transform duration-200 fixed inset-y-0 left-0 z-30 md:relative md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+    >
       {/* Brand */}
       <div className="px-5 py-5 border-b border-border-brand">
         <div className="flex items-center gap-2.5">
@@ -593,6 +606,22 @@ export default function Sidebar() {
               {isMayaOnly ? 'Maya AI' : 'Front Office AI'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="md:hidden ml-auto p-1 rounded-lg text-ink4 hover:bg-bg transition-colors"
+            aria-label="Close menu"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
 
