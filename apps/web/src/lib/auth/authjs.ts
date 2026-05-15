@@ -37,6 +37,7 @@ function getTenant(tenants: TenantInfo | TenantInfo[] | null): TenantInfo | null
 }
 
 const result = NextAuth({
+  trustHost: true,
   session: { strategy: 'jwt' },
   providers: [
     Credentials({
