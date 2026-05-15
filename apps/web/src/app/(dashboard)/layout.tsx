@@ -14,18 +14,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SessionProvider>
       <div className="flex h-screen bg-bg overflow-hidden">
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/40 z-20 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+        <div
+          className={`fixed inset-0 z-20 md:hidden transition-opacity duration-200 ${sidebarOpen ? 'bg-black/40 pointer-events-auto' : 'pointer-events-none opacity-0'}`}
+          onClick={() => setSidebarOpen(false)}
+        />
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 overflow-y-auto bg-bg">
-          <div className="relative z-50 flex items-center px-4 pt-4 md:hidden">
+          <div className="relative flex items-center px-4 pt-4 md:hidden" style={{ zIndex: 50 }}>
             <button
               type="button"
-              onClick={() => setSidebarOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setSidebarOpen(true)
+              }}
               className="p-2 rounded-lg text-ink3 hover:bg-bg transition-colors"
               aria-label="Open menu"
             >
