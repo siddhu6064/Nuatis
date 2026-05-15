@@ -1,4 +1,3 @@
-// @ts-expect-error — web-push has no type declarations
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
