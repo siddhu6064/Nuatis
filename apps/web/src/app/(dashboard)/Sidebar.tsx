@@ -285,6 +285,7 @@ export default function Sidebar({
   onClose?: () => void
 }) {
   const path = usePathname()
+  const mountedPath = useRef(path)
   const [onboardingDone, setOnboardingDone] = useState(true)
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
   const [modules, setModules] = useState<Record<string, boolean>>({})
@@ -332,8 +333,9 @@ export default function Sidebar({
     })
   }, [path])
 
-  // Close mobile drawer on navigation
+  // Close mobile drawer on navigation (skip initial mount)
   useEffect(() => {
+    if (path === mountedPath.current) return
     onClose?.()
   }, [path, onClose])
 
