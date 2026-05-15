@@ -800,7 +800,7 @@ async function main(): Promise<void> {
         phone: c.phone,
         source: c.source,
         pipeline_stage: c.pipeline_stage,
-        sms_opt_in: c.source === 'maya',
+        sms_opt_in: c.source === 'inbound_call',
       }
       if (c.email) row['email'] = c.email
       if (c.last_contacted) row['last_contacted'] = c.last_contacted
