@@ -140,16 +140,66 @@ export default function DemoBanner() {
         {open && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute top-full left-0 mt-2 bg-white rounded-xl border border-border-brand shadow-lg z-20 p-4 min-w-[560px]">
-              {/* 3-column grid */}
-              <div className="grid grid-cols-3 gap-6">
-                {GROUPED.map((group) => (
+            <div className="absolute top-full left-0 mt-2 bg-white rounded-xl border border-border-brand shadow-lg z-20 p-4 w-[calc(100vw-2rem)] md:w-auto md:min-w-[560px]">
+              {/* Mobile: 2-column layout */}
+              <div className="grid grid-cols-2 gap-4 md:hidden">
+                {/* Left col: SERVICES */}
+                {GROUPED.filter((g) => g.label === 'SERVICES').map((group) => (
                   <div key={group.label}>
-                    {/* Column label */}
                     <p className="font-mono text-[10px] uppercase tracking-widest text-ink3 border-b border-border-brand pb-2 mb-3">
                       {group.label}
                     </p>
-                    {/* Vertical items */}
+                    <div className="space-y-0.5">
+                      {group.items.map((v) => {
+                        const active = v.slug === info.vertical
+                        return (
+                          <button
+                            key={v.slug}
+                            onClick={() => void switchVertical(v.slug)}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left transition-colors ${active ? 'text-teal-700 font-medium bg-teal-50' : 'text-ink2 hover:bg-bg'}`}
+                          >
+                            <span>{v.icon}</span>
+                            <span>{v.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {/* Right col: HEALTHCARE + PROFESSIONAL stacked */}
+                <div className="space-y-4">
+                  {GROUPED.filter((g) => g.label !== 'SERVICES').map((group) => (
+                    <div key={group.label}>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-ink3 border-b border-border-brand pb-2 mb-3">
+                        {group.label}
+                      </p>
+                      <div className="space-y-0.5">
+                        {group.items.map((v) => {
+                          const active = v.slug === info.vertical
+                          return (
+                            <button
+                              key={v.slug}
+                              onClick={() => void switchVertical(v.slug)}
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left transition-colors ${active ? 'text-teal-700 font-medium bg-teal-50' : 'text-ink2 hover:bg-bg'}`}
+                            >
+                              <span>{v.icon}</span>
+                              <span>{v.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Desktop: 3-column grid */}
+              <div className="hidden md:grid grid-cols-3 gap-6">
+                {GROUPED.map((group) => (
+                  <div key={group.label}>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-ink3 border-b border-border-brand pb-2 mb-3">
+                      {group.label}
+                    </p>
                     <div className="space-y-0.5">
                       {group.items.map((v) => {
                         const active = v.slug === info.vertical
@@ -195,10 +245,11 @@ export default function DemoBanner() {
       {/* Mobile: icon-only call link */}
       <a
         href="tel:+15127376322"
-        className="md:hidden ml-auto text-base leading-none text-amber-700"
+        className="md:hidden ml-auto flex items-center gap-1 text-xs font-medium text-amber-700"
         aria-label="Call +1 512 737 6322"
       >
-        📞
+        <span>📞</span>
+        <span>Call Maya</span>
       </a>
       {/* Desktop: full call text */}
       <span className="hidden md:inline font-mono text-[11px] tracking-wide ml-auto sm:ml-2 whitespace-nowrap">
