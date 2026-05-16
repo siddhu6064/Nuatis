@@ -6,6 +6,7 @@ import { sendSms } from '../lib/sms.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { sendTemplatedEmail } from '../lib/email-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
+import { logActivity } from '../lib/activity.js'
 
 const QUEUE_NAME = 'follow-up-cadence'
 const MAX_LOOKBACK_DAYS = 14
@@ -145,6 +146,15 @@ export async function scan(): Promise<void> {
               follow_up_last_sent: new Date().toISOString(),
             })
             .eq('id', contact.id)
+
+          void logActivity({
+            tenantId: contact.tenant_id,
+            contactId: contact.id,
+            type: currentStep.channel === 'sms' ? 'sms' : 'email',
+            body: interpolate(currentStep.template, vars),
+            metadata: { step: step + 1, channel: currentStep.channel, automated: true },
+            actorType: 'ai',
+          })
 
           void publishActivityEvent({
             tenant_id: contact.tenant_id,

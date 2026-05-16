@@ -4,6 +4,7 @@ import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { logActivity } from '../lib/activity.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
@@ -137,6 +138,14 @@ export async function scan(): Promise<void> {
 
             if (res.ok) {
               console.info(`[no-show-scanner] rebook SMS sent to=${toPhone} appointment=${appt.id}`)
+              void logActivity({
+                tenantId: appt.tenant_id,
+                contactId: appt.contact_id ?? undefined,
+                type: 'sms',
+                body: smsText,
+                metadata: { appointment_id: appt.id, automated: true, trigger: 'no_show' },
+                actorType: 'ai',
+              })
             } else {
               const body = await res.text()
               console.error(`[no-show-scanner] rebook SMS failed (${res.status}): ${body}`)

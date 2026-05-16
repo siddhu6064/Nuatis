@@ -157,9 +157,10 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
   await logActivity({
     tenantId,
     contactId,
-    type: 'system',
-    body: 'Review request SMS sent',
-    metadata: { review_request_id: reviewRequest.id },
+    type: 'sms',
+    body: resolvedMessage,
+    metadata: { review_request_id: reviewRequest.id, automated: true, trigger: 'review_request' },
+    actorType: 'ai',
   })
 
   // 14. Notify owner
