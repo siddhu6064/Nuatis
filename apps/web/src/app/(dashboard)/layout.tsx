@@ -21,7 +21,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
         <Sidebar open={sidebarOpen} onClose={closeSidebar} />
         <main className="flex-1 overflow-y-auto bg-bg">
-          <div className="relative flex items-center px-4 pt-4 md:hidden" style={{ zIndex: 50 }}>
+          <div
+            className={`relative flex items-center px-4 pt-4 md:hidden ${sidebarOpen ? 'hidden' : ''}`}
+            style={{ zIndex: 50 }}
+          >
             <button
               type="button"
               onClick={(e) => {
