@@ -192,7 +192,16 @@ export default function DemoBanner() {
       <span className="text-xs text-amber-600 ml-auto hidden sm:inline">
         Switch vertical for demo
       </span>
-      <span className="font-mono text-[11px] tracking-wide ml-auto sm:ml-2 whitespace-nowrap">
+      {/* Mobile: icon-only call link */}
+      <a
+        href="tel:+15127376322"
+        className="md:hidden ml-auto text-base leading-none text-amber-700"
+        aria-label="Call +1 512 737 6322"
+      >
+        📞
+      </a>
+      {/* Desktop: full call text */}
+      <span className="hidden md:inline font-mono text-[11px] tracking-wide ml-auto sm:ml-2 whitespace-nowrap">
         <span className="text-[#7a7468]">📞&nbsp;Call </span>
         <a href="tel:+15127376322" className="text-[#0d9488] hover:underline">
           +1 512 737 6322
