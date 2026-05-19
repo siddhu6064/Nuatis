@@ -46,8 +46,8 @@ async function fetchScannerStatus(
   name: string,
   tenantId: string
 ): Promise<ScannerStatus> {
+  const q = new Queue(key, { connection: createBullMQConnection() })
   try {
-    const q = new Queue(key, { connection: createBullMQConnection() })
     const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed', 'paused')
     const [failedJobs, completedJobs] = await Promise.all([
       q.getFailed(0, 4),
@@ -104,6 +104,7 @@ async function fetchScannerStatus(
       pause_until,
     }
   } catch {
+    await q.close().catch(() => {})
     return {
       name,
       key,
@@ -286,7 +287,7 @@ router.post(
         paused_until: until.toISOString(),
         reason: reason ?? null,
       })
-      .select('id, scanner_key, paused_from, paused_until, reason')
+      .select('id, tenant_id, scanner_key, paused_from, paused_until, reason, created_at')
       .single()
     if (error) {
       console.error(`[automation] pause insert error: ${error.message}`)
