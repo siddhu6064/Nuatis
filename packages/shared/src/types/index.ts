@@ -331,6 +331,23 @@ export interface AutomationRule {
   updatedAt: string
 }
 
+// ── SMS Messages ─────────────────────────────────────────────
+
+export interface SmsMessage {
+  id: string
+  tenant_id: string
+  contact_id: string | null
+  direction: 'inbound' | 'outbound'
+  body: string
+  from_number: string
+  to_number: string
+  message_sid: string | null
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'received'
+  ai_handled: boolean
+  ai_response: string | null
+  created_at: string
+}
+
 // ── API response wrappers ────────────────────────────────────
 
 export interface ApiSuccess<T> {
