@@ -70,6 +70,7 @@ import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
 import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
+import reputationRouter from './routes/reputation.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -117,6 +118,7 @@ app.use('/api/calls', callsRouter)
 app.use('/api/maya-settings', mayaSettingsRouter)
 app.use('/api/business-profile', businessProfileRouter)
 app.use('/api/maya-kb', mayaKbRouter)
+app.use('/api/reputation', reputationRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/demo', demoRouter)
 app.use('/api/insights', insightsRouter)
