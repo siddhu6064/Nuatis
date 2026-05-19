@@ -559,3 +559,27 @@ export interface ReviewRequestStats {
   }
   last30Days: { sent: number; clicked: number; completed: number }
 }
+
+// ── Automation Overview ───────────────────────────────────────
+
+export interface ScannerStatus {
+  name: string // human-readable: "Stalled Lead Scanner", etc.
+  key: string // internal BullMQ queue name
+  status: 'active' | 'paused' | 'error'
+  last_run_at: string | null
+  last_error: string | null
+  failure_count: number
+  jobs_processed_7d: number
+}
+
+export interface AutomationOverview {
+  scanners: ScannerStatus[]
+  enrollments_chart: Array<{ week: string; count: number }>
+  trigger_analysis: {
+    attempted: number
+    matched: number
+    unmatched: number
+  }
+  total_active: number
+  total_paused: number
+}
