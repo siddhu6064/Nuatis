@@ -19,6 +19,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const supabase = getSupabase()
 
   const statusFilter = (req.query['status'] as string) ?? 'open'
+  if (!['open', 'resolved', 'all'].includes(statusFilter)) {
+    res.status(400).json({ error: 'status must be open, resolved, or all' })
+    return
+  }
   const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10) || 1)
   const limit = Math.min(
     100,
@@ -114,13 +118,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       const contact = contactMap.get(contactId)
 
       return {
+        id: contactId,
         contact_id: contactId,
         contact_name: contact?.full_name ?? null,
         contact_phone: contact?.phone ?? null,
-        last_message_body: lastMessage?.body ?? null,
-        last_message_direction: lastMessage?.direction ?? null,
+        last_message: lastMessage?.body ?? null,
         last_message_at: lastMessage?.created_at ?? null,
-        last_message_ai_handled: lastMessage?.ai_handled ?? false,
+        direction: lastMessage?.direction ?? null,
+        ai_handled: lastMessage?.ai_handled ?? false,
         unread_count: unreadCount,
         status: conversationStatus,
       }
