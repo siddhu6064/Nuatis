@@ -18,6 +18,9 @@ interface QuoteData {
   tax_rate: number
   tax_amount: number
   total: number
+  discount_type: string | null
+  discount_amount: number | null
+  discount_label: string | null
   deposit_pct: number | null
   deposit_amount: number | null
   remaining_balance: number | null
@@ -107,7 +110,7 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
             </p>
             <p className="text-sm text-ink3">
               {acted === 'accepted'
-                ? `Thank you! ${quote.business_name} will be in touch.`
+                ? `✓ Quote accepted. A receipt has been sent to ${quote.contacts?.email ?? 'your email'}.`
                 : `${quote.business_name} has been notified.`}
             </p>
           </div>
@@ -229,6 +232,14 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
               <span className="text-ink3">Subtotal</span>
               <span>${Number(quote.subtotal).toFixed(2)}</span>
             </div>
+            {quote.discount_amount != null && Number(quote.discount_amount) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-rose-600">
+                  Discount{quote.discount_label ? ` (${quote.discount_label})` : ''}
+                </span>
+                <span className="text-rose-600">-${Number(quote.discount_amount).toFixed(2)}</span>
+              </div>
+            )}
             {Number(quote.tax_rate) > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-ink3">Tax ({quote.tax_rate}%)</span>

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { VERTICALS } from '@nuatis/shared'
 import VoiceSettingsForm from './VoiceSettingsForm'
+import TestMayaPanel from './TestMayaPanel'
 
 interface LocationSettings {
   maya_enabled: boolean
@@ -53,6 +54,7 @@ export default async function VoiceSettingsPage() {
         <p className="text-sm text-ink3 mt-0.5">Configure how Maya handles your calls</p>
       </div>
 
+      <TestMayaPanel />
       <VoiceSettingsForm settings={settings} />
     </div>
   )

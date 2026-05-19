@@ -103,6 +103,173 @@ router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): 
   res.json({ deals, total: count ?? 0 })
 })
 
+// ── GET /api/deals/funnel ────────────────────────────────────────────────────
+router.get(
+  '/funnel',
+  requireAuth,
+  requireDeals,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const { data: pipelines } = await supabase
+      .from('pipelines')
+      .select('id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_default', true)
+      .limit(1)
+
+    const pipelineId = pipelines?.[0]?.id as string | undefined
+    if (!pipelineId) {
+      res.json({ stages: [] })
+      return
+    }
+
+    const { data: stages } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, position, probability')
+      .eq('pipeline_id', pipelineId)
+      .order('position', { ascending: true })
+
+    if (!stages || stages.length === 0) {
+      res.json({ stages: [] })
+      return
+    }
+
+    const stageIds = stages.map((s) => s.id as string)
+
+    const { data: deals } = await supabase
+      .from('deals')
+      .select('pipeline_stage_id, value')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false)
+      .eq('is_closed_won', false)
+      .eq('is_closed_lost', false)
+      .in('pipeline_stage_id', stageIds)
+
+    const stageMap = new Map<string, { count: number; totalValue: number }>()
+    for (const id of stageIds) stageMap.set(id, { count: 0, totalValue: 0 })
+    for (const deal of deals ?? []) {
+      const sid = deal.pipeline_stage_id as string
+      const agg = stageMap.get(sid)
+      if (agg) {
+        agg.count++
+        agg.totalValue += Number(deal.value ?? 0)
+      }
+    }
+
+    const result = stages.map((stage, i) => {
+      const agg = stageMap.get(stage.id as string) ?? { count: 0, totalValue: 0 }
+      const nextAgg = stages[i + 1]
+        ? (stageMap.get(stages[i + 1]!.id as string) ?? { count: 0, totalValue: 0 })
+        : null
+      const conversionToNext =
+        nextAgg !== null && agg.count > 0 ? Math.round((nextAgg.count / agg.count) * 100) : null
+      return {
+        stageId: stage.id,
+        stageName: stage.name,
+        position: stage.position,
+        probability: stage.probability ?? null,
+        count: agg.count,
+        totalValue: agg.totalValue,
+        conversionToNext,
+      }
+    })
+
+    res.json({ stages: result })
+  }
+)
+
+// ── GET /api/deals/velocity ──────────────────────────────────────────────────
+router.get(
+  '/velocity',
+  requireAuth,
+  requireDeals,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const now = new Date()
+    const defaultStart = new Date(now.getTime() - 90 * 86400000).toISOString()
+    const startDate =
+      typeof req.query['startDate'] === 'string' ? req.query['startDate'] : defaultStart
+    const endDate =
+      typeof req.query['endDate'] === 'string' ? req.query['endDate'] : now.toISOString()
+
+    const { data: wonDeals } = await supabase
+      .from('deals')
+      .select('value, created_at, updated_at, close_date')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_closed_won', true)
+      .eq('is_archived', false)
+      .gte('updated_at', startDate)
+      .lte('updated_at', endDate)
+
+    const deals = wonDeals ?? []
+    const totalWon = deals.length
+
+    const rangeMs = new Date(endDate).getTime() - new Date(startDate).getTime()
+    const rangeMonths = Math.max(rangeMs / (30 * 86400000), 1)
+
+    // avgDaysToClose
+    let totalDays = 0
+    let daysCount = 0
+    for (const d of deals) {
+      const closeAt = new Date(
+        (d.close_date as string | null) ?? (d.updated_at as string)
+      ).getTime()
+      const days = (closeAt - new Date(d.created_at as string).getTime()) / 86400000
+      if (days >= 0) {
+        totalDays += days
+        daysCount++
+      }
+    }
+    const avgDaysToClose = daysCount > 0 ? Math.round((totalDays / daysCount) * 10) / 10 : 0
+
+    // avgDealSize + totalValue
+    const totalValue = deals.reduce((sum, d) => sum + Number(d.value ?? 0), 0)
+    const avgDealSize = totalWon > 0 ? Math.round(totalValue / totalWon) : 0
+
+    // dealsPerMonth + velocityPerMonth
+    const dealsPerMonth = Math.round((totalWon / rangeMonths) * 10) / 10
+    const velocityPerMonth = Math.round(dealsPerMonth * avgDealSize)
+
+    // wonByMonth — group by YYYY-MM, then format label
+    const monthMap = new Map<string, { count: number; value: number }>()
+    for (const d of deals) {
+      const key = ((d.close_date as string | null) ?? (d.updated_at as string)).slice(0, 7)
+      const agg = monthMap.get(key) ?? { count: 0, value: 0 }
+      agg.count++
+      agg.value += Number(d.value ?? 0)
+      monthMap.set(key, agg)
+    }
+
+    // Fill every month in range
+    const wonByMonth: { month: string; count: number; value: number }[] = []
+    const cur = new Date(startDate)
+    cur.setDate(1)
+    cur.setHours(0, 0, 0, 0)
+    const endD = new Date(endDate)
+    while (cur <= endD) {
+      const key = cur.toISOString().slice(0, 7)
+      const agg = monthMap.get(key) ?? { count: 0, value: 0 }
+      const label = cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      wonByMonth.push({ month: label, count: agg.count, value: Math.round(agg.value) })
+      cur.setMonth(cur.getMonth() + 1)
+    }
+
+    res.json({
+      avgDaysToClose,
+      dealsPerMonth,
+      avgDealSize,
+      velocityPerMonth,
+      totalWon,
+      totalValue: Math.round(totalValue),
+      wonByMonth,
+    })
+  }
+)
+
 // ── GET /api/deals/:id ───────────────────────────────────────────────────────
 router.get(
   '/:id',
@@ -126,12 +293,29 @@ router.get(
       return
     }
 
+    const { data: dealContactRows } = await supabase
+      .from('deal_contacts')
+      .select('role, contacts(id, full_name, phone, email)')
+      .eq('deal_id', req.params['id'])
+      .limit(5)
+
+    const dealContacts = (dealContactRows ?? []).map((row) => ({
+      ...(row.contacts as unknown as {
+        id: string
+        full_name: string
+        phone: string | null
+        email: string | null
+      }),
+      role: row.role ?? null,
+    }))
+
     res.json({
       ...deal,
       stage_name: (deal.pipeline_stages as { name: string } | null)?.name ?? null,
       stage_color: (deal.pipeline_stages as { color: string } | null)?.color ?? null,
       contact_name: (deal.contacts as { full_name: string } | null)?.full_name ?? null,
       company_name: (deal.companies as { name: string } | null)?.name ?? null,
+      deal_contacts: dealContacts,
     })
   }
 )
@@ -338,6 +522,106 @@ router.put(
       contact_name: (updated?.contacts as { full_name: string } | null)?.full_name ?? null,
       company_name: (updated?.companies as { name: string } | null)?.name ?? null,
     })
+  }
+)
+
+// ── POST /api/deals/:id/contacts ─────────────────────────────────────────────
+router.post(
+  '/:id/contacts',
+  requireAuth,
+  requireDeals,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const b = req.body as Record<string, unknown>
+
+    const { data: deal } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!deal) {
+      res.status(404).json({ error: 'Deal not found' })
+      return
+    }
+
+    const { count } = await supabase
+      .from('deal_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('deal_id', req.params['id'])
+
+    if ((count ?? 0) >= 5) {
+      res.status(400).json({ error: 'Maximum 5 contacts per deal' })
+      return
+    }
+
+    const contactId = typeof b['contactId'] === 'string' ? b['contactId'] : null
+    const role = typeof b['role'] === 'string' ? b['role'] : null
+
+    if (!contactId) {
+      res.status(400).json({ error: 'contactId required' })
+      return
+    }
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', contactId)
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
+
+    const { error } = await supabase
+      .from('deal_contacts')
+      .insert({ deal_id: req.params['id'], contact_id: contactId, role })
+
+    if (error?.code === '23505') {
+      res.status(409).json({ error: 'Contact already on this deal' })
+      return
+    }
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ success: true })
+  }
+)
+
+// ── DELETE /api/deals/:id/contacts/:contactId ─────────────────────────────────
+router.delete(
+  '/:id/contacts/:contactId',
+  requireAuth,
+  requireDeals,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const { data: deal } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!deal) {
+      res.status(404).json({ error: 'Deal not found' })
+      return
+    }
+
+    await supabase
+      .from('deal_contacts')
+      .delete()
+      .eq('deal_id', req.params['id'])
+      .eq('contact_id', req.params['contactId'])
+
+    res.json({ success: true })
   }
 )
 

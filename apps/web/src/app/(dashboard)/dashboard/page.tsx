@@ -1,5 +1,7 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
+import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
+import LeadSourceReport from '@/components/dashboard/LeadSourceReport'
 
 const COLOR: Record<string, string> = {
   teal: 'bg-teal-50 text-teal-600',
@@ -84,7 +86,12 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <PipelineFunnel />
+        <LeadSourceReport />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">Recent Activity</h2>
           <div className="flex flex-col items-center justify-center py-12 text-center">

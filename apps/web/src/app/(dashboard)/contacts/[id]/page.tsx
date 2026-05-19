@@ -2,9 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import ContactDetailClient from './ContactDetailClient'
-import ContactHeader from './ContactHeader'
 
 interface Contact {
   id: string
@@ -42,16 +40,8 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   if (!contact) notFound()
 
   return (
-    <div className="px-8 py-8">
-      {/* Back link */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/contacts" className="text-ink4 hover:text-ink3 text-sm">
-          &larr; Contacts
-        </Link>
-      </div>
-
-      {/* Header — client component manages local contact state + edit drawer */}
-      <ContactHeader
+    <Suspense fallback={null}>
+      <ContactDetailClient
         contact={{
           id: contact.id,
           full_name: contact.full_name,
@@ -60,64 +50,13 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           phone_alt: contact.phone_alt,
           source: contact.source,
           referral_source_detail: contact.referral_source_detail,
+          pipeline_stage: contact.pipeline_stage,
           tags: contact.tags ?? [],
           notes: contact.notes,
-          pipeline_stage: contact.pipeline_stage,
+          created_at: contact.created_at,
+          last_contacted: contact.last_contacted,
         }}
       />
-
-      {/* Contact Info Card */}
-      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
-        <h2 className="text-sm font-semibold text-ink2 mb-3">Details</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-ink4">Source</span>
-            <p className="text-ink2">{contact.source?.replace('_', ' ') ?? '---'}</p>
-          </div>
-          <div>
-            <span className="text-ink4">Added</span>
-            <p className="text-ink2">
-              {new Date(contact.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-          {contact.last_contacted && (
-            <div>
-              <span className="text-ink4">Last Contacted</span>
-              <p className="text-ink2">
-                {new Date(contact.last_contacted).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </p>
-            </div>
-          )}
-          {contact.tags && contact.tags.length > 0 && (
-            <div>
-              <span className="text-ink4">Tags</span>
-              <div className="flex flex-wrap gap-1 mt-0.5">
-                {contact.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg2 text-ink3"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Client-side interactive sections */}
-      <Suspense fallback={null}>
-        <ContactDetailClient contactId={contact.id} contactName={contact.full_name} />
-      </Suspense>
-    </div>
+    </Suspense>
   )
 }

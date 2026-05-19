@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import QuoteActions from './QuoteActions'
+import QuotePayments from './QuotePayments'
 
 interface LineItem {
   id: string
@@ -39,6 +40,7 @@ interface Quote {
   deposit_amount: number | null
   remaining_balance: number | null
   contacts: { full_name: string; phone: string | null; email: string | null } | null
+  payment_status: string | null
 }
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
@@ -96,6 +98,24 @@ export default async function QuoteDetailPage({ params }: Props) {
         .single()
       lastViewedAt = latestView?.viewed_at ?? null
     }
+  }
+
+  // Fetch payments for accepted quotes
+  let initialPayments: {
+    id: string
+    amount: number
+    method: string
+    reference: string | null
+    notes: string | null
+    recorded_at: string
+  }[] = []
+  if (quote.status === 'accepted') {
+    const { data: payments } = await supabase
+      .from('quote_payments')
+      .select('id, amount, method, reference, notes, recorded_at')
+      .eq('quote_id', id)
+      .order('recorded_at', { ascending: true })
+    initialPayments = payments ?? []
   }
 
   const badge = STATUS_BADGE[quote.status] ?? STATUS_BADGE['draft']!
@@ -266,6 +286,16 @@ export default async function QuoteDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Payments — only for accepted quotes */}
+      {quote.status === 'accepted' && (
+        <QuotePayments
+          quoteId={quote.id}
+          quoteTotal={Number(quote.total)}
+          initialPayments={initialPayments}
+          initialPaymentStatus={quote.payment_status}
+        />
+      )}
 
       {/* Deposit info */}
       <div className="bg-white rounded-xl border border-border-brand p-6 mb-6">

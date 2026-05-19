@@ -7,6 +7,7 @@ import DemoBanner from './DemoBanner'
 import { PushNotificationPrompt } from '@/components/PushNotificationPrompt'
 import { NPSSurvey } from '@/components/NPSSurvey'
 import GlobalSearch from '@/components/search/GlobalSearch'
+import QuickActionsButton from '@/components/layout/QuickActionsButton'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -43,6 +44,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
+            </button>
+          </div>
+          {/* Desktop top bar */}
+          <div className="hidden md:flex items-center justify-end gap-2 px-4 py-2 border-b border-border-brand bg-white sticky top-0 z-10">
+            <QuickActionsButton />
+            <button
+              onClick={() =>
+                window.dispatchEvent(
+                  new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
+                )
+              }
+              className="h-8 flex items-center gap-2 px-3 rounded-lg border border-border-brand text-ink3 text-sm hover:bg-bg transition-colors"
+            >
+              <svg
+                className="w-3.5 h-3.5 text-ink4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                />
+              </svg>
+              <span className="hidden lg:inline text-ink4">Search</span>
+              <kbd className="text-[10px] bg-bg2 px-1.5 py-0.5 rounded text-ink4">⌘K</kbd>
             </button>
           </div>
           <DemoBanner />

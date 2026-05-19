@@ -15,6 +15,8 @@ interface Props {
   contactId: string
 }
 
+type SubTab = 'all' | 'due_today' | 'overdue' | 'upcoming'
+
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'border-l-red-500 bg-red-50/30',
   medium: 'border-l-amber-400 bg-amber-50/20',
@@ -25,6 +27,34 @@ const PRIORITY_BADGE: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
   medium: 'bg-amber-100 text-amber-700',
   low: 'bg-bg2 text-ink3',
+}
+
+function todayStart(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function tomorrowStart(): Date {
+  const d = todayStart()
+  d.setDate(d.getDate() + 1)
+  return d
+}
+
+function isDueToday(dueDate: string | null): boolean {
+  if (!dueDate) return false
+  const d = new Date(dueDate)
+  return d >= todayStart() && d < tomorrowStart()
+}
+
+function isTaskOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false
+  return new Date(dueDate) < todayStart()
+}
+
+function isUpcoming(dueDate: string | null): boolean {
+  if (!dueDate) return false
+  return new Date(dueDate) >= tomorrowStart()
 }
 
 function isOverdue(dueDate: string | null): boolean {
@@ -45,6 +75,7 @@ export default function ContactTasks({ contactId }: Props) {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([])
   const [showCompleted, setShowCompleted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [subTab, setSubTab] = useState<SubTab>('all')
 
   // Inline add form
   const [adding, setAdding] = useState(false)
@@ -116,6 +147,22 @@ export default function ContactTasks({ contactId }: Props) {
     }
   }
 
+  const overdueCount = tasks.filter((t) => isTaskOverdue(t.due_date)).length
+  const dueTodayCount = tasks.filter((t) => isDueToday(t.due_date)).length
+
+  const filteredTasks = (() => {
+    switch (subTab) {
+      case 'due_today':
+        return tasks.filter((t) => isDueToday(t.due_date))
+      case 'overdue':
+        return tasks.filter((t) => isTaskOverdue(t.due_date))
+      case 'upcoming':
+        return tasks.filter((t) => isUpcoming(t.due_date))
+      default:
+        return tasks
+    }
+  })()
+
   if (loading) {
     return <div className="py-4 text-center text-sm text-ink4">Loading tasks...</div>
   }
@@ -130,6 +177,47 @@ export default function ContactTasks({ contactId }: Props) {
         >
           + Add task
         </button>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-0 border-b border-border-brand mb-3 -mx-0">
+        {(
+          [
+            { id: 'all', label: 'All' },
+            {
+              id: 'due_today',
+              label: 'Due Today',
+              count: dueTodayCount,
+              badgeClass: 'bg-amber-100 text-amber-700',
+            },
+            {
+              id: 'overdue',
+              label: 'Overdue',
+              count: overdueCount,
+              badgeClass: 'bg-red-100 text-red-700',
+            },
+            { id: 'upcoming', label: 'Upcoming' },
+          ] as Array<{ id: SubTab; label: string; count?: number; badgeClass?: string }>
+        ).map(({ id, label, count, badgeClass }) => (
+          <button
+            key={id}
+            onClick={() => setSubTab(id)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+              subTab === id
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-ink3 hover:text-ink2'
+            }`}
+          >
+            {label}
+            {count !== undefined && count > 0 && (
+              <span
+                className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold leading-none ${badgeClass ?? ''}`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {adding && (
@@ -183,13 +271,27 @@ export default function ContactTasks({ contactId }: Props) {
         </div>
       )}
 
-      {tasks.length === 0 && !adding && <p className="text-xs text-ink4 py-2">No active tasks</p>}
+      {filteredTasks.length === 0 && !adding && (
+        <p className="text-xs text-ink4 py-2">
+          {subTab === 'all'
+            ? 'No active tasks'
+            : subTab === 'due_today'
+              ? 'No tasks due today'
+              : subTab === 'overdue'
+                ? 'No overdue tasks'
+                : 'No upcoming tasks'}
+        </p>
+      )}
 
       <div className="space-y-1">
-        {tasks.map((task) => (
+        {filteredTasks.map((task) => (
           <div
             key={task.id}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border-l-2 ${PRIORITY_COLORS[task.priority] ?? ''}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border-l-2 ${
+              subTab === 'overdue'
+                ? 'border-l-rose-500 bg-rose-50/30'
+                : (PRIORITY_COLORS[task.priority] ?? '')
+            }`}
           >
             <input
               type="checkbox"

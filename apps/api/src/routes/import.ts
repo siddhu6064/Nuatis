@@ -4,6 +4,7 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { parseCsv, suggestMapping } from '../lib/csv-parser.js'
 import { processImportRows } from '../lib/import-processor.js'
 import { getCsvImportQueue } from '../workers/csv-import-worker.js'
+import { logBulkAction } from '../middleware/audit-logger.js'
 
 const router = Router()
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -84,6 +85,16 @@ router.post('/contacts', requireAuth, async (req: Request, res: Response): Promi
     const result = await processImportRows(authed.tenantId, rows, mapping, {
       skip_duplicates: skipDuplicates,
       update_existing: updateExisting,
+    })
+    void logBulkAction({
+      tenantId: authed.tenantId,
+      userId: authed.userId,
+      action: 'csv_import',
+      resourceType: 'contact',
+      contactCount: rows.length,
+      successCount: result.imported,
+      failCount: result.skipped + result.errors.length,
+      details: 'CSV import',
     })
     res.json(result)
     return

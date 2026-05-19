@@ -34,6 +34,17 @@ interface Contact {
   lifecycle_stage: string | null
   lead_score: number | null
   lead_grade: string | null
+  value?: number
+}
+
+const currencyFmt = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+function formatColumnValue(amount: number): string {
+  return currencyFmt.format(amount)
 }
 
 function toTitle(slug: string): string {
@@ -296,6 +307,7 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
               {stages.map((stage) => {
                 const cards = grouped.get(stage.name) ?? []
                 const colColor = stage.color || '#0d9488'
+                const totalValue = cards.reduce((sum, c) => sum + (c.value ?? 0), 0)
                 return (
                   <Droppable key={stage.id} droppableId={stage.id}>
                     {(provided, snapshot) => (
@@ -311,13 +323,19 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                         }}
                       >
                         {/* Column header */}
-                        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-brand bg-[#f9f8f5]">
-                          <span className="text-[13px] font-semibold text-ink truncate flex-1">
-                            {stage.name}
-                          </span>
-                          <span className="font-mono text-[10px] text-ink3 bg-white border border-border-brand rounded px-1.5 py-0.5 shrink-0 tabular-nums">
-                            {cards.length}
-                          </span>
+                        <div className="px-3 py-2.5 border-b border-border-brand bg-[#f9f8f5]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-semibold text-ink truncate flex-1">
+                              {stage.name}
+                            </span>
+                            <span className="font-mono text-[10px] text-ink3 bg-white border border-border-brand rounded px-1.5 py-0.5 shrink-0 tabular-nums">
+                              {cards.length}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-ink3 mt-0.5 tabular-nums">
+                            {cards.length} deal{cards.length !== 1 ? 's' : ''}{' '}
+                            <span className="text-ink4">·</span> {formatColumnValue(totalValue)}
+                          </p>
                         </div>
 
                         {/* Cards */}

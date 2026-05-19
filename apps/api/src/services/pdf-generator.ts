@@ -19,8 +19,12 @@ interface QuotePdfData {
   businessName: string
   businessPhone: string | null
   subtotal: number
+  discountType?: 'percent' | 'fixed' | null
+  discountAmount?: number | null
+  discountLabel?: string | null
   taxRate: number
   taxAmount: number
+  taxLabel?: string
   total: number
   depositPct?: number | null
   depositAmount?: number | null
@@ -195,9 +199,18 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
     doc.fontSize(9).fillColor(GRAY).text('Subtotal', 380, y)
     doc.fillColor(DARK).text(fmt(data.subtotal), 475, y, { width: 75, align: 'right' })
 
+    if (data.discountAmount != null && data.discountAmount > 0) {
+      y += 18
+      const discountLineLabel = data.discountLabel ? `Discount (${data.discountLabel})` : 'Discount'
+      doc.fillColor('#e11d48').text(discountLineLabel, 380, y)
+      doc
+        .fillColor('#e11d48')
+        .text(`-${fmt(data.discountAmount)}`, 475, y, { width: 75, align: 'right' })
+    }
+
     if (data.taxRate > 0) {
       y += 18
-      doc.fillColor(GRAY).text(`Tax (${data.taxRate}%)`, 380, y)
+      doc.fillColor(GRAY).text(`${data.taxLabel ?? 'Tax'} (${data.taxRate}%)`, 380, y)
       doc.fillColor(DARK).text(fmt(data.taxAmount), 475, y, { width: 75, align: 'right' })
     }
 

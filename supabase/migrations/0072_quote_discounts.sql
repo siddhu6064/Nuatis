@@ -1,0 +1,4 @@
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_type text DEFAULT NULL;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_value numeric(10,2) DEFAULT 0;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_amount numeric(10,2) DEFAULT 0;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_label text DEFAULT NULL;

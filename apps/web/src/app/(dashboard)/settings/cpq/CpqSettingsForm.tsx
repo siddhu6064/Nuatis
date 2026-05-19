@@ -8,6 +8,11 @@ interface CpqSettings {
   deposit_pct: number
 }
 
+interface TaxSettings {
+  tax_rate: number
+  tax_label: string
+}
+
 export default function CpqSettingsForm() {
   const [settings, setSettings] = useState<CpqSettings>({
     max_discount_pct: 20,
@@ -18,11 +23,18 @@ export default function CpqSettingsForm() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>({ tax_rate: 0, tax_label: 'Tax' })
+  const [savingTax, setSavingTax] = useState(false)
+  const [taxToast, setTaxToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
   useEffect(() => {
-    fetch('/api/cpq/settings')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: CpqSettings | null) => {
-        if (data) setSettings(data)
+    Promise.all([
+      fetch('/api/cpq/settings').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/tenants/me', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([cpq, tax]: [CpqSettings | null, TaxSettings | null]) => {
+        if (cpq) setSettings(cpq)
+        if (tax) setTaxSettings(tax)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -58,6 +70,32 @@ export default function CpqSettingsForm() {
     } finally {
       setSaving(false)
       setTimeout(() => setToast(null), 3000)
+    }
+  }
+
+  async function saveTax() {
+    setSavingTax(true)
+    setTaxToast(null)
+    try {
+      const res = await fetch('/api/tenants/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(taxSettings),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTaxSettings(data as TaxSettings)
+        setTaxToast({ type: 'success', msg: 'Tax settings saved' })
+      } else {
+        const d = await res.json()
+        setTaxToast({ type: 'error', msg: (d as { error?: string }).error ?? 'Failed to save' })
+      }
+    } catch {
+      setTaxToast({ type: 'error', msg: 'Failed to save tax settings' })
+    } finally {
+      setSavingTax(false)
+      setTimeout(() => setTaxToast(null), 3000)
     }
   }
 
@@ -164,6 +202,71 @@ export default function CpqSettingsForm() {
       >
         {saving ? 'Saving...' : 'Save Settings'}
       </button>
+
+      {/* ── Tax Settings ─────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-5 mt-8">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">Tax Settings</h2>
+          <p className="text-xs text-ink4 mt-0.5">
+            Applied automatically to all new quotes. Existing quotes are not affected.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">Tax Label</label>
+          <p className="text-xs text-ink4 mb-2">e.g. GST, VAT, Sales Tax</p>
+          <input
+            type="text"
+            value={taxSettings.tax_label}
+            onChange={(e) => setTaxSettings((s) => ({ ...s, tax_label: e.target.value }))}
+            className={inputCls}
+            placeholder="Tax"
+            maxLength={40}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">Tax Rate</label>
+          <p className="text-xs text-ink4 mb-2">
+            {taxSettings.tax_rate === 0
+              ? 'No tax currently applied to quotes'
+              : `${taxSettings.tax_label || 'Tax'} of ${taxSettings.tax_rate}% will be added to new quotes`}
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={taxSettings.tax_rate}
+              onChange={(e) =>
+                setTaxSettings((s) => ({
+                  ...s,
+                  tax_rate: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                }))
+              }
+              className={inputCls}
+              min="0"
+              max="100"
+              step="0.01"
+            />
+            <span className="text-sm text-ink3">%</span>
+          </div>
+        </div>
+
+        {taxToast && (
+          <p
+            className={`text-sm px-3 py-2 rounded-lg ${taxToast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}
+          >
+            {taxToast.msg}
+          </p>
+        )}
+
+        <button
+          onClick={() => void saveTax()}
+          disabled={savingTax}
+          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+        >
+          {savingTax ? 'Saving...' : 'Save Tax Settings'}
+        </button>
+      </div>
     </div>
   )
 }

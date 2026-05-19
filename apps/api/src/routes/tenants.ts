@@ -8,6 +8,8 @@ import {
   type PipelineStageConfig,
 } from '@nuatis/shared'
 import { z } from 'zod'
+import { seedSampleData } from '../lib/seed-sample-data.js'
+import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
@@ -29,6 +31,9 @@ const CreateTenantSchema = z.object({
 
 // ── POST /api/tenants ─────────────────────────────────────────
 router.post('/', async (req: Request, res: Response): Promise<void> => {
+  // 0. Internal flags (read before schema strip)
+  const skipSampleData = (req.body as Record<string, unknown>)['skipSampleData'] === true
+
   // 1. Validate body
   const parsed = CreateTenantSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -232,11 +237,95 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     },
   ])
 
+  // 11. Create primary location
+  let seedLocationId: string | null = null
+  const { data: locationRow } = await supabase
+    .from('locations')
+    .insert({
+      tenant_id: tenantId,
+      name: business_name,
+      is_primary: true,
+      is_active: true,
+      timezone,
+    })
+    .select('id')
+    .single()
+  if (locationRow) {
+    seedLocationId = locationRow.id as string
+  }
+
+  // 12. Seed sample data (non-fatal — tenant works without it)
+  if (!skipSampleData) {
+    try {
+      await seedSampleData(tenantId, seedLocationId, vertical_slug)
+    } catch (err) {
+      console.error(`[tenants] seedSampleData failed for tenant ${tenantId}:`, err)
+    }
+  }
+
   res.status(201).json({
     message: 'Account created successfully',
     tenant_id: tenantId,
     vertical: vertical_slug,
     slug: uniqueSlug,
+  })
+})
+
+// ── GET /api/tenants/me ───────────────────────────────────────
+router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('tax_rate, tax_label')
+    .eq('id', authed.tenantId)
+    .single()
+
+  if (error || !data) {
+    res.status(404).json({ error: 'Tenant not found' })
+    return
+  }
+
+  res.json({ tax_rate: Number(data.tax_rate ?? 0), tax_label: (data.tax_label as string) ?? 'Tax' })
+})
+
+// ── PATCH /api/tenants/me ─────────────────────────────────────
+router.patch('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const b = req.body as Record<string, unknown>
+  const updates: Record<string, unknown> = {}
+
+  if (typeof b['tax_rate'] === 'number') {
+    if (b['tax_rate'] < 0 || b['tax_rate'] > 100) {
+      res.status(400).json({ error: 'tax_rate must be between 0 and 100' })
+      return
+    }
+    updates['tax_rate'] = Number(b['tax_rate'].toFixed(2))
+  }
+
+  if (typeof b['tax_label'] === 'string') {
+    updates['tax_label'] = b['tax_label'].trim() || 'Tax'
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: 'No valid fields provided' })
+    return
+  }
+
+  const { error } = await supabase.from('tenants').update(updates).eq('id', authed.tenantId)
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  const { data } = await supabase
+    .from('tenants')
+    .select('tax_rate, tax_label')
+    .eq('id', authed.tenantId)
+    .single()
+
+  res.json({
+    tax_rate: Number(data?.tax_rate ?? 0),
+    tax_label: (data?.tax_label as string) ?? 'Tax',
   })
 })
 

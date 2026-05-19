@@ -3,6 +3,7 @@ import { randomUUID, createHash } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
+import { sendReceiptEmail } from '../lib/receipt-email.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
@@ -35,6 +36,27 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
+}
+
+async function nextReceiptNumber(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): Promise<string> {
+  const { data } = await supabase
+    .from('quotes')
+    .select('receipt_number')
+    .like('receipt_number', 'REC-%')
+    .order('receipt_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let seq = 10001
+  if (data?.receipt_number) {
+    const parts = (data.receipt_number as string).split('-')
+    const last = parseInt(parts[1] ?? '10000', 10)
+    if (!isNaN(last)) seq = last + 1
+  }
+  return `REC-${seq}`
 }
 
 async function nextQuoteNumber(
@@ -173,26 +195,54 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
     return
   }
 
-  const taxRate = typeof b['tax_rate'] === 'number' ? b['tax_rate'] : 0
+  // Fetch tenant tax defaults — snapshot at creation time
+  const { data: tenantTax } = await supabase
+    .from('tenants')
+    .select('tax_rate, tax_label')
+    .eq('id', authed.tenantId)
+    .single()
+  const taxRate =
+    typeof b['tax_rate'] === 'number' ? b['tax_rate'] : Number(tenantTax?.tax_rate ?? 0)
+  const taxLabel =
+    typeof b['tax_label'] === 'string'
+      ? b['tax_label']
+      : ((tenantTax?.tax_label as string) ?? 'Tax')
   const validDays = typeof b['valid_days'] === 'number' ? b['valid_days'] : 30
 
-  // Discount validation
+  // Discount fields
+  const discountType =
+    typeof b['discount_type'] === 'string' ? (b['discount_type'] as 'percent' | 'fixed') : null
+  const discountValue = typeof b['discount_value'] === 'number' ? b['discount_value'] : 0
+  const discountLabel =
+    typeof b['discount_label'] === 'string' ? b['discount_label'].trim() || null : null
   const discountPct = typeof b['discount_pct'] === 'number' ? b['discount_pct'] : 0
-  const discountAmountRaw = typeof b['discount_amount'] === 'number' ? b['discount_amount'] : 0
 
+  // Compute discount_amount from type+value, fall back to legacy discount_amount field
+  const rawSubtotal = lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
+  let discountAmountFinal = 0
+  if (discountType === 'percent') {
+    discountAmountFinal = Number(((rawSubtotal * discountValue) / 100).toFixed(2))
+  } else if (discountType === 'fixed') {
+    discountAmountFinal = discountValue
+  } else {
+    discountAmountFinal = typeof b['discount_amount'] === 'number' ? b['discount_amount'] : 0
+  }
+
+  // CPQ validation — percent discounts only
+  const pctForValidation = discountType === 'percent' ? discountValue : discountPct
   let approvalStatus: string | null = null
-  if (discountPct > 0) {
+  if (pctForValidation > 0) {
     const cpq = await getCpqSettings(supabase, authed.tenantId)
-    if (discountPct > cpq.max_discount_pct) {
+    if (pctForValidation > cpq.max_discount_pct) {
       res.status(400).json({ error: `Discount exceeds maximum allowed (${cpq.max_discount_pct}%)` })
       return
     }
-    if (discountPct > cpq.require_approval_above) {
+    if (pctForValidation > cpq.require_approval_above) {
       approvalStatus = 'pending'
     }
   }
 
-  const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate, discountAmountRaw)
+  const { subtotal, taxAmount, total } = calcTotals(lineItems, taxRate, discountAmountFinal)
 
   const quoteNumber = await nextQuoteNumber(supabase, authed.tenantId)
   const shareToken = randomUUID()
@@ -208,9 +258,13 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
       subtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
+      tax_label: taxLabel,
       total,
-      discount_pct: discountPct,
-      discount_amount: discountAmountRaw,
+      discount_pct: discountType === 'percent' ? discountValue : discountPct,
+      discount_amount: discountAmountFinal,
+      discount_type: discountType,
+      discount_value: discountValue,
+      discount_label: discountLabel,
       approval_status: approvalStatus,
       notes: (b['notes'] as string) || null,
       valid_until: new Date(Date.now() + validDays * 86400000).toISOString(),
@@ -269,7 +323,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
               contactName: '',
               subtotal: `$${Number(subtotal).toFixed(2)}`,
               discountPct: String(discountPct),
-              discountAmount: `$${Number(discountAmountRaw).toFixed(2)}`,
+              discountAmount: `$${Number(discountAmountFinal).toFixed(2)}`,
               total: `$${Number(total).toFixed(2)}`,
               quoteUrl: `${process.env['WEB_URL'] ?? 'http://localhost:3000'}/quotes/${quote.id}`,
               businessName: tn?.name ?? '',
@@ -315,9 +369,24 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
   if (typeof b['valid_until'] === 'string') updates['valid_until'] = b['valid_until']
 
   // Discount validation on update
+  const discountType =
+    b['discount_type'] !== undefined
+      ? (b['discount_type'] as 'percent' | 'fixed' | null)
+      : undefined
+  const discountValue = typeof b['discount_value'] === 'number' ? b['discount_value'] : undefined
+  const discountLabel =
+    b['discount_label'] !== undefined
+      ? typeof b['discount_label'] === 'string'
+        ? b['discount_label'].trim() || null
+        : null
+      : undefined
   const discountPct = typeof b['discount_pct'] === 'number' ? b['discount_pct'] : undefined
   const discountAmountVal =
     typeof b['discount_amount'] === 'number' ? b['discount_amount'] : undefined
+
+  if (discountType !== undefined) updates['discount_type'] = discountType
+  if (discountValue !== undefined) updates['discount_value'] = discountValue
+  if (discountLabel !== undefined) updates['discount_label'] = discountLabel
 
   if (discountPct !== undefined) {
     updates['discount_pct'] = discountPct
@@ -329,7 +398,6 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
           .json({ error: `Discount exceeds maximum allowed (${cpq.max_discount_pct}%)` })
         return
       }
-      // Reset approval if discount increases above threshold
       if (discountPct > cpq.require_approval_above) {
         updates['approval_status'] = 'pending'
       } else {
@@ -693,8 +761,12 @@ async function buildPdfForQuote(
     businessName: tenant?.name ?? '',
     businessPhone: location?.telnyx_number ?? null,
     subtotal: Number(quote.subtotal),
+    discountType: (quote.discount_type as 'percent' | 'fixed' | null) ?? null,
+    discountAmount: quote.discount_amount != null ? Number(quote.discount_amount) : null,
+    discountLabel: (quote.discount_label as string | null) ?? null,
     taxRate: Number(quote.tax_rate),
     taxAmount: Number(quote.tax_amount),
+    taxLabel: (quote.tax_label as string | null) ?? 'Tax',
     total: Number(quote.total),
     depositPct: quote.deposit_pct != null ? Number(quote.deposit_pct) : null,
     depositAmount: quote.deposit_amount != null ? Number(quote.deposit_amount) : null,
@@ -871,7 +943,9 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
 
   const { data: quote } = await supabase
     .from('quotes')
-    .select('id, tenant_id, contact_id, quote_number, total, followup_job_id')
+    .select(
+      'id, tenant_id, contact_id, quote_number, title, subtotal, tax_rate, tax_amount, total, followup_job_id'
+    )
     .eq('share_token', req.params['token'])
     .single()
 
@@ -1034,6 +1108,59 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
       // sentry import failure — already logged above
     }
   }
+
+  // Auto-receipt (G84): fire-and-forget, never blocks acceptance
+  void (async () => {
+    try {
+      const receiptNumber = await nextReceiptNumber(supabase)
+      await supabase
+        .from('quotes')
+        .update({ receipt_number: receiptNumber, receipt_sent_at: new Date().toISOString() })
+        .eq('id', quote.id)
+
+      const { data: contactRow } = await supabase
+        .from('contacts')
+        .select('full_name, email')
+        .eq('id', quote.contact_id)
+        .single()
+
+      const { data: tenantRow } = await supabase
+        .from('tenants')
+        .select('name')
+        .eq('id', quote.tenant_id)
+        .single()
+
+      const { data: lineItems } = await supabase
+        .from('quote_line_items')
+        .select('description, quantity, unit_price, total')
+        .eq('quote_id', quote.id)
+        .order('sort_order')
+
+      if (contactRow?.email && tenantRow?.name) {
+        await sendReceiptEmail(
+          {
+            quote_number: quote.quote_number as string,
+            receipt_number: receiptNumber,
+            title: quote.title as string,
+            subtotal: Number(quote.subtotal),
+            tax_rate: Number(quote.tax_rate),
+            tax_amount: Number(quote.tax_amount),
+            total: Number(quote.total),
+            line_items: (lineItems ?? []).map((i) => ({
+              description: i.description as string,
+              quantity: Number(i.quantity),
+              unit_price: Number(i.unit_price),
+              total: Number(i.total),
+            })),
+          },
+          { full_name: contactRow.full_name as string, email: contactRow.email as string },
+          tenantRow.name as string
+        )
+      }
+    } catch (err) {
+      console.error('[quotes] receipt email failed:', err)
+    }
+  })()
 
   res.json({ accepted: true })
 })
@@ -1237,6 +1364,132 @@ router.post(
     })
 
     res.json({ rejected: true, quote_number: quote.quote_number })
+  }
+)
+
+// ── GET /api/quotes/:id/payments ─────────────────────────────────────────────
+router.get(
+  '/:id/payments',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, total, payment_status')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    const { data: payments, error } = await supabase
+      .from('quote_payments')
+      .select('id, amount, method, reference, notes, recorded_at')
+      .eq('quote_id', quote.id)
+      .order('recorded_at', { ascending: true })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    const totalPaid = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0)
+    const balanceDue = Math.max(0, Number(quote.total) - totalPaid)
+
+    res.json({
+      payments: payments ?? [],
+      payment_status: quote.payment_status,
+      total_paid: Number(totalPaid.toFixed(2)),
+      balance_due: Number(balanceDue.toFixed(2)),
+    })
+  }
+)
+
+// ── POST /api/quotes/:id/payments ─────────────────────────────────────────────
+router.post(
+  '/:id/payments',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const b = req.body as Record<string, unknown>
+
+    const amount = typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount']))
+    if (isNaN(amount) || amount <= 0) {
+      res.status(400).json({ error: 'amount must be a positive number' })
+      return
+    }
+
+    const method = typeof b['method'] === 'string' ? b['method'] : ''
+    if (!['cash', 'check', 'stripe', 'other'].includes(method)) {
+      res.status(400).json({ error: 'method must be cash, check, stripe, or other' })
+      return
+    }
+
+    const reference = typeof b['reference'] === 'string' ? b['reference'].trim() || null : null
+    const notes = typeof b['notes'] === 'string' ? b['notes'].trim() || null : null
+
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, total')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+
+    const { data: payment, error: payErr } = await supabase
+      .from('quote_payments')
+      .insert({
+        quote_id: quote.id,
+        tenant_id: authed.tenantId,
+        amount: Number(amount.toFixed(2)),
+        method,
+        reference,
+        notes,
+        recorded_by: authed.userId ?? null,
+      })
+      .select('*')
+      .single()
+
+    if (payErr || !payment) {
+      res.status(500).json({ error: payErr?.message ?? 'Failed to record payment' })
+      return
+    }
+
+    const { data: allPayments } = await supabase
+      .from('quote_payments')
+      .select('amount')
+      .eq('quote_id', quote.id)
+
+    const totalPaid = (allPayments ?? []).reduce((s, p) => s + Number(p.amount), 0)
+    const quoteTotal = Number(quote.total)
+    const balanceDue = Math.max(0, quoteTotal - totalPaid)
+
+    let newPaymentStatus = 'unpaid'
+    if (totalPaid >= quoteTotal) newPaymentStatus = 'paid'
+    else if (totalPaid > 0) newPaymentStatus = 'partial'
+
+    await supabase.from('quotes').update({ payment_status: newPaymentStatus }).eq('id', quote.id)
+
+    res.status(201).json({
+      payment,
+      quote: {
+        payment_status: newPaymentStatus,
+        total_paid: Number(totalPaid.toFixed(2)),
+        balance_due: Number(balanceDue.toFixed(2)),
+      },
+    })
   }
 )
 

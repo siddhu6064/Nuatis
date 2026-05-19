@@ -57,6 +57,81 @@ const UpdateAppointmentSchema = z.object({
   assigned_staff_id: z.string().uuid().nullable().optional(),
 })
 
+// ── GET /api/appointments/report ─────────────────────────────
+router.get('/report', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const now = new Date()
+  const defaultStart = new Date(now.getTime() - 30 * 86400000).toISOString()
+  const startDate =
+    typeof req.query['startDate'] === 'string' ? req.query['startDate'] : defaultStart
+  const endDate =
+    typeof req.query['endDate'] === 'string' ? req.query['endDate'] : now.toISOString()
+
+  const { data: appts } = await supabase
+    .from('appointments')
+    .select('status, created_by_call, location_id, notes')
+    .eq('tenant_id', authed.tenantId)
+    .gte('start_time', startDate)
+    .lte('start_time', endDate)
+
+  const statusCounts: Record<string, number> = {
+    scheduled: 0,
+    confirmed: 0,
+    completed: 0,
+    no_show: 0,
+    canceled: 0,
+    rescheduled: 0,
+    // not in DB enum — always 0 until schema extended
+    new: 0,
+    invalid: 0,
+  }
+  const channelCounts = { phone_call: 0, web_booking: 0, sms: 0, manual: 0 }
+  const locationCountMap = new Map<string, number>()
+
+  for (const a of appts ?? []) {
+    const status = a.status as string
+    if (status in statusCounts) statusCounts[status] = (statusCounts[status] ?? 0) + 1
+    const notes = (a.notes as string | null) ?? ''
+    if (a.created_by_call || notes.toLowerCase().includes('maya')) {
+      channelCounts.phone_call++
+    } else {
+      channelCounts.manual++
+    }
+    if (a.location_id) {
+      const lid = a.location_id as string
+      locationCountMap.set(lid, (locationCountMap.get(lid) ?? 0) + 1)
+    }
+  }
+
+  const sortedLocations = [...locationCountMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  let topCalendars: { calendarId: string; calendarName: string; count: number }[] = []
+  if (sortedLocations.length > 0) {
+    const { data: locations } = await supabase
+      .from('locations')
+      .select('id, name')
+      .in(
+        'id',
+        sortedLocations.map(([id]) => id)
+      )
+    const nameMap = new Map((locations ?? []).map((l) => [l.id as string, l.name as string]))
+    topCalendars = sortedLocations.map(([id, count]) => ({
+      calendarId: id,
+      calendarName: nameMap.get(id) ?? 'Unknown',
+      count,
+    }))
+  }
+
+  const totalAppointments = (appts ?? []).length
+  const showed = statusCounts['completed'] ?? 0
+  const noShow = statusCounts['no_show'] ?? 0
+  const showRate = showed + noShow > 0 ? Math.round((showed / (showed + noShow)) * 100) : 0
+
+  res.json({ statusCounts, channelCounts, topCalendars, totalAppointments, showRate })
+})
+
 // ── GET /api/appointments ─────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest

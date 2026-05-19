@@ -18,6 +18,8 @@ import {
 import { createReviewRequestWorker } from './review-request-worker.js'
 import { createExportWorker } from './export-worker.js'
 import { createLowStockScanner } from './low-stock-scanner.js'
+import { createScheduledReportWorker } from './scheduled-report-worker.js'
+import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 
 interface ManagedWorker {
   name: string
@@ -175,6 +177,21 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'low-stock-scanner', ...lowStockScanner })
   console.info('[workers] low-stock-scanner started, cron 0 8 * * *')
+
+  // 18. Scheduled report worker — processes on-demand send jobs
+  const scheduledReportWorker = createScheduledReportWorker()
+  managed.push({ name: 'scheduled-report', ...scheduledReportWorker })
+  console.info('[workers] scheduled-report worker started')
+
+  // 19. Scheduled report scanner — hourly, checks which reports are due
+  const scheduledReportScanner = createScheduledReportScanner()
+  await scheduledReportScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { every: 3600000 }, jobId: 'scheduled-report-scanner-repeat' }
+  )
+  managed.push({ name: 'scheduled-report-scanner', ...scheduledReportScanner })
+  console.info('[workers] scheduled-report-scanner started, repeating every 1h')
 }
 
 export async function stopWorkers(): Promise<void> {

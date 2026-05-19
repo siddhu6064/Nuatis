@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Contact {
@@ -69,6 +69,7 @@ export default function QuoteBuilder({
   const [title, setTitle] = useState('')
   const [items, setItems] = useState<LineItem[]>([])
   const [taxRate, setTaxRate] = useState(0)
+  const [taxLabel, setTaxLabel] = useState('Tax')
   const [notes, setNotes] = useState('')
   const [validDays, setValidDays] = useState(30)
   const [saving, setSaving] = useState(false)
@@ -78,6 +79,7 @@ export default function QuoteBuilder({
   const [discountEnabled, setDiscountEnabled] = useState(false)
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage')
   const [discountValue, setDiscountValue] = useState(0)
+  const [discountLabel, setDiscountLabel] = useState('')
 
   // CPQ settings
   const [cpqSettings, setCpqSettings] = useState({
@@ -108,6 +110,18 @@ export default function QuoteBuilder({
       )
       .catch(() => {})
   })
+
+  useEffect(() => {
+    fetch('/api/tenants/me', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { tax_rate?: number; tax_label?: string } | null) => {
+        if (data) {
+          if (typeof data.tax_rate === 'number') setTaxRate(data.tax_rate)
+          if (typeof data.tax_label === 'string') setTaxLabel(data.tax_label)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Packages state
   const [availablePackages, setAvailablePackages] = useState<ResolvedPackage[]>([])
@@ -264,8 +278,16 @@ export default function QuoteBuilder({
             unit_price: i.unit_price,
           })),
           tax_rate: taxRate,
+          tax_label: taxLabel,
           notes: notes || null,
           valid_days: validDays,
+          discount_type: discountEnabled
+            ? discountType === 'percentage'
+              ? 'percent'
+              : 'fixed'
+            : null,
+          discount_value: discountEnabled ? discountValue : 0,
+          discount_label: discountLabel || null,
           discount_pct: discountPct,
           discount_amount: discountAmount,
         }),
@@ -545,112 +567,123 @@ export default function QuoteBuilder({
           )}
         </div>
 
-        {/* Discount */}
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <label className="flex items-center gap-2 text-sm font-medium text-ink cursor-pointer">
-            <input
-              type="checkbox"
-              checked={discountEnabled}
-              onChange={(e) => {
-                setDiscountEnabled(e.target.checked)
-                if (!e.target.checked) setDiscountValue(0)
-              }}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
-            />
-            Apply discount
-          </label>
-
-          {discountEnabled && (
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-sm text-ink3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="discountType"
-                    checked={discountType === 'percentage'}
-                    onChange={() => {
-                      setDiscountType('percentage')
-                      setDiscountValue(0)
-                    }}
-                    className="text-teal-600 focus:ring-teal-500"
-                  />
-                  Percentage
-                </label>
-                <label className="flex items-center gap-1.5 text-sm text-ink3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="discountType"
-                    checked={discountType === 'fixed'}
-                    onChange={() => {
-                      setDiscountType('fixed')
-                      setDiscountValue(0)
-                    }}
-                    className="text-teal-600 focus:ring-teal-500"
-                  />
-                  Fixed Amount
-                </label>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  {discountType === 'fixed' && <span className="text-sm text-ink3">$</span>}
-                  <input
-                    type="number"
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className={`w-32 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-border-brand focus:ring-teal-500'}`}
-                    min="0"
-                    max={discountType === 'percentage' ? 100 : undefined}
-                    step={discountType === 'percentage' ? 1 : 0.01}
-                  />
-                  {discountType === 'percentage' && <span className="text-sm text-ink3">%</span>}
-                </div>
-                {discountExceedsMax && (
-                  <p className="text-xs text-red-600 mt-1">
-                    Maximum discount is {cpqSettings.max_discount_pct}%
-                  </p>
-                )}
-                {needsApproval && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    This discount exceeds {cpqSettings.require_approval_above}% and requires owner
-                    approval before the quote can be sent
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Totals + Options */}
         <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex justify-end">
             <div className="w-64 space-y-2">
+              {/* Inline discount toggle */}
+              {!discountEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => setDiscountEnabled(true)}
+                  className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 pb-1"
+                >
+                  + Add Discount
+                </button>
+              ) : (
+                <div className="space-y-1.5 pb-2 border-b border-dashed border-border-brand">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex border border-border-brand rounded overflow-hidden text-xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountType('percentage')
+                          setDiscountValue(0)
+                        }}
+                        className={`px-2 py-1 ${discountType === 'percentage' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
+                      >
+                        %
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountType('fixed')
+                          setDiscountValue(0)
+                        }}
+                        className={`px-2 py-1 border-l border-border-brand ${discountType === 'fixed' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
+                      >
+                        $
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      value={discountValue}
+                      onChange={(e) =>
+                        setDiscountValue(Math.max(0, parseFloat(e.target.value) || 0))
+                      }
+                      className={`w-16 px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-1 ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-border-brand focus:ring-teal-500'}`}
+                      placeholder="0"
+                      min="0"
+                      step={discountType === 'percentage' ? 1 : 0.01}
+                    />
+                    <input
+                      type="text"
+                      value={discountLabel}
+                      onChange={(e) => setDiscountLabel(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1 text-xs border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      placeholder="SUMMER20 or New Client"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDiscountEnabled(false)
+                        setDiscountValue(0)
+                        setDiscountLabel('')
+                      }}
+                      className="text-gray-300 hover:text-red-500 text-sm shrink-0"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  {discountExceedsMax && (
+                    <p className="text-xs text-red-600">
+                      Maximum discount is {cpqSettings.max_discount_pct}%
+                    </p>
+                  )}
+                  {needsApproval && (
+                    <p className="text-xs text-amber-600">
+                      Exceeds {cpqSettings.require_approval_above}% — requires owner approval
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-between text-sm">
                 <span className="text-ink3">Subtotal</span>
                 <span className="text-ink">${subtotal.toFixed(2)}</span>
               </div>
               {discountEnabled && discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-amber-600">
-                    Discount{discountType === 'percentage' ? ` (${discountValue}%)` : ''}
+                  <span className="text-rose-600">
+                    Discount
+                    {discountLabel
+                      ? ` (${discountLabel})`
+                      : discountType === 'percentage'
+                        ? ` (${discountValue}%)`
+                        : ''}
                   </span>
-                  <span className="text-amber-600">-${discountAmount.toFixed(2)}</span>
+                  <span className="text-rose-600">-${discountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm items-center gap-2">
-                <span className="text-ink3">Tax (%)</span>
+                <span className="text-ink3">{taxLabel} (%)</span>
                 <input
                   type="number"
                   value={taxRate}
                   onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                   className="w-20 px-2 py-1 text-sm text-right border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                   min="0"
-                  step="0.1"
+                  step="0.01"
                 />
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-ink3">Tax</span>
-                <span className="text-ink2">${taxAmount.toFixed(2)}</span>
-              </div>
+              {taxRate > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink3">
+                    {taxLabel} ({taxRate}%)
+                  </span>
+                  <span className="text-ink2">${taxAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-lg font-bold border-t border-border-brand pt-2">
                 <span className="text-ink">Total</span>
                 <span className="text-teal-600">${total.toFixed(2)}</span>

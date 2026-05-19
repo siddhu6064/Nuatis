@@ -6,6 +6,7 @@ import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { logBulkAction } from '../middleware/audit-logger.js'
 
 const router = Router()
 
@@ -44,7 +45,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   let query = supabase
     .from('contacts')
     .select(
-      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at, assigned_to_user_id, compliance_fields, territory',
+      'id, full_name, email, phone, pipeline_stage, source, tags, notes, vertical_data, is_archived, last_contacted, created_at, lifecycle_stage, lead_score, lead_grade, lead_score_updated_at, assigned_to_user_id, compliance_fields, territory, sms_opt_in',
       { count: 'exact' }
     )
     .eq('tenant_id', authed.tenantId)
@@ -495,6 +496,7 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (b['territory'] === null) updates['territory'] = null
   if (typeof b['company_id'] === 'string') updates['company_id'] = b['company_id'] || null
   if (b['company_id'] === null) updates['company_id'] = null
+  if (typeof b['sms_opt_in'] === 'boolean') updates['sms_opt_in'] = b['sms_opt_in']
 
   const { data: updated, error } = await supabase
     .from('contacts')
@@ -507,6 +509,15 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // email_opt_in / call_opt_in / followers may not exist as columns yet — update separately and ignore errors
+  const optInPatch: Record<string, unknown> = {}
+  if (typeof b['email_opt_in'] === 'boolean') optInPatch['email_opt_in'] = b['email_opt_in']
+  if (typeof b['call_opt_in'] === 'boolean') optInPatch['call_opt_in'] = b['call_opt_in']
+  if (Array.isArray(b['followers'])) optInPatch['followers'] = b['followers']
+  if (Object.keys(optInPatch).length > 0) {
+    await supabase.from('contacts').update(optInPatch).eq('id', id).eq('tenant_id', authed.tenantId)
   }
 
   // Log assignment change if assigned_to_user_id changed
@@ -830,6 +841,201 @@ async function validateBulkIds(
     return { valid: false, error: 'Some contact IDs do not belong to this tenant' }
   return { valid: true }
 }
+
+// ── POST /api/contacts/bulk-tag ──────────────────────────────────────────────
+router.post('/bulk-tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contactIds, tags } = req.body as { contactIds: string[]; tags: string[] }
+
+  if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+    return
+  }
+  if (contactIds.length > 500) {
+    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+    return
+  }
+  const cleanTags = (Array.isArray(tags) ? tags : []).map((t) => String(t).trim()).filter(Boolean)
+  if (cleanTags.length === 0) {
+    res.status(400).json({ error: 'tags must be a non-empty array' })
+    return
+  }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contactIds)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, tags')
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  let updated = 0
+  for (const c of contacts ?? []) {
+    const existing = Array.isArray(c.tags) ? (c.tags as string[]) : []
+    const merged = [...new Set([...existing, ...cleanTags])]
+    await supabase.from('contacts').update({ tags: merged }).eq('id', c.id)
+    updated++
+  }
+
+  void logBulkAction({
+    tenantId: authed.tenantId,
+    userId: authed.userId,
+    action: 'bulk_tag',
+    resourceType: 'contact',
+    contactCount: contactIds.length,
+    successCount: updated,
+    failCount: contactIds.length - updated,
+    details: cleanTags.join(', '),
+  })
+
+  res.json({ success: true, updated })
+})
+
+// ── POST /api/contacts/bulk-assign ──────────────────────────────────────────
+router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contactIds, assignedTo } = req.body as { contactIds: string[]; assignedTo: string }
+
+  if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+    return
+  }
+  if (contactIds.length > 500) {
+    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+    return
+  }
+  if (typeof assignedTo !== 'string' || !assignedTo.trim()) {
+    res.status(400).json({ error: 'assignedTo is required' })
+    return
+  }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contactIds)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  const { count, error } = await supabase
+    .from('contacts')
+    .update({ assigned_to_user_id: assignedTo.trim(), updated_at: new Date().toISOString() })
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  const updated = count ?? contactIds.length
+  void logBulkAction({
+    tenantId: authed.tenantId,
+    userId: authed.userId,
+    action: 'bulk_assign',
+    resourceType: 'contact',
+    contactCount: contactIds.length,
+    successCount: updated,
+    failCount: contactIds.length - updated,
+    details: `Assigned to: ${assignedTo.trim()}`,
+  })
+
+  res.json({ success: true, updated })
+})
+
+// ── POST /api/contacts/bulk-sms ──────────────────────────────────────────────
+router.post('/bulk-sms', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const { contactIds, message } = req.body as { contactIds: string[]; message: string }
+
+  if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+    return
+  }
+  if (contactIds.length > 500) {
+    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+    return
+  }
+  if (!message || !message.trim()) {
+    res.status(400).json({ error: 'message is required' })
+    return
+  }
+  if (message.length > 160) {
+    res.status(400).json({ error: 'message must be 160 chars or less' })
+    return
+  }
+
+  const check = await validateBulkIds(supabase, authed.tenantId, contactIds)
+  if (!check.valid) {
+    res.status(400).json({ error: check.error })
+    return
+  }
+
+  const { data: location } = await supabase
+    .from('locations')
+    .select('telnyx_number')
+    .eq('tenant_id', authed.tenantId)
+    .eq('is_primary', true)
+    .maybeSingle()
+
+  const apiKey = process.env['TELNYX_API_KEY']
+  if (!location?.telnyx_number || !apiKey) {
+    res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
+    return
+  }
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, full_name, phone, sms_opt_in')
+    .eq('tenant_id', authed.tenantId)
+    .in('id', contactIds)
+
+  const queued = (contacts ?? []).filter((c) => c.phone && c.sms_opt_in !== false).length
+
+  void logBulkAction({
+    tenantId: authed.tenantId,
+    userId: authed.userId,
+    action: 'bulk_sms',
+    resourceType: 'contact',
+    contactCount: contactIds.length,
+    successCount: queued,
+    failCount: contactIds.length - queued,
+    details: `Message: "${message.slice(0, 60)}"`,
+  })
+
+  // Fire-and-forget — respond immediately
+  res.json({ queued })
+
+  void (async () => {
+    for (const c of contacts ?? []) {
+      if (!c.phone || c.sms_opt_in === false) continue
+      const firstName = (c.full_name ?? '').split(' ')[0] ?? ''
+      const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
+      try {
+        await fetch('https://api.telnyx.com/v2/messages', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: location.telnyx_number, to: c.phone, text: substituted }),
+        })
+        void logActivity({
+          tenantId: authed.tenantId,
+          contactId: c.id,
+          type: 'sms',
+          body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
+          actorType: 'user',
+          actorId: authed.userId,
+        })
+      } catch (err) {
+        console.error(`[bulk-sms] failed for contact ${c.id}:`, err)
+      }
+    }
+  })()
+})
 
 // ── POST /api/contacts/bulk/stage ────────────────────────────────────────────
 router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -1339,6 +1545,81 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
   }
 
   res.json({ updated: count ?? contactIds.length })
+})
+
+// ── GET /api/contacts/source-report ─────────────────────────────────────────
+router.get('/source-report', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const [{ data: contacts }, { data: deals }] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('id, source')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false),
+    supabase
+      .from('deals')
+      .select('contact_id, value, is_closed_won, is_closed_lost')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_archived', false),
+  ])
+
+  const contactSourceMap = new Map<string, string>()
+  for (const c of contacts ?? []) {
+    contactSourceMap.set(c.id as string, (c.source as string | null) ?? 'unknown')
+  }
+
+  type Stats = {
+    lead_count: number
+    won_count: number
+    lost_count: number
+    open_count: number
+    won_value: number
+  }
+  const sourceStats = new Map<string, Stats>()
+
+  for (const c of contacts ?? []) {
+    const src = (c.source as string | null) ?? 'unknown'
+    if (!sourceStats.has(src)) {
+      sourceStats.set(src, {
+        lead_count: 0,
+        won_count: 0,
+        lost_count: 0,
+        open_count: 0,
+        won_value: 0,
+      })
+    }
+    sourceStats.get(src)!.lead_count++
+  }
+
+  for (const d of deals ?? []) {
+    const src = contactSourceMap.get(d.contact_id as string) ?? 'unknown'
+    const stats = sourceStats.get(src)
+    if (!stats) continue
+    if (d.is_closed_won) {
+      stats.won_count++
+      stats.won_value += Number(d.value ?? 0)
+    } else if (d.is_closed_lost) {
+      stats.lost_count++
+    } else {
+      stats.open_count++
+    }
+  }
+
+  const sources = Array.from(sourceStats.entries())
+    .map(([source, s]) => ({
+      source,
+      lead_count: s.lead_count,
+      won_count: s.won_count,
+      lost_count: s.lost_count,
+      open_count: s.open_count,
+      won_value: s.won_value,
+      win_rate: s.lead_count > 0 ? Math.round((s.won_count / s.lead_count) * 100) : 0,
+    }))
+    .sort((a, b) => b.lead_count - a.lead_count)
+
+  res.json({ sources })
 })
 
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ContactFilters, { type FilterState, EMPTY_FILTERS } from './ContactFilters'
-import SavedViews from './SavedViews'
+import SmartLists from './SmartLists'
 import BulkActionBar from './BulkActionBar'
 
 interface Contact {
@@ -14,6 +14,7 @@ interface Contact {
   phone: string | null
   pipeline_stage: string | null
   source: string | null
+  tags: string[] | null
   created_at: string
   lifecycle_stage: string | null
   lead_score: number | null
@@ -22,17 +23,23 @@ interface Contact {
   assigned_to_user_id: string | null
   assigned_user_name: string | null
   territory: string | null
+  sms_opt_in?: boolean | null
 }
 
-interface SavedView {
-  id: string
-  name: string
-  filters: Record<string, unknown>
-  sort_by: string | null
-  sort_dir: string | null
-  is_default: boolean
-  user_id: string | null
-  sort_order: number
+const TAG_COLORS = [
+  'bg-teal-50 text-teal-700 border-teal-200',
+  'bg-blue-50 text-blue-700 border-blue-200',
+  'bg-purple-50 text-purple-700 border-purple-200',
+  'bg-amber-50 text-amber-700 border-amber-200',
+  'bg-green-50 text-green-700 border-green-200',
+]
+
+function tagColorClass(tag: string): string {
+  let hash = 0
+  for (let i = 0; i < tag.length; i++) {
+    hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
+  }
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
 }
 
 function filtersFromParams(params: URLSearchParams): FilterState {
@@ -128,7 +135,7 @@ export default function ContactsList() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
-  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const [activeListId, setActiveListId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
 
@@ -176,7 +183,7 @@ export default function ContactsList() {
     (newFilters: FilterState) => {
       setFilters(newFilters)
       setPage(1)
-      setActiveViewId(null)
+      setActiveListId(null)
       setSelectedIds(new Set())
       setAllMatchingSelected(false)
       const params = filtersToParams(newFilters)
@@ -203,34 +210,35 @@ export default function ContactsList() {
       .catch(() => {})
   }, [])
 
-  const handleSelectView = (view: SavedView) => {
+  const handleSelectList = (list: { id: string; filters: Record<string, unknown> }) => {
+    const lf = list.filters
     const f: FilterState = {
       ...EMPTY_FILTERS,
-      q: (view.filters['q'] as string) ?? '',
-      pipeline_stage_id: ((view.filters['pipeline_stage_id'] as string) ?? '')
-        .split(',')
-        .filter(Boolean),
-      source: ((view.filters['source'] as string) ?? '').split(',').filter(Boolean),
-      tags: ((view.filters['tags'] as string) ?? '').split(',').filter(Boolean),
-      last_contacted_from: (view.filters['last_contacted_from'] as string) ?? '',
-      last_contacted_to: (view.filters['last_contacted_to'] as string) ?? '',
-      created_from: (view.filters['created_from'] as string) ?? '',
-      created_to: (view.filters['created_to'] as string) ?? '',
-      has_open_quote: view.filters['has_open_quote'] === 'true',
-      referral_source: (view.filters['referral_source'] as string) ?? '',
-      has_referral_source: view.filters['has_referral_source'] === 'true',
-      lifecycle_stage: ((view.filters['lifecycle_stage'] as string) ?? '')
-        .split(',')
-        .filter(Boolean),
-      grade: ((view.filters['grade'] as string) ?? '').split(',').filter(Boolean),
-      assigned_to: (view.filters['assigned_to'] as string) ?? '',
-      territory: (view.filters['territory'] as string) ?? '',
-      sort_by: view.sort_by ?? 'created_at',
-      sort_dir: view.sort_dir ?? 'desc',
+      q: (lf['q'] as string) ?? '',
+      pipeline_stage_id: Array.isArray(lf['pipeline_stage_id'])
+        ? (lf['pipeline_stage_id'] as string[])
+        : [],
+      source: Array.isArray(lf['source']) ? (lf['source'] as string[]) : [],
+      tags: Array.isArray(lf['tags']) ? (lf['tags'] as string[]) : [],
+      last_contacted_from: (lf['last_contacted_from'] as string) ?? '',
+      last_contacted_to: (lf['last_contacted_to'] as string) ?? '',
+      created_from: (lf['created_from'] as string) ?? '',
+      created_to: (lf['created_to'] as string) ?? '',
+      has_open_quote: (lf['has_open_quote'] as boolean) ?? false,
+      referral_source: (lf['referral_source'] as string) ?? '',
+      has_referral_source: (lf['has_referral_source'] as boolean) ?? false,
+      lifecycle_stage: Array.isArray(lf['lifecycle_stage'])
+        ? (lf['lifecycle_stage'] as string[])
+        : [],
+      grade: Array.isArray(lf['grade']) ? (lf['grade'] as string[]) : [],
+      assigned_to: (lf['assigned_to'] as string) ?? '',
+      territory: (lf['territory'] as string) ?? '',
+      sort_by: (lf['sort_by'] as string) ?? 'created_at',
+      sort_dir: (lf['sort_dir'] as string) ?? 'desc',
     }
     setFilters(f)
     setPage(1)
-    setActiveViewId(view.id)
+    setActiveListId(list.id)
     setSelectedIds(new Set())
     setAllMatchingSelected(false)
     const params = filtersToParams(f)
@@ -407,10 +415,10 @@ export default function ContactsList() {
           />
         </div>
 
-        {/* Saved Views */}
-        <SavedViews
-          activeViewId={activeViewId}
-          onSelectView={handleSelectView}
+        {/* Smart Lists */}
+        <SmartLists
+          activeListId={activeListId}
+          onSelectList={handleSelectList}
           currentFilters={filters}
           hasActiveFilters={hasActiveFilters(filters)}
         />
@@ -602,13 +610,32 @@ export default function ContactsList() {
                       className="px-4 py-4 cursor-pointer"
                       onClick={() => router.push(`/contacts/${contact.id}`)}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                          <span className="text-teal-700 text-xs font-bold">
-                            {contact.full_name?.charAt(0)?.toUpperCase() ?? '?'}
-                          </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                            <span className="text-teal-700 text-xs font-bold">
+                              {contact.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                            </span>
+                          </div>
+                          <span className="text-sm font-medium text-ink">{contact.full_name}</span>
                         </div>
-                        <span className="text-sm font-medium text-ink">{contact.full_name}</span>
+                        {contact.tags && contact.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pl-10">
+                            {contact.tags.slice(0, 2).map((tag) => (
+                              <span
+                                key={tag}
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${tagColorClass(tag)}`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {contact.tags.length > 2 && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-500 border-gray-200">
+                                +{contact.tags.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-ink3">{contact.email ?? '\u2014'}</td>

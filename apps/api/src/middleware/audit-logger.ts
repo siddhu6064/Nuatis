@@ -75,6 +75,30 @@ export async function logAuditEvent(event: AuditEvent): Promise<void> {
   }
 }
 
+export async function logBulkAction(params: {
+  tenantId: string
+  userId: string
+  action: string
+  resourceType: string
+  contactCount: number
+  successCount: number
+  failCount: number
+  details?: string
+}): Promise<void> {
+  await logAuditEvent({
+    tenantId: params.tenantId,
+    userId: params.userId,
+    action: params.action,
+    resourceType: params.resourceType,
+    details: {
+      contactCount: params.contactCount,
+      successCount: params.successCount,
+      failCount: params.failCount,
+      details: params.details,
+    },
+  })
+}
+
 export function auditLoggerMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Only log mutating requests
   const action = METHOD_ACTION[req.method]

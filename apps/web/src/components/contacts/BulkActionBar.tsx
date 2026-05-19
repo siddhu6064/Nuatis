@@ -7,6 +7,7 @@ interface Contact {
   id: string
   full_name: string
   phone: string | null
+  sms_opt_in?: boolean | null
 }
 
 interface Stage {
@@ -25,7 +26,7 @@ interface Props {
   onComplete: () => void
 }
 
-type Modal = null | 'stage' | 'tag' | 'sms' | 'archive'
+type Modal = null | 'stage' | 'tag' | 'sms' | 'assign' | 'archive'
 
 export default function BulkActionBar({
   selectedIds,
@@ -49,6 +50,9 @@ export default function BulkActionBar({
 
   // SMS state
   const [smsMessage, setSmsMessage] = useState('')
+
+  // Assign state
+  const [assignTo, setAssignTo] = useState('')
 
   const count = allMatchingSelected ? total : selectedIds.size
   const ids = [...selectedIds]
@@ -94,25 +98,17 @@ export default function BulkActionBar({
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean)
-    const remove = tagsToRemove
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-    if (add.length === 0 && remove.length === 0) return
+    if (add.length === 0) return
     setLoading(true)
     try {
-      const res = await fetch('/api/contacts/bulk/tag', {
+      const res = await fetch('/api/contacts/bulk-tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contact_ids: ids,
-          tags_to_add: add.length > 0 ? add : undefined,
-          tags_to_remove: remove.length > 0 ? remove : undefined,
-        }),
+        body: JSON.stringify({ contactIds: ids, tags: add }),
       })
       if (res.ok) {
         const data = (await res.json()) as { updated: number }
-        showToast(`Tags updated on ${data.updated} contacts`)
+        showToast(`Tagged ${data.updated} contacts`)
         setModal(null)
         setTagsToAdd('')
         setTagsToRemove('')
@@ -127,18 +123,37 @@ export default function BulkActionBar({
     if (!smsMessage.trim()) return
     setLoading(true)
     try {
-      const res = await fetch('/api/contacts/bulk/sms', {
+      const res = await fetch('/api/contacts/bulk-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contact_ids: ids, message: smsMessage }),
+        body: JSON.stringify({ contactIds: ids, message: smsMessage }),
       })
       if (res.ok) {
-        const data = (await res.json()) as { sent: number; skipped: number }
-        showToast(
-          `SMS sent to ${data.sent} contacts${data.skipped > 0 ? ` (${data.skipped} skipped)` : ''}`
-        )
+        const data = (await res.json()) as { queued: number }
+        showToast(`Queued ${data.queued} SMS messages`)
         setModal(null)
         setSmsMessage('')
+        onComplete()
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAssign = async () => {
+    if (!assignTo.trim()) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/contacts/bulk-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactIds: ids, assignedTo: assignTo.trim() }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { updated: number }
+        showToast(`Assigned ${data.updated} contacts`)
+        setModal(null)
+        setAssignTo('')
         onComplete()
       }
     } finally {
@@ -188,8 +203,11 @@ export default function BulkActionBar({
     }
   }
 
-  const noPhoneCount = contacts.filter((c) => selectedIds.has(c.id) && !c.phone).length
-  const firstContact = contacts.find((c) => selectedIds.has(c.id))
+  const selectedContacts = contacts.filter((c) => selectedIds.has(c.id))
+  const noPhoneCount = selectedContacts.filter((c) => !c.phone).length
+  const optOutCount = selectedContacts.filter((c) => c.sms_opt_in === false).length
+  const smsBlockedCount = selectedContacts.filter((c) => !c.phone || c.sms_opt_in === false).length
+  const firstContact = selectedContacts[0]
   const firstName = firstContact?.full_name?.split(' ')[0] ?? 'John'
 
   return (
@@ -215,14 +233,23 @@ export default function BulkActionBar({
           onClick={() => setModal('tag')}
           className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
         >
-          Add Tag
+          Tag
         </button>
         <button
-          onClick={() => setModal('sms')}
+          onClick={() => setModal('assign')}
           className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
         >
-          Send SMS
+          Assign
         </button>
+        <span title={optOutCount > 0 ? 'Some contacts have opted out' : undefined}>
+          <button
+            onClick={() => setModal('sms')}
+            disabled={optOutCount > 0}
+            className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Send SMS
+          </button>
+        </span>
         <button
           onClick={() => void handleExport()}
           disabled={loading}
@@ -330,13 +357,51 @@ export default function BulkActionBar({
               </>
             )}
 
+            {modal === 'assign' && (
+              <>
+                <h3 className="text-sm font-bold text-ink mb-3">Assign Contacts</h3>
+                <div className="mb-4">
+                  <label className="text-xs text-ink3 mb-1 block">Assignee user ID or name</label>
+                  <input
+                    type="text"
+                    value={assignTo}
+                    onChange={(e) => setAssignTo(e.target.value)}
+                    autoFocus
+                    placeholder="User ID..."
+                    className="w-full text-sm border border-border-brand rounded px-3 py-1.5"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleAssign()
+                    }}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setModal(null)
+                      setAssignTo('')
+                    }}
+                    className="px-3 py-1.5 text-xs text-ink3"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleAssign()}
+                    disabled={!assignTo.trim() || loading}
+                    className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Assigning...' : `Assign ${count} contacts`}
+                  </button>
+                </div>
+              </>
+            )}
+
             {modal === 'sms' && (
               <>
                 <h3 className="text-sm font-bold text-ink mb-3">Send Bulk SMS</h3>
                 <textarea
                   value={smsMessage}
-                  onChange={(e) => setSmsMessage(e.target.value)}
-                  maxLength={320}
+                  onChange={(e) => setSmsMessage(e.target.value.slice(0, 160))}
+                  maxLength={160}
                   rows={4}
                   placeholder="Type your message..."
                   className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 mb-1"
@@ -352,16 +417,22 @@ export default function BulkActionBar({
                   >
                     {'{{first_name}}'}
                   </button>
-                  <span className="text-[10px] text-ink4">{smsMessage.length}/320</span>
+                  <span
+                    className={`text-[10px] ${smsMessage.length >= 150 ? 'text-amber-600' : 'text-ink4'}`}
+                  >
+                    {smsMessage.length}/160
+                  </span>
                 </div>
                 {smsMessage.includes('{{first_name}}') && (
                   <p className="text-[10px] text-ink4 mb-2">
                     Preview: &ldquo;{smsMessage.replace(/\{\{first_name\}\}/g, firstName)}&rdquo;
                   </p>
                 )}
-                {noPhoneCount > 0 && (
+                {smsBlockedCount > 0 && (
                   <p className="text-[10px] text-amber-600 mb-2">
-                    {noPhoneCount} contacts will be skipped (no phone number)
+                    {noPhoneCount > 0 && `${noPhoneCount} skipped (no phone)`}
+                    {noPhoneCount > 0 && optOutCount > 0 && ' · '}
+                    {optOutCount > 0 && `${optOutCount} skipped (opted out)`}
                   </p>
                 )}
                 <div className="flex justify-end gap-2">
@@ -373,7 +444,7 @@ export default function BulkActionBar({
                     disabled={!smsMessage.trim() || loading}
                     className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
                   >
-                    {loading ? 'Sending...' : `Send to ${count - noPhoneCount} contacts`}
+                    {loading ? 'Queuing...' : `Queue ${count - smsBlockedCount} SMS`}
                   </button>
                 </div>
               </>
