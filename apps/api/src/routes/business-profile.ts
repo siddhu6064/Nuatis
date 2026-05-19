@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import type { BusinessProfile } from '@nuatis/shared'
 
@@ -12,26 +12,19 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-async function resolveLocationId(tenantId: string): Promise<string | null> {
-  const supabase = getSupabase()
-  const { data: primary } = await supabase
+async function resolveLocationId(
+  supabase: SupabaseClient,
+  tenantId: string
+): Promise<string | null> {
+  const { data } = await supabase
     .from('locations')
     .select('id')
     .eq('tenant_id', tenantId)
-    .eq('is_primary', true)
-    .maybeSingle<{ id: string }>()
-
-  if (primary?.id) return primary.id
-
-  const { data: fallback } = await supabase
-    .from('locations')
-    .select('id')
-    .eq('tenant_id', tenantId)
+    .order('is_primary', { ascending: false })
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle<{ id: string }>()
-
-  return fallback?.id ?? null
+  return data?.id ?? null
 }
 
 // ── GET /api/business-profile ─────────────────────────────────────────────────
@@ -40,7 +33,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const supabase = getSupabase()
 
   try {
-    const locationId = await resolveLocationId(authed.tenantId)
+    const locationId = await resolveLocationId(supabase, authed.tenantId)
     if (!locationId) {
       res.json({ business_profile: {} })
       return
@@ -89,6 +82,10 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         res.status(400).json({ error: 'Each service must have a non-empty name' })
         return
       }
+      if (typeof s.price === 'number' && s.price < 0) {
+        res.status(400).json({ error: 'Service price must be >= 0' })
+        return
+      }
     }
   }
 
@@ -97,6 +94,12 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     if (!Array.isArray(profile.staff)) {
       res.status(400).json({ error: 'staff must be an array' })
       return
+    }
+    for (const s of profile.staff) {
+      if (typeof s.name !== 'string' || !s.name.trim()) {
+        res.status(400).json({ error: 'Each staff member must have a non-empty name' })
+        return
+      }
     }
   }
 
@@ -118,7 +121,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   }
 
   try {
-    const locationId = await resolveLocationId(authed.tenantId)
+    const locationId = await resolveLocationId(supabase, authed.tenantId)
     if (!locationId) {
       res.status(404).json({ error: 'No location found for this tenant' })
       return
@@ -128,6 +131,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       .from('locations')
       .update({ business_profile: profile })
       .eq('id', locationId)
+      .eq('tenant_id', authed.tenantId)
 
     if (error) {
       console.error(`[business-profile] PUT error: ${error.message}`)
