@@ -87,3 +87,16 @@ export function buildBusinessKnowledgeBlock(profile: BusinessProfile): string {
 
   return block
 }
+
+export function buildKbFilesBlock(
+  files: Array<{ file_name: string; extracted_text: string | null }>
+): string {
+  const ready = files.filter((f) => f.extracted_text && f.extracted_text.trim())
+  if (ready.length === 0) return ''
+
+  let block = '\n\n--- UPLOADED DOCUMENTS ---\n'
+  for (const f of ready) {
+    block += `[${f.file_name}]:\n${f.extracted_text!}\n---\n`
+  }
+  return block
+}
