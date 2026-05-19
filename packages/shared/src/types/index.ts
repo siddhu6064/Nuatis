@@ -502,3 +502,16 @@ export interface TriggerLinkEvent {
   userAgent: string | null
   metadata: Record<string, unknown>
 }
+
+// ── Snippets ──────────────────────────────────────────────────
+
+export interface Snippet {
+  id: string
+  tenantId: string
+  name: string
+  shortcut: string
+  body: string
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}

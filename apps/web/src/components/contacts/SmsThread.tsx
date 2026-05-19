@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import SnippetPicker from '../SnippetPicker'
 
 interface SmsMessage {
   id: string
@@ -198,14 +199,15 @@ export default function SmsThread({ contactId, contactName }: Props) {
       {/* Send input */}
       <div className="border-t border-border-brand px-4 py-3">
         <div className="flex items-end gap-2">
-          <textarea
+          <SnippetPicker
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={setInput}
             onKeyDown={handleKeyDown}
             maxLength={320}
             rows={1}
-            placeholder="Send a message..."
-            className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+            placeholder="Send a message... (type / for snippets)"
+            contactName={contactName}
+            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
           />
           <button
             onClick={() => void handleSend()}
