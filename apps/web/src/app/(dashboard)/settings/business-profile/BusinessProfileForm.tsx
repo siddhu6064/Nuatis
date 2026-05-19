@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import type { BusinessProfile, DayHours, ServiceEntry, StaffEntry, FaqEntry } from '@nuatis/shared'
 
+// ── Local extended types with stable React keys ────────────────────────────
+type ServiceRow = ServiceEntry & { _key: string }
+type StaffRow = StaffEntry & { _key: string }
+type FaqRow = FaqEntry & { _key: string }
+
 const DAYS: Array<{ key: keyof Required<BusinessProfile>['hours']; label: string }> = [
   { key: 'monday', label: 'Monday' },
   { key: 'tuesday', label: 'Tuesday' },
@@ -53,6 +58,29 @@ interface CatalogService {
   duration_minutes: number | null
 }
 
+// ── Module-level CSS class strings ─────────────────────────────────────────
+const inputCls =
+  'w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+const smallInputCls =
+  'px-3 py-1.5 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
+const saveBtnCls =
+  'px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+const addBtnCls =
+  'px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2'
+const removeBtnCls = 'text-red-400 hover:text-red-600 text-sm px-2'
+
+// ── Standalone SectionMessage component ────────────────────────────────────
+function SectionMessage({ message }: { message: SectionState['message'] }) {
+  if (!message) return null
+  return (
+    <div
+      className={`px-3 py-2 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}
+    >
+      {message.text}
+    </div>
+  )
+}
+
 export default function BusinessProfileForm({
   initialProfile,
 }: {
@@ -63,9 +91,18 @@ export default function BusinessProfileForm({
       ? { ...DEFAULT_HOURS, ...initialProfile.hours }
       : DEFAULT_HOURS
   )
-  const [services, setServices] = useState<ServiceEntry[]>(initialProfile.services ?? [])
-  const [staff, setStaff] = useState<StaffEntry[]>(initialProfile.staff ?? [])
-  const [faqs, setFaqs] = useState<FaqEntry[]>(initialProfile.faqs ?? [])
+  const [services, setServices] = useState<ServiceRow[]>(
+    (initialProfile.services ?? []).map((s) => ({
+      ...s,
+      _key: Math.random().toString(36).slice(2),
+    }))
+  )
+  const [staff, setStaff] = useState<StaffRow[]>(
+    (initialProfile.staff ?? []).map((s) => ({ ...s, _key: Math.random().toString(36).slice(2) }))
+  )
+  const [faqs, setFaqs] = useState<FaqRow[]>(
+    (initialProfile.faqs ?? []).map((f) => ({ ...f, _key: Math.random().toString(36).slice(2) }))
+  )
   const [notes, setNotes] = useState(initialProfile.notes ?? '')
 
   const [sectionState, setSectionState] = useState<Record<Section, SectionState>>({
@@ -92,7 +129,13 @@ export default function BusinessProfileForm({
     setSectionSaving(section, true)
     setSectionMsg(section, null)
     try {
-      const current: BusinessProfile = { hours, services, staff, faqs, notes }
+      const current: BusinessProfile = {
+        hours,
+        services: services.map(({ _key: _, ...s }) => s),
+        staff: staff.map(({ _key: _, ...s }) => s),
+        faqs: faqs.map(({ _key: _, ...f }) => f),
+        notes,
+      }
       const merged: BusinessProfile = { ...current, ...patch }
       const res = await fetch('/api/business-profile', {
         method: 'PUT',
@@ -135,6 +178,8 @@ export default function BusinessProfileForm({
         const data = (await res.json()) as { services: CatalogService[] }
         setCatalogServices(data.services)
         setShowCatalogPicker(true)
+      } else {
+        setSectionMsg('services', { type: 'error', text: 'Failed to load catalog' })
       }
     } finally {
       setLoadingCatalog(false)
@@ -146,38 +191,17 @@ export default function BusinessProfileForm({
     const toImport = catalogServices
       .filter((s) => selectedCatalogIds.has(s.id))
       .map(
-        (s): ServiceEntry => ({
+        (s): ServiceRow => ({
           name: s.name,
           duration_min: s.duration_minutes ?? 0,
           price: s.unit_price,
           description: '',
+          _key: Math.random().toString(36).slice(2),
         })
       )
     setServices((prev) => [...prev, ...toImport])
     setShowCatalogPicker(false)
     setSelectedCatalogIds(new Set())
-  }
-
-  const inputCls =
-    'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-  const smallInputCls =
-    'px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-  const saveBtnCls =
-    'px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
-  const addBtnCls =
-    'px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2'
-  const removeBtnCls = 'text-red-400 hover:text-red-600 text-sm px-2'
-
-  function SectionMessage({ section }: { section: Section }) {
-    const msg = sectionState[section].message
-    if (!msg) return null
-    return (
-      <div
-        className={`px-3 py-2 rounded-lg text-sm ${msg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}
-      >
-        {msg.text}
-      </div>
-    )
   }
 
   return (
@@ -245,13 +269,14 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-5">
           <button
+            type="button"
             onClick={() => saveSection('hours', { hours })}
             disabled={sectionState.hours.saving}
             className={saveBtnCls}
           >
             {sectionState.hours.saving ? 'Saving…' : 'Save Hours'}
           </button>
-          <SectionMessage section="hours" />
+          <SectionMessage message={sectionState.hours.message} />
         </div>
       </div>
 
@@ -259,7 +284,12 @@ export default function BusinessProfileForm({
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-semibold text-ink">Services</h2>
-          <button onClick={loadCatalog} disabled={loadingCatalog} className={addBtnCls}>
+          <button
+            type="button"
+            onClick={loadCatalog}
+            disabled={loadingCatalog}
+            className={addBtnCls}
+          >
             {loadingCatalog ? 'Loading…' : 'Import from Catalog'}
           </button>
         </div>
@@ -300,13 +330,18 @@ export default function BusinessProfileForm({
             )}
             <div className="flex gap-2 mt-3">
               <button
+                type="button"
                 onClick={importSelected}
                 disabled={selectedCatalogIds.size === 0}
                 className={saveBtnCls}
               >
                 Import Selected
               </button>
-              <button onClick={() => setShowCatalogPicker(false)} className={addBtnCls}>
+              <button
+                type="button"
+                onClick={() => setShowCatalogPicker(false)}
+                className={addBtnCls}
+              >
                 Cancel
               </button>
             </div>
@@ -323,13 +358,18 @@ export default function BusinessProfileForm({
               <span />
             </div>
           )}
-          {services.map((s, i) => (
-            <div key={i} className="grid grid-cols-[1fr_80px_80px_1fr_auto] gap-2 items-center">
+          {services.map((s) => (
+            <div
+              key={s._key}
+              className="grid grid-cols-[1fr_80px_80px_1fr_auto] gap-2 items-center"
+            >
               <input
                 value={s.name}
                 onChange={(e) =>
                   setServices((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, name: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === s._key ? { ...row, name: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Service name"
@@ -340,8 +380,10 @@ export default function BusinessProfileForm({
                 value={s.duration_min || ''}
                 onChange={(e) =>
                   setServices((prev) =>
-                    prev.map((row, j) =>
-                      j === i ? { ...row, duration_min: parseInt(e.target.value) || 0 } : row
+                    prev.map((row) =>
+                      row._key === s._key
+                        ? { ...row, duration_min: parseInt(e.target.value) || 0 }
+                        : row
                     )
                   )
                 }
@@ -353,8 +395,8 @@ export default function BusinessProfileForm({
                 value={s.price || ''}
                 onChange={(e) =>
                   setServices((prev) =>
-                    prev.map((row, j) =>
-                      j === i ? { ...row, price: parseFloat(e.target.value) || 0 } : row
+                    prev.map((row) =>
+                      row._key === s._key ? { ...row, price: parseFloat(e.target.value) || 0 } : row
                     )
                   )
                 }
@@ -365,14 +407,17 @@ export default function BusinessProfileForm({
                 value={s.description}
                 onChange={(e) =>
                   setServices((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, description: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === s._key ? { ...row, description: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Optional description"
                 className={smallInputCls}
               />
               <button
-                onClick={() => setServices((prev) => prev.filter((_, j) => j !== i))}
+                type="button"
+                onClick={() => setServices((prev) => prev.filter((row) => row._key !== s._key))}
                 className={removeBtnCls}
                 title="Remove"
               >
@@ -384,10 +429,17 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-4">
           <button
+            type="button"
             onClick={() =>
               setServices((prev) => [
                 ...prev,
-                { name: '', duration_min: 0, price: 0, description: '' },
+                {
+                  name: '',
+                  duration_min: 0,
+                  price: 0,
+                  description: '',
+                  _key: Math.random().toString(36).slice(2),
+                },
               ])
             }
             className={addBtnCls}
@@ -398,13 +450,16 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
           <button
-            onClick={() => saveSection('services', { services })}
+            type="button"
+            onClick={() =>
+              saveSection('services', { services: services.map(({ _key: _, ...s }) => s) })
+            }
             disabled={sectionState.services.saving}
             className={saveBtnCls}
           >
             {sectionState.services.saving ? 'Saving…' : 'Save Services'}
           </button>
-          <SectionMessage section="services" />
+          <SectionMessage message={sectionState.services.message} />
         </div>
       </div>
 
@@ -423,13 +478,15 @@ export default function BusinessProfileForm({
               <span />
             </div>
           )}
-          {staff.map((s, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+          {staff.map((s) => (
+            <div key={s._key} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
               <input
                 value={s.name}
                 onChange={(e) =>
                   setStaff((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, name: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === s._key ? { ...row, name: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Full name"
@@ -439,14 +496,17 @@ export default function BusinessProfileForm({
                 value={s.role}
                 onChange={(e) =>
                   setStaff((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, role: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === s._key ? { ...row, role: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Role (e.g. Stylist)"
                 className={smallInputCls}
               />
               <button
-                onClick={() => setStaff((prev) => prev.filter((_, j) => j !== i))}
+                type="button"
+                onClick={() => setStaff((prev) => prev.filter((row) => row._key !== s._key))}
                 className={removeBtnCls}
                 title="Remove"
               >
@@ -458,7 +518,13 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-4">
           <button
-            onClick={() => setStaff((prev) => [...prev, { name: '', role: '' }])}
+            type="button"
+            onClick={() =>
+              setStaff((prev) => [
+                ...prev,
+                { name: '', role: '', _key: Math.random().toString(36).slice(2) },
+              ])
+            }
             className={addBtnCls}
           >
             + Add Staff Member
@@ -467,13 +533,14 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
           <button
-            onClick={() => saveSection('staff', { staff })}
+            type="button"
+            onClick={() => saveSection('staff', { staff: staff.map(({ _key: _, ...s }) => s) })}
             disabled={sectionState.staff.saving}
             className={saveBtnCls}
           >
             {sectionState.staff.saving ? 'Saving…' : 'Save Staff'}
           </button>
-          <SectionMessage section="staff" />
+          <SectionMessage message={sectionState.staff.message} />
         </div>
       </div>
 
@@ -486,11 +553,12 @@ export default function BusinessProfileForm({
 
         <div className="space-y-4">
           {faqs.map((faq, i) => (
-            <div key={i} className="space-y-1.5 p-3 bg-bg rounded-lg">
+            <div key={faq._key} className="space-y-1.5 p-3 bg-bg rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-ink4">FAQ {i + 1}</span>
                 <button
-                  onClick={() => setFaqs((prev) => prev.filter((_, j) => j !== i))}
+                  type="button"
+                  onClick={() => setFaqs((prev) => prev.filter((row) => row._key !== faq._key))}
                   className={removeBtnCls}
                   title="Remove"
                 >
@@ -501,7 +569,9 @@ export default function BusinessProfileForm({
                 value={faq.question}
                 onChange={(e) =>
                   setFaqs((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, question: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === faq._key ? { ...row, question: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Question"
@@ -511,7 +581,9 @@ export default function BusinessProfileForm({
                 value={faq.answer}
                 onChange={(e) =>
                   setFaqs((prev) =>
-                    prev.map((row, j) => (j === i ? { ...row, answer: e.target.value } : row))
+                    prev.map((row) =>
+                      row._key === faq._key ? { ...row, answer: e.target.value } : row
+                    )
                   )
                 }
                 placeholder="Answer"
@@ -522,7 +594,13 @@ export default function BusinessProfileForm({
           ))}
           {faqs.length < 10 && (
             <button
-              onClick={() => setFaqs((prev) => [...prev, { question: '', answer: '' }])}
+              type="button"
+              onClick={() =>
+                setFaqs((prev) => [
+                  ...prev,
+                  { question: '', answer: '', _key: Math.random().toString(36).slice(2) },
+                ])
+              }
               className={addBtnCls}
             >
               + Add FAQ
@@ -531,8 +609,14 @@ export default function BusinessProfileForm({
         </div>
 
         <div className="mt-4">
-          <label className="block text-xs font-medium text-ink2 mb-1.5">Additional Notes</label>
+          <label
+            htmlFor="business-profile-notes"
+            className="block text-xs font-medium text-ink2 mb-1.5"
+          >
+            Additional Notes
+          </label>
           <textarea
+            id="business-profile-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any extra context Maya should know — parking info, special instructions, etc."
@@ -545,13 +629,14 @@ export default function BusinessProfileForm({
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
           <button
-            onClick={() => saveSection('faqs', { faqs, notes })}
+            type="button"
+            onClick={() => saveSection('faqs', { faqs: faqs.map(({ _key: _, ...f }) => f), notes })}
             disabled={sectionState.faqs.saving}
             className={saveBtnCls}
           >
             {sectionState.faqs.saving ? 'Saving…' : 'Save FAQs & Notes'}
           </button>
-          <SectionMessage section="faqs" />
+          <SectionMessage message={sectionState.faqs.message} />
         </div>
       </div>
     </div>
