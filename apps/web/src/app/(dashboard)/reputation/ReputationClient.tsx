@@ -18,7 +18,6 @@ interface Props {
   connected: boolean
   locationName: string | null
   stats: ReputationStats | null
-  initialReviews: Review[]
 }
 
 type Tab = 'new' | 'replied' | 'all'
@@ -297,12 +296,12 @@ function ReviewCard({
 
 // ── ReviewFeed ────────────────────────────────────────────────
 
-function ReviewFeed({ initialReviews }: { initialReviews: Review[] }) {
+function ReviewFeed() {
   const [tab, setTab] = useState<Tab>('new')
-  const [reviews, setReviews] = useState<Review[]>(initialReviews)
+  const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(initialReviews.length)
+  const [total, setTotal] = useState(0)
 
   useEffect(() => {
     void fetchReviews('new', 1)
@@ -438,12 +437,7 @@ function ReviewFeed({ initialReviews }: { initialReviews: Review[] }) {
 
 // ── ReputationClient ──────────────────────────────────────────
 
-export default function ReputationClient({
-  connected,
-  locationName,
-  stats,
-  initialReviews,
-}: Props) {
+export default function ReputationClient({ connected, locationName, stats }: Props) {
   const [syncing, setSyncing] = useState(false)
   const [lastSynced, setLastSynced] = useState<number | null>(null)
 
@@ -510,7 +504,7 @@ export default function ReputationClient({
       ) : (
         <div className="space-y-8">
           {stats && <StatsHeader stats={stats} />}
-          <ReviewFeed initialReviews={initialReviews} />
+          <ReviewFeed />
         </div>
       )}
     </div>

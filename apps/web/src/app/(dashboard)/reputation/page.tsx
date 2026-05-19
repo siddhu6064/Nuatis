@@ -1,24 +1,7 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import ReputationClient from './ReputationClient'
-import type { Review, ReputationStats } from '@nuatis/shared'
-
-function mapReview(row: Record<string, unknown>): Review {
-  return {
-    id: row['id'] as string,
-    tenantId: row['tenant_id'] as string,
-    googleReviewId: row['google_review_id'] as string,
-    reviewerName: (row['reviewer_name'] as string | null) ?? null,
-    rating: row['rating'] as number,
-    comment: (row['comment'] as string | null) ?? null,
-    publishedAt: (row['published_at'] as string | null) ?? null,
-    replyText: (row['reply_text'] as string | null) ?? null,
-    replySentAt: (row['reply_sent_at'] as string | null) ?? null,
-    aiSuggestedReply: (row['ai_suggested_reply'] as string | null) ?? null,
-    status: row['status'] as Review['status'],
-    createdAt: row['created_at'] as string,
-  }
-}
+import type { ReputationStats } from '@nuatis/shared'
 
 function computeStats(
   allReviews: Array<{ rating: number; published_at: string | null }>
@@ -92,8 +75,6 @@ export default async function ReputationPage() {
   let connected = false
   let locationName: string | null = null
   let stats: ReputationStats | null = null
-  let initialReviews: Review[] = []
-
   if (tenantId) {
     const { data: conn } = await supabase
       .from('gbp_connections')
@@ -105,29 +86,14 @@ export default async function ReputationPage() {
     locationName = conn?.location_name ?? null
 
     if (connected) {
-      const [{ data: allReviewRows }, { data: newReviewRows }] = await Promise.all([
-        supabase.from('reviews').select('rating, published_at').eq('tenant_id', tenantId),
-        supabase
-          .from('reviews')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .eq('status', 'new')
-          .order('published_at', { ascending: false })
-          .limit(20),
-      ])
+      const { data: allReviewRows } = await supabase
+        .from('reviews')
+        .select('rating, published_at')
+        .eq('tenant_id', tenantId)
 
       stats = computeStats(allReviewRows ?? [])
-
-      initialReviews = (newReviewRows ?? []).map((row) => mapReview(row as Record<string, unknown>))
     }
   }
 
-  return (
-    <ReputationClient
-      connected={connected}
-      locationName={locationName}
-      stats={stats}
-      initialReviews={initialReviews}
-    />
-  )
+  return <ReputationClient connected={connected} locationName={locationName} stats={stats} />
 }
