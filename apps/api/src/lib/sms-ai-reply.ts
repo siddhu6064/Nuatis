@@ -33,8 +33,8 @@ export async function handleAiSmsReply(
       }
     }
 
-    // Conversation history: last 10 messages
-    const historyQuery = supabase
+    // Conversation history: last 10 messages for this contact
+    let historyQuery = supabase
       .from('sms_messages')
       .select('direction, body, created_at')
       .eq('tenant_id', tenantId)
@@ -42,24 +42,22 @@ export async function handleAiSmsReply(
       .limit(10)
 
     if (contactId) {
-      historyQuery.eq('contact_id', contactId)
+      historyQuery = historyQuery.eq('contact_id', contactId)
+    } else {
+      // Unknown contact — scope to this phone number conversation
+      historyQuery = historyQuery.eq('from_number', fromNumber)
     }
 
-    const { data: historyRows } = await historyQuery
-
-    // Location / business info
-    const { data: location } = await supabase
-      .from('locations')
-      .select('business_profile, vertical, telnyx_number')
-      .eq('tenant_id', tenantId)
-      .single()
-
-    // Tenant name
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('name')
-      .eq('id', tenantId)
-      .single()
+    // Parallelize independent queries
+    const [{ data: historyRows }, { data: location }, { data: tenant }] = await Promise.all([
+      historyQuery,
+      supabase
+        .from('locations')
+        .select('business_profile, vertical, telnyx_number')
+        .eq('tenant_id', tenantId)
+        .single(),
+      supabase.from('tenants').select('name').eq('id', tenantId).single(),
+    ])
 
     const businessName = (tenant as { name?: string | null } | null)?.name ?? 'our team'
     const vertical = (location as { vertical?: string | null } | null)?.vertical ?? 'business'
@@ -115,7 +113,7 @@ export async function handleAiSmsReply(
       config: { maxOutputTokens: 150 },
     })
 
-    const aiResponse = result.text ?? ''
+    const aiResponse = result?.text ?? ''
 
     if (!aiResponse) {
       console.warn('[sms-ai] Gemini returned empty response — skipping send')
@@ -129,7 +127,7 @@ export async function handleAiSmsReply(
     })
 
     // e. Log outbound to sms_messages
-    await supabase.from('sms_messages').insert({
+    const { error: insertErr } = await supabase.from('sms_messages').insert({
       tenant_id: tenantId,
       contact_id: contactId,
       direction: 'outbound',
@@ -140,6 +138,7 @@ export async function handleAiSmsReply(
       ai_handled: true,
       ai_response: aiResponse,
     })
+    if (insertErr) console.error('[sms-ai] failed to log outbound', insertErr)
   } catch (err) {
     // f. On any error: log and return — do NOT send a broken message
     console.error('[sms-ai]', err)
