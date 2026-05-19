@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
-import { syncReviews, refreshTokenIfNeeded } from '../lib/gbp-sync.js'
+import { syncReviews, refreshTokenIfNeeded, fetchGbpInsights } from '../lib/gbp-sync.js'
 
 const router = Router()
 
@@ -401,5 +401,16 @@ router.put(
     }
   }
 )
+
+// ── GET /api/reputation/insights ─────────────────────────────────────────────
+router.get('/insights', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const insights = await fetchGbpInsights(authed.tenantId)
+  if (!insights) {
+    res.json({ connected: false })
+    return
+  }
+  res.json(insights)
+})
 
 export default router

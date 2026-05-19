@@ -457,6 +457,19 @@ export interface ReputationStats {
   trendData: Array<{ month: string; avgRating: number; count: number }>
 }
 
+// ── GBP Insights ──────────────────────────────────────────────
+
+export interface GbpInsights {
+  queries_direct: number
+  queries_indirect: number
+  views_maps: number
+  views_search: number
+  actions_website: number
+  actions_phone: number
+  actions_driving_directions: number
+  period_days: 30
+}
+
 // ── Trigger Links ─────────────────────────────────────────────
 
 export type TriggerLinkAction =

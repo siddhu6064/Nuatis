@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
+import type { GbpInsights } from '@nuatis/shared'
 
 // ── Supabase factory ──────────────────────────────────────────
 
@@ -193,5 +194,88 @@ export async function generateAiReply(
 
   if (reply) {
     await supabase.from('reviews').update({ ai_suggested_reply: reply }).eq('id', reviewId)
+  }
+}
+
+// ── fetchGbpInsights ──────────────────────────────────────────
+
+export async function fetchGbpInsights(tenantId: string): Promise<GbpInsights | null> {
+  try {
+    const supabase = getSupabase()
+
+    const { data: conn } = await supabase
+      .from('gbp_connections')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+
+    if (!conn) return null
+
+    const accessToken = await refreshTokenIfNeeded(conn)
+
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const body = {
+      locationNames: [conn.google_location_name],
+      basicRequest: {
+        metricRequests: [
+          { metric: 'QUERIES_DIRECT' },
+          { metric: 'QUERIES_INDIRECT' },
+          { metric: 'VIEWS_MAPS' },
+          { metric: 'VIEWS_SEARCH' },
+          { metric: 'ACTIONS_WEBSITE' },
+          { metric: 'ACTIONS_PHONE' },
+          { metric: 'ACTIONS_DRIVING_DIRECTIONS' },
+        ],
+        timeRange: {
+          startTime: thirtyDaysAgo.toISOString(),
+          endTime: now.toISOString(),
+        },
+      },
+    }
+
+    const res = await fetch(
+      `https://mybusiness.googleapis.com/v4/${conn.google_account_id}/locations:reportInsights`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    )
+
+    if (!res.ok) return null
+
+    const data = (await res.json()) as {
+      locationMetrics?: Array<{
+        metricValues?: Array<{
+          metric: string
+          totalValue?: { value?: string }
+        }>
+      }>
+    }
+
+    const metrics = data.locationMetrics?.[0]?.metricValues ?? []
+
+    function getMetric(name: string): number {
+      const m = metrics.find((mv) => mv.metric === name)
+      return parseInt(m?.totalValue?.value ?? '0', 10) || 0
+    }
+
+    return {
+      queries_direct: getMetric('QUERIES_DIRECT'),
+      queries_indirect: getMetric('QUERIES_INDIRECT'),
+      views_maps: getMetric('VIEWS_MAPS'),
+      views_search: getMetric('VIEWS_SEARCH'),
+      actions_website: getMetric('ACTIONS_WEBSITE'),
+      actions_phone: getMetric('ACTIONS_PHONE'),
+      actions_driving_directions: getMetric('ACTIONS_DRIVING_DIRECTIONS'),
+      period_days: 30,
+    }
+  } catch {
+    return null
   }
 }
