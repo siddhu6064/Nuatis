@@ -74,6 +74,7 @@ import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
 import reviewRequestsRouter from './routes/review-requests.js'
 import snippetsRouter from './routes/snippets.js'
+import automationOverviewRouter from './routes/automation-overview.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -184,6 +185,7 @@ app.use('/t', triggerLinkPublicRouter)
 app.use('/api/trigger-links', triggerLinksRouter)
 app.use('/api/review-requests', reviewRequestsRouter)
 app.use('/api/snippets', snippetsRouter)
+app.use('/api/automation', automationOverviewRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })
