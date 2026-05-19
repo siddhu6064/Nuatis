@@ -10,6 +10,8 @@ import { VERTICALS } from '@nuatis/shared'
 import { FUNCTION_DECLARATIONS, executeToolCall, type ToolCallContext } from './tool-handlers.js'
 import { Sentry } from '../lib/sentry.js'
 import { getAllKnowledgeEntries } from '../services/embeddings.js'
+import { buildBusinessKnowledgeBlock } from './business-knowledge.js'
+import type { BusinessProfile } from '@nuatis/shared'
 
 export const BOOKING_CONTRACT = `
 
@@ -124,7 +126,8 @@ export async function createGeminiLiveSession(
   product?: 'maya_only' | 'suite',
   promptSuffix?: string,
   callerContactId?: string | null,
-  afterHoursPrefix?: string
+  afterHoursPrefix?: string,
+  businessProfile?: BusinessProfile | null
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -170,6 +173,15 @@ export async function createGeminiLiveSession(
     // Knowledge injection is best-effort — never delay call pickup
     const msg = err instanceof Error ? err.message : String(err)
     console.warn(`[gemini-live] knowledge injection skipped: ${msg}`)
+  }
+
+  // ── Inject business profile structured data ──────────────────────────────
+  if (businessProfile) {
+    const block = buildBusinessKnowledgeBlock(businessProfile)
+    if (block) {
+      systemPrompt += block
+      console.info(`[gemini-live] injected business knowledge block for tenant=${tenantId}`)
+    }
   }
 
   systemPrompt += BOOKING_CONTRACT
