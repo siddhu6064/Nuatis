@@ -400,7 +400,7 @@ function buildQuery(store: MockStore, table: string): unknown {
     async single() {
       state.returnSelect = true
       if (store.tableErrors?.[state.table]) {
-        return { data: null, error: store.tableErrors[state.table] }
+        return { data: null, error: store.tableErrors[state.table] ?? null }
       }
       const res = execute(store, state)
       const rows = Array.isArray(res.data) ? res.data : res.data ? [res.data] : []
@@ -412,7 +412,7 @@ function buildQuery(store: MockStore, table: string): unknown {
     async maybeSingle() {
       state.returnSelect = true
       if (store.tableErrors?.[state.table]) {
-        return { data: null, error: store.tableErrors[state.table] }
+        return { data: null, error: store.tableErrors[state.table] ?? null }
       }
       const res = execute(store, state)
       const rows = Array.isArray(res.data) ? res.data : res.data ? [res.data] : []
