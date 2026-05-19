@@ -41,6 +41,7 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
 }))
 
 jest.unstable_mockModule('../gemini-live.js', () => ({
+  BOOKING_CONTRACT: '',
   createGeminiLiveSession: (...args: unknown[]) => {
     ;(globalThis as any).__geminiCreateCalls = (globalThis as any).__geminiCreateCalls ?? []
     ;(globalThis as any).__geminiCreateCalls.push(args)
