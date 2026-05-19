@@ -547,6 +547,48 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
     status: 'received',
   })
 
+  // Log to sms_messages table
+  await sb.from('sms_messages').insert({
+    tenant_id: tenantId,
+    contact_id: contactId,
+    direction: 'inbound',
+    body,
+    from_number: fromNumber,
+    to_number: toNumber,
+    message_sid: telnyxMessageId || null,
+    status: 'received',
+  })
+
+  // STOP/HELP keyword handling
+  const trimmedBody = body.trim().toUpperCase()
+
+  // TCPA opt-out — legal requirement
+  if (['STOP', 'UNSUBSCRIBE', 'CANCEL'].includes(trimmedBody)) {
+    if (contactId) {
+      await sb.from('contacts').update({ sms_opt_in: false }).eq('id', contactId)
+      console.info(`[sms-webhook] STOP received — opted out contact=${contactId}`)
+    }
+    res.sendStatus(200)
+    return
+  }
+
+  // HELP keyword
+  if (trimmedBody === 'HELP') {
+    const { sendSms: send } = await import('./lib/sms.js')
+    const { data: loc } = await sb
+      .from('locations')
+      .select('telnyx_number')
+      .eq('tenant_id', tenantId)
+      .single()
+    const fromNum = loc?.telnyx_number ?? toNumber
+    void send(fromNum, fromNumber, 'Reply STOP to unsubscribe. For help call us directly.', {
+      tenantId,
+      contactId: contactId ?? undefined,
+    })
+    res.sendStatus(200)
+    return
+  }
+
   // Log activity
   if (contactId) {
     const { logActivity: logAct } = await import('./lib/activity.js')
@@ -567,6 +609,12 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
     body: body.slice(0, 60),
     url: contactId ? `/contacts/${contactId}?tab=messages` : '/inbox',
   })
+
+  // Fire AI reply handler — fire-and-forget, must not block Telnyx 200
+  void (async () => {
+    const { handleAiSmsReply } = await import('./lib/sms-ai-reply.js')
+    await handleAiSmsReply(tenantId, contactId, body, fromNumber, toNumber)
+  })()
 
   res.sendStatus(200)
 })
