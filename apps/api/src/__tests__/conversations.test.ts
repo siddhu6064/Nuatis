@@ -217,3 +217,83 @@ describe('POST /:contactId/messages/read', () => {
     expect(inbound?.read_at).toBeTruthy()
   })
 })
+
+describe('GET /analytics', () => {
+  it('returns expected shape with all required keys', async () => {
+    seedBase()
+    const now = Date.now()
+    store.tables['sms_messages'] = [
+      {
+        id: 'msg-a',
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        direction: 'inbound',
+        body: 'Hello',
+        ai_handled: false,
+        created_at: new Date(now - 5 * 60000).toISOString(),
+      },
+      {
+        id: 'msg-b',
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        direction: 'outbound',
+        body: 'Hi!',
+        ai_handled: false,
+        created_at: new Date(now - 1 * 60000).toISOString(),
+      },
+    ]
+
+    const res = await request(makeApp()).get('/analytics')
+    expect(res.status).toBe(200)
+    const body = res.body as Record<string, unknown>
+    expect(body).toMatchObject({
+      period_days: 30,
+      total_conversations: 1,
+      open_conversations: 1,
+      resolved_conversations: 0,
+      ai_handled_count: 0,
+      ai_handled_pct: 0,
+      volume_by_day: expect.any(Array),
+    })
+    expect('avg_response_time_minutes' in body).toBe(true)
+    expect('busiest_hour' in body).toBe(true)
+  })
+
+  it('returns avg_response_time_minutes as null when no inbound→outbound pairs', async () => {
+    seedBase()
+    store.tables['sms_messages'] = [
+      {
+        id: 'msg-a',
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        direction: 'inbound',
+        body: 'Hello',
+        ai_handled: false,
+        created_at: new Date().toISOString(),
+      },
+    ]
+
+    const res = await request(makeApp()).get('/analytics')
+    expect(res.status).toBe(200)
+    expect(res.body.avg_response_time_minutes).toBeNull()
+  })
+
+  it('returns volume_by_day with exactly 14 entries', async () => {
+    seedBase()
+    store.tables['sms_messages'] = [
+      {
+        id: 'msg-a',
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        direction: 'inbound',
+        body: 'Hello',
+        ai_handled: false,
+        created_at: new Date().toISOString(),
+      },
+    ]
+
+    const res = await request(makeApp()).get('/analytics')
+    expect(res.status).toBe(200)
+    expect((res.body.volume_by_day as unknown[]).length).toBe(14)
+  })
+})

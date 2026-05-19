@@ -182,6 +182,121 @@ router.get('/assignees', requireAuth, async (req: Request, res: Response): Promi
   res.json((data ?? []).map((u) => ({ id: u.id, name: u.full_name, email: u.email })))
 })
 
+// ── GET /api/conversations/analytics ─────────────────────────────────────────
+// MUST be before /:contactId routes
+router.get('/analytics', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const tenantId = authed.tenantId
+  const supabase = getSupabase()
+
+  const periodDays = 30
+  const since30 = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
+  const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: messages, error: msgErr } = await supabase
+    .from('sms_messages')
+    .select('id, contact_id, direction, created_at, ai_handled')
+    .eq('tenant_id', tenantId)
+    .gte('created_at', since30)
+    .not('contact_id', 'is', null)
+    .order('contact_id', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (msgErr) {
+    res.status(500).json({ error: msgErr.message })
+    return
+  }
+
+  const msgs = messages ?? []
+  const contactIds = [...new Set(msgs.map((m) => m.contact_id as string))]
+
+  // Fetch statuses for open/resolved counts
+  const { data: statuses } =
+    contactIds.length > 0
+      ? await supabase
+          .from('conversation_status')
+          .select('contact_id, resolved_at')
+          .eq('tenant_id', tenantId)
+          .in('contact_id', contactIds)
+      : { data: [] }
+
+  const statusMap = new Map((statuses ?? []).map((s) => [s.contact_id as string, s]))
+  const totalConversations = contactIds.length
+  const resolvedConversations = contactIds.filter((cid) => statusMap.get(cid)?.resolved_at).length
+  const openConversations = totalConversations - resolvedConversations
+
+  // AI handled stats (over 30-day inbound messages)
+  const inboundMsgs = msgs.filter((m) => m.direction === 'inbound')
+  const aiHandledCount = msgs.filter((m) => m.ai_handled).length
+  const aiHandledPct =
+    inboundMsgs.length > 0 ? Math.round((aiHandledCount / inboundMsgs.length) * 100) : 0
+
+  // Avg response time: inbound → next outbound pairs per conversation
+  const msgsByContact = new Map<string, typeof msgs>()
+  for (const m of msgs) {
+    const cid = m.contact_id as string
+    if (!msgsByContact.has(cid)) msgsByContact.set(cid, [])
+    msgsByContact.get(cid)!.push(m)
+  }
+
+  const responseTimes: number[] = []
+  for (const [, convMsgs] of msgsByContact) {
+    for (let i = 0; i < convMsgs.length - 1; i++) {
+      const curr = convMsgs[i]!
+      const next = convMsgs[i + 1]!
+      if (curr.direction === 'inbound' && next.direction === 'outbound') {
+        const diffMin =
+          (new Date(next.created_at as string).getTime() -
+            new Date(curr.created_at as string).getTime()) /
+          60000
+        if (diffMin >= 0 && diffMin < 1440) responseTimes.push(diffMin)
+      }
+    }
+  }
+
+  const avgResponseTimeMinutes =
+    responseTimes.length > 0
+      ? Math.round((responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) * 10) / 10
+      : null
+
+  // Busiest hour (inbound, last 30 days)
+  const hourCounts = new Array<number>(24).fill(0)
+  for (const m of inboundMsgs) {
+    const hour = new Date(m.created_at as string).getHours()
+    hourCounts[hour]!++
+  }
+  const maxCount = Math.max(...hourCounts)
+  const busiestHour = maxCount > 0 ? hourCounts.indexOf(maxCount) : null
+
+  // Volume by day — last 14 days (all days guaranteed present)
+  const volumeMap = new Map<string, { inbound: number; outbound: number }>()
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+    volumeMap.set(d.toISOString().slice(0, 10), { inbound: 0, outbound: 0 })
+  }
+  for (const m of msgs.filter((m) => (m.created_at as string) >= since14)) {
+    const key = (m.created_at as string).slice(0, 10)
+    const entry = volumeMap.get(key)
+    if (entry) {
+      if (m.direction === 'inbound') entry.inbound++
+      else entry.outbound++
+    }
+  }
+  const volumeByDay = [...volumeMap.entries()].map(([date, v]) => ({ date, ...v }))
+
+  res.json({
+    period_days: periodDays,
+    total_conversations: totalConversations,
+    open_conversations: openConversations,
+    resolved_conversations: resolvedConversations,
+    avg_response_time_minutes: avgResponseTimeMinutes,
+    ai_handled_count: aiHandledCount,
+    ai_handled_pct: aiHandledPct,
+    busiest_hour: busiestHour,
+    volume_by_day: volumeByDay,
+  })
+})
+
 // ── GET /api/conversations/:contactId/messages ────────────────────────────────
 router.get(
   '/:contactId/messages',

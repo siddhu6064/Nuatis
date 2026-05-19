@@ -18,6 +18,7 @@ interface Props {
   maxLength?: number
   contactName?: string
   className?: string
+  textareaRef?: React.RefObject<HTMLTextAreaElement>
 }
 
 function substituteVars(body: string, contactName?: string): string {
@@ -42,6 +43,7 @@ export default function SnippetPicker({
   maxLength,
   contactName,
   className,
+  textareaRef,
 }: Props) {
   const [snippets, setSnippets] = useState<SnippetResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -149,6 +151,7 @@ export default function SnippetPicker({
   return (
     <div ref={wrapperRef} className="relative flex-1">
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

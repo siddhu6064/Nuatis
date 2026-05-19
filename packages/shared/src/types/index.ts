@@ -655,3 +655,17 @@ export interface AutomationOverview {
   total_active: number
   total_paused: number
 }
+
+// ── Conversations Analytics ───────────────────────────────────
+
+export interface ConversationAnalytics {
+  period_days: number
+  total_conversations: number
+  open_conversations: number
+  resolved_conversations: number
+  avg_response_time_minutes: number | null
+  ai_handled_count: number
+  ai_handled_pct: number
+  busiest_hour: number | null
+  volume_by_day: Array<{ date: string; inbound: number; outbound: number }>
+}
