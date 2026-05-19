@@ -414,3 +414,45 @@ export interface MayaKbFile {
   createdAt: string
   updatedAt: string
 }
+
+// ── Reputation / Google Business Profile ─────────────────────
+
+export interface GbpConnection {
+  id: string
+  tenantId: string
+  locationId: string | null
+  googleAccountId: string
+  googleLocationName: string
+  locationName: string
+  placeId: string | null
+  accessToken: string
+  refreshToken: string
+  tokenExpiresAt: string
+  connectedAt: string
+}
+
+export type ReviewStatus = 'new' | 'replied' | 'ignored'
+
+export interface Review {
+  id: string
+  tenantId: string
+  googleReviewId: string
+  reviewerName: string | null
+  rating: number
+  comment: string | null
+  publishedAt: string | null
+  replyText: string | null
+  replySentAt: string | null
+  aiSuggestedReply: string | null
+  status: ReviewStatus
+  createdAt: string
+}
+
+export interface ReputationStats {
+  averageRating: number
+  totalReviews: number
+  ratingBreakdown: Record<1 | 2 | 3 | 4 | 5, number>
+  reviewsThisMonth: number
+  reviewsLastMonth: number
+  trendData: Array<{ month: string; avgRating: number; count: number }>
+}
