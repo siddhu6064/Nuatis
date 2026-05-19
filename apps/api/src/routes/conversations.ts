@@ -149,6 +149,28 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   res.json({ conversations: paginated, total, page })
 })
 
+// ── GET /api/conversations/assignees ─────────────────────────────────────────
+// MUST be before /:contactId routes to avoid Express treating 'assignees' as a contactId
+router.get('/assignees', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const tenantId = authed.tenantId
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, full_name, email')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.json((data ?? []).map((u) => ({ id: u.id, name: u.full_name, email: u.email })))
+})
+
 // ── GET /api/conversations/:contactId/messages ────────────────────────────────
 router.get(
   '/:contactId/messages',
@@ -371,5 +393,111 @@ router.post('/:contactId/send', requireAuth, async (req: Request, res: Response)
     created_at: new Date().toISOString(),
   })
 })
+
+// ── POST /api/conversations/:contactId/assign ─────────────────────────────────
+router.post(
+  '/:contactId/assign',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const tenantId = authed.tenantId
+    const supabase = getSupabase()
+    const { contactId } = req.params
+
+    // Validate body
+    const rawUserId = req.body?.user_id
+    if (rawUserId !== null && rawUserId !== undefined && typeof rawUserId !== 'string') {
+      res.status(400).json({ error: 'user_id must be a string or null' })
+      return
+    }
+    const userId: string | null = rawUserId ?? null
+
+    // Verify contact belongs to tenant
+    const { data: contact, error: contactErr } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (contactErr) {
+      res.status(500).json({ error: contactErr.message })
+      return
+    }
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
+
+    // If assigning (non-null), verify user exists in same tenant
+    if (userId !== null) {
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      if (userErr) {
+        res.status(500).json({ error: userErr.message })
+        return
+      }
+      if (!user) {
+        res.status(400).json({ error: 'User not found in this tenant' })
+        return
+      }
+    }
+
+    const now = new Date().toISOString()
+
+    const { error } = await supabase.from('conversation_status').upsert(
+      {
+        tenant_id: tenantId,
+        contact_id: contactId,
+        assigned_to: userId,
+        assigned_at: userId !== null ? now : null,
+        updated_at: now,
+      },
+      { onConflict: 'tenant_id,contact_id' }
+    )
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.json({
+      assigned_to: userId,
+      assigned_at: userId !== null ? now : null,
+    })
+  }
+)
+
+// ── POST /api/conversations/:contactId/messages/read ─────────────────────────
+router.post(
+  '/:contactId/messages/read',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const tenantId = authed.tenantId
+    const supabase = getSupabase()
+    const { contactId } = req.params
+
+    // Update inbound unread messages, returning updated rows to count them
+    const { data, error } = await supabase
+      .from('sms_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('tenant_id', tenantId)
+      .eq('contact_id', contactId)
+      .eq('direction', 'inbound')
+      .is('read_at', null)
+      .select('id')
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.json({ marked_read: data?.length ?? 0 })
+  }
+)
 
 export default router
