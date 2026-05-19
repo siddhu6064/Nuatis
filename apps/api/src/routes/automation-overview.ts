@@ -3,7 +3,8 @@ import { Queue } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
-import type { AutomationOverview, ScannerStatus } from '@nuatis/shared'
+import type { AutomationOverview, ScannerStatus, ScannerPause } from '@nuatis/shared'
+import { getActivePause } from '../lib/scanner-pause.js'
 
 const router = Router()
 
@@ -40,7 +41,11 @@ function getMondayOfWeek(date: Date): Date {
   return d
 }
 
-async function fetchScannerStatus(key: string, name: string): Promise<ScannerStatus> {
+async function fetchScannerStatus(
+  key: string,
+  name: string,
+  tenantId: string
+): Promise<ScannerStatus> {
   try {
     const q = new Queue(key, { connection: createBullMQConnection() })
     const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed', 'paused')
@@ -82,6 +87,10 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       attempt_count: job.attemptsMade,
     }))
 
+    const activePause = await getActivePause(tenantId, key)
+    const is_paused = activePause !== null
+    const pause_until = activePause?.paused_until ?? null
+
     return {
       name,
       key,
@@ -91,8 +100,8 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       failure_count: failedCount,
       jobs_processed_7d,
       failed_jobs,
-      is_paused: false,
-      pause_until: null,
+      is_paused,
+      pause_until,
     }
   } catch {
     return {
@@ -118,7 +127,7 @@ router.get('/overview', requireAuth, async (req: Request, res: Response): Promis
 
   // 1. Scanner health — all queues in parallel
   const scanners = await Promise.all(
-    SCANNER_QUEUES.map(({ key, name }) => fetchScannerStatus(key, name))
+    SCANNER_QUEUES.map(({ key, name }) => fetchScannerStatus(key, name, authed.tenantId))
   )
 
   // 2. Enrollments chart — last 7 weeks, aggregated in JS
@@ -231,6 +240,113 @@ router.post(
     } finally {
       await q.close()
     }
+  }
+)
+
+// ── POST /scanners/:key/pause ──────────────────────────────────────────────────
+
+router.post(
+  '/scanners/:key/pause',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const { key } = req.params as { key: string }
+    if (!SCANNER_KEY_SET.has(key)) {
+      res.status(400).json({ error: 'Unknown scanner key' })
+      return
+    }
+    const body = req.body as { paused_from?: string; paused_until?: string; reason?: string }
+    const { paused_from, paused_until, reason } = body
+    if (!paused_from || !paused_until) {
+      res.status(400).json({ error: 'paused_from and paused_until are required' })
+      return
+    }
+    const from = new Date(paused_from)
+    const until = new Date(paused_until)
+    if (isNaN(from.getTime()) || isNaN(until.getTime())) {
+      res.status(400).json({ error: 'Invalid date format' })
+      return
+    }
+    if (until <= from) {
+      res.status(400).json({ error: 'paused_until must be after paused_from' })
+      return
+    }
+    const maxDays = 90
+    if (until.getTime() - from.getTime() > maxDays * 24 * 60 * 60 * 1000) {
+      res.status(400).json({ error: 'Pause range cannot exceed 90 days' })
+      return
+    }
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('scanner_pauses')
+      .insert({
+        tenant_id: authed.tenantId,
+        scanner_key: key,
+        paused_from: from.toISOString(),
+        paused_until: until.toISOString(),
+        reason: reason ?? null,
+      })
+      .select('id, scanner_key, paused_from, paused_until, reason')
+      .single()
+    if (error) {
+      console.error(`[automation] pause insert error: ${error.message}`)
+      res.status(500).json({ error: 'Failed to create pause' })
+      return
+    }
+    console.info(`[automation] pause created for scanner=${key} tenant=${authed.tenantId}`)
+    res.json(data as ScannerPause)
+  }
+)
+
+// ── DELETE /scanners/:key/pause ────────────────────────────────────────────────
+
+router.delete(
+  '/scanners/:key/pause',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const { key } = req.params as { key: string }
+    if (!SCANNER_KEY_SET.has(key)) {
+      res.status(400).json({ error: 'Unknown scanner key' })
+      return
+    }
+    const supabase = getSupabase()
+    const now = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('scanner_pauses')
+      .delete()
+      .eq('tenant_id', authed.tenantId)
+      .eq('scanner_key', key)
+      .gte('paused_until', now)
+      .select('id')
+    if (error) {
+      console.error(`[automation] pause delete error: ${error.message}`)
+      res.status(500).json({ error: 'Failed to cancel pause' })
+      return
+    }
+    console.info(`[automation] pause cancelled for scanner=${key} tenant=${authed.tenantId}`)
+    res.json({ cancelled: data?.length ?? 0 })
+  }
+)
+
+// ── GET /scanners/:key/pause ───────────────────────────────────────────────────
+
+router.get(
+  '/scanners/:key/pause',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const { key } = req.params as { key: string }
+    if (!SCANNER_KEY_SET.has(key)) {
+      res.status(400).json({ error: 'Unknown scanner key' })
+      return
+    }
+    const pause = await getActivePause(authed.tenantId, key)
+    if (!pause) {
+      res.json({ active: false })
+      return
+    }
+    res.json({ active: true, ...pause })
   }
 )
 
