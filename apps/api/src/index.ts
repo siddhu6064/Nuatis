@@ -68,6 +68,7 @@ import paymentsRouter from './routes/payments.js'
 import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
+import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
@@ -177,6 +178,8 @@ app.use('/api/payments', paymentsRouter)
 app.use('/api/availability-schedules', availabilitySchedulesRouter)
 app.use('/api/calendar-groups', calendarGroupsRouter)
 app.use('/api/google-reserve', googleReserveRouter)
+app.use('/t', triggerLinkPublicRouter)
+app.use('/api/trigger-links', triggerLinksRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

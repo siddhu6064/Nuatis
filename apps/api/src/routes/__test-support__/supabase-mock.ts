@@ -433,7 +433,7 @@ export function createMockSupabase(store: MockStore): unknown {
       return buildQuery(store, table)
     },
     rpc() {
-      return Promise.resolve({ data: null, error: null })
+      return Promise.reject(new Error('rpc not supported in mock'))
     },
     auth: {
       admin: {

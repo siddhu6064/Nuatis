@@ -1,5 +1,6 @@
 export * from './types/index.js'
 export * from './verticals/index.js'
 export * from './utils/index.js'
+export { buildTriggerUrl } from './lib/trigger-links.js'
 export { seedInventory } from './seed/inventory.js'
 export { seedStaff } from './seed/staff.js'

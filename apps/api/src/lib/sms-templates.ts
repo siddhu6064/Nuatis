@@ -60,3 +60,9 @@ export function buildConfirmationSms({
   if (PROFESSIONAL.has(vertical)) return `Your appointment with ${biz} is confirmed for ${dt}.`
   return `Your appointment with ${biz} is confirmed for ${dt}. Reply CANCEL to cancel.`
 }
+
+// ── Trigger Links in SMS ───────────────────────────────────────────────────────
+// Example: embed a trigger link in an appointment reminder template:
+// `Confirm your appointment: ${buildTriggerUrl(slug, contact.id)}`
+// Import buildTriggerUrl from '@nuatis/shared'.
+// Tenants configure which trigger link slug to use per template manually.

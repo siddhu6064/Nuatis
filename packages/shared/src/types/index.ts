@@ -456,3 +456,36 @@ export interface ReputationStats {
   reviewsLastMonth: number
   trendData: Array<{ month: string; avgRating: number; count: number }>
 }
+
+// ── Trigger Links ─────────────────────────────────────────────
+
+export type TriggerLinkAction =
+  | 'confirm_appointment'
+  | 'cancel_appointment'
+  | 'mark_contacted'
+  | 'mark_won'
+  | 'mark_lost'
+  | 'custom_webhook'
+
+export interface TriggerLink {
+  id: string
+  tenantId: string
+  name: string
+  slug: string
+  action: TriggerLinkAction
+  actionConfig: Record<string, unknown>
+  clickCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TriggerLinkEvent {
+  id: string
+  triggerLinkId: string
+  tenantId: string
+  contactId: string | null
+  clickedAt: string
+  ipAddress: string | null
+  userAgent: string | null
+  metadata: Record<string, unknown>
+}
