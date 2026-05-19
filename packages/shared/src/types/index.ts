@@ -396,3 +396,21 @@ export interface BusinessProfile {
   faqs?: FaqEntry[]
   notes?: string
 }
+
+// ── Maya KB Files ─────────────────────────────────────────────
+
+export type MayaKbFileStatus = 'pending' | 'processing' | 'ready' | 'error'
+
+export interface MayaKbFile {
+  id: string
+  tenantId: string
+  locationId: string | null
+  fileName: string
+  fileSize: number
+  storagePath: string
+  extractedText: string | null
+  status: MayaKbFileStatus
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
