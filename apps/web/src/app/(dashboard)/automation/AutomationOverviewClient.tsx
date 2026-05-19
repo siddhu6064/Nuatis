@@ -15,7 +15,8 @@ export default function AutomationOverviewClient() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/overview`, {
         credentials: 'include',
       })
-      const json = await res.json()
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = (await res.json()) as AutomationOverview
       setData(json)
       setLastUpdated(new Date())
     } finally {
@@ -147,7 +148,7 @@ export default function AutomationOverviewClient() {
       <div className="bg-white rounded-xl border border-border-brand p-6 mb-4">
         <h2 className="text-sm font-semibold text-ink mb-4">Automation Activity — Last 7 Weeks</h2>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={enrollments_chart}>
+          <BarChart data={[...enrollments_chart].reverse()}>
             <XAxis dataKey="week" tick={{ fontSize: 11 }} stroke="#9ca3af" />
             <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
             <Tooltip />
