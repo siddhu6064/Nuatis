@@ -34,6 +34,7 @@ const [{ default: express }, { default: request }, { default: conversationsRoute
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-convtest0001'
 const CONTACT_ID = 'cccccccc-0000-0000-0000-convtest0001'
+const STAFF_USER_ID = 'dddddddd-0000-0000-0000-convtest0001'
 
 function makeApp() {
   const app = express()
@@ -151,5 +152,68 @@ describe('POST /:contactId/resolve', () => {
     expect(res.body).toMatchObject({ resolved: true, resolved_at: expect.any(String) })
     const row = store.tables['conversation_status']?.[0] as Record<string, unknown> | undefined
     expect(row?.resolved_at).toBeTruthy()
+  })
+})
+
+describe('POST /:contactId/assign', () => {
+  it('assigns staff member and returns 200 with assigned_to and assigned_at', async () => {
+    seedBase()
+    store.tables['users'] = [
+      {
+        id: STAFF_USER_ID,
+        tenant_id: TENANT_ID,
+        full_name: 'Staff Bob',
+        email: 'bob@test.com',
+        is_active: true,
+      },
+    ]
+
+    const res = await request(makeApp())
+      .post(`/${CONTACT_ID}/assign`)
+      .send({ user_id: STAFF_USER_ID })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({
+      assigned_to: STAFF_USER_ID,
+      assigned_at: expect.any(String),
+    })
+    const row = store.tables['conversation_status']?.[0] as Record<string, unknown> | undefined
+    expect(row?.assigned_to).toBe(STAFF_USER_ID)
+  })
+
+  it('unassigns when user_id is null and returns assigned_to: null', async () => {
+    seedBase()
+    store.tables['conversation_status'] = [
+      {
+        id: 'status-1',
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        assigned_to: STAFF_USER_ID,
+        assigned_at: '2026-01-01T09:00:00Z',
+      },
+    ]
+
+    const res = await request(makeApp()).post(`/${CONTACT_ID}/assign`).send({ user_id: null })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ assigned_to: null, assigned_at: null })
+  })
+})
+
+describe('POST /:contactId/messages/read', () => {
+  it('marks inbound unread messages as read and returns count', async () => {
+    seedBase()
+    // msg-1 is inbound with no read_at → should be marked
+    // msg-2 is outbound → should NOT be marked
+
+    const res = await request(makeApp()).post(`/${CONTACT_ID}/messages/read`)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ marked_read: 1 })
+
+    const inbound = (store.tables['sms_messages'] ?? []).find((m) => m['id'] === 'msg-1') as
+      | Record<string, unknown>
+      | undefined
+    expect(inbound?.read_at).toBeTruthy()
   })
 })

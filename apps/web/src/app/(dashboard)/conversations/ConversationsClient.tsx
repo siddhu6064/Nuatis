@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import SnippetPicker from '@/components/SnippetPicker'
-import type { Conversation, ConversationMessage } from '@nuatis/shared'
+import type { Conversation, ConversationMessage, ConversationsWsEvent } from '@nuatis/shared'
 
 type TabType = 'open' | 'resolved'
+type InboxFilter = 'all' | 'mine'
 
 interface ContactDetail {
   id: string
@@ -14,11 +16,16 @@ interface ContactDetail {
   sms_opt_in: boolean
 }
 
+interface Assignee {
+  id: string
+  name: string
+  email: string
+}
+
 function formatTime(iso: string) {
   const date = new Date(iso)
   const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / 86400000)
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000)
   if (diffDays === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'short' })
@@ -33,7 +40,11 @@ function initials(name: string | null): string {
 }
 
 export default function ConversationsClient() {
+  const { data: session } = useSession()
+  const sessionAny = session as (typeof session & { accessToken?: string }) | null
+
   const [tab, setTab] = useState<TabType>('open')
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all')
   const [search, setSearch] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +55,13 @@ export default function ConversationsClient() {
   const [compose, setCompose] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [assignees, setAssignees] = useState<Assignee[]>([])
+  const [assignDropdownOpen, setAssignDropdownOpen] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
 
   const fetchConversations = useCallback(async () => {
     const r = await fetch(`/api/conversations?status=${tab}&limit=50`)
@@ -67,22 +84,141 @@ export default function ConversationsClient() {
     setMsgLoading(false)
   }, [])
 
+  const fetchAssignees = useCallback(async () => {
+    const r = await fetch('/api/conversations/assignees')
+    if (!r.ok) return
+    const d = (await r.json()) as Assignee[]
+    setAssignees(d)
+  }, [])
+
+  // Initial load
   useEffect(() => {
     setLoading(true)
     void fetchConversations()
   }, [fetchConversations])
 
-  // Poll every 10s when tab visible
   useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState !== 'visible') return
-      void fetchConversations()
-      if (selectedId) void fetchMessages(selectedId)
-    }
-    const id = setInterval(poll, 10000)
-    return () => clearInterval(id)
-  }, [fetchConversations, fetchMessages, selectedId])
+    void fetchAssignees()
+  }, [fetchAssignees])
 
+  // WebSocket connection — replace 10s poll
+  useEffect(() => {
+    const wsUrl = process.env['NEXT_PUBLIC_WS_URL']
+    if (!wsUrl || !sessionAny?.accessToken || !session?.user?.tenantId) return
+
+    let ws: WebSocket | null = null
+    let dead = false
+
+    const startFallbackPoll = () => {
+      if (pollRef.current) return
+      pollRef.current = setInterval(() => {
+        if (document.visibilityState !== 'visible') return
+        void fetchConversations()
+        if (selectedIdRef.current) void fetchMessages(selectedIdRef.current)
+      }, 30000)
+    }
+
+    const stopFallbackPoll = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+
+    try {
+      ws = new WebSocket(`${wsUrl}/ws/conversations`)
+
+      ws.onopen = () => {
+        ws!.send(
+          JSON.stringify({
+            type: 'auth',
+            token: sessionAny.accessToken,
+            tenantId: session!.user!.tenantId,
+          })
+        )
+      }
+
+      ws.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data as string) as
+            | ConversationsWsEvent
+            | { type: 'authenticated' }
+
+          if (event.type === 'authenticated') {
+            setWsConnected(true)
+            stopFallbackPoll()
+            return
+          }
+
+          if (event.type === 'new_message') {
+            // Append to thread if this conversation is open
+            if (selectedIdRef.current === event.conversation_id) {
+              setMessages((prev) => {
+                const exists = prev.some((m) => m.id === event.message.id)
+                return exists ? prev : [...prev, event.message]
+              })
+            }
+            // Update conversation list
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === event.conversation_id
+                  ? {
+                      ...c,
+                      last_message: event.message.body,
+                      last_message_at: event.message.created_at,
+                      direction: event.message.direction,
+                      ai_handled: event.message.ai_handled,
+                      unread_count:
+                        event.message.direction === 'inbound' &&
+                        selectedIdRef.current !== event.conversation_id
+                          ? (c.unread_count ?? 0) + 1
+                          : c.unread_count,
+                    }
+                  : c
+              )
+            )
+          } else if (event.type === 'conversation_resolved') {
+            setConversations((prev) => prev.filter((c) => c.id !== event.conversation_id))
+            if (selectedIdRef.current === event.conversation_id) setSelectedId(null)
+          } else if (event.type === 'conversation_reopened') {
+            setConversations((prev) => prev.filter((c) => c.id !== event.conversation_id))
+            if (selectedIdRef.current === event.conversation_id) setSelectedId(null)
+          } else if (event.type === 'conversation_assigned') {
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === event.conversation_id ? { ...c, assigned_to: event.assigned_to } : c
+              )
+            )
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      ws.onerror = () => {
+        setWsConnected(false)
+        startFallbackPoll()
+      }
+
+      ws.onclose = () => {
+        if (!dead) {
+          setWsConnected(false)
+          startFallbackPoll()
+        }
+      }
+    } catch {
+      startFallbackPoll()
+    }
+
+    return () => {
+      dead = true
+      ws?.close()
+      stopFallbackPoll()
+      setWsConnected(false)
+    }
+  }, [sessionAny?.accessToken, session?.user?.tenantId, fetchConversations, fetchMessages])
+
+  // Load messages + mark read when selection changes
   useEffect(() => {
     if (!selectedId) {
       setMessages([])
@@ -90,6 +226,11 @@ export default function ConversationsClient() {
       return
     }
     void fetchMessages(selectedId)
+    // Mark inbound messages read + optimistic unread reset
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedId ? { ...c, unread_count: 0 } : c))
+    )
+    void fetch(`/api/conversations/${selectedId}/messages/read`, { method: 'POST' })
   }, [selectedId, fetchMessages])
 
   // Auto-scroll to bottom on new messages
@@ -115,7 +256,8 @@ export default function ConversationsClient() {
       return
     }
     setCompose('')
-    void fetchMessages(selectedId)
+    // WS will push the new message; fall back to fetch if not connected
+    if (!wsConnected) void fetchMessages(selectedId)
     void fetchConversations()
   }
 
@@ -123,21 +265,47 @@ export default function ConversationsClient() {
     if (!selectedId) return
     await fetch(`/api/conversations/${selectedId}/resolve`, { method: 'POST' })
     setSelectedId(null)
-    void fetchConversations()
+    if (!wsConnected) void fetchConversations()
   }
 
   async function handleReopen() {
     if (!selectedId) return
     await fetch(`/api/conversations/${selectedId}/reopen`, { method: 'POST' })
     setSelectedId(null)
-    void fetchConversations()
+    if (!wsConnected) void fetchConversations()
   }
 
+  async function handleAssign(userId: string | null) {
+    if (!selectedId) return
+    setAssignDropdownOpen(false)
+    await fetch(`/api/conversations/${selectedId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    })
+    const assigneeName = userId ? (assignees.find((a) => a.id === userId)?.name ?? null) : null
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selectedId ? { ...c, assigned_to: userId, assigned_to_name: assigneeName } : c
+      )
+    )
+    if (!wsConnected) void fetchConversations()
+  }
+
+  const currentUserId = session?.user?.id ?? null
+
   const filtered = conversations.filter((c) => {
+    if (inboxFilter === 'mine' && tab === 'open') {
+      if (c.assigned_to !== currentUserId) return false
+    }
     if (!search) return true
     const s = search.toLowerCase()
     return (c.contact_name ?? '').toLowerCase().includes(s) || (c.contact_phone ?? '').includes(s)
   })
+
+  const mineCount = conversations.filter(
+    (c) => c.status === 'open' && c.assigned_to === currentUserId
+  ).length
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null
 
@@ -149,14 +317,20 @@ export default function ConversationsClient() {
       {/* ── Left panel ── */}
       <div className="flex flex-col overflow-hidden">
         <div className="px-4 pt-4 pb-3 border-b border-border-brand shrink-0">
-          <h1 className="text-base font-semibold text-ink mb-3">Conversations</h1>
-          <div className="flex gap-1 mb-3">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-base font-semibold text-ink">Conversations</h1>
+            {wsConnected && <span className="w-2 h-2 rounded-full bg-teal-500" title="Live" />}
+          </div>
+
+          {/* Open / Resolved tabs */}
+          <div className="flex gap-1 mb-2">
             {(['open', 'resolved'] as TabType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => {
                   setTab(t)
                   setSelectedId(null)
+                  setInboxFilter('all')
                 }}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
                   tab === t ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
@@ -166,6 +340,31 @@ export default function ConversationsClient() {
               </button>
             ))}
           </div>
+
+          {/* All / Mine sub-tabs (open only) */}
+          {tab === 'open' && (
+            <div className="flex gap-1 mb-3">
+              {(['all', 'mine'] as InboxFilter[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setInboxFilter(f)}
+                  className={`relative flex-1 py-1 text-[11px] font-medium rounded transition-colors capitalize ${
+                    inboxFilter === f
+                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                      : 'text-ink4 hover:text-ink'
+                  }`}
+                >
+                  {f}
+                  {f === 'mine' && mineCount > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold bg-red-500 text-white">
+                      {mineCount > 9 ? '9+' : mineCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
           <input
             type="text"
             value={search}
@@ -180,7 +379,7 @@ export default function ConversationsClient() {
             <div className="flex items-center justify-center h-32 text-ink4 text-sm">Loading…</div>
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-ink4 text-sm">
-              No {tab} conversations
+              No {inboxFilter === 'mine' ? 'assigned' : tab} conversations
             </div>
           ) : (
             filtered.map((conv) => {
@@ -211,15 +410,20 @@ export default function ConversationsClient() {
                           {conv.direction === 'outbound' ? 'You: ' : ''}
                           {conv.last_message ?? ''}
                         </p>
-                        {conv.unread_count > 0 && (
+                        {(conv.unread_count ?? 0) > 0 && (
                           <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
-                            {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                            {(conv.unread_count ?? 0) > 99 ? '99+' : conv.unread_count}
                           </span>
                         )}
                       </div>
-                      {conv.ai_handled && (
-                        <span className="text-[9px] text-teal-600 font-medium">AI</span>
-                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {conv.ai_handled && (
+                          <span className="text-[9px] text-teal-600 font-medium">AI</span>
+                        )}
+                        {conv.assigned_to_name && (
+                          <span className="text-[9px] text-ink4">→ {conv.assigned_to_name}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -244,21 +448,54 @@ export default function ConversationsClient() {
               </p>
               <p className="text-xs text-ink4">{selected?.contact_phone ?? contact?.phone ?? ''}</p>
             </div>
-            {selected?.status === 'open' ? (
-              <button
-                onClick={() => void handleResolve()}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-              >
-                Resolve
-              </button>
-            ) : (
-              <button
-                onClick={() => void handleReopen()}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg border border-border-brand text-ink3 hover:text-ink transition-colors"
-              >
-                Reopen
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Assign dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setAssignDropdownOpen((v) => !v)}
+                  className="px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors max-w-[120px] truncate"
+                >
+                  {selected?.assigned_to_name ? `→ ${selected.assigned_to_name}` : 'Unassigned'}
+                </button>
+                {assignDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white border border-border-brand rounded-lg shadow-lg py-1 text-sm">
+                    <button
+                      onClick={() => void handleAssign(null)}
+                      className="w-full text-left px-3 py-1.5 text-ink3 hover:bg-bg transition-colors"
+                    >
+                      Unassigned
+                    </button>
+                    {assignees.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => void handleAssign(a.id)}
+                        className={`w-full text-left px-3 py-1.5 hover:bg-bg transition-colors ${
+                          selected?.assigned_to === a.id ? 'text-teal-700 font-medium' : 'text-ink'
+                        }`}
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selected?.status === 'open' ? (
+                <button
+                  onClick={() => void handleResolve()}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                >
+                  Resolve
+                </button>
+              ) : (
+                <button
+                  onClick={() => void handleReopen()}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                >
+                  Reopen
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Messages thread */}
