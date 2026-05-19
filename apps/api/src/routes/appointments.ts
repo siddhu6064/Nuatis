@@ -3,7 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
-import { createEvent, updateEvent, deleteEvent } from '../services/scheduling.js'
+import {
+  createEvent,
+  createEventWithMeet,
+  updateEvent,
+  deleteEvent,
+} from '../services/scheduling.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { logActivity } from '../lib/activity.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
@@ -132,6 +137,54 @@ router.get('/report', requireAuth, async (req: Request, res: Response): Promise<
   res.json({ statusCounts, channelCounts, topCalendars, totalAppointments, showRate })
 })
 
+// ── POST /api/appointments/block ─────────────────────────────
+router.post('/block', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const b = req.body as Record<string, unknown>
+  const calendarId = typeof b['calendarId'] === 'string' ? b['calendarId'] : null
+  const startTime = typeof b['startTime'] === 'string' ? b['startTime'] : null
+  const endTime = typeof b['endTime'] === 'string' ? b['endTime'] : null
+  const reason = typeof b['reason'] === 'string' && b['reason'].trim() ? b['reason'].trim() : null
+
+  if (!startTime || !endTime) {
+    res.status(400).json({ error: 'startTime and endTime required' })
+    return
+  }
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    res.status(400).json({ error: 'Invalid date format' })
+    return
+  }
+  if (end <= start) {
+    res.status(400).json({ error: 'endTime must be after startTime' })
+    return
+  }
+
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('appointments')
+    .insert({
+      tenant_id: authed.tenantId,
+      is_blocked: true,
+      block_reason: reason,
+      title: reason ?? 'Blocked',
+      start_time: startTime,
+      end_time: endTime,
+      location_id: calendarId ?? null,
+      status: 'scheduled',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(201).json({ data })
+})
+
 // ── GET /api/appointments ─────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
@@ -182,10 +235,10 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     assigned_staff_id,
   } = parsed.data
 
-  // Get location + refresh token for Google Calendar sync
+  // Get location + refresh token for Google Calendar sync + video conferencing setting
   const { data: location } = await supabase
     .from('locations')
-    .select('google_refresh_token, google_calendar_id')
+    .select('google_refresh_token, google_calendar_id, video_conferencing_enabled')
     .eq('tenant_id', authed.tenantId)
     .eq('is_primary', true)
     .single()
@@ -198,20 +251,41 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     .eq('tenant_id', authed.tenantId)
     .single()
 
+  const videoEnabled = !!(location as Record<string, unknown> | null)?.[
+    'video_conferencing_enabled'
+  ]
   let googleEventId: string | null = null
+  let videoLink: string | null = null
+  let videoProvider: string | null = null
 
   // Sync to Google Calendar if connected
   if (location?.google_refresh_token && location?.google_calendar_id) {
     try {
-      googleEventId = await createEvent({
-        refreshToken: location.google_refresh_token,
-        calendarId: location.google_calendar_id,
-        title,
-        description: description ?? '',
-        start: start_time,
-        end: end_time,
-        attendeeEmail: contact?.email ?? undefined,
-      })
+      if (videoEnabled) {
+        const { eventId, meetLink } = await createEventWithMeet({
+          refreshToken: location.google_refresh_token,
+          calendarId: location.google_calendar_id,
+          title,
+          description: description ?? '',
+          start: start_time,
+          end: end_time,
+          attendeeEmail: contact?.email ?? undefined,
+          requestId: `${authed.tenantId}-${Date.now()}`,
+        })
+        googleEventId = eventId
+        videoLink = meetLink
+        videoProvider = 'google_meet'
+      } else {
+        googleEventId = await createEvent({
+          refreshToken: location.google_refresh_token,
+          calendarId: location.google_calendar_id,
+          title,
+          description: description ?? '',
+          start: start_time,
+          end: end_time,
+          attendeeEmail: contact?.email ?? undefined,
+        })
+      }
     } catch (err) {
       console.error('Google Calendar sync failed:', err)
       // Non-fatal — appointment still gets created
@@ -232,6 +306,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       assigned_user_id: assigned_user_id ?? null,
       assigned_staff_id: assigned_staff_id ?? null,
       google_event_id: googleEventId,
+      video_link: videoLink,
+      video_provider: videoProvider,
       status: 'scheduled',
     })
     .select()
@@ -246,6 +322,18 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     })
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Fallback: video enabled but no Google Calendar connection
+  if (videoEnabled && !videoLink && appointment?.id) {
+    const aid = appointment.id as string
+    const fallbackLink = `https://meet.google.com/${aid.slice(0, 3)}-${aid.slice(3, 7)}-${aid.slice(7, 11)}`
+    await supabase
+      .from('appointments')
+      .update({ video_link: fallbackLink, video_provider: 'manual' })
+      .eq('id', aid)
+    ;(appointment as Record<string, unknown>)['video_link'] = fallbackLink
+    ;(appointment as Record<string, unknown>)['video_provider'] = 'manual'
   }
 
   const startFormatted = new Date(start_time).toLocaleDateString('en-US', {

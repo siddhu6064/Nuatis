@@ -15,6 +15,7 @@ export async function createAppointment(formData: FormData) {
   const endTime = formData.get('end_time') as string
   const notes = formData.get('notes') as string | null
   const assignedStaffId = (formData.get('assigned_staff_id') as string | null) || null
+  const serviceId = (formData.get('service_id') as string | null) || null
 
   if (!title || !date || !startTime || !endTime) {
     throw new Error('Title, date, start time, and end time are required')
@@ -33,6 +34,7 @@ export async function createAppointment(formData: FormData) {
     status: 'scheduled',
     notes: notes?.trim() || null,
     assigned_staff_id: assignedStaffId || null,
+    service_id: serviceId || null,
   })
 
   if (error) throw new Error(error.message)

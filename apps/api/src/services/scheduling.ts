@@ -72,6 +72,36 @@ export async function getAvailableSlots(
   return slots
 }
 
+export async function createEventWithMeet(
+  params: CreateEventParams & { requestId: string }
+): Promise<{ eventId: string; meetLink: string | null }> {
+  const calendar = getCalendarClient(params.refreshToken)
+
+  const event = await calendar.events.insert({
+    calendarId: params.calendarId,
+    conferenceDataVersion: 1,
+    requestBody: {
+      summary: params.title,
+      description: params.description,
+      start: { dateTime: params.start, timeZone: 'UTC' },
+      end: { dateTime: params.end, timeZone: 'UTC' },
+      attendees: params.attendeeEmail ? [{ email: params.attendeeEmail }] : undefined,
+      conferenceData: {
+        createRequest: {
+          requestId: params.requestId,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      },
+    },
+  })
+
+  const entryPoints = event.data.conferenceData?.entryPoints ?? []
+  const videoEntry = entryPoints.find((ep) => ep.entryPointType === 'video')
+  const meetLink = videoEntry?.uri ?? entryPoints[0]?.uri ?? null
+
+  return { eventId: event.data.id ?? '', meetLink }
+}
+
 export async function createEvent(params: CreateEventParams): Promise<string> {
   const calendar = getCalendarClient(params.refreshToken)
 

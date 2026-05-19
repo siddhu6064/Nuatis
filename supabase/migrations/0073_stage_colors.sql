@@ -1,0 +1,1 @@
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS color text DEFAULT '#007A6E';

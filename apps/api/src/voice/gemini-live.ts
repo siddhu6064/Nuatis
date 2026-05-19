@@ -123,7 +123,8 @@ export async function createGeminiLiveSession(
   callControlId?: string,
   product?: 'maya_only' | 'suite',
   promptSuffix?: string,
-  callerContactId?: string | null
+  callerContactId?: string | null,
+  afterHoursPrefix?: string
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -131,7 +132,9 @@ export async function createGeminiLiveSession(
   }
 
   const template = VERTICALS[vertical]?.system_prompt_template ?? DEFAULT_MAYA_PROMPT
-  let systemPrompt = template.replace(/\{\{business_name\}\}/g, businessName ?? 'the business')
+  let systemPrompt =
+    (afterHoursPrefix ? afterHoursPrefix + '\n\n' : '') +
+    template.replace(/\{\{business_name\}\}/g, businessName ?? 'the business')
 
   // ── Inject knowledge base entries into system prompt (2s timeout) ────────
   try {

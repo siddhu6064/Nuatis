@@ -4,6 +4,22 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
 
+const TAG_COLORS = [
+  'bg-teal-50 text-teal-700 border-teal-200',
+  'bg-blue-50 text-blue-700 border-blue-200',
+  'bg-purple-50 text-purple-700 border-purple-200',
+  'bg-amber-50 text-amber-700 border-amber-200',
+  'bg-green-50 text-green-700 border-green-200',
+]
+
+function tagColorClass(tag: string): string {
+  let hash = 0
+  for (let i = 0; i < tag.length; i++) {
+    hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
+  }
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
+}
+
 interface DealContact {
   id: string
   full_name: string
@@ -28,6 +44,7 @@ interface Deal {
   stage_color: string | null
   contact_name: string | null
   company_name: string | null
+  tags: string[]
   deal_contacts?: DealContact[]
 }
 
@@ -75,6 +92,11 @@ export default function DealDetail({ dealId }: Props) {
   const [dealContacts, setDealContacts] = useState<DealContact[]>([])
   const [contactSearch, setContactSearch] = useState('')
   const [searchResults, setSearchResults] = useState<DealContact[]>([])
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [addingTag, setAddingTag] = useState(false)
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
 
   // Booking state
   const [bookingMode, setBookingMode] = useState(false)
@@ -96,8 +118,16 @@ export default function DealDetail({ dealId }: Props) {
       setDeal(d)
       setNotes(d.notes ?? '')
       setDealContacts(d.deal_contacts ?? [])
+      setTags(Array.isArray(d.tags) ? d.tags : [])
     }
   }, [dealId])
+
+  useEffect(() => {
+    void fetch('/api/deals/tags')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { tags: string[] } | null) => setTagSuggestions(d?.tags ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -124,6 +154,32 @@ export default function DealDetail({ dealId }: Props) {
     }, 300)
     return () => clearTimeout(t)
   }, [contactSearch])
+
+  const saveTags = async (newTags: string[]) => {
+    setTags(newTags)
+    await fetch(`/api/deals/${dealId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: newTags }),
+    }).catch(() => {})
+  }
+
+  const removeTag = (tag: string) => {
+    void saveTags(tags.filter((t) => t !== tag))
+  }
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim()
+    if (!trimmed || tags.includes(trimmed) || tags.length >= 10) return
+    void saveTags([...tags, trimmed])
+    setTagInput('')
+    setAddingTag(false)
+    setShowTagSuggestions(false)
+  }
+
+  const filteredTagSuggestions = tagSuggestions.filter(
+    (s) => s.toLowerCase().includes(tagInput.toLowerCase()) && !tags.includes(s)
+  )
 
   const updateDeal = async (updates: Record<string, unknown>) => {
     setSaving(true)
@@ -286,6 +342,80 @@ export default function DealDetail({ dealId }: Props) {
               onChange={(e) => void updateDeal({ close_date: e.target.value || null })}
               className="mt-0.5 w-full text-sm border border-border-brand rounded px-2 py-1"
             />
+          </div>
+          {/* Tags */}
+          <div className="col-span-2">
+            <span className="text-ink4 text-xs block mb-1.5">Tags</span>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-full border ${tagColorClass(tag)}`}
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="ml-0.5 hover:opacity-60 leading-none"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+              {tags.length < 10 &&
+                (addingTag ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      autoFocus
+                      onChange={(e) => {
+                        setTagInput(e.target.value)
+                        setShowTagSuggestions(true)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addTag(tagInput)
+                        }
+                        if (e.key === 'Escape') {
+                          setAddingTag(false)
+                          setTagInput('')
+                          setShowTagSuggestions(false)
+                        }
+                      }}
+                      onBlur={() =>
+                        setTimeout(() => {
+                          setShowTagSuggestions(false)
+                          if (!tagInput.trim()) setAddingTag(false)
+                        }, 150)
+                      }
+                      placeholder="Add tag…"
+                      className="text-xs border border-border-brand rounded-full px-2.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-20 min-w-[160px] max-h-36 overflow-y-auto">
+                        {filteredTagSuggestions.slice(0, 6).map((s) => (
+                          <button
+                            key={s}
+                            onMouseDown={() => addTag(s)}
+                            className="block w-full text-left text-xs px-3 py-1.5 hover:bg-bg text-ink2"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAddingTag(true)}
+                    className="text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-0.5 rounded-full border border-dashed border-teal-300 hover:border-teal-400 transition-colors"
+                  >
+                    + tag
+                  </button>
+                ))}
+            </div>
           </div>
         </div>
 

@@ -9,6 +9,9 @@ interface BusinessHours {
   sun: string
 }
 
+type DaySchedule = { open: string; close: string; enabled: boolean }
+type WeekSchedule = Record<string, DaySchedule>
+
 interface Settings {
   maya_enabled: boolean
   escalation_phone: string
@@ -18,6 +21,10 @@ interface Settings {
   appointment_duration_default: number
   telnyx_number: string | null
   business_hours: BusinessHours
+  after_hours_enabled: boolean
+  after_hours_schedule: WeekSchedule
+  after_hours_message: string
+  timezone: string
 }
 
 const PERSONALITIES = [
@@ -35,6 +42,30 @@ const LANGUAGES = [
 
 const DURATIONS = [15, 30, 45, 60, 90]
 
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern (ET)' },
+  { value: 'America/Chicago', label: 'Central (CT)' },
+  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/Phoenix', label: 'Arizona (MT, no DST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+]
+
+const DAYS: { key: string; label: string }[] = [
+  { key: 'mon', label: 'Monday' },
+  { key: 'tue', label: 'Tuesday' },
+  { key: 'wed', label: 'Wednesday' },
+  { key: 'thu', label: 'Thursday' },
+  { key: 'fri', label: 'Friday' },
+  { key: 'sat', label: 'Saturday' },
+  { key: 'sun', label: 'Sunday' },
+]
+
+const TIME_SLOTS: string[] = []
+for (let h = 6; h <= 22; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`)
+  if (h < 22) TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`)
+}
+
 function formatPhone(phone: string | null): string {
   if (!phone) return 'Not configured'
   const digits = phone.replace(/\D/g, '')
@@ -51,6 +82,13 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [toggling, setToggling] = useState(false)
 
+  // After-hours state
+  const [ahEnabled, setAhEnabled] = useState(settings.after_hours_enabled)
+  const [ahSchedule, setAhSchedule] = useState<WeekSchedule>(settings.after_hours_schedule)
+  const [ahMessage, setAhMessage] = useState(settings.after_hours_message)
+  const [ahTimezone, setAhTimezone] = useState(settings.timezone)
+  const [savingAh, setSavingAh] = useState(false)
+
   const hasChanges =
     form.escalation_phone !== settings.escalation_phone ||
     form.maya_greeting !== settings.maya_greeting ||
@@ -58,6 +96,55 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
     form.appointment_duration_default !== settings.appointment_duration_default ||
     JSON.stringify(form.preferred_languages.sort()) !==
       JSON.stringify(settings.preferred_languages.sort())
+
+  const hasAfterHoursChanges =
+    ahEnabled !== settings.after_hours_enabled ||
+    ahTimezone !== settings.timezone ||
+    ahMessage !== settings.after_hours_message ||
+    JSON.stringify(ahSchedule) !== JSON.stringify(settings.after_hours_schedule)
+
+  function isCurrentlyOpen(): boolean {
+    try {
+      const now = new Date()
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: ahTimezone,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(now)
+
+      const weekdayMap: Record<string, string> = {
+        Mon: 'mon',
+        Tue: 'tue',
+        Wed: 'wed',
+        Thu: 'thu',
+        Fri: 'fri',
+        Sat: 'sat',
+        Sun: 'sun',
+      }
+
+      const weekday = parts.find((p) => p.type === 'weekday')?.value ?? ''
+      const hour = parts.find((p) => p.type === 'hour')?.value ?? '00'
+      const minute = parts.find((p) => p.type === 'minute')?.value ?? '00'
+
+      const dayKey = weekdayMap[weekday] ?? weekday.toLowerCase().slice(0, 3)
+      const day = ahSchedule[dayKey]
+      if (!day || !day.enabled) return false
+
+      const currentTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      return currentTime >= day.open && currentTime < day.close
+    } catch {
+      return true
+    }
+  }
+
+  function updateDaySchedule(dayKey: string, field: keyof DaySchedule, value: string | boolean) {
+    setAhSchedule((prev) => ({
+      ...prev,
+      [dayKey]: { ...prev[dayKey]!, [field]: value },
+    }))
+  }
 
   async function saveSettings() {
     setSaving(true)
@@ -96,6 +183,36 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       setMessage({ type: 'error', text: 'Failed to save settings' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function saveAfterHours() {
+    setSavingAh(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/maya-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          after_hours_enabled: ahEnabled,
+          business_hours: ahSchedule,
+          after_hours_message: ahMessage,
+          timezone: ahTimezone,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setMessage({ type: 'error', text: data.error || 'Failed to save after-hours settings' })
+        return
+      }
+
+      setMessage({ type: 'success', text: 'After-hours settings saved' })
+      router.refresh()
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save after-hours settings' })
+    } finally {
+      setSavingAh(false)
     }
   }
 
@@ -341,21 +458,174 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
         <p className="text-[11px] text-ink4 mt-2">At least one language must be selected</p>
       </div>
 
-      {/* 6. Phone Number (read-only) */}
+      {/* 6. After-Hours Mode */}
+      <div className="bg-white rounded-xl border border-border-brand p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-ink">After-Hours Mode</h2>
+          <button
+            onClick={() => setAhEnabled((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+              ahEnabled ? 'bg-teal-600' : 'bg-bg3'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                ahEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-ink4 mb-4">
+          When enabled, Maya delivers a custom message to callers outside your business hours
+        </p>
+
+        {ahEnabled && (
+          <div className="space-y-4">
+            {/* Timezone */}
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">Timezone</label>
+              <select
+                value={ahTimezone}
+                onChange={(e) => setAhTimezone(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                {TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Hours grid */}
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-2">Business Hours</label>
+              <div className="space-y-2">
+                {DAYS.map(({ key, label }) => {
+                  const day = ahSchedule[key] ?? { open: '09:00', close: '17:00', enabled: false }
+                  return (
+                    <div key={key} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateDaySchedule(key, 'enabled', !day.enabled)}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                          day.enabled ? 'bg-teal-600' : 'bg-bg3'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            day.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                      <span className="w-20 text-sm text-ink">{label}</span>
+                      {day.enabled ? (
+                        <>
+                          <select
+                            value={day.open}
+                            onChange={(e) => updateDaySchedule(key, 'open', e.target.value)}
+                            className="text-xs border border-border-brand rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            {TIME_SLOTS.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-ink4">to</span>
+                          <select
+                            value={day.close}
+                            onChange={(e) => updateDaySchedule(key, 'close', e.target.value)}
+                            className="text-xs border border-border-brand rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          >
+                            {TIME_SLOTS.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      ) : (
+                        <span className="text-xs text-ink4">Closed</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* After-hours message */}
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">
+                After-Hours Message
+              </label>
+              <textarea
+                value={ahMessage}
+                onChange={(e) => setAhMessage(e.target.value.slice(0, 300))}
+                rows={3}
+                placeholder="We are currently closed. Please leave your name and number..."
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
+              />
+              <p className="text-[11px] text-ink4 mt-1 text-right">{ahMessage.length}/300</p>
+            </div>
+
+            {/* Status preview */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-ink4">Right now:</span>
+              {isCurrentlyOpen() ? (
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                  OPEN
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                  CLOSED — after-hours active
+                </span>
+              )}
+            </div>
+
+            {/* Save after-hours */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={saveAfterHours}
+                disabled={savingAh || !hasAfterHoursChanges}
+                className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {savingAh ? 'Saving…' : 'Save After-Hours Settings'}
+              </button>
+              {hasAfterHoursChanges && <p className="text-xs text-ink4">Unsaved changes</p>}
+            </div>
+          </div>
+        )}
+
+        {!ahEnabled && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={saveAfterHours}
+              disabled={savingAh || !hasAfterHoursChanges}
+              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {savingAh ? 'Saving…' : 'Save'}
+            </button>
+            {hasAfterHoursChanges && <p className="text-xs text-ink4">Unsaved changes</p>}
+          </div>
+        )}
+      </div>
+
+      {/* 7. Phone Number (read-only) */}
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <h2 className="text-sm font-semibold text-ink mb-1">Phone Number</h2>
         <p className="text-xs text-ink4 mb-4">This is the number callers dial to reach Maya</p>
         <p className="text-lg font-semibold text-ink">{formatPhone(settings.telnyx_number)}</p>
       </div>
 
-      {/* 7. Save button */}
+      {/* 8. Save button */}
       <div className="flex items-center gap-3">
         <button
           onClick={saveSettings}
           disabled={saving || !hasChanges}
           className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {saving ? 'Saving\u2026' : 'Save Settings'}
+          {saving ? 'Saving…' : 'Save Settings'}
         </button>
         {hasChanges && <p className="text-xs text-ink4">You have unsaved changes</p>}
       </div>

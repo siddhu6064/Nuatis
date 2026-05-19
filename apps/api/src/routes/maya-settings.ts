@@ -22,6 +22,12 @@ interface LocationSettings {
   preferred_languages: string[]
   appointment_duration_default: number
   telnyx_number: string | null
+  after_hours_enabled: boolean | null
+  business_hours: Record<string, { open: string; close: string; enabled: boolean }> | null
+  after_hours_message: string | null
+  timezone: string | null
+  video_conferencing_enabled: boolean | null
+  video_provider: string | null
 }
 
 // ── GET /api/maya-settings ────────────────────────────────────────────────────
@@ -33,7 +39,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const { data: location, error } = await supabase
       .from('locations')
       .select(
-        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number'
+        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider'
       )
       .eq('tenant_id', authed.tenantId)
       .eq('is_primary', true)
@@ -47,10 +53,20 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
     const vertical = authed.vertical || 'sales_crm'
     const verticalConfig = VERTICALS[vertical]
-    const businessHours = verticalConfig?.business_hours ?? {
+    const verticalBusinessHours = verticalConfig?.business_hours ?? {
       mon_fri: '9am-5pm',
       sat: 'closed',
       sun: 'closed',
+    }
+
+    const defaultSchedule = {
+      mon: { open: '09:00', close: '17:00', enabled: true },
+      tue: { open: '09:00', close: '17:00', enabled: true },
+      wed: { open: '09:00', close: '17:00', enabled: true },
+      thu: { open: '09:00', close: '17:00', enabled: true },
+      fri: { open: '09:00', close: '17:00', enabled: true },
+      sat: { open: '09:00', close: '13:00', enabled: false },
+      sun: { open: '09:00', close: '13:00', enabled: false },
     }
 
     res.json({
@@ -62,7 +78,15 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       appointment_duration_default: location?.appointment_duration_default ?? 60,
       telnyx_number: location?.telnyx_number ?? null,
       vertical,
-      business_hours: businessHours,
+      business_hours: verticalBusinessHours,
+      after_hours_enabled: location?.after_hours_enabled ?? false,
+      after_hours_schedule: location?.business_hours ?? defaultSchedule,
+      after_hours_message:
+        location?.after_hours_message ??
+        'We are currently closed. Please leave your name and number and we will call you back during business hours.',
+      timezone: location?.timezone ?? 'America/Chicago',
+      video_conferencing_enabled: location?.video_conferencing_enabled ?? false,
+      video_provider: location?.video_provider ?? 'google_meet',
     })
   } catch (err) {
     console.error('[maya-settings] GET error:', err)
@@ -133,6 +157,31 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     }
   }
 
+  if (typeof body['after_hours_enabled'] === 'boolean') {
+    updates['after_hours_enabled'] = body['after_hours_enabled']
+  }
+
+  if (body['business_hours'] && typeof body['business_hours'] === 'object') {
+    updates['business_hours'] = body['business_hours']
+  }
+
+  if (typeof body['after_hours_message'] === 'string') {
+    const msg = body['after_hours_message'].trim().slice(0, 300)
+    updates['after_hours_message'] = msg || null
+  }
+
+  if (typeof body['timezone'] === 'string' && body['timezone'].trim()) {
+    updates['timezone'] = body['timezone'].trim()
+  }
+
+  if (typeof body['video_conferencing_enabled'] === 'boolean') {
+    updates['video_conferencing_enabled'] = body['video_conferencing_enabled']
+  }
+
+  if (typeof body['video_provider'] === 'string' && body['video_provider'].trim()) {
+    updates['video_provider'] = body['video_provider'].trim()
+  }
+
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: 'No valid fields to update' })
     return
@@ -159,7 +208,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const { data: location } = await supabase
       .from('locations')
       .select(
-        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number'
+        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider'
       )
       .eq('tenant_id', authed.tenantId)
       .eq('is_primary', true)
@@ -173,6 +222,16 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       sun: 'closed',
     }
 
+    const defaultSchedule = {
+      mon: { open: '09:00', close: '17:00', enabled: true },
+      tue: { open: '09:00', close: '17:00', enabled: true },
+      wed: { open: '09:00', close: '17:00', enabled: true },
+      thu: { open: '09:00', close: '17:00', enabled: true },
+      fri: { open: '09:00', close: '17:00', enabled: true },
+      sat: { open: '09:00', close: '13:00', enabled: false },
+      sun: { open: '09:00', close: '13:00', enabled: false },
+    }
+
     res.json({
       maya_enabled: location?.maya_enabled ?? true,
       escalation_phone: location?.escalation_phone ?? null,
@@ -183,6 +242,14 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       telnyx_number: location?.telnyx_number ?? null,
       vertical,
       business_hours: businessHours,
+      after_hours_enabled: location?.after_hours_enabled ?? false,
+      after_hours_schedule: location?.business_hours ?? defaultSchedule,
+      after_hours_message:
+        location?.after_hours_message ??
+        'We are currently closed. Please leave your name and number and we will call you back during business hours.',
+      timezone: location?.timezone ?? 'America/Chicago',
+      video_conferencing_enabled: location?.video_conferencing_enabled ?? false,
+      video_provider: location?.video_provider ?? 'google_meet',
     })
   } catch (err) {
     console.error('[maya-settings] PUT error:', err)

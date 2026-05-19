@@ -19,6 +19,8 @@ export interface Appointment {
   notes: string | null
   contacts: { full_name: string } | null
   staff_members: { id: string; name: string; color_hex: string } | null
+  video_link?: string | null
+  video_provider?: string | null
 }
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
@@ -427,7 +429,17 @@ export default function AppointmentDrawer({
             </div>
 
             {/* Read footer */}
-            <div className="px-6 py-4 border-t border-border-brand">
+            <div className="px-6 py-4 border-t border-border-brand space-y-2">
+              {localAppt.video_link && (
+                <a
+                  href={localAppt.video_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center px-4 py-2 bg-teal-50 text-teal-700 border border-teal-200 text-sm font-medium rounded-lg hover:bg-teal-100 transition-colors"
+                >
+                  Join Video Call →
+                </a>
+              )}
               <button
                 onClick={enterEdit}
                 className="block w-full text-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

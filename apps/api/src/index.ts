@@ -65,6 +65,9 @@ import voiceTestRouter from './routes/voice-test.js'
 import scheduledReportsRouter from './routes/scheduled-reports.js'
 import paymentLinksRouter from './routes/payment-links.js'
 import paymentsRouter from './routes/payments.js'
+import availabilitySchedulesRouter from './routes/availability-schedules.js'
+import calendarGroupsRouter from './routes/calendar-groups.js'
+import googleReserveRouter from './routes/google-reserve.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -165,6 +168,9 @@ app.use('/api/voice', voiceTestRouter)
 app.use('/api/scheduled-reports', scheduledReportsRouter)
 app.use('/api/payment-links', paymentLinksRouter)
 app.use('/api/payments', paymentsRouter)
+app.use('/api/availability-schedules', availabilitySchedulesRouter)
+app.use('/api/calendar-groups', calendarGroupsRouter)
+app.use('/api/google-reserve', googleReserveRouter)
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

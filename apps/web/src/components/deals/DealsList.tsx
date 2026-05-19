@@ -23,7 +23,6 @@ function tagColorClass(tag: string): string {
 interface Pipeline {
   id: string
   name: string
-  description: string | null
   is_default: boolean
   pipeline_type: string
   stage_count: number
@@ -49,23 +48,34 @@ interface Deal {
   is_closed_lost: boolean
   stage_name: string | null
   stage_color: string | null
+  source?: string | null
+  updated_at?: string | null
+  created_at?: string | null
   tags?: string[]
 }
+
+type SortCol = 'title' | 'value' | 'stage_name' | 'source' | 'updated_at' | null
+
+const PAGE_SIZE = 25
 
 function formatValue(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k`
   return `$${v.toFixed(0)}`
 }
 
-function closeDateStatus(d: string | null): 'overdue' | 'soon' | 'ok' | null {
-  if (!d) return null
-  const diff = new Date(d).getTime() - Date.now()
-  if (diff < 0) return 'overdue'
-  if (diff < 7 * 86400000) return 'soon'
-  return 'ok'
+function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diff / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo ago`
+  return `${Math.floor(months / 12)}y ago`
 }
 
-export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNode }) {
+export default function DealsList({ viewToggle }: { viewToggle?: React.ReactNode }) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -76,6 +86,11 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
   const [stages, setStages] = useState<Stage[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
+
+  const [sortCol, setSortCol] = useState<SortCol>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null)
+  const [page, setPage] = useState(1)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false)
@@ -97,7 +112,6 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
   const contactSearchRef = useRef<HTMLDivElement>(null)
   const contactDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch pipelines on mount
   useEffect(() => {
     void (async () => {
       try {
@@ -118,26 +132,18 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
           setLoading(false)
         }
       } catch {
-        // silently fail — fallback to old behaviour below
         setActivePipelineId('__legacy__')
       }
     })()
   }, [])
 
-  const fetchBoardData = useCallback(async (pipelineId: string) => {
+  const fetchData = useCallback(async (pipelineId: string) => {
     setLoading(true)
     try {
-      let stagesUrl: string
-      let dealsUrl: string
-
-      if (pipelineId === '__legacy__') {
-        // Fallback: use old stages endpoint when no pipelines API available
-        stagesUrl = `/api/contacts/stages`
-        dealsUrl = `/api/deals`
-      } else {
-        stagesUrl = `/api/pipelines/${pipelineId}`
-        dealsUrl = `/api/deals?pipeline_id=${pipelineId}`
-      }
+      const stagesUrl =
+        pipelineId === '__legacy__' ? `/api/contacts/stages` : `/api/pipelines/${pipelineId}`
+      const dealsUrl =
+        pipelineId === '__legacy__' ? `/api/deals` : `/api/deals?pipeline_id=${pipelineId}`
 
       const [stagesRes, dealsRes] = await Promise.all([
         fetch(stagesUrl, { credentials: 'include' }),
@@ -145,9 +151,7 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
       ])
 
       if (stagesRes.ok) {
-        const data = (await stagesRes.json()) as
-          | { stages: Stage[] }
-          | { id: string; name: string; stages: Stage[] }
+        const data = (await stagesRes.json()) as { stages: Stage[] }
         const list = 'stages' in data ? data.stages : []
         setStages(list.sort((a, b) => a.position - b.position))
       }
@@ -163,8 +167,8 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
 
   useEffect(() => {
     if (!activePipelineId) return
-    void fetchBoardData(activePipelineId)
-  }, [activePipelineId, fetchBoardData])
+    void fetchData(activePipelineId)
+  }, [activePipelineId, fetchData])
 
   // Close contact dropdown on outside click
   useEffect(() => {
@@ -176,6 +180,16 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
     if (contactDropOpen) document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [contactDropOpen])
+
+  // Close ··· menu on outside click
+  useEffect(() => {
+    if (!openMenu) return
+    function handler(e: MouseEvent) {
+      if (!(e.target as Element).closest('[data-menu]')) setOpenMenu(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openMenu])
 
   function handleContactSearch(q: string) {
     setContactSearch(q)
@@ -204,24 +218,56 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
     }, 250)
   }
 
-  const switchPipeline = (id: string) => {
+  function switchPipeline(id: string) {
     setActivePipelineId(id)
     const params = new URLSearchParams(searchParams.toString())
     params.set('pipeline', id)
     router.replace(`/deals?${params.toString()}`)
   }
 
-  const moveDeal = async (dealId: string, stageId: string) => {
-    // Optimistic update
+  function cycleSort(col: SortCol) {
+    setPage(1)
+    if (sortCol !== col) {
+      setSortCol(col)
+      setSortDir('asc')
+    } else if (sortDir === 'asc') {
+      setSortDir('desc')
+    } else {
+      setSortCol(null)
+      setSortDir(null)
+    }
+  }
+
+  async function markWon(id: string) {
+    setOpenMenu(null)
     setDeals((prev) =>
-      prev.map((d) => (d.id === dealId ? { ...d, pipeline_stage_id: stageId } : d))
+      prev.map((d) => (d.id === id ? { ...d, is_closed_won: true, is_closed_lost: false } : d))
     )
-    await fetch(`/api/deals/${dealId}`, {
+    await fetch(`/api/deals/${id}`, {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pipeline_stage_id: stageId }),
+      body: JSON.stringify({ is_closed_won: true, is_closed_lost: false }),
     })
+  }
+
+  async function markLost(id: string) {
+    setOpenMenu(null)
+    setDeals((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, is_closed_lost: true, is_closed_won: false } : d))
+    )
+    await fetch(`/api/deals/${id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_closed_lost: true, is_closed_won: false }),
+    })
+  }
+
+  async function deleteDeal(id: string) {
+    setOpenMenu(null)
+    setDeals((prev) => prev.filter((d) => d.id !== id))
+    await fetch(`/api/deals/${id}`, { method: 'DELETE', credentials: 'include' })
   }
 
   const createDeal = async () => {
@@ -251,22 +297,60 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
         setSelectedContact(null)
         setContactResults([])
         setShowCreate(false)
-        if (activePipelineId) void fetchBoardData(activePipelineId)
+        if (activePipelineId) void fetchData(activePipelineId)
       }
     } finally {
       setSaving(false)
     }
   }
 
-  // Group deals by stage
-  const grouped = new Map<string, Deal[]>()
-  for (const stage of stages) grouped.set(stage.id, [])
-  for (const deal of deals) {
-    if (deal.pipeline_stage_id && grouped.has(deal.pipeline_stage_id)) {
-      grouped.get(deal.pipeline_stage_id)!.push(deal)
-    } else if (stages[0]) {
-      grouped.get(stages[0].id)?.push(deal)
+  // Sort
+  const sorted = [...deals].sort((a, b) => {
+    if (!sortCol || !sortDir) return 0
+    let av: string | number | null = null
+    let bv: string | number | null = null
+    if (sortCol === 'title') {
+      av = a.title
+      bv = b.title
+    } else if (sortCol === 'value') {
+      av = Number(a.value)
+      bv = Number(b.value)
+    } else if (sortCol === 'stage_name') {
+      av = a.stage_name ?? ''
+      bv = b.stage_name ?? ''
+    } else if (sortCol === 'source') {
+      av = a.source ?? ''
+      bv = b.source ?? ''
+    } else if (sortCol === 'updated_at') {
+      av = a.updated_at ?? ''
+      bv = b.updated_at ?? ''
     }
+    if (av === null || bv === null) return 0
+    const cmp = typeof av === 'number' ? av - (bv as number) : String(av).localeCompare(String(bv))
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const total = sorted.length
+  const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+
+  const activeDeals = deals.filter((d) => !d.is_closed_won && !d.is_closed_lost)
+
+  function SortArrow({ col }: { col: SortCol }) {
+    if (sortCol !== col) return <span className="ml-1 text-ink4 opacity-40">⇅</span>
+    return <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
+  }
+
+  function Th({ col, label, className = '' }: { col: SortCol; label: string; className?: string }) {
+    return (
+      <th
+        className={`px-4 py-2.5 text-left text-xs font-semibold text-ink3 cursor-pointer select-none hover:text-ink2 whitespace-nowrap ${className}`}
+        onClick={() => cycleSort(col)}
+      >
+        {label}
+        <SortArrow col={col} />
+      </th>
+    )
   }
 
   if (loading) return <div className="px-8 py-8 text-center text-sm text-ink4">Loading...</div>
@@ -277,14 +361,9 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
         <div>
           <h1 className="text-xl font-bold text-ink">Deals</h1>
           <p className="text-sm text-ink3 mt-0.5">
-            {deals.filter((d) => !d.is_closed_won && !d.is_closed_lost).length} active deals
-            {' \u00B7 '}
-            {formatValue(
-              deals
-                .filter((d) => !d.is_closed_won && !d.is_closed_lost)
-                .reduce((s, d) => s + Number(d.value), 0)
-            )}{' '}
-            pipeline
+            {activeDeals.length} active deals
+            {' · '}
+            {formatValue(activeDeals.reduce((s, d) => s + Number(d.value), 0))} pipeline
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -305,7 +384,7 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
         </div>
       </div>
 
-      {/* Pipeline tab bar */}
+      {/* Pipeline tabs */}
       {pipelines.length > 0 && (
         <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-border-brand pb-0">
           {pipelines.map((p) => (
@@ -363,7 +442,6 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
             />
           </div>
 
-          {/* Contact search */}
           <div className="relative mb-3" ref={contactSearchRef}>
             <input
               type="text"
@@ -422,116 +500,174 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
         </div>
       )}
 
-      {/* Kanban */}
-      <div className="overflow-x-auto flex-1">
-        <div className="flex gap-4 h-full pb-4" style={{ minWidth: `${stages.length * 272}px` }}>
-          {stages.map((stage) => {
-            const cards = grouped.get(stage.id) ?? []
-            const stageValue = cards.reduce((s, d) => s + Number(d.value), 0)
-
-            return (
-              <div key={stage.id} className="w-64 shrink-0 flex flex-col">
-                <div className="flex items-center gap-2 mb-3">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: stage.color }}
-                  />
-                  <span className="text-xs font-semibold text-ink2 truncate">{stage.name}</span>
-                  <span className="ml-auto text-xs font-medium text-ink4 bg-bg2 px-1.5 py-0.5 rounded-full">
-                    {cards.length}
-                  </span>
-                </div>
-                {stageValue > 0 && (
-                  <p className="text-[10px] text-ink4 mb-2">{formatValue(stageValue)}</p>
-                )}
-
-                <div className="flex flex-col gap-2 flex-1">
-                  {cards.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border-brand px-4 py-6 text-center">
-                      <p className="text-xs text-gray-300">No deals</p>
-                    </div>
-                  ) : (
-                    cards.map((deal) => {
-                      const dateStatus = closeDateStatus(deal.close_date)
-                      return (
-                        <div
-                          key={deal.id}
-                          className="bg-white rounded-xl border border-border-brand px-4 py-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => router.push(`/deals/${deal.id}`)}
-                        >
-                          <p className="text-sm font-medium text-ink truncate mb-1">{deal.title}</p>
-                          <p className="text-sm font-semibold text-teal-600 mb-1">
-                            {formatValue(Number(deal.value))}
-                          </p>
-                          {(deal.contact_name || deal.company_name) && (
-                            <p className="text-[11px] text-ink4 truncate mb-1">
-                              {deal.contact_name}
-                              {deal.contact_name && deal.company_name ? ' \u00B7 ' : ''}
-                              {deal.company_name}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2">
-                            {deal.close_date && (
-                              <span
-                                className={`text-[10px] ${dateStatus === 'overdue' ? 'text-red-600 font-medium' : dateStatus === 'soon' ? 'text-amber-600' : 'text-ink4'}`}
-                              >
-                                {new Date(deal.close_date).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </span>
-                            )}
-                            <span className="text-[10px] text-ink4 bg-bg2 px-1 py-0.5 rounded">
-                              {deal.probability}%
-                            </span>
-                          </div>
-                          {/* Stage selector */}
-                          <select
-                            value={deal.pipeline_stage_id ?? ''}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              void moveDeal(deal.id, e.target.value)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-2 w-full text-[10px] border border-border-brand rounded px-1 py-0.5 text-ink3"
+      {/* Table */}
+      <div className="flex-1 overflow-auto rounded-xl border border-border-brand">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-bg2 border-b border-border-brand">
+            <tr>
+              <Th col="title" label="Name" />
+              <Th col="value" label="Value" />
+              <Th col="stage_name" label="Stage" />
+              <Th col="source" label="Source" />
+              <Th col="updated_at" label="Last Activity" />
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink3">Tags</th>
+              <th className="px-4 py-2.5 w-10" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-brand bg-white">
+            {paged.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-ink4">
+                  No deals
+                </td>
+              </tr>
+            ) : (
+              paged.map((deal) => (
+                <tr
+                  key={deal.id}
+                  className={`cursor-pointer hover:bg-bg transition-colors ${
+                    deal.is_closed_won ? 'bg-green-50/30' : deal.is_closed_lost ? 'opacity-70' : ''
+                  }`}
+                  onClick={() => router.push(`/deals/${deal.id}`)}
+                >
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-ink truncate max-w-[200px]">{deal.title}</p>
+                    {(deal.contact_name || deal.company_name) && (
+                      <p className="text-xs text-ink4 truncate max-w-[200px]">
+                        {deal.contact_name}
+                        {deal.contact_name && deal.company_name ? ' · ' : ''}
+                        {deal.company_name}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-teal-600 whitespace-nowrap">
+                    {formatValue(Number(deal.value))}
+                  </td>
+                  <td className="px-4 py-3">
+                    {deal.stage_name ? (
+                      <span className="bg-bg2 text-ink3 rounded-full px-2 py-0.5 text-xs whitespace-nowrap">
+                        {deal.stage_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink4">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-ink3 text-xs">{deal.source ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink4 text-xs whitespace-nowrap">
+                    {formatRelative(deal.updated_at ?? deal.created_at)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {deal.tags && deal.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {deal.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full border ${tagColorClass(tag)}`}
                           >
-                            {stages.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </select>
-                          {/* Tag chips */}
-                          {deal.tags && deal.tags.length > 0 && (
-                            <div
-                              className="flex flex-wrap gap-1 mt-2"
-                              onClick={(e) => e.stopPropagation()}
+                            {tag}
+                          </span>
+                        ))}
+                        {deal.tags.length > 2 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg2 text-ink4 border border-border-brand">
+                            +{deal.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-ink4">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative" data-menu>
+                      <button
+                        className="p-1 rounded hover:bg-bg2 text-ink3 hover:text-ink leading-none"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpenMenu(openMenu === deal.id ? null : deal.id)
+                        }}
+                      >
+                        ···
+                      </button>
+                      {openMenu === deal.id && (
+                        <div className="absolute right-0 top-full z-50 mt-1 bg-white border border-border-brand rounded-lg shadow-lg w-36 py-1">
+                          <button
+                            className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-bg"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/deals/${deal.id}`)
+                            }}
+                          >
+                            Edit
+                          </button>
+                          {!deal.is_closed_won && (
+                            <button
+                              className="w-full text-left px-3 py-1.5 text-xs text-green-700 hover:bg-bg"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void markWon(deal.id)
+                              }}
                             >
-                              {deal.tags.slice(0, 2).map((tag) => (
-                                <span
-                                  key={tag}
-                                  className={`text-[10px] px-1.5 py-0.5 rounded-full border ${tagColorClass(tag)}`}
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {deal.tags.length > 2 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg2 text-ink4 border border-border-brand">
-                                  +{deal.tags.length - 2}
-                                </span>
-                              )}
-                            </div>
+                              Mark Won
+                            </button>
                           )}
+                          {!deal.is_closed_lost && (
+                            <button
+                              className="w-full text-left px-3 py-1.5 text-xs text-ink3 hover:bg-bg"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void markLost(deal.id)
+                              }}
+                            >
+                              Mark Lost
+                            </button>
+                          )}
+                          <button
+                            className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-bg"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void deleteDeal(deal.id)
+                            }}
+                          >
+                            Delete
+                          </button>
                         </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
+
+      {/* Pagination */}
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between pt-3 border-t border-border-brand mt-3 shrink-0">
+          <span className="text-xs text-ink4">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 text-xs rounded border border-border-brand text-ink3 hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-ink4 px-2">
+              {page} / {totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 text-xs rounded border border-border-brand text-ink3 hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

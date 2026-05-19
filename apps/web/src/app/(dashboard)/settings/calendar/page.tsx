@@ -71,6 +71,16 @@ function CalendarSettingsContent() {
   const [disconnecting, setDisconnecting] = useState(false)
   const [switchConfirm, setSwitchConfirm] = useState<'google' | 'outlook' | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [videoEnabled, setVideoEnabled] = useState(false)
+  const [savingVideo, setSavingVideo] = useState(false)
+  const [primaryLocationId, setPrimaryLocationId] = useState<string | null>(null)
+  const [reserveStatus, setReserveStatus] = useState<
+    'not_submitted' | 'pending_approval' | 'approved' | 'rejected'
+  >('not_submitted')
+  const [placeId, setPlaceId] = useState('')
+  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const [submittingReserve, setSubmittingReserve] = useState(false)
+  const [savingPlaceId, setSavingPlaceId] = useState(false)
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -80,10 +90,42 @@ function CalendarSettingsContent() {
   const fetchStatus = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/settings/calendar`)
-      if (res.ok) {
-        const data: CalendarStatus = await res.json()
+      const [calRes, mayaRes, locRes] = await Promise.all([
+        fetch(`/api/settings/calendar`),
+        fetch(`/api/maya-settings`),
+        fetch(`/api/locations`),
+      ])
+      if (calRes.ok) {
+        const data: CalendarStatus = await calRes.json()
         setStatus(data)
+      }
+      if (mayaRes.ok) {
+        const maya = (await mayaRes.json()) as { video_conferencing_enabled?: boolean }
+        setVideoEnabled(maya.video_conferencing_enabled ?? false)
+      }
+      if (locRes.ok) {
+        const locs = (await locRes.json()) as {
+          id: string
+          is_primary: boolean
+        }[]
+        const primary = locs.find((l) => l.is_primary)
+        if (primary) {
+          setPrimaryLocationId(primary.id)
+          const reserveRes = await fetch(`/api/google-reserve/status/${primary.id}`)
+          if (reserveRes.ok) {
+            const r = (await reserveRes.json()) as {
+              status: string
+              merchant_id: string | null
+              place_id: string | null
+            }
+            setReserveStatus(
+              (r.status as 'not_submitted' | 'pending_approval' | 'approved' | 'rejected') ??
+                'not_submitted'
+            )
+            setPlaceId(r.place_id ?? '')
+            setMerchantId(r.merchant_id ?? null)
+          }
+        }
       }
     } catch {
       // silently fail
@@ -188,6 +230,67 @@ function CalendarSettingsContent() {
       handleConnectGoogle()
     } else {
       handleConnectOutlook()
+    }
+  }
+
+  async function saveVideoSettings(enabled: boolean) {
+    setSavingVideo(true)
+    try {
+      const res = await fetch(`/api/maya-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_conferencing_enabled: enabled }),
+      })
+      if (res.ok) {
+        setVideoEnabled(enabled)
+        showToast('success', `Video conferencing ${enabled ? 'enabled' : 'disabled'}`)
+      } else {
+        showToast('error', 'Failed to update video conferencing setting')
+      }
+    } catch {
+      showToast('error', 'Network error')
+    } finally {
+      setSavingVideo(false)
+    }
+  }
+
+  async function savePlaceIdToLocation() {
+    if (!primaryLocationId || !placeId.trim()) return
+    setSavingPlaceId(true)
+    try {
+      await fetch(`/api/locations/${primaryLocationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_place_id: placeId.trim() }),
+      })
+    } catch {
+      // non-fatal
+    } finally {
+      setSavingPlaceId(false)
+    }
+  }
+
+  async function handleReserveSubmit() {
+    if (!primaryLocationId) return
+    setSubmittingReserve(true)
+    try {
+      await savePlaceIdToLocation()
+      const res = await fetch(`/api/google-reserve/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId: primaryLocationId }),
+      })
+      const data = (await res.json()) as { status?: string; message?: string; error?: string }
+      if (res.ok) {
+        setReserveStatus('pending_approval')
+        showToast('success', data.message ?? 'Submitted for review')
+      } else {
+        showToast('error', data.error ?? 'Submission failed')
+      }
+    } catch {
+      showToast('error', 'Network error')
+    } finally {
+      setSubmittingReserve(false)
     }
   }
 
@@ -303,6 +406,127 @@ function CalendarSettingsContent() {
               </span>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* Video Conferencing Card */}
+      <div className="rounded-xl border border-border-brand bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Video Conferencing</h2>
+          <p className="text-xs text-ink4 mt-0.5">
+            Automatically generate a Google Meet link for each new appointment.
+          </p>
+        </div>
+        <div className="px-5 py-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-ink">Auto-generate video links</p>
+            <p className="text-xs text-ink4 mt-0.5">
+              Provider: Google Meet
+              {!status?.connected && ' — connect a calendar above to use Google Meet'}
+            </p>
+          </div>
+          <button
+            onClick={() => void saveVideoSettings(!videoEnabled)}
+            disabled={savingVideo}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
+              videoEnabled ? 'bg-teal-600' : 'bg-gray-200'
+            }`}
+            role="switch"
+            aria-checked={videoEnabled}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
+                videoEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Google Organic Booking Card */}
+      <div className="rounded-xl border border-border-brand bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-brand flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Google Organic Booking</h2>
+            <p className="text-xs text-ink4 mt-0.5">
+              Add a &quot;Book&quot; button to your Google Search and Maps listing — free.
+            </p>
+          </div>
+          {/* Status badge */}
+          {reserveStatus === 'not_submitted' && (
+            <span className="text-[11px] font-medium text-ink4 bg-gray-100 rounded-full px-2.5 py-0.5">
+              Not Submitted
+            </span>
+          )}
+          {reserveStatus === 'pending_approval' && (
+            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
+              Pending Approval
+            </span>
+          )}
+          {reserveStatus === 'approved' && (
+            <span className="text-[11px] font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">
+              ✓ Live on Google
+            </span>
+          )}
+          {reserveStatus === 'rejected' && (
+            <span className="text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+              Rejected
+            </span>
+          )}
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+          <p className="text-sm text-ink3">
+            Customers can book directly from Google Search and Maps results — no redirect needed.
+            Requires Google partner approval (typically 2–4 weeks).
+          </p>
+
+          {reserveStatus === 'pending_approval' && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+              Under review — Google typically responds in 2–4 weeks.
+            </div>
+          )}
+
+          {reserveStatus === 'approved' && merchantId && (
+            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+              <p className="text-sm font-semibold text-green-800">Live on Google ✓</p>
+              <p className="text-xs text-green-700 mt-0.5">Merchant ID: {merchantId}</p>
+            </div>
+          )}
+
+          {reserveStatus !== 'approved' && (
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-1">Google Place ID</label>
+              <input
+                type="text"
+                value={placeId}
+                onChange={(e) => setPlaceId(e.target.value)}
+                placeholder="ChIJ..."
+                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+              <p className="text-xs text-ink4 mt-1">
+                Find yours at{' '}
+                <a
+                  href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-600 underline"
+                >
+                  developers.google.com/maps/…/place-id
+                </a>
+              </p>
+            </div>
+          )}
+
+          {(reserveStatus === 'not_submitted' || reserveStatus === 'rejected') && (
+            <button
+              onClick={() => void handleReserveSubmit()}
+              disabled={submittingReserve || savingPlaceId || !placeId.trim()}
+              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {submittingReserve ? 'Submitting…' : 'Submit for Review'}
+            </button>
+          )}
         </div>
       </div>
 

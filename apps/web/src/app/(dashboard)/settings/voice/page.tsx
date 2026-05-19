@@ -4,6 +4,12 @@ import { VERTICALS } from '@nuatis/shared'
 import VoiceSettingsForm from './VoiceSettingsForm'
 import TestMayaPanel from './TestMayaPanel'
 
+interface DaySchedule {
+  open: string
+  close: string
+  enabled: boolean
+}
+
 interface LocationSettings {
   maya_enabled: boolean
   escalation_phone: string | null
@@ -12,6 +18,10 @@ interface LocationSettings {
   preferred_languages: string[]
   appointment_duration_default: number
   telnyx_number: string | null
+  after_hours_enabled: boolean | null
+  business_hours: Record<string, DaySchedule> | null
+  after_hours_message: string | null
+  timezone: string | null
 }
 
 export default async function VoiceSettingsPage() {
@@ -23,7 +33,7 @@ export default async function VoiceSettingsPage() {
   const { data: location } = await supabase
     .from('locations')
     .select(
-      'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number'
+      'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone'
     )
     .eq('tenant_id', tenantId)
     .eq('is_primary', true)
@@ -36,6 +46,16 @@ export default async function VoiceSettingsPage() {
     sun: 'closed',
   }
 
+  const defaultSchedule: Record<string, DaySchedule> = {
+    mon: { open: '09:00', close: '17:00', enabled: true },
+    tue: { open: '09:00', close: '17:00', enabled: true },
+    wed: { open: '09:00', close: '17:00', enabled: true },
+    thu: { open: '09:00', close: '17:00', enabled: true },
+    fri: { open: '09:00', close: '17:00', enabled: true },
+    sat: { open: '09:00', close: '13:00', enabled: false },
+    sun: { open: '09:00', close: '13:00', enabled: false },
+  }
+
   const settings = {
     maya_enabled: location?.maya_enabled ?? true,
     escalation_phone: location?.escalation_phone ?? '',
@@ -45,6 +65,12 @@ export default async function VoiceSettingsPage() {
     appointment_duration_default: location?.appointment_duration_default ?? 60,
     telnyx_number: location?.telnyx_number ?? null,
     business_hours: businessHours,
+    after_hours_enabled: location?.after_hours_enabled ?? false,
+    after_hours_schedule: location?.business_hours ?? defaultSchedule,
+    after_hours_message:
+      location?.after_hours_message ??
+      'We are currently closed. Please leave your name and number and we will call you back during business hours.',
+    timezone: location?.timezone ?? 'America/Chicago',
   }
 
   return (

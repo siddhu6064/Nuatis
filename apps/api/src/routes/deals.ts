@@ -270,6 +270,42 @@ router.get(
   }
 )
 
+// ── GET /api/deals/tags ──────────────────────────────────────────────────────
+const dealTagsCache = new Map<string, { tags: string[]; expiry: number }>()
+
+router.get(
+  '/tags',
+  requireAuth,
+  requireDeals,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    const cacheKey = authed.tenantId
+    const cached = dealTagsCache.get(cacheKey)
+    if (cached && cached.expiry > Date.now()) {
+      res.json({ tags: cached.tags })
+      return
+    }
+
+    const { data: rows } = await supabase
+      .from('deals')
+      .select('tags')
+      .eq('tenant_id', authed.tenantId)
+      .not('tags', 'eq', '{}')
+
+    const tagSet = new Set<string>()
+    for (const row of rows ?? []) {
+      const arr = row.tags as string[] | null
+      if (arr) arr.forEach((t: string) => tagSet.add(t))
+    }
+
+    const tags = [...tagSet].sort()
+    dealTagsCache.set(cacheKey, { tags, expiry: Date.now() + 5 * 60 * 1000 })
+    res.json({ tags })
+  }
+)
+
 // ── GET /api/deals/:id ───────────────────────────────────────────────────────
 router.get(
   '/:id',
@@ -420,6 +456,10 @@ router.put(
     if (typeof b['assigned_to_user_id'] === 'string')
       updates['assigned_to_user_id'] = b['assigned_to_user_id']
     if (b['assigned_to_user_id'] === null) updates['assigned_to_user_id'] = null
+    if (Array.isArray(b['tags']))
+      updates['tags'] = (b['tags'] as unknown[]).filter((t) => typeof t === 'string')
+    // Invalidate tag cache on tag update
+    if (Array.isArray(b['tags'])) dealTagsCache.delete(authed.tenantId)
 
     const { data: updated, error } = await supabase
       .from('deals')

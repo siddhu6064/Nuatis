@@ -2,6 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const PRESET_COLORS = [
+  '#007A6E',
+  '#0047FF',
+  '#7C3AED',
+  '#006B3F',
+  '#C07D00',
+  '#E84A00',
+  '#C0003C',
+  '#0891B2',
+  '#059669',
+  '#D97706',
+  '#DC2626',
+  '#6B7280',
+]
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Pipeline {
@@ -38,6 +55,7 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
   const [addingName, setAddingName] = useState('')
   const [adding, setAdding] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
+  const [colorPickerStageId, setColorPickerStageId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/pipelines/${pipelineId}`, { credentials: 'include' })
@@ -51,6 +69,14 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setColorPickerStageId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function showErr(msg: string) {
     setErrMsg(msg)
@@ -86,6 +112,22 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
     } else {
       const d = (await res.json().catch(() => ({}))) as { error?: string }
       showErr(d.error ?? 'Failed to delete stage')
+    }
+  }
+
+  async function setStageColor(stageId: string, color: string) {
+    setStages((prev) => prev.map((s) => (s.id === stageId ? { ...s, color } : s)))
+    setColorPickerStageId(null)
+    const res = await fetch(`/api/pipelines/${pipelineId}/stages/${stageId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ color }),
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string }
+      showErr(d.error ?? 'Failed to update color')
+      void load()
     }
   }
 
@@ -133,10 +175,44 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
               <span className="font-mono text-[10px] text-ink4 w-4 shrink-0 text-right">
                 {idx + 1}
               </span>
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: stage.color || '#0d9488' }}
-              />
+              {/* Color swatch button */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  title="Change color"
+                  className="w-5 h-5 rounded-full border border-rule flex items-center justify-center hover:ring-2 hover:ring-offset-1 hover:ring-teal-400 transition-shadow"
+                  style={{ backgroundColor: stage.color || '#007A6E' }}
+                  onClick={() =>
+                    setColorPickerStageId((prev) => (prev === stage.id ? null : stage.id))
+                  }
+                />
+                {colorPickerStageId === stage.id && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setColorPickerStageId(null)}
+                    />
+                    <div className="absolute top-7 left-0 z-50 bg-white border border-border-brand rounded-lg p-2 shadow-lg">
+                      <div className="grid grid-cols-6 gap-1">
+                        {PRESET_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            title={c}
+                            className={`w-6 h-6 rounded-full cursor-pointer transition-shadow hover:ring-2 hover:ring-offset-1 hover:ring-ink3 ${
+                              (stage.color || '#007A6E') === c
+                                ? 'ring-2 ring-offset-1 ring-teal-600'
+                                : ''
+                            }`}
+                            style={{ backgroundColor: c }}
+                            onClick={() => void setStageColor(stage.id, c)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               {editingId === stage.id ? (
                 <input
                   autoFocus

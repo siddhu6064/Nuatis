@@ -12,6 +12,8 @@ interface Appointment {
   notes: string | null
   contacts: { full_name: string } | null
   staff_members: { id: string; name: string; color_hex: string } | null
+  is_blocked?: boolean
+  block_reason?: string | null
 }
 
 interface StaffMember {
@@ -41,7 +43,7 @@ export default async function AppointmentsPage() {
     supabase
       .from('appointments')
       .select(
-        'id, title, start_time, end_time, status, notes, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
+        'id, title, start_time, end_time, status, notes, is_blocked, block_reason, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
       )
       .eq('tenant_id', tenantId)
       .gte('start_time', windowStart.toISOString())

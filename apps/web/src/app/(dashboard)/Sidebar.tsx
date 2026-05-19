@@ -70,6 +70,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/booking', label: 'Online Booking', icon: '📅', suiteOnly: true },
       { href: '/settings/intake-forms', label: 'Intake Forms', icon: '📋', suiteOnly: true },
       { href: '/settings/calendar', label: 'Calendar', icon: '📆', suiteOnly: true },
+      { href: '/settings/availability', label: 'Availability', icon: '🕐', suiteOnly: true },
+      { href: '/settings/calendar-groups', label: 'Calendar Groups', icon: '◈', suiteOnly: true },
     ],
   },
   {
