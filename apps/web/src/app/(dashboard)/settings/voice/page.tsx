@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { VERTICALS } from '@nuatis/shared'
 import VoiceSettingsForm from './VoiceSettingsForm'
 import TestMayaPanel from './TestMayaPanel'
+import KnowledgeFilesCard from './KnowledgeFilesCard'
 
 interface DaySchedule {
   open: string
@@ -56,6 +57,12 @@ export default async function VoiceSettingsPage() {
     sun: { open: '09:00', close: '13:00', enabled: false },
   }
 
+  const { data: kbFiles } = await supabase
+    .from('maya_kb_files')
+    .select('id, file_name, file_size, status, created_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+
   const settings = {
     maya_enabled: location?.maya_enabled ?? true,
     escalation_phone: location?.escalation_phone ?? '',
@@ -82,6 +89,7 @@ export default async function VoiceSettingsPage() {
 
       <TestMayaPanel />
       <VoiceSettingsForm settings={settings} />
+      <KnowledgeFilesCard initialFiles={kbFiles ?? []} />
     </div>
   )
 }
