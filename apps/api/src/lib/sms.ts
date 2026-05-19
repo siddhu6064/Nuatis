@@ -75,6 +75,23 @@ export async function sendSms(
           status: 'read',
           read_at: new Date().toISOString(),
         })
+
+        // Also log to sms_messages for AI-aware thread view
+        try {
+          await supabase.from('sms_messages').insert({
+            tenant_id: options.tenantId,
+            contact_id: options.contactId ?? null,
+            direction: 'outbound',
+            body: text,
+            from_number: from,
+            to_number: to,
+            message_sid: messageId ?? null,
+            status: 'sent',
+            ai_handled: false,
+          })
+        } catch (err) {
+          console.error('[sms] failed to log to sms_messages:', err)
+        }
       } catch (err) {
         console.error('[sms] failed to log outbound SMS:', err)
       }
