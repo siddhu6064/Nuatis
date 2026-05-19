@@ -1,6 +1,19 @@
-import { describe, it, expect } from '@jest/globals'
-import { starRatingToInt, buildAiReplyPrompt, fetchGbpInsights } from './gbp-sync.js'
+import { describe, it, expect, jest } from '@jest/globals'
 import type { GbpInsights } from '@nuatis/shared'
+
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: jest.fn(() => ({
+    from: jest.fn(() => ({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+      })),
+    })),
+  })),
+}))
+
+import { starRatingToInt, buildAiReplyPrompt, fetchGbpInsights } from './gbp-sync.js'
 
 describe('starRatingToInt', () => {
   it('maps all GBP star rating strings to integers', () => {
