@@ -114,6 +114,7 @@ interface LocationAfterHoursConfig {
 interface LocationConfig {
   afterHoursConfig: LocationAfterHoursConfig | null
   businessProfile: BusinessProfile | null
+  kbFiles: Array<{ file_name: string; extracted_text: string }> | null
 }
 
 function isAfterHoursNow(
@@ -144,7 +145,7 @@ function isAfterHoursNow(
 }
 
 async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
-  const FALLBACK: LocationConfig = { afterHoursConfig: null, businessProfile: null }
+  const FALLBACK: LocationConfig = { afterHoursConfig: null, businessProfile: null, kbFiles: null }
   const FALLBACK_MESSAGE =
     'We are currently closed. Please leave your name and number and we will call you back during business hours.'
   try {
@@ -163,22 +164,32 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
 
     const query = (async (): Promise<LocationConfig> => {
       try {
-        const { data, error } = await supabase
-          .from('locations')
-          .select(
-            'after_hours_enabled, business_hours, after_hours_message, timezone, business_profile'
-          )
-          .eq('tenant_id', tenantId)
-          .eq('is_primary', true)
-          .single()
-        if (timedOut || error || !data) return FALLBACK
-        const d = data as {
+        const [locResult, kbResult] = await Promise.all([
+          supabase
+            .from('locations')
+            .select(
+              'after_hours_enabled, business_hours, after_hours_message, timezone, business_profile'
+            )
+            .eq('tenant_id', tenantId)
+            .eq('is_primary', true)
+            .single(),
+          supabase
+            .from('maya_kb_files')
+            .select('file_name, extracted_text')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'ready'),
+        ])
+
+        if (timedOut || locResult.error || !locResult.data) return FALLBACK
+
+        const d = locResult.data as {
           after_hours_enabled?: boolean
           business_hours?: Record<string, AfterHoursDayConfig>
           after_hours_message?: string
           timezone?: string
           business_profile?: BusinessProfile | null
         }
+
         const afterHoursConfig: LocationAfterHoursConfig | null = d.after_hours_enabled
           ? {
               afterHoursEnabled: true,
@@ -187,11 +198,26 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
               timezone: d.timezone ?? 'America/Chicago',
             }
           : null
+
         const businessProfile =
           d.business_profile && Object.keys(d.business_profile).length > 0
             ? d.business_profile
             : null
-        return { afterHoursConfig, businessProfile }
+
+        const rawKb = (kbResult.data ?? []) as Array<{
+          file_name: string
+          extracted_text: string | null
+        }>
+        const kbFiles = rawKb.filter(
+          (f): f is { file_name: string; extracted_text: string } =>
+            typeof f.extracted_text === 'string' && f.extracted_text.length > 0
+        )
+
+        return {
+          afterHoursConfig,
+          businessProfile,
+          kbFiles: kbFiles.length > 0 ? kbFiles : null,
+        }
       } catch {
         return FALLBACK
       }
@@ -363,7 +389,8 @@ export async function prewarmGemini(
     contextSuffix,
     callerContext.contactId ?? null,
     afterHoursPrefix,
-    businessProfile
+    businessProfile,
+    locationConfig.kbFiles
   )
 
   return new Promise<void>((resolve) => {

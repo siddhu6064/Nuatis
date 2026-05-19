@@ -10,7 +10,7 @@ import { VERTICALS } from '@nuatis/shared'
 import { FUNCTION_DECLARATIONS, executeToolCall, type ToolCallContext } from './tool-handlers.js'
 import { Sentry } from '../lib/sentry.js'
 import { getAllKnowledgeEntries } from '../services/embeddings.js'
-import { buildBusinessKnowledgeBlock } from './business-knowledge.js'
+import { buildBusinessKnowledgeBlock, buildKbFilesBlock } from './business-knowledge.js'
 import type { BusinessProfile } from '@nuatis/shared'
 
 export const BOOKING_CONTRACT = `
@@ -127,7 +127,8 @@ export async function createGeminiLiveSession(
   promptSuffix?: string,
   callerContactId?: string | null,
   afterHoursPrefix?: string,
-  businessProfile?: BusinessProfile | null
+  businessProfile?: BusinessProfile | null,
+  kbFiles?: Array<{ file_name: string; extracted_text: string }> | null
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -181,6 +182,14 @@ export async function createGeminiLiveSession(
     if (block) {
       systemPrompt += block
       console.info(`[gemini-live] injected business knowledge block for tenant=${tenantId}`)
+    }
+  }
+
+  if (kbFiles && kbFiles.length > 0) {
+    const kbBlock = buildKbFilesBlock(kbFiles)
+    if (kbBlock) {
+      systemPrompt += kbBlock
+      console.info(`[gemini-live] injected ${kbFiles.length} KB files for tenant=${tenantId}`)
     }
   }
 
