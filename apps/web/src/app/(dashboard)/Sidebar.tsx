@@ -129,6 +129,7 @@ const NAV_GROUPS: NavGroup[] = [
         suiteOnly: true,
       },
       { href: '/settings/automation', label: 'Review Auto', icon: '⭐', suiteOnly: true },
+      { href: '/reputation', label: 'Reputation', icon: '★', suiteOnly: true },
     ],
   },
   {
