@@ -4,6 +4,7 @@ import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 import { sendSms } from '../lib/sms.js'
 import { notifyOwner } from '../lib/notifications.js'
+import { isScannerPaused } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'review-request'
 
@@ -177,6 +178,11 @@ export function createReviewRequestWorker(): { queue: Queue; worker: Worker } {
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
+      const jobData = job.data as { tenantId: string }
+      if (await isScannerPaused(jobData.tenantId, QUEUE_NAME)) {
+        console.info(`[review-request] paused for tenant=${jobData.tenantId} — skipping`)
+        return
+      }
       await processReviewRequest(job.data as ReviewRequestJobData)
     },
     { connection }

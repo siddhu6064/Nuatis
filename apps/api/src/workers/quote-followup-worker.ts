@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { API_BASE_URL } from '../config/urls.js'
+import { isScannerPaused } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'quote-followup'
 
@@ -111,6 +112,11 @@ export function createQuoteFollowupWorker(): { queue: Queue; worker: Worker } {
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
+      const jobData = job.data as { tenantId: string }
+      if (await isScannerPaused(jobData.tenantId, QUEUE_NAME)) {
+        console.info(`[quote-followup] paused for tenant=${jobData.tenantId} — skipping`)
+        return
+      }
       await processFollowup(job.data as FollowupJobData)
     },
     { connection }

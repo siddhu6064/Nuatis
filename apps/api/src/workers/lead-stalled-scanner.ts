@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'lead-stalled-scanner'
 const STALE_DAYS = 7
@@ -19,6 +20,7 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const cutoff = new Date(Date.now() - STALE_DAYS * 86400000).toISOString()
 
     // Find contacts whose last activity (updated_at or last_contacted) is older than 7 days
@@ -55,6 +57,7 @@ export async function scan(): Promise<void> {
     let emitted = 0
 
     for (const contact of stalled) {
+      if (pausedTenants.has(contact.tenant_id)) continue
       tenantIds.add(contact.tenant_id)
 
       const lastActivity = contact.last_contacted

@@ -5,6 +5,7 @@ import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
@@ -22,6 +23,7 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const graceEnd = new Date(now - GRACE_MINUTES * 60000).toISOString()
     const maxAge = new Date(now - MAX_AGE_HOURS * 3600000).toISOString()
@@ -49,6 +51,7 @@ export async function scan(): Promise<void> {
     const apiKey = process.env['TELNYX_API_KEY'] ?? ''
 
     for (const appt of appointments) {
+      if (pausedTenants.has(appt.tenant_id)) continue
       // Mark as no_show
       const { error: updateErr } = await supabase
         .from('appointments')

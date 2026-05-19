@@ -92,6 +92,7 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       jobs_processed_7d,
       failed_jobs,
       is_paused: false,
+      pause_until: null,
     }
   } catch {
     return {
@@ -104,6 +105,7 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       jobs_processed_7d: 0,
       failed_jobs: [],
       is_paused: false,
+      pause_until: null,
     }
   }
 }

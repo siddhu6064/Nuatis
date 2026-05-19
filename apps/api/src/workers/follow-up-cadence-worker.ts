@@ -7,6 +7,7 @@ import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { sendTemplatedEmail } from '../lib/email-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { logActivity } from '../lib/activity.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'follow-up-cadence'
 const MAX_LOOKBACK_DAYS = 14
@@ -27,6 +28,7 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const lookbackCutoff = new Date(now - MAX_LOOKBACK_DAYS * 86400000).toISOString()
 
@@ -52,6 +54,7 @@ export async function scan(): Promise<void> {
     let sentCount = 0
 
     for (const contact of contacts) {
+      if (pausedTenants.has(contact.tenant_id)) continue
       try {
         const step = contact.follow_up_step ?? 0
 

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendPushNotification } from '../lib/push-client.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'follow-up-missed-scanner'
 const MIN_DAYS = 2
@@ -27,6 +28,7 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const minCutoff = new Date(now - MAX_DAYS * 86400000).toISOString()
     const maxCutoff = new Date(now - MIN_DAYS * 86400000).toISOString()
@@ -125,6 +127,7 @@ export async function scan(): Promise<void> {
 
     // Step 4: Emit events
     for (const m of missed) {
+      if (pausedTenants.has(m.tenant_id)) continue
       const hoursSince = Math.floor((now - new Date(m.last_contact_date).getTime()) / 3600000)
 
       void publishActivityEvent({

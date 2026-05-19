@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendSms } from '../lib/sms.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'appointment-reminder'
 
@@ -26,6 +27,7 @@ export async function scan(): Promise<void> {
 
   try {
     const supabase = getSupabase()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
 
     if (!process.env['TELNYX_API_KEY']) {
       console.warn('[appointment-reminder] SMS skipped — TELNYX_API_KEY not set or send failed')
@@ -62,6 +64,7 @@ export async function scan(): Promise<void> {
 
     // Process 24h reminders
     for (const appt of reminders24h ?? []) {
+      if (pausedTenants.has(appt.tenant_id)) continue
       const contact = await getContactPhone(supabase, appt.contact_id)
       if (!contact) continue
 
@@ -89,6 +92,7 @@ export async function scan(): Promise<void> {
 
     // Process 1h reminders
     for (const appt of reminders1h ?? []) {
+      if (pausedTenants.has(appt.tenant_id)) continue
       const contact = await getContactPhone(supabase, appt.contact_id)
       if (!contact) continue
 
