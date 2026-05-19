@@ -68,13 +68,14 @@ export async function refreshTokenIfNeeded(conn: {
   const { credentials } = await oauth2Client.refreshAccessToken()
 
   const supabase = getSupabase()
-  await supabase
-    .from('gbp_connections')
-    .update({
-      access_token: credentials.access_token,
-      token_expires_at: new Date(credentials.expiry_date!).toISOString(),
-    })
-    .eq('id', conn.id)
+  const updatePayload: Record<string, string> = {
+    access_token: credentials.access_token!,
+    token_expires_at: new Date(credentials.expiry_date!).toISOString(),
+  }
+  if (credentials.refresh_token) {
+    updatePayload['refresh_token'] = credentials.refresh_token
+  }
+  await supabase.from('gbp_connections').update(updatePayload).eq('id', conn.id)
 
   return credentials.access_token!
 }
@@ -104,6 +105,18 @@ export async function syncReviews(tenantId: string): Promise<number> {
   const body = (await res.json()) as { reviews?: GbpReviewRaw[] }
   const rawReviews = body.reviews ?? []
 
+  // Fetch all existing review IDs in one query to avoid N+1
+  const reviewIds = rawReviews.map((r) => r.reviewId)
+  const { data: existingRows } = reviewIds.length
+    ? await supabase
+        .from('reviews')
+        .select('google_review_id, ai_suggested_reply')
+        .eq('tenant_id', tenantId)
+        .in('google_review_id', reviewIds)
+    : { data: [] as Array<{ google_review_id: string; ai_suggested_reply: string | null }> }
+
+  const existingMap = new Map((existingRows ?? []).map((r) => [r.google_review_id, r]))
+
   let synced = 0
 
   for (const raw of rawReviews) {
@@ -122,30 +135,18 @@ export async function syncReviews(tenantId: string): Promise<number> {
       status: raw.reviewReply?.comment ? 'replied' : 'new',
     }
 
-    const { data: existing } = await supabase
-      .from('reviews')
-      .select('id, ai_suggested_reply')
-      .eq('tenant_id', tenantId)
-      .eq('google_review_id', raw.reviewId)
-      .maybeSingle()
+    const existing = existingMap.get(raw.reviewId) ?? null
 
-    await supabase
+    const { data: upserted } = await supabase
       .from('reviews')
       .upsert(upsertPayload, { onConflict: 'tenant_id,google_review_id' })
+      .select('id')
+      .maybeSingle()
 
-    if (!existing && !raw.reviewReply && raw.comment) {
-      const { data: inserted } = await supabase
-        .from('reviews')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('google_review_id', raw.reviewId)
-        .maybeSingle()
-
-      if (inserted) {
-        generateAiReply(tenantId, inserted.id, rating, raw.comment).catch((err: unknown) =>
-          console.error('[gbp-sync] generateAiReply error:', err)
-        )
-      }
+    if (!existing && !raw.reviewReply && raw.comment && upserted) {
+      generateAiReply(tenantId, upserted.id, rating, raw.comment).catch((err: unknown) =>
+        console.error('[gbp-sync] generateAiReply error:', err)
+      )
     }
 
     synced++
@@ -173,7 +174,10 @@ export async function generateAiReply(
   if (!tenant) return
 
   const apiKey = process.env['GEMINI_API_KEY']
-  if (!apiKey) return
+  if (!apiKey) {
+    console.warn('[gbp-sync] GEMINI_API_KEY not set — skipping AI reply generation')
+    return
+  }
 
   const { GoogleGenAI } = await import('@google/genai')
   const genai = new GoogleGenAI({ apiKey })
