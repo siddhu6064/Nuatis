@@ -21,6 +21,8 @@ const SCANNER_QUEUES: Array<{ key: string; name: string }> = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+const SCANNER_KEY_SET = new Set(SCANNER_QUEUES.map((q) => q.key))
+
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -43,7 +45,7 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
     const q = new Queue(key, { connection: createBullMQConnection() })
     const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed', 'paused')
     const [failedJobs, completedJobs] = await Promise.all([
-      q.getFailed(0, 0),
+      q.getFailed(0, 4),
       q.getCompleted(0, 99),
     ])
     await q.close()
@@ -72,6 +74,14 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       (j) => j.finishedOn != null && j.finishedOn >= sevenDaysAgo
     ).length
 
+    const failed_jobs = failedJobs.map((job) => ({
+      id: String(job.id),
+      name: job.name,
+      failed_at: job.processedOn != null ? new Date(job.processedOn).toISOString() : null,
+      error_message: job.failedReason ?? 'Unknown error',
+      attempt_count: job.attemptsMade,
+    }))
+
     return {
       name,
       key,
@@ -80,6 +90,8 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       last_error: failedJobs[0]?.failedReason ?? null,
       failure_count: failedCount,
       jobs_processed_7d,
+      failed_jobs,
+      is_paused: false,
     }
   } catch {
     return {
@@ -90,6 +102,8 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       last_error: 'Queue unavailable',
       failure_count: 0,
       jobs_processed_7d: 0,
+      failed_jobs: [],
+      is_paused: false,
     }
   }
 }
@@ -164,5 +178,56 @@ router.get('/overview', requireAuth, async (req: Request, res: Response): Promis
 
   res.json(overview)
 })
+
+// ── POST /scanners/:key/retry-failed ──────────────────────────────────────────
+
+router.post(
+  '/scanners/:key/retry-failed',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const { key } = req.params as { key: string }
+    if (!SCANNER_KEY_SET.has(key)) {
+      res.status(400).json({ error: 'Unknown scanner key' })
+      return
+    }
+    try {
+      const q = new Queue(key, { connection: createBullMQConnection() })
+      const failedJobs = await q.getFailed(0, -1)
+      let retried = 0
+      for (const job of failedJobs) {
+        await job.retry()
+        retried++
+      }
+      await q.close()
+      res.json({ retried })
+    } catch (err) {
+      console.error(`[automation] retry-failed error for ${key}:`, err)
+      res.status(500).json({ error: 'Retry failed' })
+    }
+  }
+)
+
+// ── POST /scanners/:key/clear-failed ──────────────────────────────────────────
+
+router.post(
+  '/scanners/:key/clear-failed',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const { key } = req.params as { key: string }
+    if (!SCANNER_KEY_SET.has(key)) {
+      res.status(400).json({ error: 'Unknown scanner key' })
+      return
+    }
+    try {
+      const q = new Queue(key, { connection: createBullMQConnection() })
+      const cleaned = await q.clean(0, 100, 'failed')
+      await q.close()
+      res.json({ cleared: cleaned.length })
+    } catch (err) {
+      console.error(`[automation] clear-failed error for ${key}:`, err)
+      res.status(500).json({ error: 'Clear failed' })
+    }
+  }
+)
 
 export default router
