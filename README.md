@@ -16,35 +16,35 @@ Nuatis is a vertical-aware CRM + Voice AI platform built for small and mid-sized
 
 ## Modules
 
-| Module | Description |
-|---|---|
-| **Maya** | Voice AI receptionist — Gemini 2.0 Flash Live, Telnyx PSTN, <1.5s latency, 8 tool calls, multilingual |
-| **CRM** | Contacts, companies, deals, notes, tasks, activity timeline, CSV import, lead scoring, tags, smart lists |
-| **Scheduling** | Native calendar + Google/Microsoft 365 sync, public booking page, round-robin groups, video links |
-| **Pipeline** | Lead Kanban + list view, multi-pipeline, stage probability, revenue forecasting, funnel chart |
-| **Automation** | BullMQ scanners — stalled leads, no-shows, lapsed clients, follow-up cadences, review requests |
-| **CPQ** | Service catalog, quote builder, PDF proposals, tax + discounts, auto-receipts, payment recording |
-| **Insights** | Recharts analytics, ROI dashboard, Maya metrics, appointment report, sales velocity, lead source report |
-| **Ops-Copilot** | Revenue ops alerts + webhook sidecar, detects missed follow-ups and escalates |
+| Module          | Description                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| **Maya**        | Voice AI receptionist — Gemini 2.0 Flash Live, Telnyx PSTN, <1.5s latency, 8 tool calls, multilingual    |
+| **CRM**         | Contacts, companies, deals, notes, tasks, activity timeline, CSV import, lead scoring, tags, smart lists |
+| **Scheduling**  | Native calendar + Google/Microsoft 365 sync, public booking page, round-robin groups, video links        |
+| **Pipeline**    | Lead Kanban + list view, multi-pipeline, stage probability, revenue forecasting, funnel chart            |
+| **Automation**  | BullMQ scanners — stalled leads, no-shows, lapsed clients, follow-up cadences, review requests           |
+| **CPQ**         | Service catalog, quote builder, PDF proposals, tax + discounts, auto-receipts, payment recording         |
+| **Insights**    | Recharts analytics, ROI dashboard, Maya metrics, appointment report, sales velocity, lead source report  |
+| **Ops-Copilot** | Revenue ops alerts + webhook sidecar, detects missed follow-ups and escalates                            |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14 App Router · Tailwind v3 · Recharts · @hello-pangea/dnd |
-| API | Express ESM TypeScript · NodeNext · BullMQ |
-| Mobile | React Native + Expo (iOS/Android) |
-| Voice AI | Gemini 2.0 Flash Live (STT + LLM + TTS unified, ~$0.008/call) |
-| Telephony | Telnyx (PSTN, SIP, SMS, 10DLC approved) |
-| Database | Supabase PostgreSQL + RLS (82+ migrations) |
-| Auth | Auth.js v5 (credentials) |
-| Queue | BullMQ + Azure Cache for Redis |
-| Email | Resend (transactional) |
-| Calendar | Native (default) · Google Calendar · Microsoft 365 |
-| Deploy | Azure Container Apps (API) · Next.js standalone (Web) |
-| CI/CD | GitHub Actions · Node 24 · 475 tests · 68 suites |
+| Layer     | Technology                                                         |
+| --------- | ------------------------------------------------------------------ |
+| Frontend  | Next.js 14 App Router · Tailwind v3 · Recharts · @hello-pangea/dnd |
+| API       | Express ESM TypeScript · NodeNext · BullMQ                         |
+| Mobile    | React Native + Expo (iOS/Android)                                  |
+| Voice AI  | Gemini 2.0 Flash Live (STT + LLM + TTS unified, ~$0.008/call)      |
+| Telephony | Telnyx (PSTN, SIP, SMS, 10DLC approved)                            |
+| Database  | Supabase PostgreSQL + RLS (82+ migrations)                         |
+| Auth      | Auth.js v5 (credentials)                                           |
+| Queue     | BullMQ + Azure Cache for Redis                                     |
+| Email     | Resend (transactional)                                             |
+| Calendar  | Native (default) · Google Calendar · Microsoft 365                 |
+| Deploy    | Azure Container Apps (API) · Next.js standalone (Web)              |
+| CI/CD     | GitHub Actions · Node 24 · 475 tests · 68 suites                   |
 
 ---
 
@@ -105,18 +105,18 @@ NODE_OPTIONS=--experimental-vm-modules npx jest
 
 ## Production Infrastructure
 
-| Resource | Value |
-|---|---|
-| Web | https://app.nuatis.com |
-| API | https://api.nuatis.com |
-| Health | https://api.nuatis.com/health |
-| Azure region | South Central US |
-| Redis | Azure Cache for Redis (Basic C1) |
-| Container registry | nuatisacr.azurecr.io |
-| Supabase project | zhykavqqvvvpfpgtipzp.supabase.co |
-| 10DLC Brand | B2FT83B (approved) |
-| Maya production number | +1 512 737 6388 |
-| Maya demo number | +1 512 737 6322 |
+| Resource               | Value                            |
+| ---------------------- | -------------------------------- |
+| Web                    | https://app.nuatis.com           |
+| API                    | https://api.nuatis.com           |
+| Health                 | https://api.nuatis.com/health    |
+| Azure region           | South Central US                 |
+| Redis                  | Azure Cache for Redis (Basic C1) |
+| Container registry     | nuatisacr.azurecr.io             |
+| Supabase project       | zhykavqqvvvpfpgtipzp.supabase.co |
+| 10DLC Brand            | B2FT83B (approved)               |
+| Maya production number | +1 512 737 6388                  |
+| Maya demo number       | +1 512 737 6322                  |
 
 ---
 
@@ -145,14 +145,14 @@ SCANNERS_ENABLED
 
 ## Compliance
 
-| Vertical | Compliance |
-|---|---|
-| dental, medical | HIPAA · BAA required · 6-yr retention · included in Practice plan |
-| law_firm | ABA 1.6/1.1 attorney-client privilege |
-| real_estate | FHA · TREC |
-| veterinary | TX ITEA |
-| salon, restaurant, contractor, spa, gym, nail_bar, tattoo, car_wash, laundry, pet_grooming | TCPA · opt-in gated · STOP language appended · 10DLC approved |
-| physical_therapy, optometry | HIPAA-gated · deferred until HIPAA hardening complete |
+| Vertical                                                                                   | Compliance                                                        |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| dental, medical                                                                            | HIPAA · BAA required · 6-yr retention · included in Practice plan |
+| law_firm                                                                                   | ABA 1.6/1.1 attorney-client privilege                             |
+| real_estate                                                                                | FHA · TREC                                                        |
+| veterinary                                                                                 | TX ITEA                                                           |
+| salon, restaurant, contractor, spa, gym, nail_bar, tattoo, car_wash, laundry, pet_grooming | TCPA · opt-in gated · STOP language appended · 10DLC approved     |
+| physical_therapy, optometry                                                                | HIPAA-gated · deferred until HIPAA hardening complete             |
 
 ---
 
