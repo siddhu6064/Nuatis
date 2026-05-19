@@ -21,6 +21,7 @@ interface Props {
 }
 
 type Tab = 'new' | 'replied' | 'all'
+type PageTab = 'reviews' | 'requests'
 
 // ── ConnectBanner ─────────────────────────────────────────────
 
@@ -435,11 +436,141 @@ function ReviewFeed() {
   )
 }
 
+// ── RequestsPanel ─────────────────────────────────────────────
+
+interface RequestStats {
+  total_sent: number
+  total_opened: number
+  total_clicked: number
+  total_completed: number
+  open_rate: number
+  click_rate: number
+  completion_rate: number
+  by_channel: {
+    sms: { sent: number; opened: number; clicked: number; completed: number }
+    email: { sent: number; opened: number; clicked: number; completed: number }
+  }
+  last_30_days: { sent: number; clicked: number; completed: number }
+}
+
+function RequestsPanel() {
+  const [data, setData] = useState<RequestStats | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/review-requests/stats', { credentials: 'include' })
+        if (!res.ok) return
+        const json = (await res.json()) as RequestStats
+        setData(json)
+      } catch {
+        // silently ignore
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="animate-pulse bg-gray-100 rounded-xl h-24" />
+        ))}
+      </div>
+    )
+  }
+
+  if (!data || data.total_sent === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-border-brand p-8 flex flex-col items-center gap-3 text-center">
+        <div className="text-2xl">📨</div>
+        <p className="text-sm font-medium text-ink">No review requests yet</p>
+        <p className="text-xs text-ink3 max-w-sm">
+          Review requests will appear here after Maya sends them. Enable review requests in{' '}
+          <a href="/settings/reputation" className="text-teal-600 underline">
+            Automation settings
+          </a>
+          .
+        </p>
+      </div>
+    )
+  }
+
+  const statCards = [
+    { label: 'Sent', value: data.total_sent, sub: 'total' },
+    { label: 'Opened', value: data.total_opened, sub: `${data.open_rate}% open rate` },
+    { label: 'Clicked', value: data.total_clicked, sub: `${data.click_rate}% click rate` },
+    { label: 'Completed', value: data.total_completed, sub: `${data.completion_rate}% completed` },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {statCards.map(({ label, value, sub }) => (
+          <div key={label} className="bg-white rounded-xl border border-border-brand p-5">
+            <p className="text-xs font-medium text-ink3 mb-1">{label}</p>
+            <p className="text-2xl font-bold text-ink">{value}</p>
+            <p className="text-xs text-ink4 mt-1">{sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Channel breakdown */}
+      <div className="bg-white rounded-xl border border-border-brand p-5">
+        <h3 className="text-sm font-semibold text-ink mb-4">By Channel</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left py-2 text-ink3 font-medium">Channel</th>
+              <th className="text-right py-2 text-ink3 font-medium">Sent</th>
+              <th className="text-right py-2 text-ink3 font-medium">Opened</th>
+              <th className="text-right py-2 text-ink3 font-medium">Clicked</th>
+              <th className="text-right py-2 text-ink3 font-medium">Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['sms', 'email'] as const).map((ch) => {
+              const c = data.by_channel[ch]
+              return (
+                <tr key={ch} className="border-t border-border-brand">
+                  <td className="py-2 text-ink capitalize">{ch.toUpperCase()}</td>
+                  <td className="py-2 text-right text-ink">{c.sent}</td>
+                  <td className="py-2 text-right text-ink">{c.opened}</td>
+                  <td className="py-2 text-right text-ink">{c.clicked}</td>
+                  <td className="py-2 text-right text-ink">{c.completed}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Last 30 days summary */}
+      <p className="text-xs text-ink3">
+        Last 30 days:{' '}
+        <span className="font-medium text-ink">{data.last_30_days.sent} review requests sent</span>
+        {' · '}
+        <span className="font-medium text-ink">
+          {data.last_30_days.completed} completed (
+          {data.last_30_days.sent > 0
+            ? Math.round((data.last_30_days.completed / data.last_30_days.sent) * 100)
+            : 0}
+          %)
+        </span>
+      </p>
+    </div>
+  )
+}
+
 // ── ReputationClient ──────────────────────────────────────────
 
 export default function ReputationClient({ connected, locationName, stats }: Props) {
   const [syncing, setSyncing] = useState(false)
   const [lastSynced, setLastSynced] = useState<number | null>(null)
+  const [pageTab, setPageTab] = useState<PageTab>('reviews')
 
   async function handleSync() {
     setSyncing(true)
@@ -502,9 +633,30 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
       {!connected ? (
         <ConnectBanner />
       ) : (
-        <div className="space-y-8">
-          {stats && <StatsHeader stats={stats} />}
-          <ReviewFeed />
+        <div className="space-y-6">
+          {/* Page-level tabs */}
+          <div className="flex gap-1 bg-bg rounded-lg p-1 w-fit">
+            {(['reviews', 'requests'] as PageTab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setPageTab(t)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                  pageTab === t ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
+                }`}
+              >
+                {t === 'reviews' ? 'Reviews' : 'Requests'}
+              </button>
+            ))}
+          </div>
+
+          {pageTab === 'reviews' && (
+            <div className="space-y-8">
+              {stats && <StatsHeader stats={stats} />}
+              <ReviewFeed />
+            </div>
+          )}
+
+          {pageTab === 'requests' && <RequestsPanel />}
         </div>
       )}
     </div>

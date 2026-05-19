@@ -515,3 +515,47 @@ export interface Snippet {
   createdAt: string
   updatedAt: string
 }
+
+// ── Review Requests ───────────────────────────────────────────
+
+export type ReviewRequestStatus =
+  | 'pending'
+  | 'sent'
+  | 'opened'
+  | 'clicked'
+  | 'completed'
+  | 'reviewed'
+
+export type ReviewRequestChannel = 'sms' | 'email'
+
+export interface ReviewRequest {
+  id: string
+  tenantId: string
+  contactId: string | null
+  appointmentId: string | null
+  channel: ReviewRequestChannel
+  status: ReviewRequestStatus
+  sentAt: string | null
+  openedAt: string | null
+  clickedAt: string | null
+  completedAt: string | null
+  reviewUrl: string | null
+  messageSid: string | null
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface ReviewRequestStats {
+  totalSent: number
+  totalOpened: number
+  totalClicked: number
+  totalCompleted: number
+  openRate: number
+  clickRate: number
+  completionRate: number
+  byChannel: {
+    sms: { sent: number; opened: number; clicked: number; completed: number }
+    email: { sent: number; opened: number; clicked: number; completed: number }
+  }
+  last30Days: { sent: number; clicked: number; completed: number }
+}

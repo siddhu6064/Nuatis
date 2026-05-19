@@ -72,6 +72,7 @@ import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-li
 import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
+import reviewRequestsRouter from './routes/review-requests.js'
 import snippetsRouter from './routes/snippets.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
@@ -181,6 +182,7 @@ app.use('/api/calendar-groups', calendarGroupsRouter)
 app.use('/api/google-reserve', googleReserveRouter)
 app.use('/t', triggerLinkPublicRouter)
 app.use('/api/trigger-links', triggerLinksRouter)
+app.use('/api/review-requests', reviewRequestsRouter)
 app.use('/api/snippets', snippetsRouter)
 
 app.get('/', (_req, res) => {
