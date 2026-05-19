@@ -146,6 +146,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       // Setup first — only visible during onboarding
       { href: '/onboarding', label: 'Setup', icon: '◆', onboardingOnly: true },
+      {
+        href: '/settings/business-profile',
+        label: 'Business Profile',
+        icon: '▦',
+        requireModule: 'maya',
+      },
       { href: '/settings/voice', label: 'Voice AI', icon: '◇', requireModule: 'maya' },
       { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
