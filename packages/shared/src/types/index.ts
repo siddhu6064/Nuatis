@@ -570,6 +570,16 @@ export interface FailedJob {
   attempt_count: number
 }
 
+export interface ScannerPause {
+  id: string
+  tenant_id: string
+  scanner_key: string
+  paused_from: string
+  paused_until: string
+  reason: string | null
+  created_at: string
+}
+
 export interface ScannerStatus {
   name: string // human-readable: "Stalled Lead Scanner", etc.
   key: string // internal BullMQ queue name
@@ -580,6 +590,7 @@ export interface ScannerStatus {
   jobs_processed_7d: number
   failed_jobs: FailedJob[]
   is_paused: boolean
+  pause_until: string | null
 }
 
 export interface AutomationOverview {
