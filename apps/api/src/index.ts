@@ -1,14 +1,10 @@
 import { createServer } from 'http'
 import express from 'express'
-import { enqueueScoreCompute } from './lib/lead-score-queue.js'
 import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
-import {
-  initConversationsWs,
-  broadcastToTenant as broadcastConversations,
-} from './lib/conversations-ws.js'
+import { initConversationsWs } from './lib/conversations-ws.js'
 import { initSentry, Sentry } from './lib/sentry.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
@@ -73,6 +69,7 @@ import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
+import smsWebhooksRouter from './routes/sms-webhooks.js'
 import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
@@ -456,197 +453,8 @@ app.post('/voice/inbound', async (req, res) => {
   res.sendStatus(200)
 })
 
-// ── Telnyx inbound SMS webhook ──────────────────────────────────────────────
-app.post('/webhooks/telnyx/sms', async (req, res) => {
-  const eventType = req.body?.data?.event_type ?? ''
-  if (eventType !== 'message.received') {
-    res.sendStatus(200)
-    return
-  }
-
-  const payload = req.body?.data?.payload ?? {}
-  const fromNumber: string = payload.from?.phone_number ?? ''
-  const toNumber: string = payload.to?.[0]?.phone_number ?? payload.to ?? ''
-  const body: string = payload.text ?? ''
-  const telnyxMessageId: string = payload.id ?? ''
-
-  console.info(`[sms-webhook] message.received from=${fromNumber} to=${toNumber}`)
-
-  const sb = createClient(
-    process.env['SUPABASE_URL'] ?? '',
-    process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? ''
-  )
-
-  // Dedup check
-  if (telnyxMessageId) {
-    const { data: existing } = await sb
-      .from('inbound_sms')
-      .select('id')
-      .eq('telnyx_message_id', telnyxMessageId)
-      .maybeSingle()
-    if (existing) {
-      res.sendStatus(200)
-      return
-    }
-  }
-
-  // Find tenant by to_number
-  const normalizedTo = toNumber.replace(/\D/g, '').slice(-10)
-  const { data: location } = await sb
-    .from('locations')
-    .select('tenant_id')
-    .ilike('telnyx_number', `%${normalizedTo}%`)
-    .limit(1)
-    .maybeSingle()
-
-  if (!location) {
-    console.warn(`[sms-webhook] no tenant found for number ${toNumber}`)
-    res.sendStatus(200)
-    return
-  }
-
-  const tenantId = location.tenant_id
-
-  // Find contact by from_number
-  const normalizedFrom = fromNumber.replace(/\D/g, '').slice(-10)
-  let contactId: string | null = null
-  let contactName: string | null = null
-
-  const { data: matchedContact } = await sb
-    .from('contacts')
-    .select('id, full_name')
-    .eq('tenant_id', tenantId)
-    .ilike('phone', `%${normalizedFrom}%`)
-    .limit(1)
-    .maybeSingle()
-
-  if (matchedContact) {
-    contactId = matchedContact.id
-    contactName = matchedContact.full_name
-  } else {
-    // Create new contact
-    const { data: newContact } = await sb
-      .from('contacts')
-      .insert({
-        tenant_id: tenantId,
-        full_name: `Unknown - ${fromNumber}`,
-        phone: fromNumber,
-        source: 'sms',
-      })
-      .select('id, full_name')
-      .single()
-    if (newContact) {
-      contactId = newContact.id
-      contactName = newContact.full_name
-    }
-  }
-
-  // Insert SMS record
-  await sb.from('inbound_sms').insert({
-    tenant_id: tenantId,
-    contact_id: contactId,
-    from_number: fromNumber,
-    to_number: toNumber,
-    body,
-    direction: 'inbound',
-    telnyx_message_id: telnyxMessageId || null,
-    status: 'received',
-  })
-
-  // Log to sms_messages table
-  const { error: smsInsertErr } = await sb.from('sms_messages').insert({
-    tenant_id: tenantId,
-    contact_id: contactId,
-    direction: 'inbound',
-    body,
-    from_number: fromNumber,
-    to_number: toNumber,
-    message_sid: telnyxMessageId || null,
-    status: 'received',
-  })
-  if (smsInsertErr) console.error('[sms-webhook] sms_messages insert failed:', smsInsertErr)
-
-  broadcastConversations(tenantId as string, {
-    type: 'new_message',
-    conversation_id: contactId ?? '',
-    message: {
-      id: telnyxMessageId || crypto.randomUUID(),
-      direction: 'inbound',
-      body,
-      from_number: fromNumber,
-      to_number: toNumber,
-      status: 'received',
-      ai_handled: false,
-      created_at: new Date().toISOString(),
-    },
-  })
-
-  // STOP/HELP keyword handling
-  const trimmedBody = body.trim().toUpperCase()
-
-  // TCPA opt-out — legal requirement
-  if (['STOP', 'UNSUBSCRIBE', 'CANCEL'].includes(trimmedBody)) {
-    if (contactId) {
-      const { error: optOutErr } = await sb
-        .from('contacts')
-        .update({ sms_opt_in: false })
-        .eq('id', contactId)
-      if (optOutErr) {
-        console.error(`[sms-webhook] STOP opt-out failed for contact=${contactId}:`, optOutErr)
-      } else {
-        console.info(`[sms-webhook] STOP received — opted out contact=${contactId}`)
-      }
-    }
-    res.sendStatus(200)
-    return
-  }
-
-  // HELP keyword
-  if (trimmedBody === 'HELP') {
-    const { sendSms: send } = await import('./lib/sms.js')
-    const { data: loc } = await sb
-      .from('locations')
-      .select('telnyx_number')
-      .eq('tenant_id', tenantId)
-      .single()
-    const fromNum = loc?.telnyx_number ?? toNumber
-    void send(fromNum, fromNumber, 'Reply STOP to unsubscribe. For help call us directly.', {
-      tenantId,
-      contactId: contactId ?? undefined,
-    })
-    res.sendStatus(200)
-    return
-  }
-
-  // Log activity
-  if (contactId) {
-    const { logActivity: logAct } = await import('./lib/activity.js')
-    void logAct({
-      tenantId,
-      contactId,
-      type: 'sms',
-      body: `SMS received: "${body.slice(0, 80)}${body.length > 80 ? '...' : ''}"`,
-      actorType: 'contact',
-    })
-    enqueueScoreCompute(tenantId, contactId, 'sms_inbound')
-  }
-
-  // Push notification
-  const { sendPushNotification: pushNotif } = await import('./lib/push-client.js')
-  void pushNotif(tenantId, {
-    title: `New SMS from ${contactName || fromNumber}`,
-    body: body.slice(0, 60),
-    url: contactId ? `/contacts/${contactId}?tab=messages` : '/inbox',
-  })
-
-  // Fire AI reply handler — fire-and-forget, must not block Telnyx 200
-  void (async () => {
-    const { handleAiSmsReply } = await import('./lib/sms-ai-reply.js')
-    await handleAiSmsReply(tenantId, contactId, body, fromNumber, toNumber)
-  })().catch((err) => console.error('[sms-webhook] AI reply error:', err))
-
-  res.sendStatus(200)
-})
+// ── Telnyx SMS webhooks (message.received + message.finalized) ────────────────
+app.use('/webhooks/telnyx/sms', smsWebhooksRouter)
 
 // Sentry error handler — must be after all routes
 Sentry.setupExpressErrorHandler(app)
