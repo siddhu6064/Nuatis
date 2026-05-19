@@ -348,6 +348,32 @@ export interface SmsMessage {
   created_at: string
 }
 
+// ── Conversations ────────────────────────────────────────────
+
+export interface Conversation {
+  id: string // contact_id
+  contact_id: string
+  contact_name: string
+  contact_phone: string
+  last_message: string
+  last_message_at: string
+  direction: 'inbound' | 'outbound'
+  unread_count: number
+  status: 'open' | 'resolved'
+  ai_handled: boolean
+}
+
+export interface ConversationMessage {
+  id: string
+  direction: 'inbound' | 'outbound'
+  body: string
+  from_number: string
+  to_number: string
+  status: string
+  ai_handled: boolean
+  created_at: string
+}
+
 // ── API response wrappers ────────────────────────────────────
 
 export interface ApiSuccess<T> {
