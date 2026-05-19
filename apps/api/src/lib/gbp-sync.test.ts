@@ -1,19 +1,38 @@
-import { describe, it, expect, jest } from '@jest/globals'
+import { jest, describe, it, expect, beforeAll } from '@jest/globals'
 import type { GbpInsights } from '@nuatis/shared'
 
-jest.mock('@supabase/supabase-js', () => ({
+// Must be registered BEFORE dynamic import of gbp-sync.js
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
     from: jest.fn(() => ({
       select: jest.fn(() => ({
         eq: jest.fn(() => ({
           maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+          single: jest.fn().mockResolvedValue({ data: null, error: null }),
+          in: jest.fn().mockResolvedValue({ data: [], error: null }),
         })),
+        in: jest.fn().mockResolvedValue({ data: [], error: null }),
       })),
     })),
   })),
 }))
 
-import { starRatingToInt, buildAiReplyPrompt, fetchGbpInsights } from './gbp-sync.js'
+// Dynamic import AFTER mock is registered
+let starRatingToInt: (rating: string) => number
+let buildAiReplyPrompt: (
+  tenantName: string,
+  vertical: string,
+  rating: number,
+  comment: string
+) => string
+let fetchGbpInsights: (tenantId: string) => Promise<GbpInsights | null>
+
+beforeAll(async () => {
+  const mod = await import('./gbp-sync.js')
+  starRatingToInt = mod.starRatingToInt
+  buildAiReplyPrompt = mod.buildAiReplyPrompt
+  fetchGbpInsights = mod.fetchGbpInsights
+})
 
 describe('starRatingToInt', () => {
   it('maps all GBP star rating strings to integers', () => {
@@ -48,17 +67,9 @@ describe('buildAiReplyPrompt', () => {
 
 describe('fetchGbpInsights', () => {
   it('returns null when no gbp_connections row found', async () => {
-    // fetchGbpInsights needs supabase — mock it
-    // Since the existing test file has no mocks, we test via the exported function
-    // with a mocked supabase that returns no connection.
-    // But gbp-sync.ts creates its own supabase client internally.
-    // Simplest approach: verify the function exists and returns a Promise
-    expect(typeof fetchGbpInsights).toBe('function')
-    // The function will throw/return null when SUPABASE_URL is not set
-    // Since env vars aren't set in this test, calling it returns null (caught by try/catch)
-    const result = await fetchGbpInsights('nonexistent-tenant-id').catch(() => null)
+    const result = await fetchGbpInsights('nonexistent-tenant-id')
     expect(result).toBeNull()
-  })
+  }, 10000)
 })
 
 describe('GbpInsights type shape', () => {
