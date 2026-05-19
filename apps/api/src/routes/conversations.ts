@@ -29,13 +29,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     Math.max(1, parseInt((req.query['limit'] as string) ?? '20', 10) || 20)
   )
 
-  // Step 1: Fetch all sms_messages for this tenant
+  // Step 1: Fetch recent sms_messages for this tenant (capped to avoid full-table scan)
   const { data: allMessages, error: msgError } = await supabase
     .from('sms_messages')
     .select('id, contact_id, direction, body, created_at, ai_handled')
     .eq('tenant_id', tenantId)
     .not('contact_id', 'is', null)
     .order('created_at', { ascending: false })
+    .limit(2000)
 
   if (msgError) {
     res.status(500).json({ error: msgError.message })
@@ -213,6 +214,21 @@ router.post(
     const supabase = getSupabase()
     const { contactId } = req.params
 
+    const { data: contact, error: contactErr } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (contactErr) {
+      res.status(500).json({ error: contactErr.message })
+      return
+    }
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
+
     const now = new Date().toISOString()
 
     const { error } = await supabase.from('conversation_status').upsert(
@@ -244,6 +260,21 @@ router.post(
     const tenantId = authed.tenantId
     const supabase = getSupabase()
     const { contactId } = req.params
+
+    const { data: contact, error: contactErr } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (contactErr) {
+      res.status(500).json({ error: contactErr.message })
+      return
+    }
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
 
     const now = new Date().toISOString()
 
