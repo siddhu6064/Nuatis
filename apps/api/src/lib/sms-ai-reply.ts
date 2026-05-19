@@ -22,16 +22,14 @@ export async function handleAiSmsReply(
 
     // Contact lookup (skip if contactId is null)
     let contactName: string | null = null
-    let verticalData: unknown = null
     if (contactId) {
       const { data: contact } = await supabase
         .from('contacts')
-        .select('full_name, vertical_data')
+        .select('full_name')
         .eq('id', contactId)
         .single()
       if (contact) {
         contactName = (contact as { full_name?: string | null }).full_name ?? null
-        verticalData = (contact as { vertical_data?: unknown }).vertical_data ?? null
       }
     }
 
@@ -65,16 +63,24 @@ export async function handleAiSmsReply(
 
     const businessName = (tenant as { name?: string | null } | null)?.name ?? 'our team'
     const vertical = (location as { vertical?: string | null } | null)?.vertical ?? 'business'
+    const businessProfile =
+      (location as { business_profile?: unknown } | null)?.business_profile ?? null
 
     // b. Build Gemini prompt
 
+    const profileText = businessProfile
+      ? `\nBusiness context: ${JSON.stringify(businessProfile)}`
+      : ''
+
     const systemPrompt =
       `You are a helpful AI assistant for ${businessName}, a ${vertical} business.\n` +
-      `You are responding to an SMS from a customer. Keep replies SHORT (1-3 sentences max).\n` +
+      `You are responding to an SMS from a customer named ${contactName ?? 'Unknown'}.\n` +
+      `Keep replies SHORT (1-3 sentences max).\n` +
       `You can: answer questions about services/hours, confirm/cancel appointments, qualify leads by asking what service they need.\n` +
       `You cannot: make payments, access external systems, make promises not in the business profile.\n` +
       `If the customer wants to speak to a human, reply: "I'll have someone from our team reach out to you shortly."\n` +
-      `Always end with: — ${businessName} team`
+      `Always end with: — ${businessName} team` +
+      profileText
 
     // Format last 5 messages (most-recent last) as conversation history
     const last5 = ((historyRows ?? []) as Array<{ direction: string; body: string }>)
@@ -134,10 +140,6 @@ export async function handleAiSmsReply(
       ai_handled: true,
       ai_response: aiResponse,
     })
-
-    // Suppress unused-variable warnings for data we loaded but don't embed further
-    void contactName
-    void verticalData
   } catch (err) {
     // f. On any error: log and return — do NOT send a broken message
     console.error('[sms-ai]', err)
