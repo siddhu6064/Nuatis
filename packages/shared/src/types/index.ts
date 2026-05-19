@@ -353,3 +353,46 @@ export interface PaginatedResponse<T> {
   pageSize: number
   hasMore: boolean
 }
+
+// ── Business Profile ─────────────────────────────────────────
+
+export interface DayHours {
+  open: string // "09:00"
+  close: string // "17:00"
+  closed: boolean
+}
+
+export interface LocationBusinessHours {
+  monday: DayHours
+  tuesday: DayHours
+  wednesday: DayHours
+  thursday: DayHours
+  friday: DayHours
+  saturday: DayHours
+  sunday: DayHours
+}
+
+export interface ServiceEntry {
+  name: string
+  duration_min: number
+  price: number
+  description: string
+}
+
+export interface StaffEntry {
+  name: string
+  role: string
+}
+
+export interface FaqEntry {
+  question: string
+  answer: string
+}
+
+export interface BusinessProfile {
+  hours?: Partial<LocationBusinessHours>
+  services?: ServiceEntry[]
+  staff?: StaffEntry[]
+  faqs?: FaqEntry[]
+  notes?: string
+}
