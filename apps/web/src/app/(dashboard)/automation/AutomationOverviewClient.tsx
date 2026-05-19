@@ -19,6 +19,8 @@ export default function AutomationOverviewClient() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [openScanners, setOpenScanners] = useState<Set<string>>(new Set())
+  const [openPauseForm, setOpenPauseForm] = useState<string | null>(null)
+  const [pauseForm, setPauseForm] = useState({ paused_from: '', paused_until: '', reason: '' })
 
   function toggleScanner(key: string) {
     setOpenScanners((prev) => {
@@ -42,6 +44,31 @@ export default function AutomationOverviewClient() {
       method: 'POST',
       credentials: 'include',
     })
+    void refresh()
+  }
+
+  async function resumeScanner(key: string) {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    void refresh()
+  }
+
+  async function pauseScanner(key: string) {
+    if (!pauseForm.paused_from || !pauseForm.paused_until) return
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paused_from: new Date(pauseForm.paused_from).toISOString(),
+        paused_until: new Date(pauseForm.paused_until).toISOString(),
+        ...(pauseForm.reason ? { reason: pauseForm.reason } : {}),
+      }),
+    })
+    setOpenPauseForm(null)
+    setPauseForm({ paused_from: '', paused_until: '', reason: '' })
     void refresh()
   }
 
@@ -251,42 +278,132 @@ export default function AutomationOverviewClient() {
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
                       Last Error
                     </th>
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scanners.map((s) => (
-                    <tr
-                      key={s.key}
-                      className={`border-b border-gray-50 last:border-0 ${
-                        s.failure_count > 0 ? 'bg-red-50/40' : ''
-                      }`}
-                    >
-                      <td className="px-6 py-3 font-medium text-ink">{s.name}</td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            s.status === 'active'
-                              ? 'bg-green-50 text-green-700'
-                              : s.status === 'paused'
-                                ? 'bg-amber-50 text-amber-700'
-                                : 'bg-red-50 text-red-700'
-                          }`}
-                        >
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-ink3">
-                        {s.last_run_at ? new Date(s.last_run_at).toLocaleString() : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-ink3">{s.failure_count}</td>
-                      <td className="px-4 py-3 text-ink4 text-xs truncate max-w-[200px]">
-                        {s.last_error ? (
-                          s.last_error.slice(0, 60)
-                        ) : (
-                          <span className="text-green-600">No errors</span>
-                        )}
-                      </td>
-                    </tr>
+                    <>
+                      <tr
+                        key={s.key}
+                        className={`border-b border-gray-50 last:border-0 ${
+                          s.failure_count > 0 ? 'bg-red-50/40' : ''
+                        }`}
+                      >
+                        <td className="px-6 py-3 font-medium text-ink">{s.name}</td>
+                        <td className="px-6 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              s.status === 'active'
+                                ? 'bg-green-50 text-green-700'
+                                : s.status === 'paused'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-red-50 text-red-700'
+                            }`}
+                          >
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-ink3">
+                          {s.last_run_at ? new Date(s.last_run_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-ink3">{s.failure_count}</td>
+                        <td className="px-4 py-3 text-ink4 text-xs truncate max-w-[200px]">
+                          {s.last_error ? (
+                            s.last_error.slice(0, 60)
+                          ) : (
+                            <span className="text-green-600">No errors</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {s.is_paused ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700">
+                                Paused until {new Date(s.pause_until!).toLocaleDateString()}
+                              </span>
+                              <button
+                                onClick={() => void resumeScanner(s.key)}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                              >
+                                Resume
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                setOpenPauseForm(openPauseForm === s.key ? null : s.key)
+                              }
+                              className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 font-medium transition-colors"
+                            >
+                              Pause
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {openPauseForm === s.key && (
+                        <tr key={`${s.key}-pause-form`}>
+                          <td
+                            colSpan={6}
+                            className="px-6 py-4 bg-amber-50/50 border-b border-amber-100"
+                          >
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs text-ink4 font-medium">From</label>
+                                <input
+                                  type="datetime-local"
+                                  value={pauseForm.paused_from}
+                                  onChange={(e) =>
+                                    setPauseForm((f) => ({ ...f, paused_from: e.target.value }))
+                                  }
+                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs text-ink4 font-medium">Until</label>
+                                <input
+                                  type="datetime-local"
+                                  value={pauseForm.paused_until}
+                                  onChange={(e) =>
+                                    setPauseForm((f) => ({ ...f, paused_until: e.target.value }))
+                                  }
+                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs text-ink4 font-medium">Reason</label>
+                                <input
+                                  type="text"
+                                  placeholder="Optional reason"
+                                  value={pauseForm.reason}
+                                  onChange={(e) =>
+                                    setPauseForm((f) => ({ ...f, reason: e.target.value }))
+                                  }
+                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 w-48"
+                                />
+                              </div>
+                              <div className="flex items-end gap-2 mt-4">
+                                <button
+                                  onClick={() => void pauseScanner(s.key)}
+                                  disabled={!pauseForm.paused_from || !pauseForm.paused_until}
+                                  className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Pause Scanner
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setOpenPauseForm(null)
+                                    setPauseForm({ paused_from: '', paused_until: '', reason: '' })
+                                  }}
+                                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
