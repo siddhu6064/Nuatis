@@ -16,6 +16,7 @@ const mockQueue = {
   getFailed: jest.fn(),
   getCompleted: jest.fn(),
   close: jest.fn(),
+  clean: jest.fn(),
 }
 
 jest.unstable_mockModule('bullmq', () => ({
@@ -64,6 +65,7 @@ beforeEach(() => {
   mockQueue.getFailed.mockReset()
   mockQueue.getCompleted.mockReset()
   mockQueue.close.mockReset()
+  mockQueue.clean.mockReset()
 
   mockQueue.close.mockResolvedValue(undefined)
 })
@@ -149,5 +151,28 @@ describe('GET /api/automation/overview', () => {
 
     const nonErrorCount = body.scanners.filter((s) => s.status !== 'error').length
     expect(body.total_active + body.total_paused).toBe(nonErrorCount)
+  })
+})
+
+// ── Test 4: POST /api/automation/scanners/invalid-key/retry-failed → 400 ──────
+describe('POST /api/automation/scanners/:key/retry-failed', () => {
+  it('POST /api/automation/scanners/invalid-key/retry-failed returns 400', async () => {
+    const app = makeApp()
+    const res = await request(app)
+      .post('/api/automation/scanners/invalid-key/retry-failed')
+      .expect(400)
+    expect(res.body).toMatchObject({ error: expect.any(String) })
+  })
+})
+
+// ── Test 5: POST /api/automation/scanners/:key/clear-failed → { cleared: n } ──
+describe('POST /api/automation/scanners/:key/clear-failed', () => {
+  it('POST /api/automation/scanners/:key/clear-failed returns { cleared: number }', async () => {
+    mockQueue.clean.mockResolvedValue(['job1', 'job2', 'job3'])
+    const app = makeApp()
+    const res = await request(app)
+      .post('/api/automation/scanners/lead-stalled-scanner/clear-failed')
+      .expect(200)
+    expect(res.body).toMatchObject({ cleared: 3 })
   })
 })
