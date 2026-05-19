@@ -4,10 +4,46 @@ import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { AutomationOverview } from '@nuatis/shared'
 
+function relativeTime(isoString: string | null): string {
+  if (!isoString) return '—'
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 export default function AutomationOverviewClient() {
   const [data, setData] = useState<AutomationOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [openScanners, setOpenScanners] = useState<Set<string>>(new Set())
+
+  function toggleScanner(key: string) {
+    setOpenScanners((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  async function retryFailed(key: string) {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/retry-failed`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    void refresh()
+  }
+
+  async function clearFailed(key: string) {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/clear-failed`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    void refresh()
+  }
 
   async function refresh() {
     setLoading(true)
@@ -257,6 +293,114 @@ export default function AutomationOverviewClient() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Error Review */}
+      <div className="mt-4">
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-semibold text-ink">Error Review</h2>
+          {scanners.some((s) => s.failure_count > 0) ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              <span className="text-xs text-red-600 font-medium">
+                {scanners.reduce((sum, s) => sum + s.failure_count, 0)} failed jobs
+              </span>
+            </>
+          ) : null}
+        </div>
+
+        {!scanners.some((s) => s.failure_count > 0) ? (
+          <div className="bg-white rounded-xl border border-border-brand px-6 py-4 flex items-center gap-3">
+            <span className="text-green-500 text-lg">✓</span>
+            <span className="text-sm text-ink3">All scanners healthy — no failed jobs</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {scanners
+              .filter((s) => s.failure_count > 0)
+              .map((s) => {
+                const isOpen = openScanners.has(s.key)
+                return (
+                  <div
+                    key={s.key}
+                    className="bg-white rounded-xl border border-border-brand overflow-hidden"
+                  >
+                    {/* Accordion header */}
+                    <button
+                      onClick={() => toggleScanner(s.key)}
+                      className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-ink">{s.name}</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700">
+                          {s.failure_count} failed
+                        </span>
+                      </div>
+                      <span className="text-ink4 text-xs">{isOpen ? '▲' : '▼'}</span>
+                    </button>
+
+                    {/* Accordion body */}
+                    {isOpen && (
+                      <div className="border-t border-border-brand">
+                        {s.failed_jobs.length === 0 ? (
+                          <p className="px-6 py-4 text-sm text-ink4">No job details available.</p>
+                        ) : (
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-100 bg-gray-50/50">
+                                <th className="text-left font-medium text-ink4 px-6 py-2">
+                                  Job ID
+                                </th>
+                                <th className="text-left font-medium text-ink4 px-4 py-2">
+                                  Failed At
+                                </th>
+                                <th className="text-left font-medium text-ink4 px-4 py-2">
+                                  Attempts
+                                </th>
+                                <th className="text-left font-medium text-ink4 px-4 py-2">Error</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {s.failed_jobs.map((job) => (
+                                <tr key={job.id} className="border-b border-gray-50 last:border-0">
+                                  <td className="px-6 py-3 font-mono text-ink3">
+                                    {job.id.slice(0, 12)}
+                                  </td>
+                                  <td className="px-4 py-3 text-ink3">
+                                    {relativeTime(job.failed_at)}
+                                  </td>
+                                  <td className="px-4 py-3 text-ink3">{job.attempt_count}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="bg-red-50 rounded px-2 py-1 font-mono text-red-700 break-words whitespace-pre-wrap max-w-xs">
+                                      {job.error_message}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                        <div className="px-6 py-3 flex gap-2 border-t border-gray-100">
+                          <button
+                            onClick={() => void retryFailed(s.key)}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium transition-colors"
+                          >
+                            Retry All
+                          </button>
+                          <button
+                            onClick={() => void clearFailed(s.key)}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                          >
+                            Clear Failed
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+          </div>
+        )}
       </div>
     </div>
   )
