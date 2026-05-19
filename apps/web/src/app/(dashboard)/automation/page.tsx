@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { FOLLOW_UP_CADENCES, MAX_FOLLOW_UP_STEPS } from '@/lib/verticals'
+import AutomationTabs from './AutomationTabs'
 
 interface FollowUpContact {
   id: string
@@ -102,14 +103,8 @@ export default async function AutomationPage() {
   const costPerCall = 0.008
   const estimatedSavings = (totalCalls * costPerCall).toFixed(2)
 
-  return (
-    <div className="px-8 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-ink">Automation</h1>
-        <p className="text-sm text-ink3 mt-0.5">Active sequences, alerts, and system health</p>
-      </div>
-
+  const settingsContent = (
+    <>
       {/* ROI Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-border-brand p-4">
@@ -258,6 +253,18 @@ export default async function AutomationPage() {
           </div>
         )}
       </div>
+    </>
+  )
+
+  return (
+    <div className="px-8 py-8">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-ink">Automation</h1>
+        <p className="text-sm text-ink3 mt-0.5">Active sequences, alerts, and system health</p>
+      </div>
+
+      <AutomationTabs settingsContent={settingsContent} />
     </div>
   )
 }
