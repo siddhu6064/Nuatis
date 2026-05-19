@@ -105,22 +105,18 @@ export default async function ReputationPage() {
     locationName = conn?.location_name ?? null
 
     if (connected) {
-      const { data: allReviewRows } = await supabase
-        .from('reviews')
-        .select('rating, published_at')
-        .eq('tenant_id', tenantId)
+      const [{ data: allReviewRows }, { data: newReviewRows }] = await Promise.all([
+        supabase.from('reviews').select('rating, published_at').eq('tenant_id', tenantId),
+        supabase
+          .from('reviews')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'new')
+          .order('published_at', { ascending: false })
+          .limit(20),
+      ])
 
-      if (allReviewRows && allReviewRows.length > 0) {
-        stats = computeStats(allReviewRows)
-      }
-
-      const { data: newReviewRows } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'new')
-        .order('published_at', { ascending: false })
-        .limit(20)
+      stats = computeStats(allReviewRows ?? [])
 
       initialReviews = (newReviewRows ?? []).map((row) => mapReview(row as Record<string, unknown>))
     }
