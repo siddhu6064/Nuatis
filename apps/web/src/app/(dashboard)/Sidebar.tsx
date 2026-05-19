@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Customers',
     items: [
       { href: '/contacts', label: 'Contacts', icon: '◎', suiteOnly: true, requireModule: 'crm' },
+      { href: '/conversations', label: 'Conversations', icon: '💬', suiteOnly: true },
       {
         href: '/companies',
         label: 'Companies',
@@ -316,6 +317,7 @@ export default function Sidebar({
   const [product, setProduct] = useState<'maya_only' | 'suite'>('suite')
   const [modules, setModules] = useState<Record<string, boolean>>({})
   const [unreadSms, setUnreadSms] = useState(0)
+  const [openConversations, setOpenConversations] = useState(0)
   const [lowStockCount, setLowStockCount] = useState(0)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -369,6 +371,15 @@ export default function Sidebar({
     void fetch('/api/sms/unread-count')
       .then((r) => r.json())
       .then((d: { count: number }) => setUnreadSms(d.count))
+      .catch(() => {})
+  }, [path])
+
+  useEffect(() => {
+    void fetch('/api/conversations?status=open&limit=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { total?: number } | null) => {
+        if (d && typeof d.total === 'number') setOpenConversations(d.total)
+      })
       .catch(() => {})
   }, [path])
 
@@ -595,6 +606,11 @@ export default function Sidebar({
                               className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0"
                               aria-label={`${lowStockCount} low-stock item(s)`}
                             />
+                          )}
+                          {item.href === '/conversations' && openConversations > 0 && (
+                            <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
+                              {openConversations > 99 ? '99+' : openConversations}
+                            </span>
                           )}
                         </Link>
                       </div>
