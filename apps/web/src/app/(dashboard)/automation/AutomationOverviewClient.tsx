@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { AutomationOverview } from '@nuatis/shared'
 
@@ -48,25 +48,42 @@ export default function AutomationOverviewClient() {
   }
 
   async function resumeScanner(key: string) {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`, {
-      method: 'DELETE',
-      credentials: 'include',
-    })
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`,
+      {
+        method: 'DELETE',
+        credentials: 'include',
+      }
+    )
+    if (!res.ok) {
+      console.error(`[pause] resume failed: ${res.status}`)
+      return
+    }
     void refresh()
   }
 
   async function pauseScanner(key: string) {
     if (!pauseForm.paused_from || !pauseForm.paused_until) return
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paused_from: new Date(pauseForm.paused_from).toISOString(),
-        paused_until: new Date(pauseForm.paused_until).toISOString(),
-        ...(pauseForm.reason ? { reason: pauseForm.reason } : {}),
-      }),
-    })
+    const from = new Date(pauseForm.paused_from)
+    const until = new Date(pauseForm.paused_until)
+    if (until <= from) return
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paused_from: from.toISOString(),
+          paused_until: until.toISOString(),
+          ...(pauseForm.reason ? { reason: pauseForm.reason } : {}),
+        }),
+      }
+    )
+    if (!res.ok) {
+      console.error(`[pause] pause failed: ${res.status}`)
+      return
+    }
     setOpenPauseForm(null)
     setPauseForm({ paused_from: '', paused_until: '', reason: '' })
     void refresh()
@@ -283,9 +300,8 @@ export default function AutomationOverviewClient() {
                 </thead>
                 <tbody>
                   {scanners.map((s) => (
-                    <>
+                    <Fragment key={s.key}>
                       <tr
-                        key={s.key}
                         className={`border-b border-gray-50 last:border-0 ${
                           s.failure_count > 0 ? 'bg-red-50/40' : ''
                         }`}
@@ -318,9 +334,11 @@ export default function AutomationOverviewClient() {
                         <td className="px-4 py-3">
                           {s.is_paused ? (
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700">
-                                Paused until {new Date(s.pause_until!).toLocaleDateString()}
-                              </span>
+                              {s.pause_until && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700">
+                                  Paused until {new Date(s.pause_until ?? '').toLocaleString()}
+                                </span>
+                              )}
                               <button
                                 onClick={() => void resumeScanner(s.key)}
                                 className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
@@ -384,7 +402,12 @@ export default function AutomationOverviewClient() {
                               <div className="flex items-end gap-2 mt-4">
                                 <button
                                   onClick={() => void pauseScanner(s.key)}
-                                  disabled={!pauseForm.paused_from || !pauseForm.paused_until}
+                                  disabled={
+                                    !pauseForm.paused_from ||
+                                    !pauseForm.paused_until ||
+                                    new Date(pauseForm.paused_until) <=
+                                      new Date(pauseForm.paused_from)
+                                  }
                                   className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   Pause Scanner
@@ -403,7 +426,7 @@ export default function AutomationOverviewClient() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
