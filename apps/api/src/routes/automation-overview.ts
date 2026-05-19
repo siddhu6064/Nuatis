@@ -190,19 +190,20 @@ router.post(
       res.status(400).json({ error: 'Unknown scanner key' })
       return
     }
+    const q = new Queue(key, { connection: createBullMQConnection() })
     try {
-      const q = new Queue(key, { connection: createBullMQConnection() })
       const failedJobs = await q.getFailed(0, -1)
       let retried = 0
       for (const job of failedJobs) {
         await job.retry()
         retried++
       }
-      await q.close()
       res.json({ retried })
     } catch (err) {
       console.error(`[automation] retry-failed error for ${key}:`, err)
       res.status(500).json({ error: 'Retry failed' })
+    } finally {
+      await q.close()
     }
   }
 )
@@ -218,14 +219,15 @@ router.post(
       res.status(400).json({ error: 'Unknown scanner key' })
       return
     }
+    const q = new Queue(key, { connection: createBullMQConnection() })
     try {
-      const q = new Queue(key, { connection: createBullMQConnection() })
       const cleaned = await q.clean(0, 100, 'failed')
-      await q.close()
       res.json({ cleared: cleaned.length })
     } catch (err) {
       console.error(`[automation] clear-failed error for ${key}:`, err)
       res.status(500).json({ error: 'Clear failed' })
+    } finally {
+      await q.close()
     }
   }
 )
