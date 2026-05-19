@@ -29,6 +29,8 @@ export interface StorageMock {
 export interface MockStore {
   tables: Record<string, Row[]>
   storage: StorageMock
+  /** Optional per-table error to return from maybeSingle() / single() */
+  tableErrors?: Record<string, { message: string }>
 }
 
 export function createStore(): MockStore {
@@ -397,6 +399,9 @@ function buildQuery(store: MockStore, table: string): unknown {
     },
     async single() {
       state.returnSelect = true
+      if (store.tableErrors?.[state.table]) {
+        return { data: null, error: store.tableErrors[state.table] }
+      }
       const res = execute(store, state)
       const rows = Array.isArray(res.data) ? res.data : res.data ? [res.data] : []
       if (rows.length === 0) {
@@ -406,6 +411,9 @@ function buildQuery(store: MockStore, table: string): unknown {
     },
     async maybeSingle() {
       state.returnSelect = true
+      if (store.tableErrors?.[state.table]) {
+        return { data: null, error: store.tableErrors[state.table] }
+      }
       const res = execute(store, state)
       const rows = Array.isArray(res.data) ? res.data : res.data ? [res.data] : []
       if (rows.length === 0) return { data: null, error: null }

@@ -113,6 +113,16 @@ describe('isScannerPaused', () => {
     const result = await isScannerPaused('test-tenant-id', 'lead-stalled-scanner')
     expect(result).toBe(true)
   })
+
+  // ── Test 3: isScannerPaused returns false when Supabase returns an error ──────
+  it('returns false when Supabase returns an error (does not throw)', async () => {
+    store.tables['scanner_pauses'] = []
+    store.tableErrors = { scanner_pauses: { message: 'DB error' } }
+    const result = await isScannerPaused('test-tenant-id', 'lead-stalled-scanner')
+    expect(result).toBe(false)
+    // Clean up so subsequent tests are unaffected
+    store.tableErrors = {}
+  })
 })
 
 // ── Test 3: POST /pause returns 400 when paused_until < paused_from ───────────
@@ -137,9 +147,39 @@ describe('POST /api/automation/scanners/:key/pause', () => {
       .expect(400)
     expect(res.body).toMatchObject({ error: expect.any(String) })
   })
+
+  // ── Test 5: POST /pause returns ScannerPause shape on valid input ─────────────
+  it('returns 201/200 with ScannerPause shape on valid input', async () => {
+    const from = new Date().toISOString()
+    const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+    const res = await request(makeApp())
+      .post('/api/automation/scanners/lead-stalled-scanner/pause')
+      .send({ paused_from: from, paused_until: until, reason: 'vacation' })
+    expect(res.status).toBeGreaterThanOrEqual(200)
+    expect(res.status).toBeLessThan(300)
+    expect(res.body).toMatchObject({
+      id: expect.any(String),
+      scanner_key: 'lead-stalled-scanner',
+      paused_from: expect.any(String),
+      paused_until: expect.any(String),
+    })
+    // Verify the row was seeded into the store
+    expect(store.tables['scanner_pauses']?.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ── Test 6: POST /pause returns 400 for unknown scanner key ──────────────────
+  it('returns 400 for unknown scanner key', async () => {
+    const from = new Date().toISOString()
+    const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const res = await request(makeApp())
+      .post('/api/automation/scanners/unknown-scanner/pause')
+      .send({ paused_from: from, paused_until: until })
+      .expect(400)
+    expect(res.body).toMatchObject({ error: expect.any(String) })
+  })
 })
 
-// ── Test 5: DELETE /pause returns { cancelled: 0 } when no active pause ───────
+// ── Test 7: DELETE /pause returns { cancelled: 0 } when no active pause ───────
 describe('DELETE /api/automation/scanners/:key/pause', () => {
   it('returns { cancelled: 0 } when no active pause exists', async () => {
     // scanner_pauses table is empty — delete returns empty array
@@ -148,5 +188,74 @@ describe('DELETE /api/automation/scanners/:key/pause', () => {
       .delete('/api/automation/scanners/lead-stalled-scanner/pause')
       .expect(200)
     expect(res.body).toMatchObject({ cancelled: 0 })
+  })
+
+  // ── Test 8: DELETE /pause returns { cancelled: 1 } when active pause exists ──
+  it('returns { cancelled: 1 } when an active pause row exists', async () => {
+    const now = new Date()
+    const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString() // 1 hour ago
+    const until = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() // 1 day from now
+    store.tables['scanner_pauses'] = [
+      {
+        id: 'pause-active-1',
+        tenant_id: 'test-tenant-id',
+        scanner_key: 'lead-stalled-scanner',
+        paused_from: from,
+        paused_until: until,
+        reason: null,
+        created_at: from,
+      },
+    ]
+    const res = await request(makeApp())
+      .delete('/api/automation/scanners/lead-stalled-scanner/pause')
+      .expect(200)
+    expect(res.body).toMatchObject({ cancelled: 1 })
+  })
+
+  // ── Test 9: DELETE /pause returns 400 for unknown scanner key ────────────────
+  it('returns 400 for unknown scanner key', async () => {
+    const res = await request(makeApp())
+      .delete('/api/automation/scanners/unknown-scanner/pause')
+      .expect(400)
+    expect(res.body).toMatchObject({ error: expect.any(String) })
+  })
+})
+
+// ── GET /scanners/:key/pause describe block ────────────────────────────────────
+describe('GET /api/automation/scanners/:key/pause', () => {
+  // ── Test 10: returns { active: false } when no active pause ──────────────────
+  it('returns { active: false } when no active pause exists', async () => {
+    store.tables['scanner_pauses'] = []
+    const res = await request(makeApp())
+      .get('/api/automation/scanners/lead-stalled-scanner/pause')
+      .expect(200)
+    expect(res.body).toMatchObject({ active: false })
+  })
+
+  // ── Test 11: returns { active: true } with pause data when active pause ───────
+  it('returns { active: true } with pause data when active pause exists', async () => {
+    const now = new Date()
+    const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString() // 1 hour ago
+    const until = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() // 1 day from now
+    store.tables['scanner_pauses'] = [
+      {
+        id: 'pause-get-1',
+        tenant_id: 'test-tenant-id',
+        scanner_key: 'lead-stalled-scanner',
+        paused_from: from,
+        paused_until: until,
+        reason: 'maintenance',
+        created_at: from,
+      },
+    ]
+    const res = await request(makeApp())
+      .get('/api/automation/scanners/lead-stalled-scanner/pause')
+      .expect(200)
+    expect(res.body).toMatchObject({
+      active: true,
+      id: 'pause-get-1',
+      paused_from: expect.any(String),
+      paused_until: expect.any(String),
+    })
   })
 })
