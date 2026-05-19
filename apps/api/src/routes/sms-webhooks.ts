@@ -215,6 +215,8 @@ async function handleMessageReceived(req: Request, res: Response): Promise<void>
 
 // ── message.finalized ─────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, string> = {
+  queued: 'queued',
+  sent: 'sent',
   delivered: 'delivered',
   delivery_failed: 'failed',
   sending_failed: 'failed',
@@ -277,17 +279,23 @@ async function handleMessageFinalized(req: Request, res: Response): Promise<void
       tenantId = loc?.tenant_id ?? null
     }
 
-    const rows = errors.map((err) => ({
-      message_sid: messageSid,
-      error_code: err.code ?? null,
-      error_title: err.title ?? null,
-      to_number: toNumber || null,
-      tenant_id: tenantId,
-    }))
+    if (!tenantId) {
+      console.warn(
+        `[sms-webhook] message.finalized could not resolve tenant for message_sid=${messageSid} — skipping error insert`
+      )
+    } else {
+      const rows = errors.map((err) => ({
+        message_sid: messageSid,
+        error_code: err.code ?? null,
+        error_title: err.title ?? null,
+        to_number: toNumber || null,
+        tenant_id: tenantId,
+      }))
 
-    const { error: insertErr } = await sb.from('sms_delivery_errors').insert(rows)
-    if (insertErr) {
-      console.error('[sms-webhook] sms_delivery_errors insert failed:', insertErr)
+      const { error: insertErr } = await sb.from('sms_delivery_errors').insert(rows)
+      if (insertErr) {
+        console.error('[sms-webhook] sms_delivery_errors insert failed:', insertErr)
+      }
     }
   }
 
