@@ -57,6 +57,11 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     const accountsRes = await fetch('https://mybusiness.googleapis.com/v4/accounts', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
+    if (!accountsRes.ok) {
+      console.error(`[reputation] GBP accounts fetch failed: ${accountsRes.status}`)
+      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      return
+    }
     const accountsBody = (await accountsRes.json()) as {
       accounts?: Array<{ name: string }>
     }
@@ -67,6 +72,11 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
       `https://mybusiness.googleapis.com/v4/${accountName}/locations`,
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
     )
+    if (!locationsRes.ok) {
+      console.error(`[reputation] GBP locations fetch failed: ${locationsRes.status}`)
+      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      return
+    }
     const locationsBody = (await locationsRes.json()) as {
       locations?: Array<{
         name: string
@@ -81,7 +91,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     const placeId = firstLocation?.metadata?.placeId ?? null
 
     const supabase = getSupabase()
-    await supabase.from('gbp_connections').upsert(
+    const { error: upsertError } = await supabase.from('gbp_connections').upsert(
       {
         tenant_id: tenantId,
         google_account_id: accountName,
@@ -94,6 +104,12 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
       },
       { onConflict: 'tenant_id' }
     )
+
+    if (upsertError) {
+      console.error('[reputation] gbp_connections upsert error:', upsertError.message)
+      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      return
+    }
 
     console.info(`[reputation] GBP connected for tenant=${tenantId}, location=${locationName}`)
     res.redirect(`${webUrl}/settings/reputation?connected=true`)
@@ -108,7 +124,15 @@ router.delete('/disconnect', requireAuth, async (req: Request, res: Response): P
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
   try {
-    await supabase.from('gbp_connections').delete().eq('tenant_id', authed.tenantId)
+    const { error: deleteError } = await supabase
+      .from('gbp_connections')
+      .delete()
+      .eq('tenant_id', authed.tenantId)
+    if (deleteError) {
+      console.error(`[reputation] disconnect error: ${deleteError.message}`)
+      res.status(500).json({ error: 'Failed to disconnect' })
+      return
+    }
     console.info(`[reputation] disconnected for tenant=${authed.tenantId}`)
     res.json({ disconnected: true })
   } catch (err) {
