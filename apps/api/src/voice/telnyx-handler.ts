@@ -9,6 +9,7 @@ import { handlePostCall, callSessionState } from './post-call.js'
 import { persistVoiceSession } from './call-session-logger.js'
 import { lookupCaller, buildSystemPromptSuffix, type CallerContext } from './pre-call-lookup.js'
 import { Sentry } from '../lib/sentry.js'
+import type { BusinessProfile } from '@nuatis/shared'
 
 // ── Hangup data registry ─────────────────────────────────────────────────────
 // Populated by the call.hangup webhook, consumed by handleCallEnd.
@@ -110,6 +111,11 @@ interface LocationAfterHoursConfig {
   timezone: string
 }
 
+interface LocationConfig {
+  afterHoursConfig: LocationAfterHoursConfig | null
+  businessProfile: BusinessProfile | null
+}
+
 function isAfterHoursNow(
   businessHours: Record<string, AfterHoursDayConfig>,
   timezone: string
@@ -137,55 +143,63 @@ function isAfterHoursNow(
   }
 }
 
-async function getLocationAfterHoursConfig(
-  tenantId: string
-): Promise<LocationAfterHoursConfig | null> {
+async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
+  const FALLBACK: LocationConfig = { afterHoursConfig: null, businessProfile: null }
   const FALLBACK_MESSAGE =
     'We are currently closed. Please leave your name and number and we will call you back during business hours.'
   try {
     const url = process.env['SUPABASE_URL']
     const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-    if (!url || !key) return null
+    if (!url || !key) return FALLBACK
 
     const supabase = createClient(url, key)
     let timedOut = false
-    const timeout = new Promise<null>((resolve) =>
+    const timeout = new Promise<LocationConfig>((resolve) =>
       setTimeout(() => {
         timedOut = true
-        resolve(null)
+        resolve(FALLBACK)
       }, 400)
     )
 
-    const query = (async () => {
+    const query = (async (): Promise<LocationConfig> => {
       try {
         const { data, error } = await supabase
           .from('locations')
-          .select('after_hours_enabled, business_hours, after_hours_message, timezone')
+          .select(
+            'after_hours_enabled, business_hours, after_hours_message, timezone, business_profile'
+          )
           .eq('tenant_id', tenantId)
           .eq('is_primary', true)
           .single()
-        if (timedOut || error || !data) return null
+        if (timedOut || error || !data) return FALLBACK
         const d = data as {
           after_hours_enabled?: boolean
           business_hours?: Record<string, AfterHoursDayConfig>
           after_hours_message?: string
           timezone?: string
+          business_profile?: BusinessProfile | null
         }
-        if (!d.after_hours_enabled) return null
-        return {
-          afterHoursEnabled: true,
-          businessHours: d.business_hours ?? {},
-          afterHoursMessage: d.after_hours_message ?? FALLBACK_MESSAGE,
-          timezone: d.timezone ?? 'America/Chicago',
-        } satisfies LocationAfterHoursConfig
+        const afterHoursConfig: LocationAfterHoursConfig | null = d.after_hours_enabled
+          ? {
+              afterHoursEnabled: true,
+              businessHours: d.business_hours ?? {},
+              afterHoursMessage: d.after_hours_message ?? FALLBACK_MESSAGE,
+              timezone: d.timezone ?? 'America/Chicago',
+            }
+          : null
+        const businessProfile =
+          d.business_profile && Object.keys(d.business_profile).length > 0
+            ? d.business_profile
+            : null
+        return { afterHoursConfig, businessProfile }
       } catch {
-        return null
+        return FALLBACK
       }
     })()
 
     return Promise.race([query, timeout])
   } catch {
-    return null
+    return FALLBACK
   }
 }
 
@@ -324,13 +338,17 @@ export async function prewarmGemini(
   // Check after-hours mode in parallel with caller lookup
   const [callerContext, locationConfig] = await Promise.all([
     lookupPromise,
-    getLocationAfterHoursConfig(tenantId),
+    getLocationConfig(tenantId),
   ])
   const contextSuffix = buildSystemPromptSuffix(callerContext, fromNumber)
+  const { afterHoursConfig, businessProfile } = locationConfig
 
   let afterHoursPrefix: string | undefined
-  if (locationConfig && isAfterHoursNow(locationConfig.businessHours, locationConfig.timezone)) {
-    afterHoursPrefix = buildAfterHoursSystemPrefix(locationConfig.afterHoursMessage)
+  if (
+    afterHoursConfig &&
+    isAfterHoursNow(afterHoursConfig.businessHours, afterHoursConfig.timezone)
+  ) {
+    afterHoursPrefix = buildAfterHoursSystemPrefix(afterHoursConfig.afterHoursMessage)
     console.info(
       `[telnyx-handler] after-hours mode active for tenant=${tenantId} — overriding system prompt`
     )
@@ -344,7 +362,8 @@ export async function prewarmGemini(
     product,
     contextSuffix,
     callerContext.contactId ?? null,
-    afterHoursPrefix
+    afterHoursPrefix,
+    businessProfile
   )
 
   return new Promise<void>((resolve) => {
