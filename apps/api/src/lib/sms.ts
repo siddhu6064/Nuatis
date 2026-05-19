@@ -78,7 +78,7 @@ export async function sendSms(
 
         // Also log to sms_messages for AI-aware thread view
         try {
-          await supabase.from('sms_messages').insert({
+          const { error: smsErr } = await supabase.from('sms_messages').insert({
             tenant_id: options.tenantId,
             contact_id: options.contactId ?? null,
             direction: 'outbound',
@@ -89,6 +89,7 @@ export async function sendSms(
             status: 'sent',
             ai_handled: false,
           })
+          if (smsErr) console.error('[sms] failed to log to sms_messages:', smsErr)
         } catch (err) {
           console.error('[sms] failed to log to sms_messages:', err)
         }

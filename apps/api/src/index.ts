@@ -548,7 +548,7 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
   })
 
   // Log to sms_messages table
-  await sb.from('sms_messages').insert({
+  const { error: smsInsertErr } = await sb.from('sms_messages').insert({
     tenant_id: tenantId,
     contact_id: contactId,
     direction: 'inbound',
@@ -558,6 +558,7 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
     message_sid: telnyxMessageId || null,
     status: 'received',
   })
+  if (smsInsertErr) console.error('[sms-webhook] sms_messages insert failed:', smsInsertErr)
 
   // STOP/HELP keyword handling
   const trimmedBody = body.trim().toUpperCase()
@@ -565,8 +566,15 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
   // TCPA opt-out — legal requirement
   if (['STOP', 'UNSUBSCRIBE', 'CANCEL'].includes(trimmedBody)) {
     if (contactId) {
-      await sb.from('contacts').update({ sms_opt_in: false }).eq('id', contactId)
-      console.info(`[sms-webhook] STOP received — opted out contact=${contactId}`)
+      const { error: optOutErr } = await sb
+        .from('contacts')
+        .update({ sms_opt_in: false })
+        .eq('id', contactId)
+      if (optOutErr) {
+        console.error(`[sms-webhook] STOP opt-out failed for contact=${contactId}:`, optOutErr)
+      } else {
+        console.info(`[sms-webhook] STOP received — opted out contact=${contactId}`)
+      }
     }
     res.sendStatus(200)
     return
@@ -614,7 +622,7 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
   void (async () => {
     const { handleAiSmsReply } = await import('./lib/sms-ai-reply.js')
     await handleAiSmsReply(tenantId, contactId, body, fromNumber, toNumber)
-  })()
+  })().catch((err) => console.error('[sms-webhook] AI reply error:', err))
 
   res.sendStatus(200)
 })
