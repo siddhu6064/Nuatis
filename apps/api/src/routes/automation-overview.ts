@@ -42,12 +42,14 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
   try {
     const q = new Queue(key, { connection: createBullMQConnection() })
     const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed', 'paused')
-    const failedJobs = await q.getFailed(0, 0)
+    const [failedJobs, completedJobs] = await Promise.all([
+      q.getFailed(0, 0),
+      q.getCompleted(0, 99),
+    ])
     await q.close()
 
     const pausedCount = counts.paused ?? 0
     const failedCount = counts.failed ?? 0
-    const completedCount = counts.completed ?? 0
 
     let status: ScannerStatus['status']
     if (pausedCount > 0) {
@@ -58,19 +60,26 @@ async function fetchScannerStatus(key: string, name: string): Promise<ScannerSta
       status = 'active'
     }
 
-    const lastRunAt =
-      failedJobs.length > 0 && failedJobs[0]?.finishedOn != null
-        ? new Date(failedJobs[0].finishedOn).toISOString()
-        : null
+    // Fix 1: last_run_at — use whichever of failed/completed is more recent
+    const lastFailed = failedJobs[0]?.finishedOn ?? null
+    const lastCompleted = completedJobs[0]?.finishedOn ?? null
+    const lastRunTs = Math.max(lastFailed ?? 0, lastCompleted ?? 0)
+    const last_run_at = lastRunTs > 0 ? new Date(lastRunTs).toISOString() : null
+
+    // Fix 2: jobs_processed_7d — filter completed jobs to 7-day window
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const jobs_processed_7d = completedJobs.filter(
+      (j) => j.finishedOn != null && j.finishedOn >= sevenDaysAgo
+    ).length
 
     return {
       name,
       key,
       status,
-      last_run_at: lastRunAt,
+      last_run_at,
       last_error: failedJobs[0]?.failedReason ?? null,
       failure_count: failedCount,
-      jobs_processed_7d: completedCount,
+      jobs_processed_7d,
     }
   } catch {
     return {
@@ -123,7 +132,7 @@ router.get('/overview', requireAuth, async (req: Request, res: Response): Promis
     .sort((a, b) => b.monday.getTime() - a.monday.getTime())
     .slice(0, 7)
     .map(({ monday, count }) => ({
-      week: monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      week: monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
       count,
     }))
 
