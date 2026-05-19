@@ -562,6 +562,14 @@ export interface ReviewRequestStats {
 
 // ── Automation Overview ───────────────────────────────────────
 
+export interface FailedJob {
+  id: string
+  name: string
+  failed_at: string | null
+  error_message: string
+  attempt_count: number
+}
+
 export interface ScannerStatus {
   name: string // human-readable: "Stalled Lead Scanner", etc.
   key: string // internal BullMQ queue name
@@ -570,6 +578,8 @@ export interface ScannerStatus {
   last_error: string | null
   failure_count: number
   jobs_processed_7d: number
+  failed_jobs: FailedJob[]
+  is_paused: boolean
 }
 
 export interface AutomationOverview {
