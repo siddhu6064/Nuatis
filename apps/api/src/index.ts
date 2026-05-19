@@ -5,7 +5,10 @@ import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
-import { initConversationsWs } from './lib/conversations-ws.js'
+import {
+  initConversationsWs,
+  broadcastToTenant as broadcastConversations,
+} from './lib/conversations-ws.js'
 import { initSentry, Sentry } from './lib/sentry.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
@@ -562,6 +565,21 @@ app.post('/webhooks/telnyx/sms', async (req, res) => {
     status: 'received',
   })
   if (smsInsertErr) console.error('[sms-webhook] sms_messages insert failed:', smsInsertErr)
+
+  broadcastConversations(tenantId as string, {
+    type: 'new_message',
+    conversation_id: contactId ?? '',
+    message: {
+      id: telnyxMessageId || crypto.randomUUID(),
+      direction: 'inbound',
+      body,
+      from_number: fromNumber,
+      to_number: toNumber,
+      status: 'received',
+      ai_handled: false,
+      created_at: new Date().toISOString(),
+    },
+  })
 
   // STOP/HELP keyword handling
   const trimmedBody = body.trim().toUpperCase()

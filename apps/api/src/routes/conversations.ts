@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendSms } from '../lib/sms.js'
+import { broadcastToTenant } from '../lib/conversations-ws.js'
 
 const router = Router()
 
@@ -32,7 +33,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   // Step 1: Fetch recent sms_messages for this tenant (capped to avoid full-table scan)
   const { data: allMessages, error: msgError } = await supabase
     .from('sms_messages')
-    .select('id, contact_id, direction, body, created_at, ai_handled')
+    .select('id, contact_id, direction, body, created_at, ai_handled, read_at')
     .eq('tenant_id', tenantId)
     .not('contact_id', 'is', null)
     .order('created_at', { ascending: false })
@@ -67,13 +68,31 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   // Step 3: Fetch conversation statuses
   const { data: statuses, error: statusError } = await supabase
     .from('conversation_status')
-    .select('contact_id, resolved_at')
+    .select('contact_id, resolved_at, assigned_to, assigned_at')
     .eq('tenant_id', tenantId)
     .in('contact_id', contactIds)
 
   if (statusError) {
     res.status(500).json({ error: statusError.message })
     return
+  }
+
+  // Step 4: Fetch assignee names for any assigned conversations
+  const assigneeIds = [
+    ...new Set(
+      (statuses ?? [])
+        .map((s) => s.assigned_to as string | null)
+        .filter((id): id is string => id !== null)
+    ),
+  ]
+
+  let assigneeMap = new Map<string, string>()
+  if (assigneeIds.length > 0) {
+    const { data: assignees } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', assigneeIds)
+    assigneeMap = new Map((assignees ?? []).map((u) => [u.id as string, u.full_name as string]))
   }
 
   // Build lookup maps
@@ -97,22 +116,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       // Messages are ordered descending, so first is most recent
       const lastMessage = messages[0]
 
-      // Compute unread count: inbound messages after the last outbound
-      const outboundMessages = messages.filter((m) => m.direction === 'outbound')
-      let unreadCount = 0
-      if (outboundMessages.length === 0) {
-        // No outbound: all inbound are unread
-        unreadCount = messages.filter((m) => m.direction === 'inbound').length
-      } else {
-        // Find the max outbound created_at
-        const lastOutboundAt = outboundMessages.reduce((max, m) =>
-          m.created_at > max.created_at ? m : max
-        ).created_at
-        // Count inbound after last outbound
-        unreadCount = messages.filter(
-          (m) => m.direction === 'inbound' && m.created_at > lastOutboundAt
-        ).length
-      }
+      // Compute unread count: inbound messages without a read_at timestamp
+      const unreadCount = messages.filter(
+        (m) => m.direction === 'inbound' && m.read_at == null
+      ).length
 
       const statusRow = statusMap.get(contactId)
       const conversationStatus = statusRow?.resolved_at ? 'resolved' : 'open'
@@ -129,6 +136,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         ai_handled: lastMessage?.ai_handled ?? false,
         unread_count: unreadCount,
         status: conversationStatus,
+        assigned_to: statusRow?.assigned_to ?? null,
+        assigned_to_name: statusRow?.assigned_to
+          ? (assigneeMap.get(statusRow.assigned_to as string) ?? null)
+          : null,
       }
     })
     .filter((conv) => {
@@ -269,6 +280,11 @@ router.post(
       return
     }
 
+    broadcastToTenant(tenantId as string, {
+      type: 'conversation_resolved',
+      conversation_id: contactId!,
+    })
+
     res.json({ resolved: true, resolved_at: now })
   }
 )
@@ -315,6 +331,11 @@ router.post(
       res.status(500).json({ error: error.message })
       return
     }
+
+    broadcastToTenant(tenantId as string, {
+      type: 'conversation_reopened',
+      conversation_id: contactId!,
+    })
 
     res.json({ reopened: true })
   }
@@ -387,6 +408,21 @@ router.post('/:contactId/send', requireAuth, async (req: Request, res: Response)
     res.status(500).json({ error: 'Failed to send SMS' })
     return
   }
+
+  broadcastToTenant(tenantId as string, {
+    type: 'new_message',
+    conversation_id: contactId as string,
+    message: {
+      id: result.messageId ?? crypto.randomUUID(),
+      direction: 'outbound',
+      body,
+      from_number: location.telnyx_number!,
+      to_number: contact.phone!,
+      status: 'sent',
+      ai_handled: false,
+      created_at: new Date().toISOString(),
+    },
+  })
 
   res.json({
     message_sid: result.messageId ?? null,
@@ -463,6 +499,12 @@ router.post(
       res.status(500).json({ error: error.message })
       return
     }
+
+    broadcastToTenant(tenantId as string, {
+      type: 'conversation_assigned',
+      conversation_id: contactId!,
+      assigned_to: userId,
+    })
 
     res.json({
       assigned_to: userId,
