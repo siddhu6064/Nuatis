@@ -361,6 +361,8 @@ export interface Conversation {
   unread_count: number
   status: 'open' | 'resolved'
   ai_handled: boolean
+  assigned_to?: string | null
+  assigned_to_name?: string | null
 }
 
 export interface ConversationMessage {
@@ -373,6 +375,12 @@ export interface ConversationMessage {
   ai_handled: boolean
   created_at: string
 }
+
+export type ConversationsWsEvent =
+  | { type: 'new_message'; conversation_id: string; message: ConversationMessage }
+  | { type: 'conversation_resolved'; conversation_id: string }
+  | { type: 'conversation_assigned'; conversation_id: string; assigned_to: string | null }
+  | { type: 'conversation_reopened'; conversation_id: string }
 
 // ── API response wrappers ────────────────────────────────────
 
