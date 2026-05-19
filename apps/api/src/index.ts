@@ -5,6 +5,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
+import { initConversationsWs } from './lib/conversations-ws.js'
 import { initSentry, Sentry } from './lib/sentry.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
@@ -637,6 +638,7 @@ const server = createServer(app)
 const wss = new WebSocketServer({ server, path: '/voice/stream' })
 registerVoiceWebSocket(wss)
 setWssRef(wss)
+initConversationsWs(server)
 
 // ── Background workers ──────────────────────────────────────────────────────
 import { startWorkers, stopWorkers } from './workers/index.js'
@@ -644,6 +646,7 @@ import { startWorkers, stopWorkers } from './workers/index.js'
 server.listen(PORT, () => {
   console.info(`Nuatis API running on http://localhost:${PORT}`)
   console.info(`Voice WebSocket listening at ws://localhost:${PORT}/voice/stream`)
+  console.info(`Conversations WebSocket listening at ws://localhost:${PORT}/ws/conversations`)
 
   // Start BullMQ scanners (best-effort — don't block server start)
   startWorkers().catch((err) => console.error('[workers] failed to start:', err))
