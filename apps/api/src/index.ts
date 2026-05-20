@@ -70,6 +70,7 @@ import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import smsWebhooksRouter from './routes/sms-webhooks.js'
+import smsHealthRouter from './routes/sms-health.js'
 import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
@@ -148,6 +149,7 @@ app.use('/api/views', savedViewsRouter)
 app.use('/api/import', importRouter)
 app.use('/api/contacts', attachmentsRouter)
 app.use('/api', smsRouter)
+app.use('/api/sms', smsHealthRouter)
 app.use('/api/companies', companiesRouter)
 app.use('/api/deals', dealsRouter)
 app.use('/api/inventory', inventoryRouter)
