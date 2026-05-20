@@ -1,0 +1,86 @@
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabase() {
+  const url = process.env['SUPABASE_URL']
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+  if (!url || !key) throw new Error('Supabase env vars not set')
+  return createClient(url, key)
+}
+
+export async function updateEmailRiskScore(
+  contactId: string,
+  tenantId: string,
+  eventType: string
+): Promise<void> {
+  // For non-risk event types, do nothing
+  if (['sent', 'opened', 'clicked'].includes(eventType)) {
+    return
+  }
+
+  const supabase = getSupabase()
+
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('email_risk_score, email_status')
+    .eq('id', contactId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  const currentScore: number = contact?.email_risk_score ?? 0
+  const currentStatus: string = contact?.email_status ?? 'ok'
+
+  let newScore = currentScore
+  let newStatus = currentStatus
+
+  if (eventType === 'bounced_hard') {
+    newStatus = 'hard_bounce'
+    newScore = 100
+  } else if (eventType === 'bounced_soft') {
+    newScore = Math.min(currentScore + 25, 75)
+    newStatus = 'soft_bounce'
+  } else if (eventType === 'complained') {
+    newStatus = 'complained'
+    newScore = 100
+  } else if (eventType === 'unsubscribed') {
+    newStatus = 'unsubscribed'
+    newScore = 90
+  } else if (eventType === 'delivered') {
+    if (currentScore > 0) {
+      newScore = Math.max(currentScore - 5, 0)
+    }
+    if (newScore === 0 && currentStatus === 'soft_bounce') {
+      newStatus = 'ok'
+    }
+  } else {
+    // Unknown event type — do nothing
+    return
+  }
+
+  await supabase
+    .from('contacts')
+    .update({ email_risk_score: newScore, email_status: newStatus })
+    .eq('id', contactId)
+    .eq('tenant_id', tenantId)
+}
+
+export function shouldSuppressEmail(contact: {
+  email_status: string | null
+  email_risk_score: number | null
+}): boolean {
+  const status = contact.email_status ?? 'ok'
+  const score = contact.email_risk_score ?? 0
+
+  if (status === 'hard_bounce' || status === 'complained') {
+    return true
+  }
+  if (score >= 90) {
+    return true
+  }
+  return false
+}
+
+export function getRiskLabel(score: number): 'healthy' | 'at_risk' | 'suppressed' {
+  if (score <= 30) return 'healthy'
+  if (score <= 89) return 'at_risk'
+  return 'suppressed'
+}
