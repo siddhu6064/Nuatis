@@ -125,6 +125,13 @@ const NAV_GROUPS: NavGroup[] = [
         requireModule: 'automation',
       },
       {
+        href: '/campaigns',
+        label: 'Campaigns',
+        icon: '◎',
+        suiteOnly: true,
+        requireModule: 'campaigns',
+      },
+      {
         href: '/settings/follow-ups',
         label: 'Follow-ups',
         icon: '↻',

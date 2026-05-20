@@ -916,3 +916,17 @@ export interface ClientSubscription {
   // Relations
   contacts?: { full_name: string; email?: string | null } | null
 }
+
+// ── Campaign prerequisites ────────────────────────────────────────────────────
+export interface CampaignPrereqCheck {
+  key: string
+  label: string
+  status: 'pass' | 'fail' | 'warning'
+  detail: string
+  action_url: string | null
+}
+
+export interface CampaignPrereqResult {
+  ready: boolean
+  checks: CampaignPrereqCheck[]
+}
