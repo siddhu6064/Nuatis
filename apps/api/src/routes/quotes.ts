@@ -132,7 +132,7 @@ router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Pr
   let query = supabase
     .from('quotes')
     .select(
-      'id, quote_number, title, status, total, created_by, created_at, contact_id, contacts(full_name)',
+      'id, quote_number, title, status, total, created_by, created_at, contact_id, signature_status, contacts(full_name)',
       { count: 'exact' }
     )
     .eq('tenant_id', authed.tenantId)
@@ -267,6 +267,9 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
       discount_value: discountValue,
       discount_label: discountLabel,
       approval_status: approvalStatus,
+      requires_signature:
+        typeof b['requires_signature'] === 'boolean' ? b['requires_signature'] : false,
+      signature_status: b['requires_signature'] === true ? 'waiting' : 'none',
       notes: (b['notes'] as string) || null,
       valid_until: new Date(Date.now() + validDays * 86400000).toISOString(),
       share_token: shareToken,
@@ -368,6 +371,17 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
   if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
   if (typeof b['tax_rate'] === 'number') updates['tax_rate'] = b['tax_rate']
   if (typeof b['valid_until'] === 'string') updates['valid_until'] = b['valid_until']
+
+  // E-signature toggle — only allowed on draft quotes (guard already checked above)
+  if (typeof b['requires_signature'] === 'boolean') {
+    if (b['requires_signature']) {
+      updates['requires_signature'] = true
+      updates['signature_status'] = 'waiting'
+    } else {
+      updates['requires_signature'] = false
+      updates['signature_status'] = 'none'
+    }
+  }
 
   // Discount validation on update
   const discountType =
@@ -788,6 +802,15 @@ async function buildPdfForQuote(
         package_id: i.package_id ?? null,
       })
     ),
+    signatureData:
+      quote.signature_data && quote.signed_by_name
+        ? {
+            dataUrl: quote.signature_data as string,
+            signedByName: quote.signed_by_name as string,
+            signedAt: quote.signed_at as string,
+            signedIp: (quote.signed_ip as string | null) ?? null,
+          }
+        : null,
   })
 
   return { buffer, filename: `Quote-${quote.quote_number}.pdf` }
@@ -1334,6 +1357,101 @@ router.post('/view/:token/decline', async (req: Request, res: Response): Promise
   if (quote.contact_id) enqueueScoreCompute(quote.tenant_id, quote.contact_id, 'quote_declined')
 
   res.json({ declined: true })
+})
+
+// ── processQuoteSignature — exported for testing ─────────────────────────────
+export async function processQuoteSignature(
+  shareToken: string,
+  signatureData: string,
+  signedByName: string,
+  clientIp: string
+): Promise<{ success: true; signed_at: string } | { error: string; status: number }> {
+  // Validate inputs
+  if (!signatureData || !signedByName.trim()) {
+    return { error: 'signature_data and signed_by_name required', status: 400 }
+  }
+  if (!signatureData.startsWith('data:image/png;base64,')) {
+    return { error: 'Invalid signature format', status: 400 }
+  }
+  // 500KB limit (~666KB base64)
+  if (signatureData.length > 700_000) {
+    return { error: 'Signature image too large (max 500KB)', status: 400 }
+  }
+
+  // Lookup quote by share token
+  const supabase = getSupabase()
+  const { data: quote, error: selectErr } = await supabase
+    .from('quotes')
+    .select('id, requires_signature, signature_status, status')
+    .eq('share_token', shareToken)
+    .single()
+
+  if (selectErr || !quote) {
+    return { error: 'Quote not found', status: 404 }
+  }
+
+  // Validation guards
+  if (!quote.requires_signature) {
+    return { error: 'This quote does not require a signature', status: 400 }
+  }
+  if (quote.signature_status === 'signed') {
+    return { error: 'Quote has already been signed', status: 409 }
+  }
+  if (quote.status === 'accepted') {
+    return { error: 'Quote is already accepted', status: 409 }
+  }
+
+  const now = new Date().toISOString()
+
+  // Update quote
+  const { error: updateErr } = await supabase
+    .from('quotes')
+    .update({
+      signature_data: signatureData,
+      signed_by_name: signedByName.trim(),
+      signed_at: now,
+      signed_ip: clientIp,
+      signature_status: 'signed',
+      status: 'accepted',
+      accepted_at: now,
+    })
+    .eq('id', quote.id)
+
+  if (updateErr) {
+    return { error: 'Failed to save signature', status: 500 }
+  }
+
+  return { success: true, signed_at: now }
+}
+
+// ── PUBLIC: POST /api/quotes/sign/:token ────────────────────────────────────
+router.post('/sign/:token', async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.params
+  const { signature_data, signed_by_name } = req.body as {
+    signature_data?: string
+    signed_by_name?: string
+  }
+
+  // Extract client IP
+  const clientIp =
+    (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+    req.socket?.remoteAddress ??
+    req.ip ??
+    'unknown'
+
+  const result = await processQuoteSignature(
+    token ?? '',
+    signature_data ?? '',
+    signed_by_name ?? '',
+    clientIp
+  )
+
+  if ('error' in result) {
+    res.status(result.status).json({ error: result.error })
+    return
+  }
+
+  res.json(result)
 })
 
 // ── POST /api/quotes/:id/approve ─────────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface LineItem {
   description: string
@@ -36,13 +36,17 @@ interface QuoteData {
   contacts: { full_name: string; email?: string | null } | null
   line_items: LineItem[]
   square_info: SquareInfo | null
+  requires_signature: boolean
+  signature_status: 'none' | 'waiting' | 'signed' | 'declined'
+  signed_by_name: string | null
+  signed_at: string | null
 }
 
 export default function PublicQuoteView({ params }: { params: Promise<{ token: string }> }) {
   const [token, setToken] = useState<string | null>(null)
   const [quote, setQuote] = useState<QuoteData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [acted, setActed] = useState<'accepted' | 'declined' | null>(null)
+  const [acted, setActed] = useState<'accepted' | 'declined' | 'signed' | null>(null)
   const [acting, setActing] = useState(false)
 
   // Square payment state
@@ -52,6 +56,14 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
   const [paymentComplete, setPaymentComplete] = useState<string | null>(null) // receipt_url
+
+  // Signature state
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawing = useRef(false)
+  const [hasStrokes, setHasStrokes] = useState(false)
+  const [signerName, setSignerName] = useState('')
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState<string | null>(null)
 
   useEffect(() => {
     params.then((p) => setToken(p.token))
@@ -146,6 +158,142 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
     }
   }
 
+  // Setup canvas on mount / when signature section becomes visible
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.strokeStyle = '#1e293b'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }, [quote?.requires_signature, quote?.signature_status])
+
+  function getCanvasPos(
+    e: MouseEvent | React.MouseEvent | Touch | { clientX: number; clientY: number },
+    canvas: HTMLCanvasElement
+  ): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const clientX = 'clientX' in e ? e.clientX : (e as Touch).clientX
+    const clientY = 'clientY' in e ? e.clientY : (e as Touch).clientY
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    }
+  }
+
+  function handleCanvasMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    drawing.current = true
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const pos = getCanvasPos(e, canvas)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+  }
+
+  function handleCanvasMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (!drawing.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const pos = getCanvasPos(e, canvas)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    setHasStrokes(true)
+  }
+
+  function handleCanvasMouseUp() {
+    drawing.current = false
+  }
+
+  function handleCanvasTouchStart(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    if (!canvas) return
+    drawing.current = true
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const pos = getCanvasPos(touch, canvas)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+  }
+
+  function handleCanvasTouchMove(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault()
+    if (!drawing.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const pos = getCanvasPos(touch, canvas)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    setHasStrokes(true)
+  }
+
+  function handleCanvasTouchEnd() {
+    drawing.current = false
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    setHasStrokes(false)
+  }
+
+  function getSignatureData(): string {
+    return canvasRef.current?.toDataURL('image/png') ?? ''
+  }
+
+  async function handleSign() {
+    const signatureData = getSignatureData()
+    if (!signatureData || !hasStrokes || !signerName.trim() || !token) return
+
+    const sizeKB = Math.round((signatureData.length * 3) / 4 / 1024)
+    if (sizeKB > 400) {
+      setSignError('Signature image is too large. Please clear and sign again.')
+      return
+    }
+
+    setSigning(true)
+    setSignError(null)
+    try {
+      const res = await fetch(`/api/quotes/sign/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signature_data: signatureData,
+          signed_by_name: signerName.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error ?? 'Signature failed')
+      }
+      setActed('signed')
+    } catch (e) {
+      setSignError(e instanceof Error ? e.message : 'Signature failed')
+    } finally {
+      setSigning(false)
+    }
+  }
+
   async function accept() {
     if (!token) return
     setActing(true)
@@ -181,6 +329,13 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   const isExpired = quote.valid_until && new Date(quote.valid_until) < new Date()
   const canAct = !acted && !isExpired && (quote.status === 'sent' || quote.status === 'viewed')
 
+  // Signature pad is shown when requires_signature && status is 'waiting' and not yet acted
+  const showSignaturePad =
+    canAct &&
+    quote.requires_signature &&
+    (quote.signature_status === 'waiting' || quote.signature_status === 'none')
+  const alreadySigned = !acted && quote.requires_signature && quote.signature_status === 'signed'
+
   return (
     <div className="min-h-screen bg-bg px-4 py-8">
       <div className="max-w-xl mx-auto">
@@ -195,15 +350,34 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
         {/* Acted confirmation */}
         {acted && (
           <div
-            className={`rounded-xl p-6 text-center mb-6 ${acted === 'accepted' ? 'bg-green-50 border border-green-100' : 'bg-bg border border-border-brand'}`}
+            className={`rounded-xl p-6 text-center mb-6 ${acted === 'declined' ? 'bg-bg border border-border-brand' : 'bg-green-50 border border-green-100'}`}
           >
             <p className="text-lg font-semibold text-ink mb-1">
-              {acted === 'accepted' ? 'Quote Accepted!' : 'Quote Declined'}
+              {acted === 'signed'
+                ? 'Proposal Signed!'
+                : acted === 'accepted'
+                  ? 'Quote Accepted!'
+                  : 'Quote Declined'}
             </p>
-            <p className="text-sm text-ink3">
-              {acted === 'accepted'
-                ? `✓ Quote accepted. A receipt has been sent to ${quote.contacts?.email ?? 'your email'}.`
-                : `${quote.business_name} has been notified.`}
+            <p className="text-sm text-green-700">
+              {acted === 'signed'
+                ? `✓ Signed by ${signerName}. ${quote.business_name} has been notified.`
+                : acted === 'accepted'
+                  ? `✓ Quote accepted. A receipt has been sent to ${quote.contacts?.email ?? 'your email'}.`
+                  : `${quote.business_name} has been notified.`}
+            </p>
+          </div>
+        )}
+
+        {/* Already signed (loaded from DB) */}
+        {!acted && quote.requires_signature && quote.signature_status === 'signed' && (
+          <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center mb-6">
+            <p className="text-lg font-semibold text-green-800 mb-1">Proposal Signed</p>
+            <p className="text-sm text-green-700">
+              ✓ Signed by {quote.signed_by_name}
+              {quote.signed_at
+                ? ` on ${new Date(quote.signed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                : ''}
             </p>
           </div>
         )}
@@ -404,100 +578,181 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
           </div>
         )}
 
-        {/* Square payment section — only when accepted + Square connected */}
-        {(quote.status === 'accepted' || acted === 'accepted') && quote.square_info && (
-          <div className="bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden mt-6">
-            <div className="px-6 py-4 border-b border-border-brand">
-              <h3 className="text-sm font-semibold text-ink">Pay Now</h3>
-              <p className="text-xs text-ink4 mt-1">
-                {quote.deposit_amount != null
-                  ? `Deposit due: $${Number(quote.deposit_amount).toFixed(2)}`
-                  : `Total: $${Number(quote.total).toFixed(2)}`}
-              </p>
-            </div>
-
-            {paymentComplete !== null ? (
-              <div className="px-6 py-6 text-center">
-                <p className="text-base font-semibold text-green-700 mb-2">Payment complete!</p>
-                {paymentComplete && (
-                  <a
-                    href={paymentComplete}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-teal-600 underline"
-                  >
-                    View receipt
-                  </a>
-                )}
+        {/* Square payment section — only when accepted/signed + Square connected */}
+        {(quote.status === 'accepted' ||
+          acted === 'accepted' ||
+          acted === 'signed' ||
+          alreadySigned) &&
+          quote.square_info && (
+            <div className="bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden mt-6">
+              <div className="px-6 py-4 border-b border-border-brand">
+                <h3 className="text-sm font-semibold text-ink">Pay Now</h3>
+                <p className="text-xs text-ink4 mt-1">
+                  {quote.deposit_amount != null
+                    ? `Deposit due: $${Number(quote.deposit_amount).toFixed(2)}`
+                    : `Total: $${Number(quote.total).toFixed(2)}`}
+                </p>
               </div>
-            ) : (
-              <>
-                {/* Tab switcher */}
-                <div className="flex border-b border-border-brand">
-                  <button
-                    onClick={() => setPayTab('square')}
-                    className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'square' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
-                  >
-                    Card (Square)
-                  </button>
-                  <button
-                    onClick={() => setPayTab('other')}
-                    className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'other' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
-                  >
-                    Other payment
-                  </button>
-                </div>
 
-                {payTab === 'square' ? (
-                  <div className="px-6 py-4">
-                    {/* Square card form mounts here */}
-                    <div id="square-card-container" className="mb-4" />
-
-                    {payError && <p className="text-xs text-rose-600 mb-3">{payError}</p>}
-
-                    <button
-                      onClick={() => void payWithSquare()}
-                      disabled={paying || !squareCard}
-                      className="w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              {paymentComplete !== null ? (
+                <div className="px-6 py-6 text-center">
+                  <p className="text-base font-semibold text-green-700 mb-2">Payment complete!</p>
+                  {paymentComplete && (
+                    <a
+                      href={paymentComplete}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-teal-600 underline"
                     >
-                      {paying
-                        ? 'Processing...'
-                        : `Pay $${quote.deposit_amount != null ? Number(quote.deposit_amount).toFixed(2) : Number(quote.total).toFixed(2)} with Square`}
+                      View receipt
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Tab switcher */}
+                  <div className="flex border-b border-border-brand">
+                    <button
+                      onClick={() => setPayTab('square')}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'square' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
+                    >
+                      Card (Square)
+                    </button>
+                    <button
+                      onClick={() => setPayTab('other')}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'other' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
+                    >
+                      Other payment
                     </button>
                   </div>
-                ) : (
-                  <div className="px-6 py-4">
-                    {quote.contacts?.email ? (
-                      <a
-                        href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Payment — ${quote.title}`)}`}
-                        className="block w-full text-center py-2 text-sm text-teal-600 font-medium border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
+
+                  {payTab === 'square' ? (
+                    <div className="px-6 py-4">
+                      {/* Square card form mounts here */}
+                      <div id="square-card-container" className="mb-4" />
+
+                      {payError && <p className="text-xs text-rose-600 mb-3">{payError}</p>}
+
+                      <button
+                        onClick={() => void payWithSquare()}
+                        disabled={paying || !squareCard}
+                        className="w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
                       >
-                        Contact us to arrange payment
-                      </a>
-                    ) : (
-                      <p className="text-sm text-ink3 text-center">
-                        Contact {quote.business_name} to arrange payment.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+                        {paying
+                          ? 'Processing...'
+                          : `Pay $${quote.deposit_amount != null ? Number(quote.deposit_amount).toFixed(2) : Number(quote.total).toFixed(2)} with Square`}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-6 py-4">
+                      {quote.contacts?.email ? (
+                        <a
+                          href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Payment — ${quote.title}`)}`}
+                          className="block w-full text-center py-2 text-sm text-teal-600 font-medium border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
+                        >
+                          Contact us to arrange payment
+                        </a>
+                      ) : (
+                        <p className="text-sm text-ink3 text-center">
+                          Contact {quote.business_name} to arrange payment.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+        {/* Signature capture section — shown when requires_signature and waiting */}
+        {showSignaturePad && (
+          <div className="mt-6 bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-brand">
+              <h3 className="text-sm font-semibold text-ink">Sign to accept this proposal</h3>
+              <p className="text-xs text-ink4 mt-1">
+                By signing below, you agree to the terms outlined in this proposal.
+              </p>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {/* Canvas pad */}
+              <div>
+                <canvas
+                  ref={canvasRef}
+                  width={600}
+                  height={180}
+                  style={{ maxWidth: '100%', touchAction: 'none' }}
+                  className="block border border-gray-300 rounded-lg bg-white cursor-crosshair"
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseUp}
+                  onTouchStart={handleCanvasTouchStart}
+                  onTouchMove={handleCanvasTouchMove}
+                  onTouchEnd={handleCanvasTouchEnd}
+                />
+                <button
+                  type="button"
+                  onClick={clearCanvas}
+                  className="mt-2 text-xs text-ink4 hover:text-ink3 px-2 py-1 border border-gray-200 rounded"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Name input */}
+              <div>
+                <label className="block text-xs text-ink4 mb-1" htmlFor="signer-name">
+                  Your full name
+                </label>
+                <input
+                  id="signer-name"
+                  type="text"
+                  value={signerName}
+                  onChange={(e) => setSignerName(e.target.value)}
+                  placeholder="Full name"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+
+              {signError && <p className="text-xs text-rose-600">{signError}</p>}
+
+              {/* Sign & Accept button */}
+              <button
+                type="button"
+                onClick={() => void handleSign()}
+                disabled={signing || !hasStrokes || !signerName.trim()}
+                className="w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                style={{ backgroundColor: '#0d9488' }}
+              >
+                {signing ? 'Signing...' : 'Sign & Accept'}
+              </button>
+
+              {/* Decline still available */}
+              <button
+                type="button"
+                onClick={() => void decline()}
+                disabled={acting}
+                className="w-full py-2 text-sm text-ink3 hover:text-ink2"
+              >
+                Decline
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Action buttons */}
-        {canAct && (
+        {/* Normal Action buttons — only for non-signature quotes */}
+        {canAct && !showSignaturePad && (
           <div className="mt-6 space-y-3">
             <button
-              onClick={accept}
+              onClick={() => void accept()}
               disabled={acting}
               className="w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
             >
               {acting ? 'Processing...' : 'Accept Quote'}
             </button>
             <button
-              onClick={decline}
+              onClick={() => void decline()}
               disabled={acting}
               className="w-full py-2 text-sm text-ink3 hover:text-ink2"
             >

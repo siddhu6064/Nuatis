@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import QuoteActions from './QuoteActions'
 import QuotePayments from './QuotePayments'
+import QuoteSignatureToggle from './QuoteSignatureToggle'
 
 interface LineItem {
   id: string
@@ -41,6 +42,8 @@ interface Quote {
   remaining_balance: number | null
   contacts: { full_name: string; phone: string | null; email: string | null } | null
   payment_status: string | null
+  requires_signature: boolean | null
+  signature_status: string | null
 }
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
@@ -311,6 +314,14 @@ export default async function QuoteDetailPage({ params }: Props) {
           <p className="text-sm text-ink4">Not configured</p>
         )}
       </div>
+
+      {/* E-signature toggle — draft quotes only */}
+      {quote.status === 'draft' && (
+        <QuoteSignatureToggle
+          quoteId={quote.id}
+          requiresSignature={quote.requires_signature ?? false}
+        />
+      )}
 
       {/* Notes */}
       {quote.notes && (

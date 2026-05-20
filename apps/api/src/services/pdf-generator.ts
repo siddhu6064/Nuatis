@@ -8,6 +8,13 @@ interface LineItem {
   package_id?: string | null
 }
 
+interface SignatureData {
+  dataUrl: string // data:image/png;base64,...
+  signedByName: string
+  signedAt: string // ISO timestamp
+  signedIp: string | null
+}
+
 interface QuotePdfData {
   quoteNumber: string
   title: string
@@ -31,6 +38,7 @@ interface QuotePdfData {
   remainingBalance?: number | null
   notes: string | null
   lineItems: LineItem[]
+  signatureData?: SignatureData | null
 }
 
 const TEAL = '#0d9488'
@@ -255,6 +263,51 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
       doc.fontSize(10).fillColor(TEAL).text('Notes', 50, y)
       y += 16
       doc.fontSize(9).fillColor(GRAY).text(data.notes, 50, y, { width: pageWidth })
+    }
+
+    // ── Signature ─────────────────────────────────────────────────────────
+    if (data.signatureData) {
+      const sig = data.signatureData
+      y += 40
+      doc
+        .moveTo(50, y)
+        .lineTo(50 + pageWidth, y)
+        .strokeColor(LIGHT_GRAY)
+        .lineWidth(1)
+        .stroke()
+      y += 16
+
+      doc.fontSize(11).fillColor(TEAL).text('Digital Signature', 50, y)
+      y += 20
+
+      doc.fontSize(9).fillColor(GRAY).text('Digitally signed by:', 50, y)
+      doc.fillColor(DARK).text(sig.signedByName, 160, y)
+
+      y += 16
+      const formattedDate = new Date(sig.signedAt).toLocaleString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+      doc.fillColor(GRAY).text('Date:', 50, y)
+      doc.fillColor(DARK).text(formattedDate, 160, y)
+
+      if (sig.signedIp) {
+        y += 16
+        doc.fillColor(GRAY).text('IP Address:', 50, y)
+        doc.fillColor(DARK).text(sig.signedIp, 160, y)
+      }
+
+      y += 20
+      // Embed the signature image (max 300×90px)
+      const base64Data = sig.dataUrl.split(',')[1]
+      if (base64Data) {
+        const imgBuffer = Buffer.from(base64Data, 'base64')
+        doc.image(imgBuffer, 50, y, { fit: [300, 90] })
+        y += 96
+      }
     }
 
     // ── Footer ────────────────────────────────────────────────────────────

@@ -797,6 +797,46 @@ export interface SquarePayment {
   currency: string
 }
 
+// ── Quotes ───────────────────────────────────────────────────
+
+export interface Quote {
+  id: string
+  tenant_id: string
+  contact_id: string | null
+  quote_number: string
+  title: string
+  status: string
+  subtotal: number
+  tax_rate: number
+  tax_amount: number
+  total: number
+  notes: string | null
+  valid_until: string | null
+  sent_at: string | null
+  accepted_at: string | null
+  declined_at: string | null
+  created_by: string | null
+  share_token: string
+  created_at: string
+  updated_at: string
+  discount_pct: number | null
+  discount_amount: number | null
+  approval_status: string | null
+  approval_note: string | null
+  approved_by: string | null
+  approved_at: string | null
+  deposit_pct: number | null
+  deposit_amount: number | null
+  remaining_balance: number | null
+  payment_status: string | null
+  requires_signature?: boolean | null
+  signature_data?: string | null
+  signed_by_name?: string | null
+  signed_at?: string | null
+  signed_ip?: string | null
+  signature_status?: 'none' | 'waiting' | 'signed' | 'declined' | null
+}
+
 // ── Quote Payments ───────────────────────────────────────────
 
 export interface QuotePayment {

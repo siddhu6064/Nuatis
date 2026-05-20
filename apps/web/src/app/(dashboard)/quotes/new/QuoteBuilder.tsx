@@ -74,6 +74,7 @@ export default function QuoteBuilder({
   const [validDays, setValidDays] = useState(30)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [requireSignature, setRequireSignature] = useState(false)
 
   // Discount state
   const [discountEnabled, setDiscountEnabled] = useState(false)
@@ -290,6 +291,7 @@ export default function QuoteBuilder({
           discount_label: discountLabel || null,
           discount_pct: discountPct,
           discount_amount: discountAmount,
+          requires_signature: requireSignature,
         }),
       })
 
@@ -747,6 +749,23 @@ export default function QuoteBuilder({
               />
             </div>
           </div>
+        </div>
+
+        {/* E-signature toggle — only shown for new (draft) quotes */}
+        <div className="bg-white rounded-xl border border-border-brand p-4 flex items-start gap-3">
+          <input
+            id="require-signature"
+            type="checkbox"
+            checked={requireSignature}
+            onChange={(e) => setRequireSignature(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border-brand text-teal-600 focus:ring-teal-500 cursor-pointer"
+          />
+          <label htmlFor="require-signature" className="cursor-pointer select-none">
+            <span className="block text-sm font-medium text-ink">Require e-signature</span>
+            <span className="block text-xs text-ink3 mt-0.5">
+              Client must sign before quote is accepted.
+            </span>
+          </label>
         </div>
 
         {/* Error + Actions */}

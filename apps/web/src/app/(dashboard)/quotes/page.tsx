@@ -11,6 +11,7 @@ interface Quote {
   created_by: string | null
   created_at: string
   approval_status: string | null
+  signature_status?: string | null
   contacts: { full_name: string } | null
 }
 
@@ -35,7 +36,7 @@ export default async function QuotesPage() {
   const { data: rawQuotes } = await supabase
     .from('quotes')
     .select(
-      'id, quote_number, title, status, total, created_by, created_at, approval_status, contacts(full_name)'
+      'id, quote_number, title, status, total, created_by, created_at, approval_status, signature_status, contacts(full_name)'
     )
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
@@ -101,6 +102,7 @@ export default async function QuotesPage() {
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Title</th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Total</th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Status</th>
+                <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Signature</th>
                 <th className="text-center text-xs font-medium text-ink4 px-6 py-3">Views</th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Date</th>
               </tr>
@@ -143,6 +145,23 @@ export default async function QuotesPage() {
                       {q.approval_status === 'rejected' && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600">
                           Rejected
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {q.signature_status === 'waiting' && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">
+                          Awaiting Signature
+                        </span>
+                      )}
+                      {q.signature_status === 'signed' && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
+                          Signed
+                        </span>
+                      )}
+                      {q.signature_status === 'declined' && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">
+                          Declined
                         </span>
                       )}
                     </td>
