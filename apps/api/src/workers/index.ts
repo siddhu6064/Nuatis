@@ -21,6 +21,7 @@ import { createLowStockScanner } from './low-stock-scanner.js'
 import { createScheduledReportWorker } from './scheduled-report-worker.js'
 import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
+import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
 
 interface ManagedWorker {
   name: string
@@ -203,6 +204,16 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'weekly-digest', ...weeklyDigestWorker })
   console.info('[workers] weekly-digest started, cron 0 8 * * 1')
+
+  // 21. Invoice overdue scanner — daily at 09:00 UTC
+  const invoiceOverdueScanner = createInvoiceOverdueScanner()
+  await invoiceOverdueScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 9 * * *' }, jobId: 'invoice-overdue-scanner-daily' }
+  )
+  managed.push({ name: 'invoice-overdue-scanner', ...invoiceOverdueScanner })
+  console.info('[workers] invoice-overdue-scanner started, cron 0 9 * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

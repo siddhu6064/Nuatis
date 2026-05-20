@@ -88,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       { href: '/deals', label: 'Deals', icon: '◆', suiteOnly: true, requireModule: 'deals' },
       { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
+      { href: '/invoices', label: 'Invoices', icon: '◪', suiteOnly: true, requireModule: 'cpq' },
       {
         href: '/quotes/payment-links',
         label: 'Payment Links',

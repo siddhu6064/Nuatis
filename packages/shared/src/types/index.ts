@@ -851,3 +851,42 @@ export interface QuotePayment {
   notes?: string | null
   recorded_at: string
 }
+
+// ── Invoices ─────────────────────────────────────────────────
+
+export interface InvoiceLineItem {
+  id: string
+  invoice_id: string
+  tenant_id: string
+  description: string
+  quantity: number
+  unit_price: number
+  amount: number // generated column: quantity * unit_price
+  sort_order: number
+}
+
+export interface Invoice {
+  id: string
+  tenant_id: string
+  contact_id: string | null
+  deal_id: string | null
+  invoice_number: string
+  status: 'draft' | 'sent' | 'due' | 'received' | 'overdue' | 'void'
+  issue_date: string
+  due_date: string | null
+  subtotal: number
+  tax_rate: number | null
+  tax_amount: number | null
+  total: number
+  amount_paid: number | null
+  balance_due: number | null // generated column
+  notes: string | null
+  paid_at: string | null
+  sent_at: string | null
+  voided_at: string | null
+  created_at: string
+  updated_at: string
+  // Relations (optional, from joins)
+  contacts?: { full_name: string; email?: string | null; phone?: string | null } | null
+  line_items?: InvoiceLineItem[]
+}

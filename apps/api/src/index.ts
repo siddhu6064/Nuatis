@@ -70,6 +70,7 @@ import squareRouter from './routes/square.js'
 import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
+import invoicesRouter, { publicRouter as invoicesPublicRouter } from './routes/invoices.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import smsWebhooksRouter from './routes/sms-webhooks.js'
 import smsHealthRouter from './routes/sms-health.js'
@@ -142,6 +143,8 @@ app.use('/api/push', pushRouter)
 app.use('/api/push/mobile', pushMobileRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
+app.use('/api/invoices/public', invoicesPublicRouter)
+app.use('/api/invoices', invoicesRouter)
 app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/nps', npsRouter)
