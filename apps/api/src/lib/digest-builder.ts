@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import type { WeeklyDigestData } from '@nuatis/shared'
+import type { BrandVoice, WeeklyDigestData } from '@nuatis/shared'
+import { buildBrandVoicePromptBlock } from './brand-voice.js'
 
 // ── Month abbreviations ───────────────────────────────────────
 
@@ -59,8 +60,8 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
     smsSentResult,
     smsDeliveredResult,
   ] = await Promise.all([
-    // Business name
-    supabase.from('tenants').select('name').eq('id', tenantId).single(),
+    // Business name + brand voice
+    supabase.from('tenants').select('name, brand_voice').eq('id', tenantId).single(),
 
     // contacts.new_this_week
     supabase
@@ -212,7 +213,9 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
 
   // ── Derive metrics from results ──────────────────────────────
 
-  const businessName = (tenantResult.data as { name?: string } | null)?.name ?? 'Your Business'
+  const businessName =
+    (tenantResult.data as { name?: string; brand_voice?: unknown } | null)?.name ?? 'Your Business'
+  const brandVoice = (tenantResult.data as { brand_voice?: unknown } | null)?.brand_voice ?? null
 
   const newThisWeek = contactsNewThisWeekResult.count ?? 0
   const totalContacts = contactsTotalResult.count ?? 0
@@ -292,7 +295,9 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
     console.warn('[digest-builder] GEMINI_API_KEY not set — skipping top_insight')
   } else {
     try {
+      const bvBlock = buildBrandVoicePromptBlock(brandVoice as BrandVoice | null)
       const prompt = `In one sentence, highlight the most notable metric from this week's business data: ${JSON.stringify(dataWithoutInsight)}. Be specific with numbers. Start with the metric name.`
+      const fullPrompt = bvBlock ? bvBlock + '\n\n' + prompt : prompt
 
       const { GoogleGenAI } = await import('@google/genai')
       const genai = new GoogleGenAI({ apiKey })
@@ -300,7 +305,7 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
       const geminiCall = genai.models
         .generateContent({
           model: 'gemini-2.0-flash',
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
           config: { maxOutputTokens: 60 },
         })
         .then((result) => result?.text?.trim() ?? null)

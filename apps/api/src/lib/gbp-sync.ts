@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
-import type { GbpInsights } from '@nuatis/shared'
+import type { BrandVoice, GbpInsights } from '@nuatis/shared'
+import { buildBrandVoicePromptBlock } from './brand-voice.js'
 
 // ── Supabase factory ──────────────────────────────────────────
 
@@ -168,7 +169,7 @@ export async function generateAiReply(
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, vertical')
+    .select('name, vertical, brand_voice')
     .eq('id', tenantId)
     .maybeSingle()
 
@@ -183,11 +184,14 @@ export async function generateAiReply(
   const { GoogleGenAI } = await import('@google/genai')
   const genai = new GoogleGenAI({ apiKey })
 
+  const brandVoice = (tenant as { brand_voice?: unknown }).brand_voice ?? null
+  const bvBlock = buildBrandVoicePromptBlock(brandVoice as BrandVoice | null)
   const prompt = buildAiReplyPrompt(tenant.name, tenant.vertical, rating, comment)
+  const fullPrompt = bvBlock ? bvBlock + '\n\n' + prompt : prompt
 
   const result = await genai.models.generateContent({
     model: 'gemini-2.0-flash',
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
   })
 
   const reply = result.text ?? ''

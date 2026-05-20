@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import type { BrandVoice } from '@nuatis/shared'
+import { buildBrandVoicePromptBlock } from './brand-voice.js'
 import { sendSms } from './sms.js'
 
 function getSupabase() {
@@ -56,10 +58,12 @@ export async function handleAiSmsReply(
         .select('business_profile, vertical, telnyx_number')
         .eq('tenant_id', tenantId)
         .single(),
-      supabase.from('tenants').select('name').eq('id', tenantId).single(),
+      supabase.from('tenants').select('name, brand_voice').eq('id', tenantId).single(),
     ])
 
-    const businessName = (tenant as { name?: string | null } | null)?.name ?? 'our team'
+    const businessName =
+      (tenant as { name?: string | null; brand_voice?: unknown } | null)?.name ?? 'our team'
+    const brandVoice = (tenant as { brand_voice?: unknown } | null)?.brand_voice ?? null
     const vertical = (location as { vertical?: string | null } | null)?.vertical ?? 'business'
     const businessProfile =
       (location as { business_profile?: unknown } | null)?.business_profile ?? null
@@ -70,6 +74,7 @@ export async function handleAiSmsReply(
       ? `\nBusiness context: ${JSON.stringify(businessProfile)}`
       : ''
 
+    const bvBlock = buildBrandVoicePromptBlock(brandVoice as BrandVoice | null)
     const systemPrompt =
       `You are a helpful AI assistant for ${businessName}, a ${vertical} business.\n` +
       `You are responding to an SMS from a customer named ${contactName ?? 'Unknown'}.\n` +
@@ -78,7 +83,8 @@ export async function handleAiSmsReply(
       `You cannot: make payments, access external systems, make promises not in the business profile.\n` +
       `If the customer wants to speak to a human, reply: "I'll have someone from our team reach out to you shortly."\n` +
       `Always end with: — ${businessName} team` +
-      profileText
+      profileText +
+      (bvBlock ? '\n\n' + bvBlock : '')
 
     // Format last 5 messages (most-recent last) as conversation history
     const last5 = ((historyRows ?? []) as Array<{ direction: string; body: string }>)
