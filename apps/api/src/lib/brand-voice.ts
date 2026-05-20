@@ -14,8 +14,8 @@ export function buildBrandVoicePromptBlock(brandVoice: BrandVoice | null): strin
   if (hasTone || hasFormality) {
     let toneLine = 'Tone:'
     const parts: string[] = []
-    if (hasTone) parts.push(brandVoice.tone)
-    if (hasFormality) parts.push(brandVoice.formality)
+    if (hasTone) parts.push(brandVoice.tone!)
+    if (hasFormality) parts.push(brandVoice.formality!)
     toneLine += ' ' + parts.join(' and ')
     lines.push(toneLine)
   }

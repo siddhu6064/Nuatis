@@ -87,6 +87,7 @@ import reviewRequestsRouter from './routes/review-requests.js'
 import snippetsRouter from './routes/snippets.js'
 import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
+import campaignsRouter from './routes/campaigns.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -213,6 +214,7 @@ app.use('/api/trigger-links', triggerLinksRouter)
 app.use('/api/review-requests', reviewRequestsRouter)
 app.use('/api/snippets', snippetsRouter)
 app.use('/api/automation', automationOverviewRouter)
+app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
 
 app.get('/', (_req, res) => {

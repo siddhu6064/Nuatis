@@ -77,3 +77,29 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     res.status(401).json({ error: 'Authentication failed' })
   }
 }
+
+export function requireModule(moduleName: string) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    // Module check: fetch tenant modules from DB
+    const supabaseUrl = process.env['SUPABASE_URL']
+    const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
+    if (!supabaseUrl || !supabaseKey) {
+      next() // fail open if env not configured
+      return
+    }
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { data } = await supabase
+      .from('tenants')
+      .select('modules')
+      .eq('id', authed.tenantId)
+      .single<{ modules: Record<string, boolean> | null }>()
+    const modules = data?.modules ?? {}
+    if (modules[moduleName] === false) {
+      res.status(403).json({ error: `Module '${moduleName}' is not enabled for your account` })
+      return
+    }
+    next()
+  }
+}
