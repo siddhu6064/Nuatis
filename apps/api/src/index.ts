@@ -71,6 +71,8 @@ import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
 import invoicesRouter, { publicRouter as invoicesPublicRouter } from './routes/invoices.js'
+import subscriptionsRouter from './routes/subscriptions.js'
+import stripeWebhooksRouter from './routes/stripe-webhooks.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import smsWebhooksRouter from './routes/sms-webhooks.js'
 import smsHealthRouter from './routes/sms-health.js'
@@ -116,6 +118,8 @@ app.use(
 )
 // Capture raw body for Resend webhook signature verification
 app.use('/api/webhooks/email', express.raw({ type: '*/*' }))
+// Capture raw body for Stripe webhook signature verification
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }))
 app.use(express.json())
 app.use(auditLoggerMiddleware)
 
@@ -145,6 +149,8 @@ app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
 app.use('/api/invoices/public', invoicesPublicRouter)
 app.use('/api/invoices', invoicesRouter)
+app.use('/api/subscriptions', subscriptionsRouter)
+app.use('/api/webhooks/stripe', stripeWebhooksRouter)
 app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/nps', npsRouter)

@@ -890,3 +890,29 @@ export interface Invoice {
   contacts?: { full_name: string; email?: string | null; phone?: string | null } | null
   line_items?: InvoiceLineItem[]
 }
+
+// ── Subscriptions ─────────────────────────────────────────────────
+
+export interface ClientSubscription {
+  id: string
+  tenant_id: string
+  contact_id: string
+  stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+  name: string
+  description: string | null
+  amount: number
+  currency: string
+  interval: 'weekly' | 'monthly' | 'quarterly' | 'annually'
+  interval_count: number
+  status: 'active' | 'paused' | 'cancelled' | 'past_due' | 'incomplete'
+  stripe_price_id: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+  // Relations
+  contacts?: { full_name: string; email?: string | null } | null
+}

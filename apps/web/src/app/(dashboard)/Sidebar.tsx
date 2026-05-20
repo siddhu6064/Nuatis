@@ -90,6 +90,13 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/quotes', label: 'Quotes', icon: '◫', suiteOnly: true, requireModule: 'cpq' },
       { href: '/invoices', label: 'Invoices', icon: '◪', suiteOnly: true, requireModule: 'cpq' },
       {
+        href: '/subscriptions',
+        label: 'Subscriptions',
+        icon: '↻',
+        suiteOnly: true,
+        requireModule: 'cpq',
+      },
+      {
         href: '/quotes/payment-links',
         label: 'Payment Links',
         icon: '🔗',

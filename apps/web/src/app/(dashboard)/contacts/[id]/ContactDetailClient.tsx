@@ -274,6 +274,18 @@ export default function ContactDetailClient({ contact: initial }: Props) {
   // Right panel appointments
   const [rightAppts, setRightAppts] = useState<Appt[]>([])
 
+  // Right panel subscriptions
+  const [contactSubscriptions, setContactSubscriptions] = useState<
+    Array<{
+      id: string
+      name: string
+      amount: number
+      interval: string
+      status: string
+      current_period_end: string | null
+    }>
+  >([])
+
   // Left panel tab + DnD opt-ins + metadata
   const [leftTab, setLeftTab] = useState<'fields' | 'dnd'>('fields')
   const [smsOptIn, setSmsOptIn] = useState(false)
@@ -428,6 +440,25 @@ export default function ContactDetailClient({ contact: initial }: Props) {
     void fetch(`/api/appointments?contact_id=${contactId}&limit=20`)
       .then((r) => r.json())
       .then((d: { appointments: Appt[] }) => setRightAppts(d.appointments ?? []))
+      .catch(() => {})
+  }, [activePanel, contactId])
+
+  useEffect(() => {
+    if (activePanel !== 'payments') return
+    void fetch(`/api/subscriptions?contact_id=${contactId}&status=active&limit=10`)
+      .then((r) => (r.ok ? r.json() : { subscriptions: [] }))
+      .then(
+        (data: {
+          subscriptions?: Array<{
+            id: string
+            name: string
+            amount: number
+            interval: string
+            status: string
+            current_period_end: string | null
+          }>
+        }) => setContactSubscriptions(data.subscriptions ?? [])
+      )
       .catch(() => {})
   }, [activePanel, contactId])
 
@@ -754,8 +785,42 @@ export default function ContactDetailClient({ contact: initial }: Props) {
         return <FileAttachments contactId={contactId} />
       case 'payments':
         return (
-          <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-            <p className="text-sm text-ink4">No accepted quotes yet.</p>
+          <div className="p-4">
+            <h3 className="text-[10px] font-semibold text-ink4 uppercase tracking-wider mb-3">
+              Active Subscriptions
+            </h3>
+            {contactSubscriptions.length === 0 ? (
+              <p className="text-sm text-ink4">No active subscriptions.</p>
+            ) : (
+              <div className="space-y-2">
+                {contactSubscriptions.map((sub) => (
+                  <div key={sub.id} className="rounded-lg border border-border-brand bg-bg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-ink2 truncate mr-2">
+                        {sub.name}
+                      </span>
+                      <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+                        {sub.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink4">
+                      ${Number(sub.amount).toFixed(2)} / {sub.interval}
+                      {sub.current_period_end
+                        ? ` · Next: ${new Date(sub.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                        : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4">
+              <Link
+                href={`/subscriptions?contact_id=${contactId}`}
+                className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+              >
+                Manage →
+              </Link>
+            </div>
           </div>
         )
       default:
