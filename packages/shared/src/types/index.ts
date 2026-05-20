@@ -931,6 +931,69 @@ export interface CampaignPrereqResult {
   checks: CampaignPrereqCheck[]
 }
 
+// ── Campaigns ─────────────────────────────────────────────────────────────────
+
+export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'paused'
+export type CampaignType = 'email' | 'sms'
+export type CampaignRecipientStatus =
+  | 'pending'
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'bounced'
+  | 'failed'
+  | 'suppressed'
+
+export interface Campaign {
+  id: string
+  tenant_id: string
+  name: string
+  type: CampaignType
+  status: CampaignStatus
+  subject: string | null
+  body_html: string | null
+  body_text: string | null
+  smart_list_id: string | null
+  scheduled_at: string | null
+  sent_at: string | null
+  cancelled_at: string | null
+  recipient_count: number
+  sent_count: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CampaignRecipient {
+  id: string
+  campaign_id: string
+  tenant_id: string
+  contact_id: string
+  email: string
+  status: CampaignRecipientStatus
+  resend_email_id: string | null
+  sent_at: string | null
+  delivered_at: string | null
+  opened_at: string | null
+  clicked_at: string | null
+  error_message: string | null
+}
+
+export interface CampaignStats {
+  recipient_count: number
+  sent_count: number
+  delivered: number
+  opened: number
+  clicked: number
+  bounced: number
+  failed: number
+  open_rate: number
+  click_rate: number
+  bounce_rate: number
+  status_breakdown: Record<CampaignRecipientStatus, number>
+}
+
 // ── Brand Voice ───────────────────────────────────────────────
 export interface BrandVoice {
   tone?: 'professional' | 'friendly' | 'casual' | 'authoritative' | 'warm'
