@@ -14,11 +14,12 @@ import {
 } from 'recharts'
 import type { SmsHealthStats, SmsDeliveryError, EmailHealthStats } from '@nuatis/shared'
 
-export default function SmsHealthPage() {
+export default function DeliveryHealthPage() {
   const [stats, setStats] = useState<SmsHealthStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [smsLastUpdated, setSmsLastUpdated] = useState<string | null>(null)
+  const [emailLastUpdated, setEmailLastUpdated] = useState<string | null>(null)
 
   const [activeTab, setActiveTab] = useState<'sms' | 'email'>('sms')
   const [emailStats, setEmailStats] = useState<EmailHealthStats | null>(null)
@@ -33,7 +34,7 @@ export default function SmsHealthPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as SmsHealthStats
       setStats(data)
-      setLastUpdated(new Date().toLocaleTimeString())
+      setSmsLastUpdated(new Date().toLocaleTimeString())
     } catch {
       setError('Failed to load SMS health data')
     } finally {
@@ -49,7 +50,7 @@ export default function SmsHealthPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as EmailHealthStats
       setEmailStats(data)
-      setLastUpdated(new Date().toLocaleTimeString())
+      setEmailLastUpdated(new Date().toLocaleTimeString())
     } catch {
       setEmailError('Failed to load email health data')
     } finally {
@@ -62,10 +63,10 @@ export default function SmsHealthPage() {
   }, [fetchStats])
 
   useEffect(() => {
-    if (activeTab === 'email' && !emailStats && !emailLoading) {
+    if (activeTab === 'email' && !emailStats && !emailLoading && !emailError) {
       void fetchEmailStats()
     }
-  }, [activeTab, emailStats, emailLoading, fetchEmailStats])
+  }, [activeTab, emailStats, emailLoading, emailError, fetchEmailStats])
 
   const trendIsEmpty = useMemo(
     () =>
@@ -94,7 +95,11 @@ export default function SmsHealthPage() {
           <p className="text-sm text-ink3 mt-0.5">Email and SMS delivery monitoring</p>
         </div>
         <div className="flex items-center gap-3">
-          {lastUpdated && <span className="text-xs text-ink4">Last updated: {lastUpdated}</span>}
+          {(activeTab === 'sms' ? smsLastUpdated : emailLastUpdated) && (
+            <span className="text-xs text-ink4">
+              Last updated: {activeTab === 'sms' ? smsLastUpdated : emailLastUpdated}
+            </span>
+          )}
           <button
             onClick={() => void (activeTab === 'sms' ? fetchStats() : fetchEmailStats())}
             disabled={activeTab === 'sms' ? loading : emailLoading}
@@ -321,6 +326,16 @@ export default function SmsHealthPage() {
       {/* ── Email Tab ── */}
       {activeTab === 'email' && (
         <>
+          {/* Error state */}
+          {emailError && (
+            <div
+              role="alert"
+              className="mb-6 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800"
+            >
+              {emailError}
+            </div>
+          )}
+
           {/* Loading skeleton */}
           {emailLoading && !emailStats && (
             <div className="animate-pulse space-y-4">
@@ -331,16 +346,6 @@ export default function SmsHealthPage() {
               </div>
               <div className="bg-gray-100 rounded-xl h-56" />
               <div className="bg-gray-100 rounded-xl h-40" />
-            </div>
-          )}
-
-          {/* Error state */}
-          {emailError && (
-            <div
-              role="alert"
-              className="mb-6 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800"
-            >
-              Failed to load email health data
             </div>
           )}
 
