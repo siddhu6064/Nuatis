@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { shouldSuppressEmail } from './email-risk.js'
 
 export interface EmailAttachment {
   filename: string
@@ -12,6 +13,11 @@ export interface EmailParams {
   from?: string
   replyTo?: string
   attachments?: EmailAttachment[]
+  tenantId?: string
+  suppressionCheck?: {
+    email_status: string | null
+    email_risk_score: number | null
+  }
 }
 
 export interface TemplatedEmailParams {
@@ -31,6 +37,13 @@ function getClient(): Resend | null {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (params.suppressionCheck && shouldSuppressEmail(params.suppressionCheck)) {
+    console.info(
+      `[email] suppressed send to=${params.to} — email_status=${params.suppressionCheck.email_status}`
+    )
+    return false
+  }
+
   const client = getClient()
   if (!client) return false
 
@@ -50,6 +63,10 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
         filename: a.filename,
         content: a.content,
       }))
+    }
+
+    if (params.tenantId) {
+      sendParams['tags'] = [{ name: 'tenant_id', value: params.tenantId }]
     }
 
     const { error } = await client.emails.send(
