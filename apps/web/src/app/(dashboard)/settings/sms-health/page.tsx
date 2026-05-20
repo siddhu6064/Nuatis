@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import {
   LineChart,
   Line,
@@ -39,13 +40,13 @@ export default function SmsHealthPage() {
     void fetchStats()
   }, [fetchStats])
 
-  const trendIsEmpty =
-    !stats ||
-    stats.trend_7d.length === 0 ||
-    stats.trend_7d.every(
-      (d: { date: string; sent: number; delivered: number; failed: number }) =>
-        d.sent === 0 && d.delivered === 0 && d.failed === 0
-    )
+  const trendIsEmpty = useMemo(
+    () =>
+      !stats ||
+      stats.trend_7d.length === 0 ||
+      stats.trend_7d.every((d) => d.sent === 0 && d.delivered === 0 && d.failed === 0),
+    [stats]
+  )
 
   const totalFailed = stats?.total_failed ?? 0
 
@@ -62,6 +63,8 @@ export default function SmsHealthPage() {
           <button
             onClick={() => void fetchStats()}
             disabled={loading}
+            aria-label={loading ? 'Loading SMS health data' : 'Refresh SMS health data'}
+            aria-busy={loading}
             className="px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Refresh'}
@@ -71,7 +74,10 @@ export default function SmsHealthPage() {
 
       {/* Error state */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800">
+        <div
+          role="alert"
+          className="mb-6 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800"
+        >
           {error}
         </div>
       )}
@@ -103,7 +109,7 @@ export default function SmsHealthPage() {
               <span className="text-base leading-none mt-0.5">
                 {stats.alert.level === 'critical' ? '🚨' : '⚠'}
               </span>
-              <span>{stats.alert.message}</span>
+              <span>{stats.alert.message ?? ''}</span>
             </div>
           )}
 
@@ -179,6 +185,7 @@ export default function SmsHealthPage() {
               </div>
             ) : (
               <table className="w-full text-sm">
+                <caption className="sr-only">Error breakdown for the last 30 days</caption>
                 <thead>
                   <tr className="border-b border-border-brand">
                     <th className="text-left text-xs font-medium text-ink4 pb-2 pr-4">
@@ -220,12 +227,12 @@ export default function SmsHealthPage() {
               Opted-Out Contacts: {stats.total_opted_out}
             </span>{' '}
             &mdash;{' '}
-            <a
+            <Link
               href="/contacts?sms_opt_in=false"
-              className="text-teal-600 hover:text-teal-700 hover:underline"
+              className="text-teal-600 hover:underline text-sm"
             >
               View opted-out contacts →
-            </a>
+            </Link>
           </div>
         </>
       )}
