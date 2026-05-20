@@ -4,6 +4,22 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
+// Fix 4: module-level constant
+const MONTH_ABBREVS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -21,12 +37,10 @@ router.get('/health', requireAuth, async (req: Request, res: Response): Promise<
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString()
 
-    // Build the 7-day window (today is day 7, 6 days ago is day 1)
+    // Build the 7-day window (today is day 7, 6 days ago is day 1) — UTC midnight
     const sevenDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)
     const sevenDaysAgoIso = new Date(
-      sevenDaysAgo.getFullYear(),
-      sevenDaysAgo.getMonth(),
-      sevenDaysAgo.getDate()
+      Date.UTC(sevenDaysAgo.getUTCFullYear(), sevenDaysAgo.getUTCMonth(), sevenDaysAgo.getUTCDate())
     ).toISOString()
 
     // Run all DB queries in parallel
@@ -79,14 +93,27 @@ router.get('/health', requireAuth, async (req: Request, res: Response): Promise<
         .eq('tenant_id', authed.tenantId)
         .gte('created_at', thirtyDaysAgoIso),
 
-      // trend_7d rows (last 7 days)
+      // trend_7d rows (last 7 days) — Fix 5: exclude queued to match total_sent definition
       supabase
         .from('sms_messages')
         .select('created_at, status')
         .eq('tenant_id', authed.tenantId)
         .eq('direction', 'outbound')
+        .neq('status', 'queued')
         .gte('created_at', sevenDaysAgoIso),
     ])
+
+    // Fix 3: surface errors on critical queries
+    if (sentResult.error || deliveredResult.error || failedResult.error) {
+      res.status(500).json({ error: 'Failed to fetch SMS metrics' })
+      return
+    }
+    if (optedOutResult.error) {
+      console.error('[sms-health] optedOut query error:', optedOutResult.error)
+    }
+    if (trendRowsResult.error) {
+      console.error('[sms-health] trendRows query error:', trendRowsResult.error)
+    }
 
     const totalSent = sentResult.count ?? 0
     const totalDelivered = deliveredResult.count ?? 0
@@ -119,44 +146,26 @@ router.get('/health', requireAuth, async (req: Request, res: Response): Promise<
       .slice(0, 5)
 
     // Build trend_7d — 7 days oldest-first
-    const MONTH_ABBREVS = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ]
-
-    // Build the 7 date labels
-    const days: { date: string; year: number; month: number; day: number }[] = []
+    // Fix 1 + 2: use ISO date as bucket key (avoids cross-year collision); use UTC for all date math
+    const days: { isoKey: string; label: string }[] = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-      days.push({
-        date: `${MONTH_ABBREVS[d.getMonth()]} ${d.getDate()}`,
-        year: d.getFullYear(),
-        month: d.getMonth(),
-        day: d.getDate(),
-      })
+      const isoKey = d.toISOString().slice(0, 10) // e.g. "2025-05-19"
+      const label = `${MONTH_ABBREVS[d.getUTCMonth()]} ${d.getUTCDate()}` // e.g. "May 19"
+      days.push({ isoKey, label })
     }
 
-    // Bucket trend rows into day slots
+    // Bucket trend rows into day slots — key by ISO date string
     const buckets = new Map<string, { sent: number; delivered: number; failed: number }>()
     for (const d of days) {
-      buckets.set(d.date, { sent: 0, delivered: 0, failed: 0 })
+      buckets.set(d.isoKey, { sent: 0, delivered: 0, failed: 0 })
     }
 
     const trendRows = trendRowsResult.data ?? []
     for (const row of trendRows) {
       const rowDate = new Date(row.created_at as string)
-      const label = `${MONTH_ABBREVS[rowDate.getMonth()]} ${rowDate.getDate()}`
-      const bucket = buckets.get(label)
+      const isoKey = rowDate.toISOString().slice(0, 10)
+      const bucket = buckets.get(isoKey)
       if (!bucket) continue
       bucket.sent++
       if (row.status === 'delivered') bucket.delivered++
@@ -164,8 +173,8 @@ router.get('/health', requireAuth, async (req: Request, res: Response): Promise<
     }
 
     const trend7d = days.map((d) => {
-      const b = buckets.get(d.date) ?? { sent: 0, delivered: 0, failed: 0 }
-      return { date: d.date, sent: b.sent, delivered: b.delivered, failed: b.failed }
+      const b = buckets.get(d.isoKey) ?? { sent: 0, delivered: 0, failed: 0 }
+      return { date: d.label, sent: b.sent, delivered: b.delivered, failed: b.failed }
     })
 
     // Alert thresholds
