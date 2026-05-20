@@ -94,6 +94,15 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
+  // ─── Weekly Digest state ───────────────────────────────────────────────────
+  const [digestEnabled, setDigestEnabled] = useState(true)
+  const [digestSaving, setDigestSaving] = useState(false)
+  const [digestToast, setDigestToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(
+    null
+  )
+  const [testSending, setTestSending] = useState(false)
+  const [testToast, setTestToast] = useState<string | null>(null)
+
   const modules = ((session?.user as Record<string, unknown> | undefined)?.['modules'] ??
     {}) as Record<string, boolean>
   const visibleEvents = EVENTS.filter((e) => !e.requireModule || modules[e.requireModule] !== false)
@@ -147,6 +156,58 @@ export default function NotificationSettingsPage() {
 
   function resetToDefaults() {
     setPrefs(DEFAULT_PREFS)
+  }
+
+  async function toggleDigest(newValue: boolean) {
+    setDigestSaving(true)
+    setDigestToast(null)
+    try {
+      const res = await fetch('/api/digest/preferences', {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ digest_enabled: newValue }),
+      })
+      if (res.ok) {
+        setDigestEnabled(newValue)
+        setDigestToast({
+          type: 'success',
+          msg: newValue ? 'Weekly digest enabled' : 'Weekly digest disabled',
+        })
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setDigestToast({
+          type: 'error',
+          msg: (d as { error?: string }).error || 'Failed to update',
+        })
+      }
+    } catch {
+      setDigestToast({ type: 'error', msg: 'Failed to update digest preference' })
+    } finally {
+      setDigestSaving(false)
+      setTimeout(() => setDigestToast(null), 2000)
+    }
+  }
+
+  async function sendTestDigest() {
+    setTestSending(true)
+    setTestToast(null)
+    try {
+      const res = await fetch('/api/digest/send-test', {
+        method: 'POST',
+        headers: authHeaders,
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setTestToast(`Test sent to ${(d as { sent_to: string }).sent_to}`)
+      } else {
+        setTestToast('Failed to send test')
+      }
+    } catch {
+      setTestToast('Failed to send test')
+    } finally {
+      setTestSending(false)
+      setTimeout(() => setTestToast(null), 3000)
+    }
   }
 
   if (loading) {
@@ -237,7 +298,7 @@ export default function NotificationSettingsPage() {
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pb-8">
+      <div className="flex items-center gap-3">
         <button
           onClick={save}
           disabled={saving}
@@ -253,6 +314,44 @@ export default function NotificationSettingsPage() {
         >
           Reset to Defaults
         </button>
+      </div>
+
+      {/* Weekly Digest card */}
+      <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
+        {/* Card header */}
+        <div className="px-6 py-4 border-b border-border-brand flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Weekly Digest</h2>
+            <p className="text-xs text-ink3 mt-0.5">
+              Every Monday morning — contacts, appointments, pipeline, and Maya call summary
+            </p>
+          </div>
+          <Toggle checked={digestEnabled} onChange={toggleDigest} disabled={digestSaving} />
+        </div>
+
+        {/* Card body */}
+        <div className="px-6 py-4 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={sendTestDigest}
+            disabled={testSending}
+            className="px-3 py-1.5 bg-white text-ink3 text-sm font-medium rounded-lg border border-border-brand hover:bg-bg disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {testSending ? 'Sending...' : 'Send test digest'}
+          </button>
+
+          {/* Inline feedback */}
+          {testToast && <p className="text-sm text-ink3">{testToast}</p>}
+          {digestToast && !testToast && (
+            <p
+              className={`text-sm ${
+                digestToast.type === 'success' ? 'text-green-700' : 'text-red-600'
+              }`}
+            >
+              {digestToast.msg}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -741,3 +741,37 @@ export interface EmailHealthStats {
   alert: EmailHealthAlert
   trend_7d: Array<{ date: string; sent: number; delivered: number; bounced: number }>
 }
+
+// ── Weekly Digest ─────────────────────────────────────────
+
+export interface WeeklyDigestData {
+  period: { from: string; to: string }
+  business_name: string
+  contacts: {
+    new_this_week: number
+    total: number
+    change_pct: number | null
+  }
+  appointments: {
+    booked_this_week: number
+    showed: number
+    no_show: number
+    upcoming_7d: number
+  }
+  pipeline: {
+    new_deals: number
+    deals_won: number
+    revenue_won: number
+    open_pipeline_value: number
+  }
+  maya_calls: {
+    total_this_week: number
+    bookings_from_calls: number
+    avg_duration_seconds: number | null
+  }
+  sms_health: {
+    sent_this_week: number
+    delivery_rate: number | null
+  }
+  top_insight: string | null
+}

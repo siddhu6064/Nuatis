@@ -260,7 +260,7 @@ function buildQuery(store: MockStore, table: string): unknown {
     ilike: (col: string, pat: string) => QueryAPI
     like: (col: string, pat: string) => QueryAPI
     filter: (col: string, op: string, val: unknown) => QueryAPI
-    not: (col: string, op: 'is', val: unknown) => QueryAPI
+    not: (col: string, op: 'is' | 'in', val: unknown) => QueryAPI
     order: (col: string, opts?: { ascending?: boolean }) => QueryAPI
     range: (from: number, to: number) => QueryAPI
     limit: (n: number) => QueryAPI
@@ -379,6 +379,14 @@ function buildQuery(store: MockStore, table: string): unknown {
     },
     not(col, op, val) {
       if (op === 'is') addFilter((r) => r[col] !== val)
+      if (op === 'in') {
+        // val is like '(canceled,no_show)' — parse the values and exclude rows that match
+        const values = String(val)
+          .replace(/^\(|\)$/g, '')
+          .split(',')
+          .map((s) => s.trim())
+        addFilter((r) => !values.includes(String(r[col])))
+      }
       return q
     },
     order(col, opts) {

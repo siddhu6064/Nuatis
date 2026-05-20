@@ -20,6 +20,7 @@ import { createExportWorker } from './export-worker.js'
 import { createLowStockScanner } from './low-stock-scanner.js'
 import { createScheduledReportWorker } from './scheduled-report-worker.js'
 import { createScheduledReportScanner } from './scheduled-report-scanner.js'
+import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -192,6 +193,16 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'scheduled-report-scanner', ...scheduledReportScanner })
   console.info('[workers] scheduled-report-scanner started, repeating every 1h')
+
+  // 20. Weekly digest — every Monday 8am UTC
+  const weeklyDigestWorker = createWeeklyDigestWorker()
+  await weeklyDigestWorker.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 8 * * 1' }, jobId: 'weekly-digest-repeat' }
+  )
+  managed.push({ name: 'weekly-digest', ...weeklyDigestWorker })
+  console.info('[workers] weekly-digest started, cron 0 8 * * 1')
 }
 
 export async function stopWorkers(): Promise<void> {

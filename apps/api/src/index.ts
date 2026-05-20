@@ -77,6 +77,7 @@ import businessProfileRouter from './routes/business-profile.js'
 import mayaKbRouter from './routes/maya-kb.js'
 import reputationRouter from './routes/reputation.js'
 import conversationsRouter from './routes/conversations.js'
+import digestRouter from './routes/digest.js'
 import reviewRequestsRouter from './routes/review-requests.js'
 import snippetsRouter from './routes/snippets.js'
 import automationOverviewRouter from './routes/automation-overview.js'
@@ -131,6 +132,7 @@ app.use('/api/business-profile', businessProfileRouter)
 app.use('/api/maya-kb', mayaKbRouter)
 app.use('/api/reputation', reputationRouter)
 app.use('/api/conversations', conversationsRouter)
+app.use('/api/digest', digestRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/demo', demoRouter)
 app.use('/api/insights', insightsRouter)
