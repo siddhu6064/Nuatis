@@ -1,5 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
+export type EmailEventType =
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'bounced_hard'
+  | 'bounced_soft'
+  | 'complained'
+  | 'unsubscribed'
+
+const SUPPRESS_THRESHOLD = 90
+
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -10,7 +22,7 @@ function getSupabase() {
 export async function updateEmailRiskScore(
   contactId: string,
   tenantId: string,
-  eventType: string
+  eventType: EmailEventType
 ): Promise<void> {
   // For non-risk event types, do nothing
   if (['sent', 'opened', 'clicked'].includes(eventType)) {
@@ -19,15 +31,22 @@ export async function updateEmailRiskScore(
 
   const supabase = getSupabase()
 
-  const { data: contact } = await supabase
+  const { data: contact, error: selectErr } = await supabase
     .from('contacts')
     .select('email_risk_score, email_status')
     .eq('id', contactId)
     .eq('tenant_id', tenantId)
     .single()
 
-  const currentScore: number = contact?.email_risk_score ?? 0
-  const currentStatus: string = contact?.email_status ?? 'ok'
+  if (selectErr) throw new Error(`email-risk SELECT failed: ${selectErr.message}`)
+
+  if (!contact) {
+    console.warn(`[email-risk] contact not found: contactId=${contactId} tenantId=${tenantId}`)
+    return
+  }
+
+  const currentScore: number = contact.email_risk_score ?? 0
+  const currentStatus: string = contact.email_status ?? 'ok'
 
   let newScore = currentScore
   let newStatus = currentStatus
@@ -56,11 +75,13 @@ export async function updateEmailRiskScore(
     return
   }
 
-  await supabase
+  const { error: updateErr } = await supabase
     .from('contacts')
     .update({ email_risk_score: newScore, email_status: newStatus })
     .eq('id', contactId)
     .eq('tenant_id', tenantId)
+
+  if (updateErr) throw new Error(`email-risk UPDATE failed: ${updateErr.message}`)
 }
 
 export function shouldSuppressEmail(contact: {
@@ -70,10 +91,10 @@ export function shouldSuppressEmail(contact: {
   const status = contact.email_status ?? 'ok'
   const score = contact.email_risk_score ?? 0
 
-  if (status === 'hard_bounce' || status === 'complained') {
+  if (status === 'hard_bounce' || status === 'complained' || status === 'unsubscribed') {
     return true
   }
-  if (score >= 90) {
+  if (score >= SUPPRESS_THRESHOLD) {
     return true
   }
   return false
@@ -81,6 +102,6 @@ export function shouldSuppressEmail(contact: {
 
 export function getRiskLabel(score: number): 'healthy' | 'at_risk' | 'suppressed' {
   if (score <= 30) return 'healthy'
-  if (score <= 89) return 'at_risk'
+  if (score <= SUPPRESS_THRESHOLD - 1) return 'at_risk'
   return 'suppressed'
 }
