@@ -137,6 +137,44 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     )
   }
 
+  // ── Campaign recipient tracking ───────────────────────────────────────────────
+  const campaignRecipientId: string =
+    tags.find((t) => t.name === 'campaign_recipient_id')?.value ?? ''
+  if (campaignRecipientId) {
+    // Map event to campaign_recipient status update
+    const now = new Date().toISOString()
+    let recipientUpdate: Record<string, unknown> | null = null
+
+    if (eventType === 'email.delivered') {
+      recipientUpdate = { status: 'delivered', delivered_at: now }
+    } else if (eventType === 'email.opened') {
+      recipientUpdate = { status: 'opened', opened_at: now }
+    } else if (eventType === 'email.clicked') {
+      recipientUpdate = { status: 'clicked', clicked_at: now }
+    } else if (eventType === 'email.bounced') {
+      recipientUpdate = { status: 'bounced' }
+    } else if (eventType === 'email.complained') {
+      recipientUpdate = { status: 'failed' }
+    }
+
+    if (recipientUpdate) {
+      // For opened: only update if not already clicked (preserve higher-value status)
+      let query = supabase
+        .from('campaign_recipients')
+        .update(recipientUpdate)
+        .eq('id', campaignRecipientId)
+
+      if (eventType === 'email.opened') {
+        query = query.neq('status', 'clicked')
+      }
+
+      const { error: recipientErr } = await query
+      if (recipientErr) {
+        console.error('[email-webhook] campaign_recipient update failed:', recipientErr.message)
+      }
+    }
+  }
+
   res.sendStatus(200)
 })
 
