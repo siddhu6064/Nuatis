@@ -930,3 +930,14 @@ export interface CampaignPrereqResult {
   ready: boolean
   checks: CampaignPrereqCheck[]
 }
+
+// ── Brand Voice ───────────────────────────────────────────────
+export interface BrandVoice {
+  tone?: 'professional' | 'friendly' | 'casual' | 'authoritative' | 'warm'
+  formality?: 'formal' | 'semi-formal' | 'informal'
+  emoji_use?: 'none' | 'minimal' | 'moderate'
+  industry_terms?: string[] // up to 10
+  avoid_phrases?: string[] // up to 10
+  signature?: string // max 100 chars
+  sample_message?: string // max 500 chars
+}
