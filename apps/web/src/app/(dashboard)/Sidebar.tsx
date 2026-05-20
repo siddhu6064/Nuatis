@@ -174,7 +174,7 @@ const NAV_GROUPS: NavGroup[] = [
         suiteOnly: true,
         requireModule: 'crm',
       },
-      { href: '/settings/sms-health', label: 'SMS Health', icon: '📊', suiteOnly: true },
+      { href: '/settings/sms-health', label: 'Delivery Health', icon: '📊', suiteOnly: true },
       { href: '/settings/audit-log', label: 'Audit Log', icon: '🛡', suiteOnly: true },
       { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
       { href: '/settings/reports', label: 'Scheduled Reports', icon: '📨', suiteOnly: true },
