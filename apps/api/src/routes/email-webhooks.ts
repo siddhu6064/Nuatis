@@ -23,7 +23,8 @@ function verifyWebhookSignature(req: Request): boolean {
   const ts = parseInt(svixTimestamp, 10)
   if (Math.abs(Date.now() / 1000 - ts) > 300) return false
 
-  const rawBody = JSON.stringify(req.body)
+  // req.body is a Buffer (from express.raw) when called on this route
+  const rawBody = req.body instanceof Buffer ? req.body.toString('utf8') : JSON.stringify(req.body)
   const message = `${svixId}.${svixTimestamp}.${rawBody}`
   const hmac = createHmac('sha256', Buffer.from(secret.replace('whsec_', ''), 'base64'))
     .update(message)
@@ -32,12 +33,12 @@ function verifyWebhookSignature(req: Request): boolean {
   // svix-signature can be "v1,<base64sig> v1,<base64sig2>" (space-separated, multiple sigs)
   const signatures = svixSignature.split(' ')
   return signatures.some((sig) => {
-    const sigValue = sig.replace('v1,', '')
-    try {
-      return timingSafeEqual(Buffer.from(hmac), Buffer.from(sigValue))
-    } catch {
-      return false
-    }
+    if (!sig.startsWith('v1,')) return false
+    const sigValue = sig.slice(3)
+    const a = Buffer.from(hmac)
+    const b = Buffer.from(sigValue)
+    if (a.byteLength !== b.byteLength) return false
+    return timingSafeEqual(a, b)
   })
 }
 
@@ -48,8 +49,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const eventType: string = req.body?.type ?? ''
-  const data = req.body?.data ?? {}
+  // Parse body (may be Buffer from express.raw, or already-parsed object from express.json)
+  const body =
+    req.body instanceof Buffer
+      ? (JSON.parse(req.body.toString('utf8')) as Record<string, unknown>)
+      : (req.body as Record<string, unknown>)
+
+  const eventType: string = (body['type'] as string | undefined) ?? ''
+  const data = (body['data'] as Record<string, unknown> | undefined) ?? {}
 
   // Map Resend event type to our internal type
   let internalEventType: EmailEventType | null = null
@@ -58,7 +65,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   else if (eventType === 'email.opened') internalEventType = 'opened'
   else if (eventType === 'email.clicked') internalEventType = 'clicked'
   else if (eventType === 'email.bounced') {
-    internalEventType = data.bounce?.type === 'hard' ? 'bounced_hard' : 'bounced_soft'
+    const bounce = data['bounce'] as Record<string, unknown> | undefined
+    internalEventType = bounce?.['type'] === 'hard' ? 'bounced_hard' : 'bounced_soft'
   } else if (eventType === 'email.complained') internalEventType = 'complained'
   else if (eventType === 'email.unsubscribed') internalEventType = 'unsubscribed'
 
@@ -68,12 +76,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const resendEmailId: string = data.email_id ?? ''
-  const toAddress: string = Array.isArray(data.to) ? (data.to[0] ?? '') : (data.to ?? '')
-  const tags: Array<{ name: string; value: string }> = Array.isArray(data.tags) ? data.tags : []
+  const resendEmailId: string = (data['email_id'] as string | undefined) ?? ''
+  const toRaw = data['to']
+  const toAddress: string = Array.isArray(toRaw)
+    ? ((toRaw[0] as string | undefined) ?? '')
+    : ((toRaw as string | undefined) ?? '')
+  const tags: Array<{ name: string; value: string }> = Array.isArray(data['tags'])
+    ? (data['tags'] as Array<{ name: string; value: string }>)
+    : []
   const tenantId: string = tags.find((t) => t.name === 'tenant_id')?.value ?? ''
-  const bounceType: string | null = data.bounce?.type ?? null
-  const bounceSubtype: string | null = data.bounce?.subtype ?? null
+  const bounce = data['bounce'] as Record<string, unknown> | undefined
+  const bounceType: string | null = (bounce?.['type'] as string | undefined) ?? null
+  const bounceSubtype: string | null = (bounce?.['subtype'] as string | undefined) ?? null
 
   if (!tenantId) {
     console.warn(`[email-webhook] no tenant_id tag in event ${eventType} email_id=${resendEmailId}`)
@@ -110,7 +124,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     bounce_subtype: bounceSubtype,
     raw_payload: req.body,
   })
-  if (insertErr) console.error('[email-webhook] insert failed:', insertErr.message)
+  if (insertErr) {
+    console.error('[email-webhook] insert failed:', insertErr.message)
+    res.sendStatus(500)
+    return
+  }
 
   // Update contact risk score (fire-and-forget style, errors logged not thrown)
   if (contactId) {

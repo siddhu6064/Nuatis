@@ -110,6 +110,8 @@ app.use(
       (process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000'),
   })
 )
+// Capture raw body for Resend webhook signature verification
+app.use('/api/webhooks/email', express.raw({ type: '*/*' }))
 app.use(express.json())
 app.use(auditLoggerMiddleware)
 
