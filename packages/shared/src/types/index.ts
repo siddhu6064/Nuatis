@@ -669,3 +669,29 @@ export interface ConversationAnalytics {
   busiest_hour: number | null
   volume_by_day: Array<{ date: string; inbound: number; outbound: number }>
 }
+
+// ── SMS Health ────────────────────────────────────────────────
+
+export interface SmsDeliveryAlert {
+  level: 'ok' | 'warning' | 'critical'
+  message: string | null
+}
+
+export interface SmsDeliveryError {
+  error_code: string
+  error_title: string
+  count: number
+}
+
+export interface SmsHealthStats {
+  period_days: number
+  total_sent: number
+  total_delivered: number
+  total_failed: number
+  total_opted_out: number
+  delivery_rate: number
+  failure_rate: number
+  error_breakdown: SmsDeliveryError[]
+  trend_7d: Array<{ date: string; sent: number; delivered: number; failed: number }>
+  alert: SmsDeliveryAlert
+}
