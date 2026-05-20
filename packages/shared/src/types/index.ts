@@ -775,3 +775,39 @@ export interface WeeklyDigestData {
   }
   top_insight: string | null
 }
+
+// ── Square Integration ────────────────────────────────────────
+
+export interface SquareConnection {
+  id: string
+  tenant_id: string
+  square_merchant_id: string
+  square_location_id: string | null
+  access_token: string
+  refresh_token: string
+  token_expires_at: string
+  connected_at: string
+}
+
+export interface SquarePayment {
+  paymentId: string
+  status: string
+  receiptUrl: string | null
+  amountCents: number
+  currency: string
+}
+
+// ── Quote Payments ───────────────────────────────────────────
+
+export interface QuotePayment {
+  id: string
+  quote_id: string
+  tenant_id: string
+  amount: number
+  method: string
+  provider?: 'stripe' | 'square' | 'cash' | 'check' | 'other'
+  square_payment_id?: string | null
+  reference?: string | null
+  notes?: string | null
+  recorded_at: string
+}

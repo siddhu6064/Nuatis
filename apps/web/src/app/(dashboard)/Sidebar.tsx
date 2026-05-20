@@ -159,6 +159,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
       { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },
       { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
+      { href: '/settings/payments', label: 'Payments', icon: '💳', suiteOnly: true },
       { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
       {
         href: '/settings/cpq',

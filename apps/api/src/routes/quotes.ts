@@ -14,6 +14,7 @@ import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
+import { createSquarePayment } from '../lib/square-client.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -909,7 +910,24 @@ router.get('/view/:token', async (req: Request, res: Response): Promise<void> =>
     .eq('id', quote.tenant_id)
     .single()
 
-  res.json({ ...quote, line_items: items ?? [], business_name: tenant?.name ?? '' })
+  // Include Square info if the tenant has a connected Square account
+  const { data: squareConn } = await supabase
+    .from('square_connections')
+    .select('square_location_id')
+    .eq('tenant_id', quote.tenant_id)
+    .single()
+
+  const squareInfo =
+    squareConn && process.env['SQUARE_APP_ID']
+      ? { app_id: process.env['SQUARE_APP_ID'], location_id: squareConn.square_location_id }
+      : null
+
+  res.json({
+    ...quote,
+    line_items: items ?? [],
+    business_name: tenant?.name ?? '',
+    square_info: squareInfo,
+  })
 })
 
 // ── PUBLIC: GET /api/quotes/view/:token/pdf ──────────────────────────────────
@@ -935,6 +953,82 @@ router.get('/view/:token/pdf', async (req: Request, res: Response): Promise<void
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
   res.send(result.buffer)
+})
+
+// ── PUBLIC: POST /api/quotes/view/:token/pay-square ─────────────────────────
+router.post('/view/:token/pay-square', async (req: Request, res: Response): Promise<void> => {
+  const supabase = getSupabase()
+  const { sourceId, amountCents } = req.body as { sourceId?: unknown; amountCents?: unknown }
+
+  if (typeof sourceId !== 'string' || !sourceId) {
+    res.status(400).json({ error: 'sourceId is required' })
+    return
+  }
+  if (typeof amountCents !== 'number' || amountCents <= 0) {
+    res.status(400).json({ error: 'amountCents must be a positive number' })
+    return
+  }
+
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('id, tenant_id, quote_number, status, total')
+    .eq('share_token', req.params['token'])
+    .single()
+
+  if (!quote) {
+    res.status(404).json({ error: 'Quote not found' })
+    return
+  }
+  if (quote.status !== 'accepted') {
+    res.status(400).json({ error: 'Payment only allowed for accepted quotes' })
+    return
+  }
+
+  let squarePaymentId: string | null = null
+  let receiptUrl: string | null = null
+
+  try {
+    const squareResult = await createSquarePayment({
+      tenantId: quote.tenant_id,
+      amountCents,
+      currency: 'USD',
+      sourceId,
+      referenceId: String(quote.id),
+    })
+    squarePaymentId = squareResult.paymentId
+    receiptUrl = squareResult.receiptUrl
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Square payment failed' })
+    return
+  }
+
+  const amountDollars = Number((amountCents / 100).toFixed(2))
+  const { error: payErr } = await supabase.from('quote_payments').insert({
+    quote_id: quote.id,
+    tenant_id: quote.tenant_id,
+    amount: amountDollars,
+    method: 'square',
+    provider: 'square',
+    square_payment_id: squarePaymentId,
+    recorded_by: null,
+  })
+
+  if (payErr) {
+    console.error('[quotes] pay-square: failed to record payment:', payErr)
+  }
+
+  // Update payment_status
+  const { data: allPayments } = await supabase
+    .from('quote_payments')
+    .select('amount')
+    .eq('quote_id', quote.id)
+
+  const totalPaid = (allPayments ?? []).reduce((s, p) => s + Number(p.amount), 0)
+  const quoteTotal = Number(quote.total)
+  const newPaymentStatus = totalPaid >= quoteTotal ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid'
+  await supabase.from('quotes').update({ payment_status: newPaymentStatus }).eq('id', quote.id)
+
+  res.json({ success: true, receipt_url: receiptUrl })
 })
 
 // ── PUBLIC: POST /api/quotes/view/:token/accept ──────────────────────────────
@@ -1428,13 +1522,14 @@ router.post(
     }
 
     const method = typeof b['method'] === 'string' ? b['method'] : ''
-    if (!['cash', 'check', 'stripe', 'other'].includes(method)) {
-      res.status(400).json({ error: 'method must be cash, check, stripe, or other' })
+    if (!['cash', 'check', 'stripe', 'square', 'other'].includes(method)) {
+      res.status(400).json({ error: 'method must be cash, check, stripe, square, or other' })
       return
     }
 
     const reference = typeof b['reference'] === 'string' ? b['reference'].trim() || null : null
     const notes = typeof b['notes'] === 'string' ? b['notes'].trim() || null : null
+    const sourceId = typeof b['sourceId'] === 'string' ? b['sourceId'].trim() || null : null
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1448,6 +1543,32 @@ router.post(
       return
     }
 
+    let squarePaymentId: string | null = null
+    let squareReceiptUrl: string | null = null
+
+    if (method === 'square') {
+      if (!sourceId) {
+        res.status(400).json({ error: 'sourceId required for Square payments' })
+        return
+      }
+      try {
+        const squareResult = await createSquarePayment({
+          tenantId: authed.tenantId,
+          amountCents: Math.round(amount * 100),
+          currency: 'USD',
+          sourceId,
+          referenceId: String(req.params['id']),
+        })
+        squarePaymentId = squareResult.paymentId
+        squareReceiptUrl = squareResult.receiptUrl
+      } catch (err) {
+        res
+          .status(400)
+          .json({ error: err instanceof Error ? err.message : 'Square payment failed' })
+        return
+      }
+    }
+
     const { data: payment, error: payErr } = await supabase
       .from('quote_payments')
       .insert({
@@ -1455,9 +1576,11 @@ router.post(
         tenant_id: authed.tenantId,
         amount: Number(amount.toFixed(2)),
         method,
+        provider: method,
         reference,
         notes,
         recorded_by: authed.userId ?? null,
+        ...(squarePaymentId ? { square_payment_id: squarePaymentId } : {}),
       })
       .select('*')
       .single()
@@ -1489,6 +1612,7 @@ router.post(
         total_paid: Number(totalPaid.toFixed(2)),
         balance_due: Number(balanceDue.toFixed(2)),
       },
+      receipt_url: squareReceiptUrl,
     })
   }
 )

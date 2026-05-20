@@ -10,6 +10,11 @@ interface LineItem {
   package_id: string | null
 }
 
+interface SquareInfo {
+  app_id: string
+  location_id: string
+}
+
 interface QuoteData {
   quote_number: string
   title: string
@@ -30,6 +35,7 @@ interface QuoteData {
   business_name: string
   contacts: { full_name: string; email?: string | null } | null
   line_items: LineItem[]
+  square_info: SquareInfo | null
 }
 
 export default function PublicQuoteView({ params }: { params: Promise<{ token: string }> }) {
@@ -38,6 +44,14 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
   const [loading, setLoading] = useState(true)
   const [acted, setActed] = useState<'accepted' | 'declined' | null>(null)
   const [acting, setActing] = useState(false)
+
+  // Square payment state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [squareCard, setSquareCard] = useState<any>(null)
+  const [payTab, setPayTab] = useState<'square' | 'other'>('square')
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+  const [paymentComplete, setPaymentComplete] = useState<string | null>(null) // receipt_url
 
   useEffect(() => {
     params.then((p) => setToken(p.token))
@@ -53,6 +67,84 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [token])
+
+  // Load Square Web Payments SDK when square_info is present
+  useEffect(() => {
+    if (!quote?.square_info) return
+
+    const scriptSrc =
+      process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT === 'production'
+        ? 'https://web.squarecdn.com/v1/square.js'
+        : 'https://sandbox.web.squarecdn.com/v1/square.js'
+
+    // Avoid double-loading if script already present
+    if (document.querySelector(`script[src="${scriptSrc}"]`)) {
+      if ((window as unknown as { Square?: unknown }).Square) {
+        void initSquareForm(quote.square_info)
+      }
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = scriptSrc
+    script.async = true
+    script.onload = () => void initSquareForm(quote.square_info!)
+    document.head.appendChild(script)
+  }, [quote?.square_info])
+
+  async function initSquareForm(squareInfo: SquareInfo) {
+    try {
+      const Square = (
+        window as unknown as {
+          Square: {
+            payments: (
+              appId: string,
+              locationId: string
+            ) => Promise<{ card: () => Promise<{ attach: (selector: string) => Promise<void> }> }>
+          }
+        }
+      ).Square
+      const payments = await Square.payments(squareInfo.app_id, squareInfo.location_id)
+      const card = await payments.card()
+      await card.attach('#square-card-container')
+      setSquareCard(card)
+    } catch (err) {
+      console.error('[square] init error:', err)
+    }
+  }
+
+  async function payWithSquare() {
+    if (!squareCard || !token || !quote) return
+    setPaying(true)
+    setPayError(null)
+    try {
+      const tokenizeResult = await squareCard.tokenize()
+      if (tokenizeResult.status !== 'OK') {
+        setPayError('Card tokenization failed. Please check your card details.')
+        return
+      }
+      const depositCents =
+        quote.deposit_amount != null
+          ? Math.round(Number(quote.deposit_amount) * 100)
+          : Math.round(Number(quote.total) * 100)
+
+      const res = await fetch(`/api/quotes/view/${token}/pay-square`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId: tokenizeResult.token, amountCents: depositCents }),
+      })
+      const data = (await res.json()) as { receipt_url?: string; error?: string }
+      if (res.ok) {
+        setPaymentComplete(data.receipt_url ?? '')
+      } else {
+        setPayError(data.error ?? 'Payment failed')
+      }
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : 'Payment failed')
+    } finally {
+      setPaying(false)
+    }
+  }
 
   async function accept() {
     if (!token) return
@@ -298,7 +390,8 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
                 <p className="text-xs text-ink4">(due at completion)</p>
               </div>
             </div>
-            {quote.contacts?.email && (
+            {/* Show Square payment form if available, else fallback contact link */}
+            {quote.status === 'accepted' && quote.square_info ? null : quote.contacts?.email ? (
               <div className="border-t border-border-brand px-6 py-3">
                 <a
                   href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Deposit payment — ${quote.title}`)}`}
@@ -307,6 +400,88 @@ export default function PublicQuoteView({ params }: { params: Promise<{ token: s
                   Contact us to arrange payment
                 </a>
               </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Square payment section — only when accepted + Square connected */}
+        {(quote.status === 'accepted' || acted === 'accepted') && quote.square_info && (
+          <div className="bg-white rounded-xl border border-border-brand shadow-sm overflow-hidden mt-6">
+            <div className="px-6 py-4 border-b border-border-brand">
+              <h3 className="text-sm font-semibold text-ink">Pay Now</h3>
+              <p className="text-xs text-ink4 mt-1">
+                {quote.deposit_amount != null
+                  ? `Deposit due: $${Number(quote.deposit_amount).toFixed(2)}`
+                  : `Total: $${Number(quote.total).toFixed(2)}`}
+              </p>
+            </div>
+
+            {paymentComplete !== null ? (
+              <div className="px-6 py-6 text-center">
+                <p className="text-base font-semibold text-green-700 mb-2">Payment complete!</p>
+                {paymentComplete && (
+                  <a
+                    href={paymentComplete}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-teal-600 underline"
+                  >
+                    View receipt
+                  </a>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Tab switcher */}
+                <div className="flex border-b border-border-brand">
+                  <button
+                    onClick={() => setPayTab('square')}
+                    className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'square' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
+                  >
+                    Card (Square)
+                  </button>
+                  <button
+                    onClick={() => setPayTab('other')}
+                    className={`flex-1 py-2 text-xs font-medium transition-colors ${payTab === 'other' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-ink4 hover:text-ink3'}`}
+                  >
+                    Other payment
+                  </button>
+                </div>
+
+                {payTab === 'square' ? (
+                  <div className="px-6 py-4">
+                    {/* Square card form mounts here */}
+                    <div id="square-card-container" className="mb-4" />
+
+                    {payError && <p className="text-xs text-rose-600 mb-3">{payError}</p>}
+
+                    <button
+                      onClick={() => void payWithSquare()}
+                      disabled={paying || !squareCard}
+                      className="w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                    >
+                      {paying
+                        ? 'Processing...'
+                        : `Pay $${quote.deposit_amount != null ? Number(quote.deposit_amount).toFixed(2) : Number(quote.total).toFixed(2)} with Square`}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="px-6 py-4">
+                    {quote.contacts?.email ? (
+                      <a
+                        href={`mailto:${quote.contacts.email}?subject=${encodeURIComponent(`Payment — ${quote.title}`)}`}
+                        className="block w-full text-center py-2 text-sm text-teal-600 font-medium border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
+                      >
+                        Contact us to arrange payment
+                      </a>
+                    ) : (
+                      <p className="text-sm text-ink3 text-center">
+                        Contact {quote.business_name} to arrange payment.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

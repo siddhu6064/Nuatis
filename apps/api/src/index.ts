@@ -66,6 +66,7 @@ import voiceTestRouter from './routes/voice-test.js'
 import scheduledReportsRouter from './routes/scheduled-reports.js'
 import paymentLinksRouter from './routes/payment-links.js'
 import paymentsRouter from './routes/payments.js'
+import squareRouter from './routes/square.js'
 import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
@@ -191,6 +192,7 @@ app.use('/api/voice', voiceTestRouter)
 app.use('/api/scheduled-reports', scheduledReportsRouter)
 app.use('/api/payment-links', paymentLinksRouter)
 app.use('/api/payments', paymentsRouter)
+app.use('/api/square', squareRouter)
 app.use('/api/availability-schedules', availabilitySchedulesRouter)
 app.use('/api/calendar-groups', calendarGroupsRouter)
 app.use('/api/google-reserve', googleReserveRouter)
