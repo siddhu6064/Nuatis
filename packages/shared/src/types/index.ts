@@ -234,6 +234,8 @@ export interface Contact {
   verticalData: VerticalData
   isArchived: boolean
   lastContacted: string | null
+  email_risk_score: number | null
+  email_status: 'ok' | 'soft_bounce' | 'hard_bounce' | 'complained' | 'unsubscribed' | null
   createdAt: string
   updatedAt: string
 }
@@ -694,4 +696,48 @@ export interface SmsHealthStats {
   error_breakdown: SmsDeliveryError[]
   trend_7d: Array<{ date: string; sent: number; delivered: number; failed: number }>
   alert: SmsDeliveryAlert
+}
+
+// ── Email Health ──────────────────────────────────────────────
+
+export interface EmailEvent {
+  id: string
+  tenant_id: string
+  contact_id: string | null
+  email_address: string
+  event_type:
+    | 'sent'
+    | 'delivered'
+    | 'opened'
+    | 'clicked'
+    | 'bounced_hard'
+    | 'bounced_soft'
+    | 'complained'
+    | 'unsubscribed'
+  resend_email_id: string | null
+  bounce_type: string | null
+  bounce_subtype: string | null
+  created_at: string
+}
+
+export interface EmailHealthAlert {
+  level: 'ok' | 'warning' | 'critical'
+  message: string | null
+}
+
+export interface EmailHealthStats {
+  period_days: number
+  total_sent: number
+  total_delivered: number
+  total_hard_bounced: number
+  total_soft_bounced: number
+  total_complained: number
+  total_unsubscribed: number
+  delivery_rate: number
+  hard_bounce_rate: number
+  complaint_rate: number
+  suppressed_contacts: number
+  at_risk_contacts: number
+  alert: EmailHealthAlert
+  trend_7d: Array<{ date: string; sent: number; delivered: number; bounced: number }>
 }
