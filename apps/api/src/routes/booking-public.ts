@@ -102,6 +102,19 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
   const businessPhone =
     (location?.telnyx_number as string | null) ?? (tenant.phone as string | null) ?? null
 
+  const { data: resources } = await supabase
+    .from('bookable_resources')
+    .select('id, name, resource_type, color, capacity, status')
+    .eq('tenant_id', tenant.id as string)
+    .eq('status', 'active')
+    .order('name', { ascending: true })
+
+  const { data: tenantFull } = await supabase
+    .from('tenants')
+    .select('vertical')
+    .eq('id', tenant.id as string)
+    .maybeSingle()
+
   res.json({
     tenantId,
     businessName: tenant.business_name,
@@ -115,6 +128,8 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
     advanceDays: tenant.booking_advance_days ?? 30,
     services,
     intakeForms,
+    resources: resources ?? [],
+    vertical: tenantFull?.vertical ?? null,
   })
 })
 
@@ -215,6 +230,7 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
     intakeFormId,
     intakeData,
     notes,
+    resource_id,
   } = body as {
     serviceId?: string
     date?: string
@@ -226,6 +242,7 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
     intakeFormId?: string
     intakeData?: Record<string, unknown>
     notes?: string
+    resource_id?: string
   }
 
   // Validate required fields
@@ -435,6 +452,19 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
   }
 
   const appointmentId: string = appointment.id as string
+
+  // Insert resource booking if resource_id provided (fire-and-forget)
+  if (resource_id) {
+    void supabase.from('resource_bookings').insert({
+      tenant_id: tenantId,
+      resource_id,
+      appointment_id: appointmentId,
+      contact_id: contactId,
+      start_time: startIso,
+      end_time: endIso,
+      status: 'confirmed',
+    })
+  }
 
   // Insert intake submission if provided
   if (intakeFormId && intakeData) {

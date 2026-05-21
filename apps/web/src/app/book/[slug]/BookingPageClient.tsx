@@ -39,6 +39,8 @@ interface BookingPage {
   bufferMinutes: number
   advanceDays: number
   services: Service[]
+  resources: Array<{ id: string; name: string; resource_type: string; color: string }>
+  vertical: string | null
 }
 
 interface ConfirmResponse {
@@ -360,6 +362,7 @@ function StepYourInfo({
   selectedDate,
   selectedSlot,
   slug,
+  resourceId,
   onConfirmed,
   onBack,
   onSlotTaken,
@@ -369,6 +372,7 @@ function StepYourInfo({
   selectedDate: Date
   selectedSlot: string
   slug: string
+  resourceId?: string | null
   onConfirmed: (resp: ConfirmResponse) => void
   onBack: () => void
   onSlotTaken: () => void
@@ -433,6 +437,7 @@ function StepYourInfo({
           notes: notes.trim() || undefined,
           intakeFormId: intakeForm?.id ?? undefined,
           intakeData: intakeForm ? intakeData : undefined,
+          resource_id: resourceId ?? undefined,
         }),
       })
 
@@ -713,6 +718,65 @@ function StepConfirmation({
   )
 }
 
+// ─── Step 3: Select Resource ───────────────────────────────────────────────────
+
+function StepSelectResource({
+  resources,
+  vertical,
+  accentColor,
+  onSelect,
+  onBack,
+}: {
+  resources: Array<{ id: string; name: string; resource_type: string; color: string }>
+  vertical: string | null
+  accentColor: string
+  onSelect: (resourceId: string) => void
+  onBack: () => void
+}) {
+  // Filter by vertical relevance
+  const VERTICAL_RESOURCE_MAP: Record<string, string[]> = {
+    dental: ['room'], medical: ['room'], veterinary: ['room'],
+    salon: ['station'], nail_bar: ['station'],
+    gym: ['equipment'],
+  }
+  const preferredTypes = vertical ? (VERTICAL_RESOURCE_MAP[vertical] ?? []) : []
+  // Show preferred types first, then others
+  const sorted = [...resources].sort((a, b) => {
+    const aPreferred = preferredTypes.includes(a.resource_type) ? 0 : 1
+    const bPreferred = preferredTypes.includes(b.resource_type) ? 0 : 1
+    return aPreferred - bPreferred
+  })
+
+  return (
+    <div>
+      <BackButton onClick={onBack} />
+      <h2 className="text-lg font-semibold text-ink mb-1">Select a Resource</h2>
+      <p className="text-sm text-ink3 mb-5">Choose an available room, station, or equipment</p>
+      <div className="space-y-3">
+        {sorted.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onSelect(r.id)}
+            className="w-full text-left rounded-xl border border-border-brand bg-white p-4 shadow-sm hover:border-teal-400 hover:shadow-md transition-all flex items-center gap-3"
+          >
+            <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+            <div>
+              <p className="font-medium text-ink capitalize">{r.name}</p>
+              <p className="text-xs text-ink4 capitalize">{r.resource_type}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => onSelect('')}
+        className="mt-3 w-full text-sm text-ink4 hover:text-ink3 py-2"
+      >
+        Skip — no resource needed
+      </button>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function BookingPage() {
@@ -724,10 +788,11 @@ export default function BookingPage() {
   const [page, setPage] = useState<BookingPage | null>(null)
 
   // Multi-step state
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [confirmationMessage, setConfirmationMessage] = useState('')
@@ -757,6 +822,7 @@ export default function BookingPage() {
     setSelectedService(null)
     setSelectedDate(null)
     setSelectedSlot(null)
+    setSelectedResourceId(null)
     setFirstName('')
     setLastName('')
     setConfirmationMessage('')
@@ -802,6 +868,7 @@ export default function BookingPage() {
   }
 
   const accentColor = page.accentColor || '#0d9488'
+  const hasResources = (page?.resources?.length ?? 0) > 0
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -819,7 +886,11 @@ export default function BookingPage() {
             </span>
           </div>
           <h1 className="text-xl font-bold text-ink">{page.businessName}</h1>
-          {step > 1 && step < 4 && <p className="text-xs text-ink4 mt-1">Step {step} of 3</p>}
+          {step > 1 && step < (hasResources ? 5 : 4) && (
+            <p className="text-xs text-ink4 mt-1">
+              Step {step - 1} of {hasResources ? 3 : 3}
+            </p>
+          )}
         </div>
 
         {/* Steps */}
@@ -845,24 +916,41 @@ export default function BookingPage() {
             }}
             onSelectSlot={(slot) => {
               setSelectedSlot(slot)
-              setStep(3)
+              setStep(hasResources ? 3 : 4)
             }}
             onBack={() => setStep(1)}
           />
         )}
 
-        {step === 3 && selectedService && selectedDate && selectedSlot && (
+        {step === 3 && hasResources && page.resources && selectedDate && selectedSlot && (
+          <StepSelectResource
+            resources={page.resources}
+            vertical={page.vertical}
+            accentColor={accentColor}
+            onSelect={(resourceId) => {
+              setSelectedResourceId(resourceId || null)
+              setStep(4)
+            }}
+            onBack={() => {
+              setSelectedSlot(null)
+              setStep(2)
+            }}
+          />
+        )}
+
+        {step === 4 && selectedService && selectedDate && selectedSlot && (
           <StepYourInfo
             page={{ ...page, accentColor }}
             service={selectedService}
             selectedDate={selectedDate}
             selectedSlot={selectedSlot}
             slug={slug}
+            resourceId={selectedResourceId}
             onConfirmed={(resp) => {
               setConfirmationMessage(resp.confirmationMessage || page.confirmationMessage)
-              setStep(4)
+              setStep(5)
             }}
-            onBack={() => setStep(2)}
+            onBack={() => setStep(hasResources ? 3 : 2)}
             onSlotTaken={() => {
               setSelectedSlot(null)
               setSelectedDate(null)
@@ -871,7 +959,7 @@ export default function BookingPage() {
           />
         )}
 
-        {step === 4 && selectedService && selectedDate && selectedSlot && (
+        {step === 5 && selectedService && selectedDate && selectedSlot && (
           <StepConfirmation
             page={{ ...page, accentColor }}
             service={selectedService}
