@@ -103,9 +103,7 @@ export default function CallerMemoryCard({
             />
           </button>
         </div>
-        {error && (
-          <p className="mt-2 text-xs text-red-600">{error}</p>
-        )}
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
 
       {/* Memory table card */}
