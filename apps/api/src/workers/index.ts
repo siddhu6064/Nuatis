@@ -25,6 +25,7 @@ import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
 import { createCampaignSendWorker } from './campaign-send-worker.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
+import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
 
 interface ManagedWorker {
   name: string
@@ -237,6 +238,11 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'custom-automation-scanner', ...customAutomationWorker })
   console.info('[workers] custom-automation-scanner started, repeating every 30m')
+
+  // 25. Maya memory extractor — processes post-call memory jobs on-demand
+  const mayaMemoryExtractor = createMayaMemoryExtractor()
+  managed.push({ name: 'maya-memory-extractor', ...mayaMemoryExtractor })
+  console.info('[workers] maya-memory-extractor worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

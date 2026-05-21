@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { ToolCallRecord } from './post-call.js'
+import { enqueueMayaMemoryExtraction } from '../lib/maya-memory-queue.js'
 
 export interface VoiceSessionParams {
   tenantId: string
@@ -81,6 +82,9 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
     console.info(
       `[call-logger] voice session persisted: id=${data.id} outcome=${outcome} duration=${params.duration}s tenant=${params.tenantId}`
     )
+
+    // Enqueue memory extraction — fire and forget, must never affect call flow
+    enqueueMayaMemoryExtraction(params.tenantId, data.id, params.callerPhone)
   } catch (err) {
     console.error('[call-logger] error persisting voice session:', err)
   }
