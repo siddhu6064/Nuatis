@@ -1324,3 +1324,34 @@ export interface ResourceAvailabilitySlot {
     appointment_id: string | null
   }>
 }
+
+// ── G52: Referral Program ────────────────────────────────────
+
+export type ReferralCodeStatus = 'active' | 'paused' | 'expired'
+
+export type ReferralSignupStatus = 'signed_up' | 'active' | 'churned' | 'paid'
+
+export interface ReferralCode {
+  id: string
+  tenant_id: string
+  code: string
+  clicks: number
+  signups: number
+  commission_rate: number
+  status: ReferralCodeStatus
+  created_at: string
+}
+
+export interface ReferralSignup {
+  id: string
+  referral_code_id: string
+  referring_tenant_id: string
+  referred_tenant_id: string | null
+  referred_email: string
+  status: ReferralSignupStatus
+  commission_amount: number | null
+  signed_up_at: string
+  activated_at: string | null
+  first_payment_at: string | null
+  created_at: string
+}
