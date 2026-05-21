@@ -21,6 +21,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/coverage/**',
       'apps/mobile/**',
+      '.claude/**',
     ],
   },
   {
@@ -30,6 +31,29 @@ export default tseslint.config(
         module: 'writable',
         require: 'readonly',
       },
+    },
+  },
+  {
+    // API webchat widget — browser-only vanilla JS
+    files: ['apps/api/src/webchat-widget/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        navigator: 'readonly',
+        URL: 'readonly',
+      },
+    },
+    rules: {
+      'no-empty': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {

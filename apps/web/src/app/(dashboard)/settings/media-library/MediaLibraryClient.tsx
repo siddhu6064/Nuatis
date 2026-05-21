@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 
 interface MediaFile {
   id: string
@@ -157,10 +158,11 @@ export default function MediaLibraryClient() {
                 title={copiedId === file.id ? 'Copied!' : 'Click to copy URL'}
               >
                 {file.public_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={file.public_url}
                     alt={file.file_name}
+                    width={200}
+                    height={200}
                     className="w-full h-full object-cover transition-opacity group-hover:opacity-90"
                   />
                 ) : (

@@ -34,9 +34,8 @@ type Contact = {
   [key: string]: unknown
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getContactsForTrigger(
-  supabase: any,
+  supabase: ReturnType<typeof getSupabase>,
   automation: CustomAutomation
 ): Promise<Contact[]> {
   const { tenant_id, trigger_type, trigger_config } = automation
@@ -189,9 +188,8 @@ async function getContactsForTrigger(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runAction(
-  supabase: any,
+  supabase: ReturnType<typeof getSupabase>,
   automation: CustomAutomation,
   contact: Contact
 ): Promise<void> {

@@ -723,7 +723,7 @@ function StepConfirmation({
 function StepSelectResource({
   resources,
   vertical,
-  accentColor,
+  accentColor: _accentColor,
   onSelect,
   onBack,
 }: {

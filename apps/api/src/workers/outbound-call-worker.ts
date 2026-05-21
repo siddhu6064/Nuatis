@@ -8,6 +8,30 @@ export interface OutboundCallJobData {
   jobId: string
 }
 
+interface OutboundCallJob {
+  id: string
+  tenant_id: string
+  contact_id: string
+  trigger_type: string
+  trigger_config: { call_context?: string } | null
+  status: string
+  call_context: string | null
+  max_attempts: number
+  attempts: number
+}
+
+interface ContactRow {
+  id: string
+  full_name: string | null
+  phone: string | null
+  sms_opt_out: boolean | null
+  is_archived: boolean | null
+}
+
+interface LocationRow {
+  telnyx_number: string | null
+}
+
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -33,15 +57,17 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     return
   }
 
+  const typedJob = job as unknown as OutboundCallJob
+
   // Step 2: Check status still pending
-  if ((job as any).status !== 'pending') {
-    console.info(`[outbound-call] job ${jobId} status=${(job as any).status} — skipping`)
+  if (typedJob.status !== 'pending') {
+    console.info(`[outbound-call] job ${jobId} status=${typedJob.status} — skipping`)
     return
   }
 
-  const tenantId = (job as any).tenant_id as string
-  const contactId = (job as any).contact_id as string
-  const callContext = ((job as any).trigger_config?.call_context as string) ?? 'follow-up call'
+  const tenantId = typedJob.tenant_id
+  const contactId = typedJob.contact_id
+  const callContext = typedJob.trigger_config?.call_context ?? 'follow-up call'
 
   // Step 3: Check scanner paused
   const paused = await isScannerPaused(tenantId, 'outbound-calls')
@@ -66,9 +92,10 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     return
   }
 
-  const phone = (contact as any).phone as string | null
-  const optedOut = (contact as any).sms_opt_out as boolean | null
-  const archived = (contact as any).is_archived as boolean | null
+  const typedContact = contact as unknown as ContactRow
+  const phone = typedContact.phone
+  const optedOut = typedContact.sms_opt_out
+  const archived = typedContact.is_archived
 
   // Step 5: Validate phone exists and not opted out
   if (!phone) {
@@ -102,7 +129,7 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     .eq('is_primary', true)
     .maybeSingle()
 
-  const fromNumber = (location as any)?.telnyx_number as string | null
+  const fromNumber = (location as unknown as LocationRow | null)?.telnyx_number ?? null
 
   if (!fromNumber) {
     await supabase

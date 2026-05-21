@@ -20,7 +20,7 @@ router.get('/my-code', requireAuth, async (req: Request, res: Response): Promise
     const supabase = getSupabase()
 
     // Try to find existing referral code for tenant
-    let { data: row, error } = await supabase
+    const { data: initialRow, error } = await supabase
       .from('referral_codes')
       .select('id, code, clicks, signups, commission_rate, status')
       .eq('tenant_id', authed.tenantId)
@@ -32,6 +32,8 @@ router.get('/my-code', requireAuth, async (req: Request, res: Response): Promise
       res.status(500).json({ error: error.message })
       return
     }
+
+    let row = initialRow
 
     // If none found, generate one
     if (!row) {
@@ -221,11 +223,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       .eq('id', row.id)
 
     // Fire-and-forget notification (best effort — just log)
-    void (async () => {
-      try {
-        console.log(`[referrals] new signup via code ${code}: ${email}`)
-      } catch {}
-    })()
+    console.info(`[referrals] new signup via code ${code}: ${email}`)
 
     res.status(201).json({ ok: true })
   } catch (err) {

@@ -61,7 +61,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   }
   // Best-effort email notification (just log for now)
   if (recipient_email) {
-    console.log(
+    console.info(
       `[gift-cards] gift card ${data.code} issued to ${recipient_email}, balance: ${amount_cents}`
     )
   }

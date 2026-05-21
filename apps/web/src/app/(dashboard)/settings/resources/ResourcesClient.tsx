@@ -52,7 +52,7 @@ const HOUR_LABELS = Array.from({ length: 10 }, (_, i) => {
   return hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`
 })
 
-export default function ResourcesClient({ initialResources, tenantId }: Props) {
+export default function ResourcesClient({ initialResources, tenantId: _tenantId }: Props) {
   const [resources, setResources] = useState<Resource[]>(initialResources)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -82,7 +82,6 @@ export default function ResourcesClient({ initialResources, tenantId }: Props) {
   useEffect(() => {
     if (activeResources.length === 0) return
     void fetchAvailability(calDate)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calDate, resources])
 
   async function fetchAvailability(date: string) {

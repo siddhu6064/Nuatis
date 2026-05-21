@@ -35,7 +35,6 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function ReferralsClient() {
-  const [code, setCode] = useState<string>('')
   const [clicks, setClicks] = useState<number>(0)
   const [signups, setSignups] = useState<number>(0)
   const [referralUrl, setReferralUrl] = useState<string>('')
@@ -56,7 +55,6 @@ export default function ReferralsClient() {
 
         if (codeRes.ok) {
           const codeData = await codeRes.json()
-          setCode(codeData.code ?? '')
           setClicks(codeData.clicks ?? 0)
           setReferralUrl(codeData.referral_url ?? '')
         }

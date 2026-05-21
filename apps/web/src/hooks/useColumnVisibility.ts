@@ -10,8 +10,9 @@ export function useColumnVisibility(storageKey: string, defaults: Record<string,
       if (stored) {
         setVisible({ ...defaults, ...JSON.parse(stored) })
       }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch {
+      // ignore storage errors
+    }
   }, [storageKey])
 
   function toggle(key: string, isVisible: boolean) {
@@ -19,7 +20,9 @@ export function useColumnVisibility(storageKey: string, defaults: Record<string,
     setVisible(next)
     try {
       localStorage.setItem(storageKey, JSON.stringify(next))
-    } catch {}
+    } catch {
+      // ignore storage errors
+    }
   }
 
   return { visible, toggle }

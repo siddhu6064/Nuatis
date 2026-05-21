@@ -74,7 +74,9 @@ export default function PortalSettingsPage() {
           loadClients()
         }
       }
-    } catch {}
+    } catch {
+      // ignore toggle errors — UI stays in current state
+    }
     setToggling(false)
   }
 
@@ -120,7 +122,9 @@ export default function PortalSettingsPage() {
         setSearchResults([])
         loadClients()
       }
-    } catch {}
+    } catch {
+      // ignore invite errors
+    }
     setInviting(null)
   }
 
