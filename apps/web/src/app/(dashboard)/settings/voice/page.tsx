@@ -5,6 +5,7 @@ import VoiceSettingsForm from './VoiceSettingsForm'
 import TestMayaPanel from './TestMayaPanel'
 import KnowledgeFilesCard from './KnowledgeFilesCard'
 import WebsiteKnowledgeCard from './WebsiteKnowledgeCard'
+import CallerMemoryCard from './CallerMemoryCard'
 
 interface DaySchedule {
   open: string
@@ -24,6 +25,7 @@ interface LocationSettings {
   business_hours: Record<string, DaySchedule> | null
   after_hours_message: string | null
   timezone: string | null
+  maya_memory_enabled: boolean | null
 }
 
 export default async function VoiceSettingsPage() {
@@ -35,7 +37,7 @@ export default async function VoiceSettingsPage() {
   const { data: location } = await supabase
     .from('locations')
     .select(
-      'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone'
+      'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, maya_memory_enabled'
     )
     .eq('tenant_id', tenantId)
     .eq('is_primary', true)
@@ -107,6 +109,7 @@ export default async function VoiceSettingsPage() {
       <VoiceSettingsForm settings={settings} />
       <KnowledgeFilesCard initialFiles={kbFiles ?? []} />
       <WebsiteKnowledgeCard initialUrls={kbUrls ?? []} />
+      <CallerMemoryCard initialMemoryEnabled={location?.maya_memory_enabled ?? true} />
     </div>
   )
 }

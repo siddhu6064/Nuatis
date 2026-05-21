@@ -461,6 +461,13 @@ export async function prewarmGemini(
     )
   }
 
+  // Normalize caller phone to E.164 for memory lookup
+  const callerPhoneE164 = fromNumber
+    ? fromNumber.trim().startsWith('+')
+      ? fromNumber.trim()
+      : `+${fromNumber.trim()}`
+    : undefined
+
   const session = await createGeminiLiveSession(
     tenantId,
     safeVertical,
@@ -472,7 +479,8 @@ export async function prewarmGemini(
     afterHoursPrefix,
     businessProfile,
     locationConfig.kbFiles,
-    kbUrls ?? null
+    kbUrls ?? null,
+    callerPhoneE164
   )
 
   return new Promise<void>((resolve) => {

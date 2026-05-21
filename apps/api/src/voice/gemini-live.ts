@@ -6,6 +6,7 @@ import {
   ActivityHandling,
   type Blob as GBlob,
 } from '@google/genai'
+import { createClient } from '@supabase/supabase-js'
 import { VERTICALS } from '@nuatis/shared'
 import { FUNCTION_DECLARATIONS, executeToolCall, type ToolCallContext } from './tool-handlers.js'
 import { Sentry } from '../lib/sentry.js'
@@ -16,6 +17,13 @@ import {
   buildKbUrlsBlock,
 } from './business-knowledge.js'
 import type { BusinessProfile } from '@nuatis/shared'
+
+function getSupabase() {
+  const url = process.env['SUPABASE_URL']
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+  if (!url || !key) throw new Error('Supabase env vars not set')
+  return createClient(url, key)
+}
 
 export const BOOKING_CONTRACT = `
 
@@ -133,7 +141,8 @@ export async function createGeminiLiveSession(
   afterHoursPrefix?: string,
   businessProfile?: BusinessProfile | null,
   kbFiles?: Array<{ file_name: string; extracted_text: string }> | null,
-  kbUrls?: Array<{ url: string; extracted_text: string | null }> | null
+  kbUrls?: Array<{ url: string; extracted_text: string | null }> | null,
+  callerPhone?: string
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -208,6 +217,34 @@ export async function createGeminiLiveSession(
 
   systemPrompt += BOOKING_CONTRACT
 
+  // ── Inject caller memory block (2s timeout) ──────────────────────────────
+  let memoryBlock = ''
+  if (callerPhone) {
+    try {
+      const memResult = await Promise.race([
+        getSupabase()
+          .from('caller_memory')
+          .select('summary, call_count, facts')
+          .eq('tenant_id', tenantId)
+          .eq('phone', callerPhone)
+          .maybeSingle(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ])
+      const mem = memResult && 'data' in memResult ? memResult.data : null
+      if (mem?.summary) {
+        memoryBlock = [
+          '',
+          '## CALLER CONTEXT',
+          mem.summary,
+          `This caller has contacted you ${mem.call_count} time(s) before. Treat them as a returning client.`,
+          '',
+        ].join('\n')
+      }
+    } catch (e) {
+      console.warn('[maya-memory] prompt injection skipped:', e)
+    }
+  }
+
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
@@ -279,7 +316,7 @@ export async function createGeminiLiveSession(
         activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
       },
       systemInstruction: {
-        parts: [{ text: systemPrompt + (promptSuffix ?? '') }],
+        parts: [{ text: memoryBlock + systemPrompt + (promptSuffix ?? '') }],
       },
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     },

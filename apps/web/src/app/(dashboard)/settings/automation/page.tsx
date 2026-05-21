@@ -97,7 +97,12 @@ export default function ReviewAutomationPage() {
           ReviewAutomationSettings | null,
           ReviewAutomationStats | null,
         ]) => {
-          if (settingsData) setSettings(settingsData)
+          if (settingsData)
+            setSettings({
+              ...settingsData,
+              googleReviewUrl: settingsData.googleReviewUrl ?? '',
+              messageTemplate: settingsData.messageTemplate ?? DEFAULT_TEMPLATE,
+            })
           if (statsData) setStats(statsData)
         }
       )
@@ -132,7 +137,11 @@ export default function ReviewAutomationPage() {
       })
       if (res.ok) {
         const data = (await res.json()) as ReviewAutomationSettings
-        setSettings(data)
+        setSettings({
+          ...data,
+          googleReviewUrl: data.googleReviewUrl ?? '',
+          messageTemplate: data.messageTemplate ?? DEFAULT_TEMPLATE,
+        })
         setToast({ type: 'success', msg: 'Settings saved' })
       } else {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
@@ -203,7 +212,7 @@ export default function ReviewAutomationPage() {
         <p className="text-sm font-semibold text-ink">Google Review URL</p>
         <input
           type="url"
-          value={settings.googleReviewUrl}
+          value={settings.googleReviewUrl ?? ''}
           onChange={(e) => setSettings((prev) => ({ ...prev, googleReviewUrl: e.target.value }))}
           placeholder="https://g.page/your-business/review"
           className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -243,7 +252,7 @@ export default function ReviewAutomationPage() {
         )}
 
         <textarea
-          value={settings.messageTemplate}
+          value={settings.messageTemplate ?? ''}
           onChange={(e) => setSettings((prev) => ({ ...prev, messageTemplate: e.target.value }))}
           rows={5}
           className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y font-normal"

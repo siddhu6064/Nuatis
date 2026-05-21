@@ -28,6 +28,7 @@ interface LocationSettings {
   timezone: string | null
   video_conferencing_enabled: boolean | null
   video_provider: string | null
+  maya_memory_enabled: boolean | null
 }
 
 // ── GET /api/maya-settings ────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const { data: location, error } = await supabase
       .from('locations')
       .select(
-        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider'
+        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider, maya_memory_enabled'
       )
       .eq('tenant_id', authed.tenantId)
       .eq('is_primary', true)
@@ -87,6 +88,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       timezone: location?.timezone ?? 'America/Chicago',
       video_conferencing_enabled: location?.video_conferencing_enabled ?? false,
       video_provider: location?.video_provider ?? 'google_meet',
+      maya_memory_enabled: location?.maya_memory_enabled ?? true,
     })
   } catch (err) {
     console.error('[maya-settings] GET error:', err)
@@ -105,6 +107,10 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
   if (typeof body['maya_enabled'] === 'boolean') {
     updates['maya_enabled'] = body['maya_enabled']
+  }
+
+  if (typeof body['maya_memory_enabled'] === 'boolean') {
+    updates['maya_memory_enabled'] = body['maya_memory_enabled']
   }
 
   if (body['escalation_phone'] !== undefined) {
@@ -208,7 +214,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const { data: location } = await supabase
       .from('locations')
       .select(
-        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider'
+        'maya_enabled, escalation_phone, maya_greeting, maya_personality, preferred_languages, appointment_duration_default, telnyx_number, after_hours_enabled, business_hours, after_hours_message, timezone, video_conferencing_enabled, video_provider, maya_memory_enabled'
       )
       .eq('tenant_id', authed.tenantId)
       .eq('is_primary', true)
@@ -250,6 +256,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       timezone: location?.timezone ?? 'America/Chicago',
       video_conferencing_enabled: location?.video_conferencing_enabled ?? false,
       video_provider: location?.video_provider ?? 'google_meet',
+      maya_memory_enabled: location?.maya_memory_enabled ?? true,
     })
   } catch (err) {
     console.error('[maya-settings] PUT error:', err)

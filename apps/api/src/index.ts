@@ -15,6 +15,7 @@ import appointmentsRouter from './routes/appointments.js'
 import knowledgeRouter from './routes/knowledge.js'
 import callsRouter from './routes/calls.js'
 import mayaSettingsRouter from './routes/maya-settings.js'
+import callerMemoryRouter from './routes/caller-memory.js'
 import webhooksRouter from './routes/webhooks.js'
 import demoRouter from './routes/demo.js'
 import insightsRouter from './routes/insights.js'
@@ -154,6 +155,7 @@ app.use('/api/appointments', appointmentsRouter)
 app.use('/api/knowledge', knowledgeRouter)
 app.use('/api/calls', callsRouter)
 app.use('/api/maya-settings', mayaSettingsRouter)
+app.use('/api/caller-memory', callerMemoryRouter)
 app.use('/api/business-profile', businessProfileRouter)
 app.use('/api/brand-voice', brandVoiceRouter)
 app.use('/api/maya-kb', mayaKbRouter)
