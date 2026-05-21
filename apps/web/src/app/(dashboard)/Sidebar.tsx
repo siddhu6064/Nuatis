@@ -173,6 +173,7 @@ const NAV_GROUPS: NavGroup[] = [
         requireModule: 'maya',
       },
       { href: '/settings/voice', label: 'Voice AI', icon: '◇', requireModule: 'maya' },
+      { href: '/settings/phone-numbers', label: 'Phone Numbers', icon: '◈', requireModule: 'maya' },
       { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
       { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },

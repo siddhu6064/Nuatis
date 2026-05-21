@@ -83,6 +83,7 @@ import emailHealthRouter from './routes/email-health.js'
 import businessProfileRouter from './routes/business-profile.js'
 import brandVoiceRouter from './routes/brand-voice.js'
 import mayaKbRouter from './routes/maya-kb.js'
+import telnyxNumbersRouter from './routes/telnyx-numbers.js'
 import reputationRouter from './routes/reputation.js'
 import conversationsRouter from './routes/conversations.js'
 import digestRouter from './routes/digest.js'
@@ -148,6 +149,7 @@ app.use('/api/maya-settings', mayaSettingsRouter)
 app.use('/api/business-profile', businessProfileRouter)
 app.use('/api/brand-voice', brandVoiceRouter)
 app.use('/api/maya-kb', mayaKbRouter)
+app.use('/api/telnyx-numbers', telnyxNumbersRouter)
 app.use('/api/reputation', reputationRouter)
 app.use('/api/conversations', conversationsRouter)
 app.use('/api/digest', digestRouter)

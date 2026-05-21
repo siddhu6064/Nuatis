@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 interface BusinessHours {
@@ -94,8 +95,8 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
     form.maya_greeting !== settings.maya_greeting ||
     form.maya_personality !== settings.maya_personality ||
     form.appointment_duration_default !== settings.appointment_duration_default ||
-    JSON.stringify(form.preferred_languages.sort()) !==
-      JSON.stringify(settings.preferred_languages.sort())
+    JSON.stringify([...form.preferred_languages].sort()) !==
+      JSON.stringify([...settings.preferred_languages].sort())
 
   const hasAfterHoursChanges =
     ahEnabled !== settings.after_hours_enabled ||
@@ -160,8 +161,8 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       if (form.appointment_duration_default !== settings.appointment_duration_default)
         body.appointment_duration_default = form.appointment_duration_default
       if (
-        JSON.stringify(form.preferred_languages.sort()) !==
-        JSON.stringify(settings.preferred_languages.sort())
+        JSON.stringify([...form.preferred_languages].sort()) !==
+        JSON.stringify([...settings.preferred_languages].sort())
       )
         body.preferred_languages = form.preferred_languages
 
@@ -614,8 +615,18 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       {/* 7. Phone Number (read-only) */}
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <h2 className="text-sm font-semibold text-ink mb-1">Phone Number</h2>
-        <p className="text-xs text-ink4 mb-4">This is the number callers dial to reach Maya</p>
-        <p className="text-lg font-semibold text-ink">{formatPhone(settings.telnyx_number)}</p>
+        <p className="text-xs text-ink4 mb-3">Maya's primary number for incoming calls</p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-lg font-semibold text-ink">
+            {settings.telnyx_number ? formatPhone(settings.telnyx_number) : 'Not configured'}
+          </p>
+          <Link
+            href="/settings/phone-numbers"
+            className="text-sm text-brand hover:underline shrink-0"
+          >
+            Manage numbers →
+          </Link>
+        </div>
       </div>
 
       {/* 8. Save button */}

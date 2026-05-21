@@ -1203,3 +1203,31 @@ export interface MayaKbUrl {
   created_at: string
   updated_at: string
 }
+
+// ── G10: Multi-number / Telnyx numbers ───────────────────────────────────────
+
+export type TelnyxNumberDepartment =
+  | 'general'
+  | 'scheduling'
+  | 'billing'
+  | 'sales'
+  | 'support'
+  | 'maya'
+
+export type TelnyxNumberStatus = 'active' | 'inactive'
+
+export interface TelnyxNumber {
+  id: string
+  tenant_id: string
+  location_id: string | null
+  phone_number: string
+  label: string
+  department: TelnyxNumberDepartment
+  is_primary: boolean
+  maya_enabled: boolean
+  telnyx_connection_id: string | null
+  forwarding_number: string | null
+  status: TelnyxNumberStatus
+  created_at: string
+  updated_at: string
+}

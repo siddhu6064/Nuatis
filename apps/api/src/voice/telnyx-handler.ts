@@ -10,6 +10,7 @@ import { persistVoiceSession } from './call-session-logger.js'
 import { lookupCaller, buildSystemPromptSuffix, type CallerContext } from './pre-call-lookup.js'
 import { Sentry } from '../lib/sentry.js'
 import type { BusinessProfile } from '@nuatis/shared'
+import { getTenantByPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 // ── Hangup data registry ─────────────────────────────────────────────────────
 // Populated by the call.hangup webhook, consumed by handleCallEnd.
@@ -390,6 +391,23 @@ RULES:
 --- END OUTBOUND CALL MODE ---`
 }
 
+function buildDepartmentContextSuffix(department: string): string {
+  switch (department) {
+    case 'scheduling':
+      return `\n\n--- DEPARTMENT ROUTING ---\nThis call came in on the SCHEDULING line. Prioritize booking and managing appointments.\n--- END DEPARTMENT ROUTING ---`
+    case 'billing':
+      return `\n\n--- DEPARTMENT ROUTING ---\nThis call came in on the BILLING line. Help with payment questions, invoices, and account balances.\n--- END DEPARTMENT ROUTING ---`
+    case 'sales':
+      return `\n\n--- DEPARTMENT ROUTING ---\nThis call came in on the SALES line. Focus on qualifying leads and converting prospects into customers.\n--- END DEPARTMENT ROUTING ---`
+    case 'support':
+      return `\n\n--- DEPARTMENT ROUTING ---\nThis call came in on the SUPPORT line. Help resolve issues patiently and thoroughly.\n--- END DEPARTMENT ROUTING ---`
+    case 'general':
+    case 'maya':
+    default:
+      return '' // No extra context — use default Maya behavior
+  }
+}
+
 /**
  * Pre-warm a Gemini Live session before answering the call.
  * Resolves when setupComplete fires or after 3500ms (whichever first).
@@ -401,10 +419,15 @@ export async function prewarmGemini(
   toNumber: string,
   fromNumber?: string
 ): Promise<void> {
-  const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
-  const tenantMap = parseTenantMap(tenantMapRaw)
-  let tenantId = lookupTenant(toNumber, tenantMap) ?? null
-  if (!tenantId) {
+  let tenantId: string | null = null
+  let prewarmDepartment = 'general'
+
+  const phoneResult = await getTenantByPhoneNumber(toNumber)
+  if (phoneResult) {
+    tenantId = phoneResult.tenantId
+    prewarmDepartment = phoneResult.department
+  } else {
+    // Fallback to dev tenant for local testing
     tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
   }
 
@@ -423,6 +446,8 @@ export async function prewarmGemini(
     getLocationConfig(tenantId),
   ])
   const contextSuffix = buildSystemPromptSuffix(callerContext, fromNumber)
+  const deptSuffix = buildDepartmentContextSuffix(prewarmDepartment)
+  const fullContextSuffix = contextSuffix + deptSuffix
   const { afterHoursConfig, businessProfile, kbUrls } = locationConfig
 
   let afterHoursPrefix: string | undefined
@@ -442,7 +467,7 @@ export async function prewarmGemini(
     safeName,
     callControlId,
     product,
-    contextSuffix,
+    fullContextSuffix,
     callerContext.contactId ?? null,
     afterHoursPrefix,
     businessProfile,
@@ -482,7 +507,7 @@ export async function prewarmGemini(
       callControlId,
       cleanupTimer,
       callerContext,
-      contextSuffix,
+      contextSuffix: fullContextSuffix,
     })
   })
 }
@@ -520,9 +545,6 @@ export function rekeyPrewarmedSession(callControlId: string, streamId: string): 
 // ── WebSocket handler ─────────────────────────────────────────────────────────
 
 export function registerVoiceWebSocket(wss: WebSocketServer): void {
-  const tenantMapRaw = process.env['TELNYX_TENANT_MAP'] ?? ''
-  const tenantMap = parseTenantMap(tenantMapRaw)
-
   wss.on('connection', (ws: WebSocket) => {
     console.info('[telnyx-handler] WebSocket connection opened')
 
@@ -545,6 +567,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let sessionProduct: 'maya_only' | 'suite' = 'suite'
     let preCallContactId: string | null = null
     let preCallContextSuffix = ''
+    let callDepartment = 'general'
 
     // Azure Container Apps kills idle WebSocket connections after 4 minutes.
     // Ping every 30 seconds to keep the connection alive during call pauses.
@@ -569,9 +592,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       if (event.event === 'start') {
         streamId = event.stream_id ?? null
         const toNumber = event.start.to
-        tenantId = lookupTenant(toNumber, tenantMap) ?? null
 
-        if (!tenantId) {
+        // Try DB lookup first, then env var fallback
+        const phoneResult = await getTenantByPhoneNumber(toNumber)
+        if (phoneResult) {
+          tenantId = phoneResult.tenantId
+          callDepartment = phoneResult.department
+        } else {
           console.warn(
             `[telnyx-handler] No tenant found for number ${toNumber} — using dev fallback`
           )
@@ -584,6 +611,35 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         console.info(
           `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, from: ${callerId}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
+
+        // ── Pure call forwarding (maya_enabled=false + forwarding_number set) ────
+        if (phoneResult && !phoneResult.mayaEnabled && phoneResult.forwardingNumber) {
+          console.info(
+            `[telnyx-handler] Forwarding call — number=${toNumber} → ${phoneResult.forwardingNumber} (maya disabled)`
+          )
+          const ccId = event.start.call_sid ?? null
+          if (ccId) {
+            const telnyxApiKey = process.env['TELNYX_API_KEY'] ?? ''
+            try {
+              await fetch(
+                `https://api.telnyx.com/v2/calls/${encodeURIComponent(ccId)}/actions/transfer`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${telnyxApiKey}`,
+                  },
+                  body: JSON.stringify({ to: phoneResult.forwardingNumber }),
+                }
+              )
+            } catch (err) {
+              console.error('[telnyx-handler] Call forward failed:', err)
+            }
+          }
+          // Don't set up Gemini session — forwarded call
+          sessionReady = true // prevent media queue buildup
+          return
+        }
 
         // Detect outbound call
         const outboundMeta = callControlId ? outboundCallRegistry.get(callControlId) : undefined
@@ -752,6 +808,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               const fallbackCtx = await fallbackLookup
               preCallContactId = fallbackCtx.contactId ?? null
               preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx, callerId ?? undefined)
+              const deptSuffix = buildDepartmentContextSuffix(callDepartment)
+              preCallContextSuffix += deptSuffix
               console.info('[pre-call-ctx]', {
                 tenantId: resolvedTenantId,
                 matched: fallbackCtx.matched,
@@ -807,6 +865,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             const fallbackCtx = await fallbackLookup
             preCallContactId = fallbackCtx.contactId ?? null
             preCallContextSuffix = buildSystemPromptSuffix(fallbackCtx)
+            const deptSuffix2 = buildDepartmentContextSuffix(callDepartment)
+            preCallContextSuffix += deptSuffix2
             console.info('[pre-call-ctx]', {
               tenantId: resolvedTenantId,
               matched: fallbackCtx.matched,

@@ -70,6 +70,13 @@ export default async function VoiceSettingsPage() {
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
 
+  const { data: primaryNumber } = await supabase
+    .from('telnyx_numbers')
+    .select('phone_number')
+    .eq('tenant_id', tenantId)
+    .eq('is_primary', true)
+    .maybeSingle<{ phone_number: string }>()
+
   const settings = {
     maya_enabled: location?.maya_enabled ?? true,
     escalation_phone: location?.escalation_phone ?? '',
@@ -77,7 +84,7 @@ export default async function VoiceSettingsPage() {
     maya_personality: location?.maya_personality ?? 'professional',
     preferred_languages: location?.preferred_languages ?? ['en'],
     appointment_duration_default: location?.appointment_duration_default ?? 60,
-    telnyx_number: location?.telnyx_number ?? null,
+    telnyx_number: primaryNumber?.phone_number ?? location?.telnyx_number ?? null,
     business_hours: businessHours,
     after_hours_enabled: location?.after_hours_enabled ?? false,
     after_hours_schedule: location?.business_hours ?? defaultSchedule,
