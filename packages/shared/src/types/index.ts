@@ -1076,3 +1076,73 @@ export interface OutboundCallJob {
   contact_name?: string | null
   contact_phone?: string | null
 }
+
+// ── Portal ────────────────────────────────────────────────────────────────────
+
+export interface PortalAccess {
+  id: string
+  tenant_id: string
+  contact_id: string
+  access_token: string
+  email: string
+  last_accessed_at: string | null
+  expires_at: string | null
+  created_at: string
+  // joined
+  contact_name?: string | null
+}
+
+export interface PortalSettings {
+  portal_enabled: boolean
+  portal_slug: string | null
+  portal_url: string | null
+  access_count: number
+}
+
+export interface PortalAppointment {
+  id: string
+  scheduled_at: string
+  service_name: string | null
+  status: string
+  location_id: string | null
+}
+
+export interface PortalQuote {
+  id: string
+  quote_number: string | null
+  description: string | null
+  total: number
+  status: string
+  created_at: string
+  public_token: string | null
+}
+
+export interface PortalInvoice {
+  id: string
+  invoice_number: string | null
+  total: number
+  balance_due: number
+  status: string
+  due_date: string | null
+  created_at: string
+}
+
+export interface PortalData {
+  contact: { full_name: string | null; email: string | null; phone: string | null } | null
+  appointments: {
+    upcoming: PortalAppointment[]
+    past: PortalAppointment[]
+  }
+  quotes: PortalQuote[]
+  invoices: PortalInvoice[]
+  documents: unknown[]
+}
+
+export interface PortalVerifyResult {
+  valid: boolean
+  contact_id?: string
+  tenant_id?: string
+  contact_name?: string | null
+  business_name?: string | null
+  portal_slug?: string | null
+}

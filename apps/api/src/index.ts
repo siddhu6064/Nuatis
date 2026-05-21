@@ -92,6 +92,7 @@ import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
 import campaignsRouter from './routes/campaigns.js'
 import outboundCallsRouter from './routes/outbound-calls.js'
+import portalRouter from './routes/portal.js'
 import voiceOutboundRouter from './routes/voice-outbound.js'
 import webchatRouter, { webchatSettingsRouter } from './routes/webchat.js'
 import { securityHeaders } from './middleware/security-headers.js'
@@ -223,6 +224,7 @@ app.use('/api/automation', automationOverviewRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
 app.use('/api/outbound-calls', outboundCallsRouter)
+app.use('/api/portal', portalRouter)
 // PUBLIC webchat routes — CORS *
 app.use('/api/webchat', cors({ origin: '*' }), webchatRouter)
 // Authenticated webchat settings

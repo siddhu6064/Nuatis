@@ -57,10 +57,12 @@ jest.unstable_mockModule('../lib/bullmq-connection.js', () => ({
 }))
 
 // ── outbound-caller mock ──────────────────────────────────────────────────────
-const mockInitiateOutboundCall = jest.fn<() => Promise<{ callControlId: string; callLegId: string }>>().mockResolvedValue({
-  callControlId: 'call-ctrl-123',
-  callLegId: 'call-leg-123',
-})
+const mockInitiateOutboundCall = jest
+  .fn<() => Promise<{ callControlId: string; callLegId: string }>>()
+  .mockResolvedValue({
+    callControlId: 'call-ctrl-123',
+    callLegId: 'call-leg-123',
+  })
 
 jest.unstable_mockModule('../lib/outbound-caller.js', () => ({
   initiateOutboundCall: mockInitiateOutboundCall,
@@ -73,11 +75,7 @@ jest.unstable_mockModule('../lib/scanner-pause.js', () => ({
 
 // ── Dynamic imports (after all mocks) ─────────────────────────────────────────
 const [{ default: express }, { default: request }, { default: outboundCallsRouter }] =
-  await Promise.all([
-    import('express'),
-    import('supertest'),
-    import('../routes/outbound-calls.js'),
-  ])
+  await Promise.all([import('express'), import('supertest'), import('../routes/outbound-calls.js')])
 
 const { processOutboundCall } = await import('../workers/outbound-call-worker.js')
 

@@ -11,6 +11,7 @@ import SmsThread from '@/components/contacts/SmsThread'
 import ContactDeals from '@/components/contacts/ContactDeals'
 import EmailComposeModal from '../../../../components/contacts/EmailComposeModal'
 import ContactHeader, { type ContactFields } from './ContactHeader'
+import PortalAccessCard from './PortalAccessCard'
 
 type Tab = 'activity' | 'messages' | 'files'
 type RightPanel =
@@ -1096,6 +1097,9 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                 {recalculating ? 'Recalculating…' : 'Recalculate'}
               </button>
             </section>
+
+            {/* Portal Access */}
+            <PortalAccessCard contactId={contactId} contactName={contactName} />
 
             {/* Compliance */}
             {complianceFields.length > 0 && (

@@ -52,9 +52,7 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [callJobId, setCallJobId] = useState<string | null>(null)
-  const [callStatus, setCallStatus] = useState<'idle' | 'dialing' | 'connected' | 'ended'>(
-    'idle',
-  )
+  const [callStatus, setCallStatus] = useState<'idle' | 'dialing' | 'connected' | 'ended'>('idle')
 
   useEffect(() => {
     if (!callJobId) return
