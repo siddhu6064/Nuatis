@@ -2,19 +2,26 @@
 
 import { useState } from 'react'
 import AutomationOverviewClient from './AutomationOverviewClient'
+import CustomAutomationBuilder from './CustomAutomationBuilder'
 
 interface Props {
   settingsContent: React.ReactNode
 }
 
+const TAB_LABELS: Record<'overview' | 'custom' | 'settings', string> = {
+  overview: 'Overview',
+  custom: 'Custom',
+  settings: 'Settings',
+}
+
 export default function AutomationTabs({ settingsContent }: Props) {
-  const [tab, setTab] = useState<'overview' | 'settings'>('overview')
+  const [tab, setTab] = useState<'overview' | 'custom' | 'settings'>('overview')
 
   return (
     <>
       {/* Tab nav */}
       <div className="flex gap-1 mb-6 border-b border-border-brand">
-        {(['overview', 'settings'] as const).map((t) => (
+        {(['overview', 'custom', 'settings'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -24,11 +31,13 @@ export default function AutomationTabs({ settingsContent }: Props) {
                 : 'border-transparent text-ink3 hover:text-ink'
             }`}
           >
-            {t === 'overview' ? 'Overview' : 'Settings'}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
-      {tab === 'overview' ? <AutomationOverviewClient /> : settingsContent}
+      {tab === 'overview' && <AutomationOverviewClient />}
+      {tab === 'custom' && <CustomAutomationBuilder />}
+      {tab === 'settings' && settingsContent}
     </>
   )
 }
