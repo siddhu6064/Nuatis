@@ -20,6 +20,31 @@ function normalizeE164(raw: string): string | null {
   return withPlus
 }
 
+/**
+ * Calls Telnyx Number Lookup API to get caller name for an unknown number.
+ * Never throws — returns { name: null } on any error.
+ */
+export async function enrichCallerInfo(phoneNumber: string): Promise<{ name: string | null }> {
+  const apiKey = process.env['TELNYX_API_KEY']
+  if (!apiKey) return { name: null }
+
+  try {
+    const response = await fetch(
+      `https://api.telnyx.com/v2/number_lookup/${encodeURIComponent(phoneNumber)}?type=caller-name`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(2000), // 2s timeout for enrichment
+      }
+    )
+    if (!response.ok) return { name: null }
+    const json = await response.json() as { data?: { caller_name?: { caller_name?: string } } }
+    const name = json?.data?.caller_name?.caller_name ?? null
+    return { name: name && name.trim() ? name.trim() : null }
+  } catch {
+    return { name: null }
+  }
+}
+
 export function maskPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '')
   const last4 = digits.slice(-4).padStart(4, '*')
@@ -73,7 +98,18 @@ export async function lookupCaller(tenantId: string, phoneE164: string): Promise
         console.error('[pre-call-lookup] db error:', error.message)
         return { matched: false }
       }
-      if (!data) return { matched: false }
+      if (!data) {
+        // No existing contact — try Telnyx caller ID enrichment (best effort, fire-and-forget result)
+        const enriched = await enrichCallerInfo(normalized)
+        if (enriched.name) {
+          console.info(`[pre-call-lookup] caller ID enrichment found name for ${phoneMasked}: present`)
+          return {
+            matched: false,
+            name: enriched.name,
+          }
+        }
+        return { matched: false }
+      }
 
       const row = data as {
         id: string
@@ -132,7 +168,16 @@ export function buildSystemPromptSuffix(ctx: CallerContext, callerPhone?: string
     ? `\n\nThe caller's phone number is ${callerPhone}. Use this number when calling lookup_contact — do NOT ask the caller for their phone number.`
     : ''
 
-  if (!ctx.matched) return phoneBlock
+  if (!ctx.matched) {
+    // Enriched caller name even for unknown contacts
+    if (ctx.name) {
+      return (
+        phoneBlock +
+        `\n\nCaller ID shows name: ${ctx.name}. Confirm this is correct before using it.`
+      )
+    }
+    return phoneBlock
+  }
 
   const truncate = (s: string): string => (s.length > 60 ? s.slice(0, 60) + '…' : s)
 
