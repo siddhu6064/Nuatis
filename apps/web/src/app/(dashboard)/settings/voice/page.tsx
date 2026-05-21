@@ -66,7 +66,9 @@ export default async function VoiceSettingsPage() {
 
   const { data: kbUrls } = await supabase
     .from('maya_kb_urls')
-    .select('id, tenant_id, url, status, pages_crawled, extracted_text, error_message, last_crawled_at, created_at, updated_at')
+    .select(
+      'id, tenant_id, url, status, pages_crawled, extracted_text, error_message, last_crawled_at, created_at, updated_at'
+    )
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
 

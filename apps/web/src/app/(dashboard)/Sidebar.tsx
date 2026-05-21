@@ -206,6 +206,10 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/chat-widget', label: 'Chat Widget', icon: '💬', suiteOnly: true },
       { href: '/settings/trigger-links', label: 'Trigger Links', icon: '🔗', suiteOnly: true },
       { href: '/settings/snippets', label: 'Snippets', icon: '✂', suiteOnly: true },
+      { href: '/settings/labs', label: 'Labs', icon: '🧪', suiteOnly: true },
+      { href: '/settings/qr-codes', label: 'QR Codes', icon: '▦', suiteOnly: true },
+      { href: '/settings/gift-cards', label: 'Gift Cards', icon: '🎁', suiteOnly: true },
+      { href: '/settings/media-library', label: 'Media Library', icon: '🖼', suiteOnly: true },
     ],
   },
 ]

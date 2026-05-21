@@ -42,8 +42,8 @@ export default function CollectPageClient({ slug }: { slug: string }) {
   // Load collector info
   useEffect(() => {
     fetch(`/api/video-testimonials/collect/${slug}`)
-      .then(r => r.json() as Promise<CollectApiResponse>)
-      .then(data => {
+      .then((r) => r.json() as Promise<CollectApiResponse>)
+      .then((data) => {
         if (!data.valid || !data.collector) {
           setError('This recording link is no longer active.')
           setState('error')
@@ -63,7 +63,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current.getTracks().forEach((t) => t.stop())
       }
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -78,7 +78,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
       mediaRecorderRef.current.stop()
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
   }, [])
@@ -97,14 +97,14 @@ export default function CollectPageClient({ slug }: { slug: string }) {
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : 'video/mp4'
+          ? 'video/webm'
+          : 'video/mp4'
 
       const recorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = recorder
       chunksRef.current = []
 
-      recorder.ondataavailable = e => {
+      recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
 
@@ -124,7 +124,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
       const maxSecs = collector?.max_duration_seconds ?? 30
       setTimeLeft(maxSecs)
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           if (prev <= 1) {
             stopRecording()
             return 0
@@ -166,7 +166,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
       if (r.ok) {
         setState('success')
       } else {
-        const d = await r.json().catch(() => ({})) as { error?: string }
+        const d = (await r.json().catch(() => ({}))) as { error?: string }
         setError(d.error ?? 'Upload failed. Please try again.')
         setState('preview')
       }
@@ -227,9 +227,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
               <span className="w-4 h-4 rounded-full bg-white block" />
               Start Recording
             </button>
-            {error && (
-              <p className="mt-4 text-red-400 text-sm">{error}</p>
-            )}
+            {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
           </div>
         )}
 
@@ -237,9 +235,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
         {state === 'recording' && (
           <div className="text-center">
             {/* Timer */}
-            <div className="text-6xl font-bold text-red-500 mb-4 tabular-nums">
-              {timeLeft}
-            </div>
+            <div className="text-6xl font-bold text-red-500 mb-4 tabular-nums">{timeLeft}</div>
             {/* Live feed — mirrored */}
             <div className="relative rounded-2xl overflow-hidden bg-gray-800 aspect-video mb-6">
               <video
@@ -278,15 +274,18 @@ export default function CollectPageClient({ slug }: { slug: string }) {
               />
             </div>
 
-            {error && (
-              <p className="mb-4 text-red-400 text-sm text-center">{error}</p>
-            )}
+            {error && <p className="mb-4 text-red-400 text-sm text-center">{error}</p>}
 
-            <form onSubmit={e => { void handleSubmit(e) }} className="space-y-3 mb-6">
+            <form
+              onSubmit={(e) => {
+                void handleSubmit(e)
+              }}
+              className="space-y-3 mb-6"
+            >
               <input
                 type="text"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Your name *"
                 required
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -294,7 +293,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email (optional)"
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
@@ -329,7 +328,13 @@ export default function CollectPageClient({ slug }: { slug: string }) {
         {state === 'success' && (
           <div className="text-center">
             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg
+                className="w-10 h-10 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>

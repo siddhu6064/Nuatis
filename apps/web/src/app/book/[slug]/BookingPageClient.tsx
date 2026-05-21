@@ -735,8 +735,11 @@ function StepSelectResource({
 }) {
   // Filter by vertical relevance
   const VERTICAL_RESOURCE_MAP: Record<string, string[]> = {
-    dental: ['room'], medical: ['room'], veterinary: ['room'],
-    salon: ['station'], nail_bar: ['station'],
+    dental: ['room'],
+    medical: ['room'],
+    veterinary: ['room'],
+    salon: ['station'],
+    nail_bar: ['station'],
     gym: ['equipment'],
   }
   const preferredTypes = vertical ? (VERTICAL_RESOURCE_MAP[vertical] ?? []) : []

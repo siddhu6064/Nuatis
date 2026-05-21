@@ -44,7 +44,7 @@ interface CreateCollectorFormProps {
 
 function CreateCollectorForm({ onCreated, onCancel }: CreateCollectorFormProps) {
   const [name, setName] = useState('')
-  const [prompt, setPrompt] = useState("Tell us about your experience!")
+  const [prompt, setPrompt] = useState('Tell us about your experience!')
   const [maxDuration, setMaxDuration] = useState<15 | 30 | 60>(30)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,7 +61,11 @@ function CreateCollectorForm({ onCreated, onCancel }: CreateCollectorFormProps) 
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), prompt: prompt.trim(), max_duration_seconds: maxDuration }),
+        body: JSON.stringify({
+          name: name.trim(),
+          prompt: prompt.trim(),
+          max_duration_seconds: maxDuration,
+        }),
       })
       if (!res.ok) {
         const j = (await res.json()) as { error?: string }
@@ -81,9 +85,7 @@ function CreateCollectorForm({ onCreated, onCancel }: CreateCollectorFormProps) 
     <div className="bg-white rounded-xl border border-border-brand p-5 space-y-4">
       <h3 className="text-sm font-semibold text-ink">New Video Collector</h3>
 
-      {error && (
-        <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
       <div className="space-y-3">
         <div>
@@ -169,7 +171,9 @@ function SubmissionModal({ submission, onClose, onAction, onDelete }: Submission
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 space-y-5">
@@ -184,7 +188,9 @@ function SubmissionModal({ submission, onClose, onAction, onDelete }: Submission
               )}
               <p className="text-xs text-ink4 mt-0.5">
                 {new Date(submission.submitted_at).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
                 })}
               </p>
             </div>
@@ -217,11 +223,15 @@ function SubmissionModal({ submission, onClose, onAction, onDelete }: Submission
           {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap">
             {submission.sentiment && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(submission.sentiment)}`}>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(submission.sentiment)}`}
+              >
                 {submission.sentiment}
               </span>
             )}
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(submission.status)}`}>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(submission.status)}`}
+            >
               {submission.status}
             </span>
             {submission.duration_seconds != null && (
@@ -294,7 +304,9 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
   const [submissions, setSubmissions] = useState<VideoTestimonial[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<SubmissionFilter>('all')
-  const [selected, setSelected] = useState<(VideoTestimonial & { signed_url?: string | null }) | null>(null)
+  const [selected, setSelected] = useState<
+    (VideoTestimonial & { signed_url?: string | null }) | null
+  >(null)
 
   const fetchSubmissions = useCallback(async () => {
     setLoading(true)
@@ -321,7 +333,9 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
     try {
       const res = await fetch(`/api/video-testimonials/${s.id}`, { credentials: 'include' })
       if (res.ok) {
-        const data = (await res.json()) as { testimonial?: VideoTestimonial & { signed_url?: string | null } }
+        const data = (await res.json()) as {
+          testimonial?: VideoTestimonial & { signed_url?: string | null }
+        }
         setSelected(data.testimonial ?? { ...s })
       } else {
         setSelected(s)
@@ -376,8 +390,7 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
     { id: 'rejected', label: 'Rejected' },
   ]
 
-  const filtered =
-    filter === 'all' ? submissions : submissions.filter((s) => s.status === filter)
+  const filtered = filter === 'all' ? submissions : submissions.filter((s) => s.status === filter)
 
   return (
     <div className="space-y-4">
@@ -434,16 +447,22 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
                 </p>
                 <p className="text-xs text-ink4">
                   {new Date(s.submitted_at).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
                   })}
                 </p>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {s.sentiment && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(s.sentiment)}`}>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(s.sentiment)}`}
+                    >
                       {s.sentiment}
                     </span>
                   )}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(s.status)}`}>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(s.status)}`}
+                  >
                     {s.status}
                   </span>
                 </div>
@@ -585,10 +604,7 @@ export default function VideoReviewsTab() {
 
       {/* Create form */}
       {createOpen && (
-        <CreateCollectorForm
-          onCreated={handleCreated}
-          onCancel={() => setCreateOpen(false)}
-        />
+        <CreateCollectorForm onCreated={handleCreated} onCancel={() => setCreateOpen(false)} />
       )}
 
       {/* Collectors table */}
@@ -610,11 +626,17 @@ export default function VideoReviewsTab() {
             <thead className="border-b border-border-brand">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-medium text-ink3">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden md:table-cell">Prompt</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden lg:table-cell">Max Duration</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden md:table-cell">
+                  Prompt
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden lg:table-cell">
+                  Max Duration
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-ink3">Submissions</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-ink3">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden xl:table-cell">Share Link</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-ink3 hidden xl:table-cell">
+                  Share Link
+                </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-ink3">Actions</th>
               </tr>
             </thead>
@@ -636,18 +658,26 @@ export default function VideoReviewsTab() {
                     </td>
                     <td className="px-4 py-3 text-ink">
                       <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedCollectorId(c.id) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedCollectorId(c.id)
+                        }}
                         className="text-teal-600 hover:underline font-medium"
                       >
                         {c.submission_count}
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${statusBadge(c.status)}`}>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${statusBadge(c.status)}`}
+                      >
                         {c.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden xl:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3 hidden xl:table-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-ink3 truncate max-w-[180px]">{link}</span>
                         <button
@@ -666,7 +696,11 @@ export default function VideoReviewsTab() {
                             disabled={toggling === c.id}
                             className="text-[10px] px-2 py-0.5 border border-border-brand rounded font-medium text-ink3 hover:bg-bg transition-colors disabled:opacity-40"
                           >
-                            {toggling === c.id ? '...' : c.status === 'active' ? 'Pause' : 'Activate'}
+                            {toggling === c.id
+                              ? '...'
+                              : c.status === 'active'
+                                ? 'Pause'
+                                : 'Activate'}
                           </button>
                         )}
                         {c.status !== 'archived' && (

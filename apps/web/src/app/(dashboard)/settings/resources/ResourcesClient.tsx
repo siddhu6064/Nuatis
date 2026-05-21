@@ -201,7 +201,9 @@ export default function ResourcesClient({ initialResources, tenantId }: Props) {
       if (res.ok) {
         setResources((prev) =>
           prev.map((r) =>
-            r.id === id ? { ...r, name: editName.trim(), resource_type: editType, color: editColor } : r
+            r.id === id
+              ? { ...r, name: editName.trim(), resource_type: editType, color: editColor }
+              : r
           )
         )
         setEditingId(null)
@@ -249,7 +251,9 @@ export default function ResourcesClient({ initialResources, tenantId }: Props) {
         </div>
 
         {error && (
-          <div className="mx-6 mt-4 px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>
+          <div className="mx-6 mt-4 px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg">
+            {error}
+          </div>
         )}
 
         {/* Add form */}
@@ -524,7 +528,11 @@ export default function ResourcesClient({ initialResources, tenantId }: Props) {
                         }`}
                         style={isBooked ? { backgroundColor: r.color } : undefined}
                       >
-                        {isBooked && i === Math.min(...[...bookedMap.keys()].filter((k) => bookedMap.get(k) === slot))
+                        {isBooked &&
+                        i ===
+                          Math.min(
+                            ...[...bookedMap.keys()].filter((k) => bookedMap.get(k) === slot)
+                          )
                           ? (slot?.contact_name ?? '').slice(0, 8)
                           : null}
                       </div>

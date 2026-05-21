@@ -1355,3 +1355,48 @@ export interface ReferralSignup {
   first_payment_at: string | null
   created_at: string
 }
+
+// ── G54: Announcements ───────────────────────────────────────
+export type AnnouncementType = 'feature' | 'maintenance' | 'tip' | 'update'
+
+export interface Announcement {
+  id: string
+  title: string
+  body: string
+  type: AnnouncementType
+  cta_label: string | null
+  cta_url: string | null
+  starts_at: string
+  ends_at: string | null
+  created_at: string
+}
+
+// ── G86: Gift Cards ──────────────────────────────────────────
+export type GiftCardStatus = 'active' | 'redeemed' | 'expired' | 'cancelled'
+
+export interface GiftCard {
+  id: string
+  tenant_id: string
+  code: string
+  amount_cents: number
+  balance_cents: number
+  status: GiftCardStatus
+  recipient_name: string | null
+  recipient_email: string | null
+  purchased_by_contact_id: string | null
+  expires_at: string | null
+  created_at: string
+}
+
+// ── G90: Media Library ───────────────────────────────────────
+export interface MediaFile {
+  id: string
+  tenant_id: string
+  file_name: string
+  file_size: number
+  mime_type: string
+  storage_path: string
+  public_url: string | null
+  tags: string[]
+  created_at: string
+}

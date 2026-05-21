@@ -93,6 +93,11 @@ import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
 import campaignsRouter from './routes/campaigns.js'
 import resourcesRouter from './routes/resources.js'
+import settingsLabsRouter from './routes/settings-labs.js'
+import announcementsRouter from './routes/announcements.js'
+import qrRouter from './routes/qr.js'
+import giftCardsRouter from './routes/gift-cards.js'
+import mediaLibraryRouter from './routes/media-library.js'
 import referralsRouter from './routes/referrals.js'
 import outboundCallsRouter from './routes/outbound-calls.js'
 import customAutomationsRouter from './routes/custom-automations.js'
@@ -239,6 +244,11 @@ app.use('/api/video-testimonials', videoTestimonialsRouter)
 app.use('/api/webchat', cors({ origin: '*' }), webchatRouter)
 // Authenticated webchat settings
 app.use('/api/settings/webchat', webchatSettingsRouter)
+app.use('/api/settings/labs', settingsLabsRouter)
+app.use('/api/announcements', announcementsRouter)
+app.use('/api/qr', qrRouter)
+app.use('/api/gift-cards', giftCardsRouter)
+app.use('/api/media', mediaLibraryRouter)
 
 // Widget JS file — served with CORS * so any website can embed it
 const __filename = fileURLToPath(import.meta.url)

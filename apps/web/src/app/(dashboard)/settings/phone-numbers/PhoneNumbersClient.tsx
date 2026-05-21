@@ -46,7 +46,11 @@ function formatPhone(p: string) {
   return p
 }
 
-export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers: TelnyxNumberRow[] }) {
+export default function PhoneNumbersClient({
+  initialNumbers,
+}: {
+  initialNumbers: TelnyxNumberRow[]
+}) {
   const [numbers, setNumbers] = useState<TelnyxNumberRow[]>(initialNumbers)
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState({
@@ -69,12 +73,18 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     const phone = addForm.phone_number.trim()
-    if (!phone) { setAddError('Phone number required'); return }
+    if (!phone) {
+      setAddError('Phone number required')
+      return
+    }
     if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
       setAddError('Must be E.164 format: +15125551234')
       return
     }
-    if (!addForm.label.trim()) { setAddError('Label required'); return }
+    if (!addForm.label.trim()) {
+      setAddError('Label required')
+      return
+    }
 
     setAdding(true)
     setAddError(null)
@@ -92,10 +102,19 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
         credentials: 'include',
       })
       const data = (await res.json()) as TelnyxNumberRow & { error?: string }
-      if (!res.ok) { setAddError(data.error ?? 'Failed to add'); return }
-      setNumbers(prev => [...prev, data])
+      if (!res.ok) {
+        setAddError(data.error ?? 'Failed to add')
+        return
+      }
+      setNumbers((prev) => [...prev, data])
       setShowAddForm(false)
-      setAddForm({ phone_number: '', label: '', department: 'general', maya_enabled: true, forwarding_number: '' })
+      setAddForm({
+        phone_number: '',
+        label: '',
+        department: 'general',
+        maya_enabled: true,
+        forwarding_number: '',
+      })
     } catch {
       setAddError('Network error')
     } finally {
@@ -114,7 +133,7 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
         credentials: 'include',
       })
       if (res.ok) {
-        setNumbers(prev => prev.map(n => n.id === id ? { ...n, maya_enabled: !current } : n))
+        setNumbers((prev) => prev.map((n) => (n.id === id ? { ...n, maya_enabled: !current } : n)))
       } else {
         const d = (await res.json()) as { error?: string }
         setActionError(d.error ?? 'Failed to update')
@@ -139,7 +158,11 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
       })
       const data = (await res.json()) as TelnyxNumberRow & { error?: string }
       if (res.ok) {
-        setNumbers(prev => prev.map(n => n.id === id ? { ...n, label: data.label, department: data.department } : n))
+        setNumbers((prev) =>
+          prev.map((n) =>
+            n.id === id ? { ...n, label: data.label, department: data.department } : n
+          )
+        )
         setEditingId(null)
         setEditForm(null)
       } else {
@@ -161,7 +184,7 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
         credentials: 'include',
       })
       if (res.ok) {
-        setNumbers(prev => prev.map(n => ({ ...n, is_primary: n.id === id })))
+        setNumbers((prev) => prev.map((n) => ({ ...n, is_primary: n.id === id })))
       } else {
         const d = (await res.json()) as { error?: string }
         setActionError(d.error ?? 'Failed to set primary')
@@ -183,7 +206,7 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
         credentials: 'include',
       })
       if (res.ok) {
-        setNumbers(prev => prev.filter(n => n.id !== id))
+        setNumbers((prev) => prev.filter((n) => n.id !== id))
       } else {
         const d = (await res.json()) as { error?: string }
         setActionError(d.error ?? 'Failed to delete')
@@ -203,7 +226,10 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
           <h2 className="text-sm font-semibold text-ink">Telnyx Numbers</h2>
           <button
             type="button"
-            onClick={() => { setShowAddForm(v => !v); setAddError(null) }}
+            onClick={() => {
+              setShowAddForm((v) => !v)
+              setAddError(null)
+            }}
             className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2"
           >
             {showAddForm ? 'Cancel' : 'Add Number'}
@@ -218,43 +244,56 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
 
         {/* Add form */}
         {showAddForm && (
-          <form onSubmit={handleAdd} className="px-6 py-4 border-b border-border-brand bg-bg space-y-3">
+          <form
+            onSubmit={handleAdd}
+            className="px-6 py-4 border-b border-border-brand bg-bg space-y-3"
+          >
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="add-phone" className="block text-xs text-ink3 mb-1">Phone Number (E.164)</label>
+                <label htmlFor="add-phone" className="block text-xs text-ink3 mb-1">
+                  Phone Number (E.164)
+                </label>
                 <input
                   id="add-phone"
                   type="text"
                   placeholder="+15125551234"
                   value={addForm.phone_number}
-                  onChange={e => setAddForm(f => ({ ...f, phone_number: e.target.value }))}
+                  onChange={(e) => setAddForm((f) => ({ ...f, phone_number: e.target.value }))}
                   className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
                 />
               </div>
               <div>
-                <label htmlFor="add-label" className="block text-xs text-ink3 mb-1">Label</label>
+                <label htmlFor="add-label" className="block text-xs text-ink3 mb-1">
+                  Label
+                </label>
                 <input
                   id="add-label"
                   type="text"
                   placeholder="Front Desk"
                   maxLength={50}
                   value={addForm.label}
-                  onChange={e => setAddForm(f => ({ ...f, label: e.target.value }))}
+                  onChange={(e) => setAddForm((f) => ({ ...f, label: e.target.value }))}
                   className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="add-department" className="block text-xs text-ink3 mb-1">Department</label>
+                <label htmlFor="add-department" className="block text-xs text-ink3 mb-1">
+                  Department
+                </label>
                 <select
                   id="add-department"
                   value={addForm.department}
-                  onChange={e => setAddForm(f => ({ ...f, department: e.target.value as Department }))}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, department: e.target.value as Department }))
+                  }
                   className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none bg-white text-ink"
                 >
-                  {DEPARTMENTS.map(d => (
-                    <option key={d} value={d}>{DEPT_LABELS[d]}</option>
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d} value={d}>
+                      {DEPT_LABELS[d]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -267,7 +306,7 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                   type="text"
                   placeholder="+15125559999"
                   value={addForm.forwarding_number}
-                  onChange={e => setAddForm(f => ({ ...f, forwarding_number: e.target.value }))}
+                  onChange={(e) => setAddForm((f) => ({ ...f, forwarding_number: e.target.value }))}
                   className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
                 />
               </div>
@@ -278,7 +317,7 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                   id="add-maya"
                   type="checkbox"
                   checked={addForm.maya_enabled}
-                  onChange={e => setAddForm(f => ({ ...f, maya_enabled: e.target.checked }))}
+                  onChange={(e) => setAddForm((f) => ({ ...f, maya_enabled: e.target.checked }))}
                   className="w-4 h-4 rounded border-border-brand"
                 />
                 <span className="text-sm text-ink2">Maya answers this number</span>
@@ -299,12 +338,10 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
 
         {/* Numbers list */}
         {numbers.length === 0 ? (
-          <div className="px-6 py-8 text-center text-sm text-ink4">
-            No phone numbers added yet.
-          </div>
+          <div className="px-6 py-8 text-center text-sm text-ink4">No phone numbers added yet.</div>
         ) : (
           <div className="divide-y divide-border-brand">
-            {numbers.map(num => (
+            {numbers.map((num) => (
               <div key={num.id} className="px-6 py-4">
                 {editingId === num.id && editForm ? (
                   /* Inline edit row */
@@ -312,17 +349,25 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                     <input
                       type="text"
                       value={editForm.label}
-                      onChange={e => setEditForm(f => f ? { ...f, label: e.target.value } : f)}
+                      onChange={(e) =>
+                        setEditForm((f) => (f ? { ...f, label: e.target.value } : f))
+                      }
                       maxLength={50}
                       className="px-2 py-1 text-sm border border-border-brand rounded focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                     <select
                       value={editForm.department}
-                      onChange={e => setEditForm(f => f ? { ...f, department: e.target.value as Department } : f)}
+                      onChange={(e) =>
+                        setEditForm((f) =>
+                          f ? { ...f, department: e.target.value as Department } : f
+                        )
+                      }
                       className="px-2 py-1 text-sm border border-border-brand rounded focus:outline-none"
                     >
-                      {DEPARTMENTS.map(d => (
-                        <option key={d} value={d}>{DEPT_LABELS[d]}</option>
+                      {DEPARTMENTS.map((d) => (
+                        <option key={d} value={d}>
+                          {DEPT_LABELS[d]}
+                        </option>
                       ))}
                     </select>
                     <button
@@ -335,22 +380,33 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setEditingId(null); setEditForm(null) }}
+                      onClick={() => {
+                        setEditingId(null)
+                        setEditForm(null)
+                      }}
                       className="text-sm text-ink4 hover:underline"
-                    >Cancel</button>
+                    >
+                      Cancel
+                    </button>
                   </div>
                 ) : (
                   /* Normal display row */
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3 min-w-0">
                       {num.is_primary && (
-                        <span title="Primary number" className="text-amber-500 shrink-0">★</span>
+                        <span title="Primary number" className="text-amber-500 shrink-0">
+                          ★
+                        </span>
                       )}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink">{formatPhone(num.phone_number)}</p>
+                        <p className="text-sm font-medium text-ink">
+                          {formatPhone(num.phone_number)}
+                        </p>
                         <p className="text-xs text-ink4">{num.label}</p>
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${DEPT_CLASSES[num.department]}`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${DEPT_CLASSES[num.department]}`}
+                      >
                         {DEPT_LABELS[num.department]}
                       </span>
                       {num.status === 'inactive' && (
@@ -372,16 +428,23 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                           onClick={() => void handleToggleMaya(num.id, num.maya_enabled)}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${num.maya_enabled ? 'bg-brand' : 'bg-gray-200'}`}
                         >
-                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${num.maya_enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${num.maya_enabled ? 'translate-x-4' : 'translate-x-1'}`}
+                          />
                         </button>
                       </div>
                       {/* Edit */}
                       <button
                         type="button"
-                        onClick={() => { setEditingId(num.id); setEditForm({ label: num.label, department: num.department }) }}
+                        onClick={() => {
+                          setEditingId(num.id)
+                          setEditForm({ label: num.label, department: num.department })
+                        }}
                         className="text-xs text-ink4 hover:text-ink transition-colors"
                         title="Edit"
-                      >Edit</button>
+                      >
+                        Edit
+                      </button>
                       {/* Set Primary */}
                       {!num.is_primary && (
                         <button
@@ -390,7 +453,9 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                           disabled={settingPrimaryId === num.id}
                           className="text-xs text-ink4 hover:text-ink transition-colors disabled:opacity-50"
                           title="Set as primary"
-                        >Set Primary</button>
+                        >
+                          Set Primary
+                        </button>
                       )}
                       {/* Delete */}
                       {!num.is_primary && (
@@ -400,7 +465,9 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
                           disabled={deletingId === num.id}
                           className="text-xs text-ink4 hover:text-red-500 transition-colors disabled:opacity-40"
                           title="Remove"
-                        >Remove</button>
+                        >
+                          Remove
+                        </button>
                       )}
                     </div>
                   </div>
@@ -414,8 +481,8 @@ export default function PhoneNumbersClient({ initialNumbers }: { initialNumbers:
       {/* Info note */}
       <div className="bg-bg rounded-xl border border-border-brand px-6 py-4">
         <p className="text-xs text-ink3">
-          Numbers are linked to your Telnyx account. To add a new number, purchase it in Telnyx then add it here.
-          Maya will answer calls to any number with Maya enabled.
+          Numbers are linked to your Telnyx account. To add a new number, purchase it in Telnyx then
+          add it here. Maya will answer calls to any number with Maya enabled.
         </p>
       </div>
     </div>

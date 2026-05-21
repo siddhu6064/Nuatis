@@ -94,15 +94,19 @@ export default function AutomationOverviewClient() {
     setLoading(true)
     try {
       const [overviewRes, customRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/overview`, { credentials: 'include' }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-automations`, { credentials: 'include' }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/overview`, {
+          credentials: 'include',
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-automations`, {
+          credentials: 'include',
+        }),
       ])
       if (!overviewRes.ok) throw new Error(`HTTP ${overviewRes.status}`)
       const json = (await overviewRes.json()) as AutomationOverview
       setData(json)
       setLastUpdated(new Date())
       if (customRes.ok) {
-        const customJson = await customRes.json() as { automations: CustomAutomation[] }
+        const customJson = (await customRes.json()) as { automations: CustomAutomation[] }
         setCustomAutomations(customJson.automations)
       }
     } finally {
@@ -574,14 +578,22 @@ export default function AutomationOverviewClient() {
                 {customAutomations.map((a) => (
                   <tr key={a.id} className="border-b border-gray-50 last:border-0">
                     <td className="px-6 py-3 font-medium text-ink">{a.name}</td>
-                    <td className="px-4 py-3 text-ink3 capitalize">{a.trigger_type.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-3 text-ink3 capitalize">{a.action_type.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-3 text-ink3 capitalize">
+                      {a.trigger_type.replace(/_/g, ' ')}
+                    </td>
+                    <td className="px-4 py-3 text-ink3 capitalize">
+                      {a.action_type.replace(/_/g, ' ')}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        a.status === 'active' ? 'bg-green-50 text-green-700' :
-                        a.status === 'paused' ? 'bg-amber-50 text-amber-700' :
-                        'bg-gray-100 text-ink4'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          a.status === 'active'
+                            ? 'bg-green-50 text-green-700'
+                            : a.status === 'paused'
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-gray-100 text-ink4'
+                        }`}
+                      >
                         {a.status}
                       </span>
                     </td>

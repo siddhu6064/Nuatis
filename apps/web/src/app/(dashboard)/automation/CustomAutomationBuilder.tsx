@@ -177,9 +177,7 @@ export default function CustomAutomationBuilder() {
           </button>
         </div>
 
-        {loadError && (
-          <p className="text-sm text-red-600 mb-4">{loadError}</p>
-        )}
+        {loadError && <p className="text-sm text-red-600 mb-4">{loadError}</p>}
 
         {automations.length === 0 ? (
           <div className="text-center py-16 text-ink3">
@@ -192,13 +190,10 @@ export default function CustomAutomationBuilder() {
                 <tr className="border-b border-border-brand">
                   {['Name', 'Trigger', 'Action', 'Status', 'Run Count', 'Last Run', 'Actions'].map(
                     (col) => (
-                      <th
-                        key={col}
-                        className="text-left text-xs text-ink4 font-medium pb-3 pr-4"
-                      >
+                      <th key={col} className="text-left text-xs text-ink4 font-medium pb-3 pr-4">
                         {col}
                       </th>
-                    ),
+                    )
                   )}
                 </tr>
               </thead>
@@ -213,9 +208,7 @@ export default function CustomAutomationBuilder() {
                     </td>
                     <td className="py-3 pr-4 text-ink3">{a.run_count ?? 0}</td>
                     <td className="py-3 pr-4 text-ink3">
-                      {a.last_run_at
-                        ? new Date(a.last_run_at).toLocaleDateString()
-                        : '—'}
+                      {a.last_run_at ? new Date(a.last_run_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="py-3 flex gap-2 flex-wrap">
                       {a.status !== 'active' && (

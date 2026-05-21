@@ -28,16 +28,14 @@ export async function generateReferralCode(
     const randomSuffix = generateRandomLetters(4)
     const candidate = `${businessPrefix}-${randomSuffix}`
 
-    const { error } = await supabase
-      .from('referral_codes')
-      .insert({
-        tenant_id: tenantId,
-        code: candidate,
-        status: 'active',
-        clicks: 0,
-        signups: 0,
-        commission_rate: 10.0,
-      })
+    const { error } = await supabase.from('referral_codes').insert({
+      tenant_id: tenantId,
+      code: candidate,
+      status: 'active',
+      clicks: 0,
+      signups: 0,
+      commission_rate: 10.0,
+    })
 
     if (!error) return candidate
     // 23505 = unique_violation — code already taken, retry
