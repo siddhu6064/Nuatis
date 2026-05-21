@@ -1279,3 +1279,48 @@ export interface CustomAutomation {
   created_at: string
   updated_at: string
 }
+
+// ── G68: Resource Booking ────────────────────────────────────
+
+export type ResourceType = 'room' | 'station' | 'equipment' | 'vehicle' | 'other'
+
+export type ResourceStatus = 'active' | 'inactive' | 'maintenance'
+
+export type ResourceBookingStatus = 'confirmed' | 'cancelled' | 'completed'
+
+export interface BookableResource {
+  id: string
+  tenant_id: string
+  location_id: string | null
+  name: string
+  resource_type: ResourceType
+  capacity: number
+  color: string
+  status: ResourceStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ResourceBooking {
+  id: string
+  tenant_id: string
+  resource_id: string
+  appointment_id: string | null
+  contact_id: string | null
+  booked_by: string | null
+  start_time: string
+  end_time: string
+  notes: string | null
+  status: ResourceBookingStatus
+  created_at: string
+}
+
+export interface ResourceAvailabilitySlot {
+  resource_id: string
+  booked_slots: Array<{
+    start_time: string
+    end_time: string
+    appointment_id: string | null
+  }>
+}
