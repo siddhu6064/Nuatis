@@ -52,12 +52,12 @@ export async function getResourceAvailability(params: {
   resourceIds: string[]
   date: string // YYYY-MM-DD
 }): Promise<ResourceAvailabilitySlot[]> {
-  const { resourceIds, date } = params
+  const { tenantId, resourceIds, date } = params
 
   if (resourceIds.length === 0) return []
 
   const dayStart = new Date(`${date}T00:00:00.000Z`)
-  const dayEnd = new Date(`${date}T00:00:00.000Z`)
+  const dayEnd = new Date(dayStart)
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
 
   const supabase = getSupabase()
@@ -65,6 +65,7 @@ export async function getResourceAvailability(params: {
   const { data, error } = await supabase
     .from('resource_bookings')
     .select('resource_id, start_time, end_time, appointment_id')
+    .eq('tenant_id', tenantId)
     .in('resource_id', resourceIds)
     .neq('status', 'cancelled')
     .gte('start_time', dayStart.toISOString())
