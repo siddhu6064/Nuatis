@@ -6,6 +6,8 @@ import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { createClient } from '@supabase/supabase-js'
 import AppointmentDrawer from './AppointmentDrawer'
+import { ColumnsButton } from '@/components/ColumnsButton'
+import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import './calendar.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -106,6 +108,18 @@ function getSupabase() {
   )
 }
 
+// ── Column visibility (G65) ───────────────────────────────────────────────────
+
+const APPT_COLUMNS = [
+  { key: 'contact', label: 'Contact' },
+  { key: 'service', label: 'Service' },
+  { key: 'staff', label: 'Staff' },
+  { key: 'date', label: 'Date' },
+  { key: 'status', label: 'Status' },
+  { key: 'channel', label: 'Channel' },
+]
+const APPT_DEFAULTS = Object.fromEntries(APPT_COLUMNS.map(c => [c.key, true]))
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -123,6 +137,11 @@ export default function AppointmentsCalendar({
 }: Props) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [view, setView] = useState<View>(Views.WEEK)
+  // TODO(G65): When a list/table view is added to appointments, use colVisible to gate columns
+  const { visible: colVisible, toggle: toggleCol } = useColumnVisibility(
+    'nuatis_appointments_columns',
+    APPT_DEFAULTS
+  )
   const [date, setDate] = useState(new Date())
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null)
@@ -353,6 +372,11 @@ export default function AppointmentsCalendar({
             </svg>
             Block Time
           </button>
+          <ColumnsButton
+            columns={APPT_COLUMNS}
+            visible={colVisible}
+            onChange={toggleCol}
+          />
           <a
             href="/appointments/new"
             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

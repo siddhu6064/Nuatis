@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { ColumnsButton } from '@/components/ColumnsButton'
+import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 
 interface Task {
   id: string
@@ -76,6 +78,15 @@ function formatDue(dueDate: string): string {
   return `${date} at ${time}`
 }
 
+const TASKS_COLUMNS = [
+  { key: 'contact', label: 'Contact' },
+  { key: 'due_date', label: 'Due Date' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'status', label: 'Status' },
+]
+const TASKS_DEFAULTS = Object.fromEntries(TASKS_COLUMNS.map(c => [c.key, true]))
+
 export default function TasksDashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,6 +99,11 @@ export default function TasksDashboard() {
   const [newTime, setNewTime] = useState('12:00')
   const [newPriority, setNewPriority] = useState('medium')
   const [saving, setSaving] = useState(false)
+  // TODO(G65): When a table/list view is added to tasks, use colVisible to gate columns
+  const { visible: colVisible, toggle: toggleCol } = useColumnVisibility(
+    'nuatis_tasks_columns',
+    TASKS_DEFAULTS
+  )
 
   const fetchTasks = useCallback(async () => {
     const params = new URLSearchParams({ completed: 'false' })
@@ -209,13 +225,20 @@ export default function TasksDashboard() {
           <h1 className="text-xl font-bold text-ink">Tasks</h1>
           <p className="text-sm text-ink3 mt-0.5">{tasks.length} active</p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          Add Task
-        </button>
+        <div className="flex items-center gap-2">
+          <ColumnsButton
+            columns={TASKS_COLUMNS}
+            visible={colVisible}
+            onChange={toggleCol}
+          />
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            <span className="text-base leading-none">+</span>
+            Add Task
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}

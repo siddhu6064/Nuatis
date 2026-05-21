@@ -20,10 +20,12 @@ type SignedUrlResult = {
   data: { signedUrl: string } | null
   error: null | { message: string }
 }
+type RemoveResult = { data: unknown; error: null | { message: string } }
 
 export interface StorageMock {
   upload: jest.Mock<(path: string, body: unknown, opts?: unknown) => Promise<UploadResult>>
   createSignedUrl: jest.Mock<(path: string, seconds: number) => Promise<SignedUrlResult>>
+  remove: jest.Mock<(paths: string[]) => Promise<RemoveResult>>
 }
 
 export interface MockStore {
@@ -40,7 +42,10 @@ export function createStore(): MockStore {
   const createSignedUrl = jest
     .fn<(path: string, seconds: number) => Promise<SignedUrlResult>>()
     .mockResolvedValue({ data: { signedUrl: 'https://signed.url/test' }, error: null })
-  return { tables: {}, storage: { upload, createSignedUrl } }
+  const remove = jest
+    .fn<(paths: string[]) => Promise<RemoveResult>>()
+    .mockResolvedValue({ data: [], error: null })
+  return { tables: {}, storage: { upload, createSignedUrl, remove } }
 }
 
 type Op = 'select' | 'insert' | 'update' | 'delete'
@@ -462,6 +467,10 @@ export function createMockSupabase(store: MockStore): unknown {
         return {
           upload: store.storage.upload,
           createSignedUrl: store.storage.createSignedUrl,
+          getPublicUrl: (path: string) => ({
+            data: { publicUrl: `https://mock.supabase.co/storage/v1/object/public/media-library/${path}` },
+          }),
+          remove: store.storage.remove,
         }
       },
     },

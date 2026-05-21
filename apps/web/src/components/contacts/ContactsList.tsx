@@ -6,6 +6,8 @@ import Link from 'next/link'
 import ContactFilters, { type FilterState, EMPTY_FILTERS } from './ContactFilters'
 import SmartLists from './SmartLists'
 import BulkActionBar from './BulkActionBar'
+import { ColumnsButton } from '@/components/ColumnsButton'
+import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 
 interface Contact {
   id: string
@@ -126,6 +128,18 @@ function activeFilterCount(f: FilterState): number {
   return count
 }
 
+const CONTACTS_COLUMNS = [
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'lifecycle', label: 'Lifecycle' },
+  { key: 'lead_score', label: 'Lead Score' },
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'territory', label: 'Territory' },
+  { key: 'added', label: 'Added' },
+]
+const CONTACTS_DEFAULTS = Object.fromEntries(CONTACTS_COLUMNS.map(c => [c.key, true]))
+
 export default function ContactsList() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -138,6 +152,10 @@ export default function ContactsList() {
   const [activeListId, setActiveListId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tenantUsers, setTenantUsers] = useState<{ id: string; full_name: string }[]>([])
+  const { visible: colVisible, toggle: toggleCol } = useColumnVisibility(
+    'nuatis_contacts_columns',
+    CONTACTS_DEFAULTS
+  )
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -394,6 +412,11 @@ export default function ContactsList() {
                 </span>
               )}
             </button>
+            <ColumnsButton
+              columns={CONTACTS_COLUMNS}
+              visible={colVisible}
+              onChange={toggleCol}
+            />
             <Link
               href="/contacts/new"
               className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
@@ -530,64 +553,80 @@ export default function ContactsList() {
                       </span>
                     </button>
                   </th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Email</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Phone</th>
+                  {colVisible['email'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Email</th>
+                  )}
+                  {colVisible['phone'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Phone</th>
+                  )}
                   {/* Sortable: Stage */}
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateFilters({
-                          ...filters,
-                          sort_by: 'pipeline_stage',
-                          sort_dir:
-                            filters.sort_by === 'pipeline_stage' && filters.sort_dir === 'asc'
-                              ? 'desc'
-                              : 'asc',
-                        })
-                      }
-                      className="flex items-center gap-1 hover:text-ink transition-colors"
-                    >
-                      Stage
-                      <span className="text-[10px]">
-                        {filters.sort_by === 'pipeline_stage'
-                          ? filters.sort_dir === 'asc'
-                            ? '▲'
-                            : '▼'
-                          : '↕'}
-                      </span>
-                    </button>
-                  </th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Lifecycle</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Score</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Assigned</th>
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Territory</th>
+                  {colVisible['stage'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateFilters({
+                            ...filters,
+                            sort_by: 'pipeline_stage',
+                            sort_dir:
+                              filters.sort_by === 'pipeline_stage' && filters.sort_dir === 'asc'
+                                ? 'desc'
+                                : 'asc',
+                          })
+                        }
+                        className="flex items-center gap-1 hover:text-ink transition-colors"
+                      >
+                        Stage
+                        <span className="text-[10px]">
+                          {filters.sort_by === 'pipeline_stage'
+                            ? filters.sort_dir === 'asc'
+                              ? '▲'
+                              : '▼'
+                            : '↕'}
+                        </span>
+                      </button>
+                    </th>
+                  )}
+                  {colVisible['lifecycle'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Lifecycle</th>
+                  )}
+                  {colVisible['lead_score'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Score</th>
+                  )}
+                  {colVisible['assigned'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Assigned</th>
+                  )}
+                  {colVisible['territory'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Territory</th>
+                  )}
                   {/* Sortable: Added */}
-                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateFilters({
-                          ...filters,
-                          sort_by: 'created_at',
-                          sort_dir:
-                            filters.sort_by === 'created_at' && filters.sort_dir === 'desc'
-                              ? 'asc'
-                              : 'desc',
-                        })
-                      }
-                      className="flex items-center gap-1 hover:text-ink transition-colors"
-                    >
-                      Added
-                      <span className="text-[10px]">
-                        {filters.sort_by === 'created_at'
-                          ? filters.sort_dir === 'desc'
-                            ? '▼'
-                            : '▲'
-                          : '↕'}
-                      </span>
-                    </button>
-                  </th>
+                  {colVisible['added'] !== false && (
+                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateFilters({
+                            ...filters,
+                            sort_by: 'created_at',
+                            sort_dir:
+                              filters.sort_by === 'created_at' && filters.sort_dir === 'desc'
+                                ? 'asc'
+                                : 'desc',
+                          })
+                        }
+                        className="flex items-center gap-1 hover:text-ink transition-colors"
+                      >
+                        Added
+                        <span className="text-[10px]">
+                          {filters.sort_by === 'created_at'
+                            ? filters.sort_dir === 'desc'
+                              ? '▼'
+                              : '▲'
+                            : '↕'}
+                        </span>
+                      </button>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -638,110 +677,126 @@ export default function ContactsList() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-ink3">{contact.email ?? '\u2014'}</td>
-                    <td className="px-4 py-4 text-sm text-ink3">{contact.phone ?? '\u2014'}</td>
-                    <td className="px-4 py-4">
-                      {contact.pipeline_stage ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
-                          {contact.pipeline_stage}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-300">{'\u2014'}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {contact.lifecycle_stage ? (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            {
-                              subscriber: 'bg-bg2 text-ink3',
-                              lead: 'bg-blue-50 text-blue-700',
-                              marketing_qualified: 'bg-purple-50 text-purple-700',
-                              sales_qualified: 'bg-orange-50 text-orange-700',
-                              opportunity: 'bg-yellow-50 text-yellow-700',
-                              customer: 'bg-green-50 text-green-700',
-                              evangelist: 'bg-emerald-50 text-emerald-700',
-                              other: 'bg-bg2 text-ink3',
-                            }[contact.lifecycle_stage] ?? 'bg-bg2 text-ink3'
-                          }`}
-                        >
-                          {contact.lifecycle_stage
-                            .split('_')
-                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                            .join(' ')}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-300">{'\u2014'}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {contact.lead_score != null || contact.lead_grade ? (
-                        <div className="flex items-center gap-1.5">
-                          {contact.lead_score != null && (
-                            <span className="text-sm text-ink2">{contact.lead_score}</span>
-                          )}
-                          {contact.lead_grade && (
-                            <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                {
-                                  A: 'bg-green-50 text-green-700',
-                                  B: 'bg-blue-50 text-blue-700',
-                                  C: 'bg-yellow-50 text-yellow-700',
-                                  D: 'bg-orange-50 text-orange-700',
-                                  F: 'bg-red-50 text-red-700',
-                                }[contact.lead_grade] ?? 'bg-bg2 text-ink3'
-                              }`}
-                            >
-                              {contact.lead_grade}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-300">{'\u2014'}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {contact.assigned_user_name ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                            <span className="text-teal-700 text-[10px] font-bold">
-                              {contact.assigned_user_name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-xs text-ink3">{contact.assigned_user_name}</span>
-                        </div>
-                      ) : contact.assigned_to_user_id &&
-                        tenantUsers.find((u) => u.id === contact.assigned_to_user_id) ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                            <span className="text-teal-700 text-[10px] font-bold">
-                              {tenantUsers
-                                .find((u) => u.id === contact.assigned_to_user_id)!
-                                .full_name.charAt(0)
-                                .toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-xs text-ink3">
-                            {
-                              tenantUsers.find((u) => u.id === contact.assigned_to_user_id)!
-                                .full_name
-                            }
+                    {colVisible['email'] !== false && (
+                      <td className="px-4 py-4 text-sm text-ink3">{contact.email ?? '\u2014'}</td>
+                    )}
+                    {colVisible['phone'] !== false && (
+                      <td className="px-4 py-4 text-sm text-ink3">{contact.phone ?? '\u2014'}</td>
+                    )}
+                    {colVisible['stage'] !== false && (
+                      <td className="px-4 py-4">
+                        {contact.pipeline_stage ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
+                            {contact.pipeline_stage}
                           </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-300">{'\u2014'}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-ink3">
-                      {contact.territory ?? <span className="text-gray-300">{'\u2014'}</span>}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-ink4">
-                      {new Date(contact.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </td>
+                        ) : (
+                          <span className="text-sm text-gray-300">{'\u2014'}</span>
+                        )}
+                      </td>
+                    )}
+                    {colVisible['lifecycle'] !== false && (
+                      <td className="px-4 py-4">
+                        {contact.lifecycle_stage ? (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              {
+                                subscriber: 'bg-bg2 text-ink3',
+                                lead: 'bg-blue-50 text-blue-700',
+                                marketing_qualified: 'bg-purple-50 text-purple-700',
+                                sales_qualified: 'bg-orange-50 text-orange-700',
+                                opportunity: 'bg-yellow-50 text-yellow-700',
+                                customer: 'bg-green-50 text-green-700',
+                                evangelist: 'bg-emerald-50 text-emerald-700',
+                                other: 'bg-bg2 text-ink3',
+                              }[contact.lifecycle_stage] ?? 'bg-bg2 text-ink3'
+                            }`}
+                          >
+                            {contact.lifecycle_stage
+                              .split('_')
+                              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                              .join(' ')}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-300">{'\u2014'}</span>
+                        )}
+                      </td>
+                    )}
+                    {colVisible['lead_score'] !== false && (
+                      <td className="px-4 py-4">
+                        {contact.lead_score != null || contact.lead_grade ? (
+                          <div className="flex items-center gap-1.5">
+                            {contact.lead_score != null && (
+                              <span className="text-sm text-ink2">{contact.lead_score}</span>
+                            )}
+                            {contact.lead_grade && (
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  {
+                                    A: 'bg-green-50 text-green-700',
+                                    B: 'bg-blue-50 text-blue-700',
+                                    C: 'bg-yellow-50 text-yellow-700',
+                                    D: 'bg-orange-50 text-orange-700',
+                                    F: 'bg-red-50 text-red-700',
+                                  }[contact.lead_grade] ?? 'bg-bg2 text-ink3'
+                                }`}
+                              >
+                                {contact.lead_grade}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-300">{'\u2014'}</span>
+                        )}
+                      </td>
+                    )}
+                    {colVisible['assigned'] !== false && (
+                      <td className="px-4 py-4">
+                        {contact.assigned_user_name ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                              <span className="text-teal-700 text-[10px] font-bold">
+                                {contact.assigned_user_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="text-xs text-ink3">{contact.assigned_user_name}</span>
+                          </div>
+                        ) : contact.assigned_to_user_id &&
+                          tenantUsers.find((u) => u.id === contact.assigned_to_user_id) ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                              <span className="text-teal-700 text-[10px] font-bold">
+                                {tenantUsers
+                                  .find((u) => u.id === contact.assigned_to_user_id)!
+                                  .full_name.charAt(0)
+                                  .toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="text-xs text-ink3">
+                              {
+                                tenantUsers.find((u) => u.id === contact.assigned_to_user_id)!
+                                  .full_name
+                              }
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-300">{'\u2014'}</span>
+                        )}
+                      </td>
+                    )}
+                    {colVisible['territory'] !== false && (
+                      <td className="px-4 py-4 text-sm text-ink3">
+                        {contact.territory ?? <span className="text-gray-300">{'\u2014'}</span>}
+                      </td>
+                    )}
+                    {colVisible['added'] !== false && (
+                      <td className="px-4 py-4 text-sm text-ink4">
+                        {new Date(contact.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
