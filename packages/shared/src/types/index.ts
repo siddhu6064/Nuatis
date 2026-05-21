@@ -1231,3 +1231,51 @@ export interface TelnyxNumber {
   created_at: string
   updated_at: string
 }
+
+// ── G39: Custom Automations ──────────────────────────────────
+
+export type CustomAutomationTrigger =
+  | 'no_response'
+  | 'birthday'
+  | 'overdue_invoice'
+  | 'inactive_customer'
+  | 'new_contact'
+  | 'appointment_followup'
+
+export type CustomAutomationAction =
+  | 'send_sms'
+  | 'send_email'
+  | 'create_task'
+  | 'add_tag'
+  | 'update_field'
+  | 'send_to_campaign'
+
+export type CustomAutomationStatus = 'active' | 'paused' | 'draft'
+
+export interface GeneratedAutomation {
+  name: string
+  description: string
+  trigger_type: CustomAutomationTrigger
+  trigger_config: Record<string, unknown>
+  action_type: CustomAutomationAction
+  action_config: Record<string, unknown>
+  confidence: number
+  error?: string
+}
+
+export interface CustomAutomation {
+  id: string
+  tenant_id: string
+  name: string
+  description: string | null
+  natural_language_prompt: string
+  trigger_type: CustomAutomationTrigger
+  trigger_config: Record<string, unknown>
+  action_type: CustomAutomationAction
+  action_config: Record<string, unknown>
+  status: CustomAutomationStatus
+  run_count: number
+  last_run_at: string | null
+  created_at: string
+  updated_at: string
+}
