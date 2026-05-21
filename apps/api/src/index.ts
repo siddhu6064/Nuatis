@@ -93,6 +93,7 @@ import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
 import campaignsRouter from './routes/campaigns.js'
 import resourcesRouter from './routes/resources.js'
+import referralsRouter from './routes/referrals.js'
 import outboundCallsRouter from './routes/outbound-calls.js'
 import customAutomationsRouter from './routes/custom-automations.js'
 import portalRouter from './routes/portal.js'
@@ -227,6 +228,7 @@ app.use('/api/review-requests', reviewRequestsRouter)
 app.use('/api/snippets', snippetsRouter)
 app.use('/api/automation', automationOverviewRouter)
 app.use('/api/resources', resourcesRouter)
+app.use('/api/referrals', referralsRouter)
 app.use('/api/custom-automations', customAutomationsRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
