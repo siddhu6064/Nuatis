@@ -59,7 +59,6 @@ export default function ReferralsClient() {
           setCode(codeData.code ?? '')
           setClicks(codeData.clicks ?? 0)
           setReferralUrl(codeData.referral_url ?? '')
-          setEstimatedMrr(codeData.estimated_mrr ?? 0)
         }
 
         if (signupsRes.ok) {
@@ -67,6 +66,7 @@ export default function ReferralsClient() {
           const list: Signup[] = signupsData.signups ?? signupsData ?? []
           setSignupsList(list)
           setSignups(list.length)
+          setEstimatedMrr(signupsData.estimated_mrr ?? 0)
         }
       } catch {
         // Silently fail — UI shows zeros
@@ -100,9 +100,7 @@ export default function ReferralsClient() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Hero banner */}
       <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-6 mb-6">
-        <h1 className="text-2xl font-bold text-amber-900 mb-2">
-          Earn 10% recurring commission
-        </h1>
+        <h1 className="text-2xl font-bold text-amber-900 mb-2">Earn 10% recurring commission</h1>
         <p className="text-amber-800">
           Refer a business to Nuatis and earn 10% of their monthly subscription — every month they
           stay active.
