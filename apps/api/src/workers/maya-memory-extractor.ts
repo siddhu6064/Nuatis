@@ -38,7 +38,7 @@ function getSupabase() {
 
 async function processMemory(data: MayaMemoryJobData): Promise<void> {
   const { tenantId, sessionId, phone } = data
-  console.log(
+  console.info(
     `[maya-memory-extractor] job start: session=${sessionId} tenant=${tenantId} phone=${phone}`
   )
 
@@ -92,7 +92,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
       .trim()
 
     extractedFacts = JSON.parse(stripped) as CallerFacts
-    console.log(`[maya-memory-extractor] facts extracted successfully: session=${sessionId}`)
+    console.info(`[maya-memory-extractor] facts extracted successfully: session=${sessionId}`)
   } catch (err) {
     console.error(
       `[maya-memory-extractor] fact extraction failed: session=${sessionId}`,
@@ -184,7 +184,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
     return
   }
 
-  console.log(
+  console.info(
     `[maya-memory-extractor] upsert complete: session=${sessionId} phone=${phone} calls=${(existingRow?.call_count ?? 0) + 1}`
   )
 }
