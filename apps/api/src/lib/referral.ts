@@ -21,38 +21,28 @@ export async function generateReferralCode(
   businessName: string
 ): Promise<string> {
   const supabase = getSupabase()
-  const businessPrefix = businessName.split(' ')[0].toUpperCase()
+  const businessPrefix = (businessName.split(' ')[0] ?? 'REF').toUpperCase()
   const maxRetries = 10
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const randomSuffix = generateRandomLetters(4)
     const candidate = `${businessPrefix}-${randomSuffix}`
 
-    // Check if code already exists
-    const { data } = await supabase
+    const { error } = await supabase
       .from('referral_codes')
-      .select('id')
-      .eq('code', candidate)
-      .maybeSingle()
+      .insert({
+        tenant_id: tenantId,
+        code: candidate,
+        status: 'active',
+        clicks: 0,
+        signups: 0,
+        commission_rate: 10.0,
+      })
 
-    if (data === null) {
-      // Code is available, insert it
-      const { error } = await supabase
-        .from('referral_codes')
-        .insert({
-          tenant_id: tenantId,
-          code: candidate,
-          status: 'active',
-          clicks: 0,
-          signups: 0,
-          commission_rate: 10.0,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      return candidate
-    }
+    if (!error) return candidate
+    // 23505 = unique_violation — code already taken, retry
+    if ((error as { code?: string }).code === '23505') continue
+    throw error
   }
 
   throw new Error('Could not generate unique referral code after 10 attempts')
