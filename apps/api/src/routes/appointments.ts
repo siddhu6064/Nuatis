@@ -13,6 +13,7 @@ import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { logActivity } from '../lib/activity.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { checkResourceAvailable } from '../lib/resource-availability.js'
 
 const router = Router()
 
@@ -48,6 +49,7 @@ const CreateAppointmentSchema = z.object({
   location_id: z.string().uuid().optional(),
   assigned_user_id: z.string().uuid().optional(),
   assigned_staff_id: z.string().uuid().nullable().optional(),
+  resource_ids: z.array(z.string().uuid()).optional(),
 })
 
 const UpdateAppointmentSchema = z.object({
@@ -233,6 +235,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     location_id,
     assigned_user_id,
     assigned_staff_id,
+    resource_ids,
   } = parsed.data
 
   // Get location + refresh token for Google Calendar sync + video conferencing setting
@@ -292,6 +295,34 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     }
   }
 
+  // Resource availability check
+  if (resource_ids && resource_ids.length > 0) {
+    const startDate = new Date(start_time)
+    const endDate = new Date(end_time)
+    for (const resourceId of resource_ids) {
+      const available = await checkResourceAvailable({
+        resourceId,
+        startTime: startDate,
+        endTime: endDate,
+      })
+      if (!available) {
+        // Fetch resource name for error message
+        const { data: resource } = await supabase
+          .from('bookable_resources')
+          .select('name')
+          .eq('id', resourceId)
+          .eq('tenant_id', authed.tenantId)
+          .maybeSingle<{ name: string }>()
+        res.status(409).json({
+          error: 'Resource already booked for this time',
+          conflict: true,
+          resource_name: resource?.name ?? 'Unknown resource',
+        })
+        return
+      }
+    }
+  }
+
   // Insert appointment
   const { data: appointment, error } = await supabase
     .from('appointments')
@@ -322,6 +353,23 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     })
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Book resources for this appointment
+  if (resource_ids && resource_ids.length > 0 && appointment?.id) {
+    const appointmentId = appointment.id as string
+    for (const resourceId of resource_ids) {
+      await supabase.from('resource_bookings').insert({
+        tenant_id: authed.tenantId,
+        resource_id: resourceId,
+        appointment_id: appointmentId,
+        contact_id,
+        start_time,
+        end_time,
+        booked_by: authed.userId,
+        status: 'confirmed',
+      })
+    }
   }
 
   // Fallback: video enabled but no Google Calendar connection
@@ -422,6 +470,16 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Cancel resource bookings when appointment is cancelled
+  if (parsed.data.status === 'canceled') {
+    await supabase
+      .from('resource_bookings')
+      .update({ status: 'cancelled' })
+      .eq('appointment_id', id)
+      .eq('tenant_id', authed.tenantId)
+      .neq('status', 'cancelled')
   }
 
   // Activity logging for status changes
@@ -553,6 +611,14 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
       }
     }
   }
+
+  // Cancel resource bookings before deleting appointment
+  await supabase
+    .from('resource_bookings')
+    .update({ status: 'cancelled' })
+    .eq('appointment_id', id)
+    .eq('tenant_id', authed.tenantId)
+    .neq('status', 'cancelled')
 
   const { error } = await supabase
     .from('appointments')
