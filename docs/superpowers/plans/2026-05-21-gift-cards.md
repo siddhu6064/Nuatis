@@ -13,6 +13,7 @@
 ### Task 1: Create the API route file
 
 **Files:**
+
 - Create: `apps/api/src/routes/gift-cards.ts`
 
 - [ ] **Step 1: Write the route file** (spec-provided, copy verbatim)
@@ -38,6 +39,7 @@ git add apps/api/src/routes/gift-cards.ts && git commit -m "feat(gift-cards): AP
 ### Task 2: Create the Next.js settings UI
 
 **Files:**
+
 - Create: `apps/web/src/app/(dashboard)/settings/gift-cards/page.tsx`
 - Create: `apps/web/src/app/(dashboard)/settings/gift-cards/GiftCardsClient.tsx`
 

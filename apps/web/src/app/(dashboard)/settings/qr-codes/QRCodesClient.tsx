@@ -25,8 +25,12 @@ export default function QRCodesClient() {
     setQrSrc(buildQrUrl(inputUrl.trim(), size))
   }
 
-  function handleLoad() { setLoading(false) }
-  function handleError() { setLoading(false) }
+  function handleLoad() {
+    setLoading(false)
+  }
+  function handleError() {
+    setLoading(false)
+  }
 
   function handleDownload() {
     if (!qrSrc) return
@@ -47,7 +51,7 @@ export default function QRCodesClient() {
         {/* Presets */}
         <p className="text-xs font-medium text-ink4 mb-2 uppercase tracking-wide">Quick presets</p>
         <div className="flex gap-2 flex-wrap mb-4">
-          {PRESETS.map(p => (
+          {PRESETS.map((p) => (
             <button
               key={p.label}
               type="button"
@@ -65,7 +69,7 @@ export default function QRCodesClient() {
           <input
             type="url"
             value={inputUrl}
-            onChange={e => setInputUrl(e.target.value)}
+            onChange={(e) => setInputUrl(e.target.value)}
             placeholder="https://example.com"
             className="flex-1 border border-border-brand rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -86,7 +90,7 @@ export default function QRCodesClient() {
           min={100}
           max={400}
           value={size}
-          onChange={e => setSize(Number(e.target.value))}
+          onChange={(e) => setSize(Number(e.target.value))}
           className="w-full mb-4 accent-teal-600"
         />
 

@@ -85,7 +85,7 @@ const TASKS_COLUMNS = [
   { key: 'assigned', label: 'Assigned' },
   { key: 'status', label: 'Status' },
 ]
-const TASKS_DEFAULTS = Object.fromEntries(TASKS_COLUMNS.map(c => [c.key, true]))
+const TASKS_DEFAULTS = Object.fromEntries(TASKS_COLUMNS.map((c) => [c.key, true]))
 
 export default function TasksDashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -226,11 +226,7 @@ export default function TasksDashboard() {
           <p className="text-sm text-ink3 mt-0.5">{tasks.length} active</p>
         </div>
         <div className="flex items-center gap-2">
-          <ColumnsButton
-            columns={TASKS_COLUMNS}
-            visible={colVisible}
-            onChange={toggleCol}
-          />
+          <ColumnsButton columns={TASKS_COLUMNS} visible={colVisible} onChange={toggleCol} />
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

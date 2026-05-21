@@ -37,7 +37,7 @@ export async function enrichCallerInfo(phoneNumber: string): Promise<{ name: str
       }
     )
     if (!response.ok) return { name: null }
-    const json = await response.json() as { data?: { caller_name?: { caller_name?: string } } }
+    const json = (await response.json()) as { data?: { caller_name?: { caller_name?: string } } }
     const name = json?.data?.caller_name?.caller_name ?? null
     return { name: name && name.trim() ? name.trim() : null }
   } catch {
@@ -102,7 +102,9 @@ export async function lookupCaller(tenantId: string, phoneE164: string): Promise
         // No existing contact — try Telnyx caller ID enrichment (best effort, fire-and-forget result)
         const enriched = await enrichCallerInfo(normalized)
         if (enriched.name) {
-          console.info(`[pre-call-lookup] caller ID enrichment found name for ${phoneMasked}: present`)
+          console.info(
+            `[pre-call-lookup] caller ID enrichment found name for ${phoneMasked}: present`
+          )
           return {
             matched: false,
             name: enriched.name,

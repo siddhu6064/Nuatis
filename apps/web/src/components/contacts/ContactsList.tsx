@@ -44,7 +44,22 @@ function tagColorClass(tag: string): string {
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
 }
 
+const SORT_KEY = 'nuatis_contacts_sort'
+
 function filtersFromParams(params: URLSearchParams): FilterState {
+  // Prefer URL params; fall back to localStorage-persisted sort
+  let savedSortBy = 'created_at'
+  let savedSortDir = 'desc'
+  try {
+    const raw = localStorage.getItem(SORT_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { field?: string; direction?: string }
+      if (parsed.field) savedSortBy = parsed.field
+      if (parsed.direction) savedSortDir = parsed.direction
+    }
+  } catch {
+    // ignore storage errors
+  }
   return {
     q: params.get('q') ?? '',
     pipeline_stage_id: params.get('pipeline_stage_id')?.split(',').filter(Boolean) ?? [],
@@ -61,8 +76,8 @@ function filtersFromParams(params: URLSearchParams): FilterState {
     grade: params.get('grade')?.split(',').filter(Boolean) ?? [],
     assigned_to: params.get('assigned_to') ?? '',
     territory: params.get('territory') ?? '',
-    sort_by: params.get('sort_by') ?? 'created_at',
-    sort_dir: params.get('sort_dir') ?? 'desc',
+    sort_by: params.get('sort_by') ?? savedSortBy,
+    sort_dir: params.get('sort_dir') ?? savedSortDir,
   }
 }
 
@@ -138,7 +153,7 @@ const CONTACTS_COLUMNS = [
   { key: 'territory', label: 'Territory' },
   { key: 'added', label: 'Added' },
 ]
-const CONTACTS_DEFAULTS = Object.fromEntries(CONTACTS_COLUMNS.map(c => [c.key, true]))
+const CONTACTS_DEFAULTS = Object.fromEntries(CONTACTS_COLUMNS.map((c) => [c.key, true]))
 
 export default function ContactsList() {
   const router = useRouter()
@@ -204,6 +219,15 @@ export default function ContactsList() {
       setActiveListId(null)
       setSelectedIds(new Set())
       setAllMatchingSelected(false)
+      // Persist sort preference to localStorage
+      try {
+        localStorage.setItem(
+          SORT_KEY,
+          JSON.stringify({ field: newFilters.sort_by, direction: newFilters.sort_dir })
+        )
+      } catch {
+        // ignore storage errors
+      }
       const params = filtersToParams(newFilters)
       const qs = params.toString()
       router.push(qs ? `/contacts?${qs}` : '/contacts', { scroll: false })
@@ -412,11 +436,7 @@ export default function ContactsList() {
                 </span>
               )}
             </button>
-            <ColumnsButton
-              columns={CONTACTS_COLUMNS}
-              visible={colVisible}
-              onChange={toggleCol}
-            />
+            <ColumnsButton columns={CONTACTS_COLUMNS} visible={colVisible} onChange={toggleCol} />
             <Link
               href="/contacts/new"
               className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

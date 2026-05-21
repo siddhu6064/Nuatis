@@ -33,10 +33,7 @@ function formatDate(dateStr: string | null): string {
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
-const STATUS_BADGE: Record<
-  GiftCard['status'],
-  { bg: string; text: string; label: string }
-> = {
+const STATUS_BADGE: Record<GiftCard['status'], { bg: string; text: string; label: string }> = {
   active: { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
   redeemed: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Redeemed' },
   expired: { bg: 'bg-red-100', text: 'text-red-700', label: 'Expired' },
@@ -73,8 +70,14 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
   async function handleRedeem() {
     setError(null)
     const dollars = parseFloat(amountDollars)
-    if (!code.trim()) { setError('Gift card code is required'); return }
-    if (!dollars || dollars <= 0) { setError('Redemption amount must be greater than $0'); return }
+    if (!code.trim()) {
+      setError('Gift card code is required')
+      return
+    }
+    if (!dollars || dollars <= 0) {
+      setError('Redemption amount must be greater than $0')
+      return
+    }
     const amount_cents = Math.round(dollars * 100)
     setLoading(true)
     try {
@@ -83,10 +86,16 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: code.trim().toUpperCase(), amount_cents }),
       })
-      const json = await res.json() as { success?: boolean; new_balance_cents?: number; error?: string; balance_cents?: number }
+      const json = (await res.json()) as {
+        success?: boolean
+        new_balance_cents?: number
+        error?: string
+        balance_cents?: number
+      }
       if (!res.ok) {
         const msg = json.error ?? 'Redemption failed'
-        const balance = json.balance_cents != null ? ` (balance: ${formatDollars(json.balance_cents)})` : ''
+        const balance =
+          json.balance_cents != null ? ` (balance: ${formatDollars(json.balance_cents)})` : ''
         setError(msg + balance)
       } else {
         setResult({ new_balance_cents: json.new_balance_cents ?? 0 })
@@ -103,17 +112,28 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
         <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4 p-6 text-center">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mx-auto mb-4">
-            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg
+              className="w-6 h-6 text-green-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
           <h3 className="text-base font-semibold text-ink mb-1">Redeemed successfully</h3>
           <p className="text-sm text-ink3">
             Remaining balance:{' '}
-            <span className="font-semibold text-ink">{formatDollars(result.new_balance_cents)}</span>
+            <span className="font-semibold text-ink">
+              {formatDollars(result.new_balance_cents)}
+            </span>
           </p>
           <button
-            onClick={() => { onSuccess(); onClose() }}
+            onClick={() => {
+              onSuccess()
+              onClose()
+            }}
             className="mt-5 w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
           >
             Done
@@ -129,7 +149,13 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-brand">
           <h2 className="text-sm font-semibold text-ink">Redeem Gift Card</h2>
           <button onClick={onClose} className="text-ink4 hover:text-ink">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -146,7 +172,9 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-ink3 mb-1">Redemption Amount ($)</label>
+            <label className="block text-xs font-medium text-ink3 mb-1">
+              Redemption Amount ($)
+            </label>
             <input
               type="number"
               min="0.01"
@@ -201,7 +229,10 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
   async function handleSubmit() {
     setError(null)
     const dollars = parseFloat(amountDollars)
-    if (!dollars || dollars <= 0) { setError('Amount must be greater than $0'); return }
+    if (!dollars || dollars <= 0) {
+      setError('Amount must be greater than $0')
+      return
+    }
     const amount_cents = Math.round(dollars * 100)
     setLoading(true)
     try {
@@ -214,7 +245,7 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
           recipient_email: recipientEmail.trim() || undefined,
         }),
       })
-      const json = await res.json() as { error?: string }
+      const json = (await res.json()) as { error?: string }
       if (!res.ok) {
         setError(json.error ?? 'Failed to issue gift card')
       } else {
@@ -234,7 +265,9 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
       </div>
       <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs font-medium text-ink3 mb-1">Amount ($) <span className="text-red-500">*</span></label>
+          <label className="block text-xs font-medium text-ink3 mb-1">
+            Amount ($) <span className="text-red-500">*</span>
+          </label>
           <input
             type="number"
             min="0.01"
@@ -311,7 +344,7 @@ export default function GiftCardsClient() {
     try {
       const res = await fetch(`${API_URL}/api/gift-cards`)
       if (res.ok) {
-        const json = await res.json() as { gift_cards: GiftCard[] }
+        const json = (await res.json()) as { gift_cards: GiftCard[] }
         setGiftCards(json.gift_cards)
       }
     } finally {
@@ -340,14 +373,22 @@ export default function GiftCardsClient() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-ink">Gift Cards</h1>
-          <p className="text-sm text-ink3 mt-0.5">Issue and manage gift cards for your customers.</p>
+          <p className="text-sm text-ink3 mt-0.5">
+            Issue and manage gift cards for your customers.
+          </p>
         </div>
         {!showIssueForm && (
           <button
             onClick={() => setShowIssueForm(true)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Issue Gift Card
@@ -443,9 +484,7 @@ export default function GiftCardsClient() {
                     <td className="px-4 py-3">
                       <StatusBadge status={card.status} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-ink3">
-                      {formatDate(card.expires_at)}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-ink3">{formatDate(card.expires_at)}</td>
                     <td className="px-4 py-3 text-right">
                       {card.status === 'active' && (
                         <button

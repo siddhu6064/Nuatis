@@ -1,8 +1,10 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
+import crypto from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { syncReviews, refreshTokenIfNeeded, fetchGbpInsights } from '../lib/gbp-sync.js'
+import redis from '../lib/redis.js'
 
 const router = Router()
 
@@ -21,16 +23,21 @@ function getOAuth2Client() {
   )
 }
 
-// GET /api/reputation/ — generate GBP OAuth URL
+// GET /api/reputation/ — generate GBP OAuth URL with CSRF nonce
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   try {
+    const nonce = crypto.randomBytes(32).toString('hex')
+    await redis.set(`oauth_nonce:${nonce}`, authed.tenantId, 'EX', 600)
+    const state = Buffer.from(JSON.stringify({ nonce, tenantId: authed.tenantId })).toString(
+      'base64'
+    )
     const oauth2Client = getOAuth2Client()
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: ['https://www.googleapis.com/auth/business.manage'],
       prompt: 'consent',
-      state: authed.tenantId,
+      state,
     })
     res.json({ url })
   } catch (err) {
@@ -41,11 +48,30 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
 // GET /api/reputation/callback — OAuth exchange (no requireAuth — uses state param for tenantId)
 router.get('/callback', async (req: Request, res: Response): Promise<void> => {
-  const { code, state: tenantId } = req.query as { code?: string; state?: string }
+  const { code, state: rawState } = req.query as { code?: string; state?: string }
   const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
 
-  if (!code || !tenantId) {
+  if (!code || !rawState) {
     res.redirect(`${webUrl}/settings/reputation?error=missing_params`)
+    return
+  }
+
+  let tenantId: string
+  try {
+    const parsed = JSON.parse(Buffer.from(rawState, 'base64').toString()) as {
+      nonce?: string
+      tenantId?: string
+    }
+    if (!parsed.nonce || !parsed.tenantId) throw new Error('Invalid state')
+    const stored = await redis.get(`oauth_nonce:${parsed.nonce}`)
+    if (!stored || stored !== parsed.tenantId) {
+      res.redirect(`${webUrl}/settings/reputation?error=invalid_state`)
+      return
+    }
+    await redis.del(`oauth_nonce:${parsed.nonce}`)
+    tenantId = parsed.tenantId
+  } catch {
+    res.redirect(`${webUrl}/settings/reputation?error=invalid_state`)
     return
   }
 

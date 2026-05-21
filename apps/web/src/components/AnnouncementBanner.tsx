@@ -15,10 +15,10 @@ interface Announcement {
 }
 
 const TYPE_STYLE: Record<string, { border: string; bg: string; icon: string }> = {
-  feature:     { border: 'border-teal-300',  bg: 'bg-teal-50',  icon: '🚀' },
+  feature: { border: 'border-teal-300', bg: 'bg-teal-50', icon: '🚀' },
   maintenance: { border: 'border-amber-300', bg: 'bg-amber-50', icon: '⚠️' },
-  tip:         { border: 'border-blue-300',  bg: 'bg-blue-50',  icon: '💡' },
-  update:      { border: 'border-gray-300',  bg: 'bg-gray-50',  icon: '📣' },
+  tip: { border: 'border-blue-300', bg: 'bg-blue-50', icon: '💡' },
+  update: { border: 'border-gray-300', bg: 'bg-gray-50', icon: '📣' },
 }
 
 export function AnnouncementBanner() {
@@ -27,7 +27,7 @@ export function AnnouncementBanner() {
   useEffect(() => {
     const dismissed: string[] = JSON.parse(localStorage.getItem(LS_KEY) ?? '[]')
     fetch(`${API_URL}/api/announcements`)
-      .then(r => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((d: { announcements?: Announcement[] } | null) => {
         const list = d?.announcements ?? []
         const next = list.find((a: Announcement) => !dismissed.includes(a.id))
@@ -55,11 +55,21 @@ export function AnnouncementBanner() {
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
         {announcement.cta_label && announcement.cta_url && (
-          <Link href={announcement.cta_url} className="text-xs font-medium text-teal-600 hover:text-teal-700 whitespace-nowrap">
+          <Link
+            href={announcement.cta_url}
+            className="text-xs font-medium text-teal-600 hover:text-teal-700 whitespace-nowrap"
+          >
             {announcement.cta_label} →
           </Link>
         )}
-        <button type="button" onClick={dismiss} aria-label="Dismiss" className="text-ink4 hover:text-ink text-xl leading-none">×</button>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Dismiss"
+          className="text-ink4 hover:text-ink text-xl leading-none"
+        >
+          ×
+        </button>
       </div>
     </div>
   )

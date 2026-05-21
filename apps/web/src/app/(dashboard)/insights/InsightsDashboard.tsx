@@ -778,31 +778,35 @@ export default function InsightsDashboard({
             {stats.dailyVolume.length === 0 ? (
               <p className="text-sm text-ink4 py-8 text-center">No call data yet</p>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={stats.dailyVolume}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="calls"
-                    stroke="#0d9488"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Calls"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="bookings"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Bookings"
-                  />
-                  <Legend />
-                </LineChart>
-              </ResponsiveContainer>
+              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
+                <div style={{ minWidth: 320 }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={stats.dailyVolume}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="calls"
+                        stroke="#0d9488"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Calls"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="bookings"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Bookings"
+                      />
+                      <Legend />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             )}
           </div>
         )
@@ -837,15 +841,19 @@ export default function InsightsDashboard({
             </div>
             <div className="bg-white rounded-xl border border-border-brand p-6">
               <h2 className="text-sm font-semibold text-ink mb-4">Peak Hours</h2>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={stats.peakHours}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
-                  <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="calls" fill="#0d9488" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
+                <div style={{ minWidth: 320 }}>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={stats.peakHours}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="hour" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={2} />
+                      <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="calls" fill="#0d9488" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         )
@@ -858,26 +866,30 @@ export default function InsightsDashboard({
               <p className="text-sm text-ink4 py-8 text-center">No pipeline data</p>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={stats.stageDistribution} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize: 11 }}
-                      stroke="#9ca3af"
-                      allowDecimals={false}
-                    />
-                    <YAxis
-                      dataKey="stage"
-                      type="category"
-                      tick={{ fontSize: 11 }}
-                      stroke="#9ca3af"
-                      width={120}
-                    />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
+                  <div style={{ minWidth: 320 }}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={stats.stageDistribution} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis
+                          type="number"
+                          tick={{ fontSize: 11 }}
+                          stroke="#9ca3af"
+                          allowDecimals={false}
+                        />
+                        <YAxis
+                          dataKey="stage"
+                          type="category"
+                          tick={{ fontSize: 11 }}
+                          stroke="#9ca3af"
+                          width={120}
+                        />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
                 <div className="flex items-center gap-4 mt-3 text-xs text-ink3">
                   <span>
                     Conversion rate:{' '}

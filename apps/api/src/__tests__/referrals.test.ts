@@ -76,8 +76,7 @@ it('auto-generates a referral code if tenant has none, returns referral_url', as
   store.tables['tenants'] = [{ id: 'tenant-1', business_name: 'Green Salon' }]
   // No existing referral_codes for tenant-1
 
-  const res = await request(makeApp())
-    .get('/api/referrals/my-code')
+  const res = await request(makeApp()).get('/api/referrals/my-code')
 
   expect(res.status).toBe(200)
   expect(res.body.code).toMatch(/^GREEN-[A-Z]{4}$/)
@@ -86,19 +85,19 @@ it('auto-generates a referral code if tenant has none, returns referral_url', as
 
 // ── Test 3: GET /api/referrals/track/:code — click increment + redirect ───────
 it('increments click count and redirects to signup URL', async () => {
-  store.tables['referral_codes'] = [{
-    id: 'code-1',
-    tenant_id: 'tenant-1',
-    code: 'SALON-WXYZ',
-    clicks: 3,
-    signups: 0,
-    status: 'active',
-    commission_rate: 10,
-  }]
+  store.tables['referral_codes'] = [
+    {
+      id: 'code-1',
+      tenant_id: 'tenant-1',
+      code: 'SALON-WXYZ',
+      clicks: 3,
+      signups: 0,
+      status: 'active',
+      commission_rate: 10,
+    },
+  ]
 
-  const res = await request(makeApp())
-    .get('/api/referrals/track/SALON-WXYZ')
-    .redirects(0)  // don't follow redirects
+  const res = await request(makeApp()).get('/api/referrals/track/SALON-WXYZ').redirects(0) // don't follow redirects
 
   expect(res.status).toBe(302)
   expect(res.headers['location']).toBe('https://app.nuatis.com/signup?ref=SALON-WXYZ')
@@ -120,15 +119,17 @@ it('returns 404 when referral code does not exist', async () => {
 
 // ── Test 5: POST /api/referrals/signup — successful signup ───────────────────
 it('creates referral_signup row and increments signups count', async () => {
-  store.tables['referral_codes'] = [{
-    id: 'code-1',
-    tenant_id: 'tenant-1',
-    code: 'SALON-ABCD',
-    clicks: 0,
-    signups: 0,
-    status: 'active',
-    commission_rate: 10,
-  }]
+  store.tables['referral_codes'] = [
+    {
+      id: 'code-1',
+      tenant_id: 'tenant-1',
+      code: 'SALON-ABCD',
+      clicks: 0,
+      signups: 0,
+      status: 'active',
+      commission_rate: 10,
+    },
+  ]
 
   const res = await request(makeApp())
     .post('/api/referrals/signup')
@@ -150,25 +151,47 @@ it('creates referral_signup row and increments signups count', async () => {
 
 // ── Test 6: GET /api/referrals/signups — estimated_mrr calculation ────────────
 it('calculates estimated_mrr: 3 active signups * $149 * 0.10 = $44.70', async () => {
-  store.tables['referral_codes'] = [{
-    id: 'code-1',
-    tenant_id: 'tenant-1',
-    code: 'DENTAL-ABCD',
-    clicks: 0,
-    signups: 3,
-    status: 'active',
-    commission_rate: 10,
-  }]
+  store.tables['referral_codes'] = [
+    {
+      id: 'code-1',
+      tenant_id: 'tenant-1',
+      code: 'DENTAL-ABCD',
+      clicks: 0,
+      signups: 3,
+      status: 'active',
+      commission_rate: 10,
+    },
+  ]
   store.tables['referral_signups'] = [
-    { id: 'sig-1', referring_tenant_id: 'tenant-1', referred_email: 'a@example.com', status: 'active', referral_code_id: 'code-1', created_at: new Date().toISOString() },
-    { id: 'sig-2', referring_tenant_id: 'tenant-1', referred_email: 'b@example.com', status: 'active', referral_code_id: 'code-1', created_at: new Date().toISOString() },
-    { id: 'sig-3', referring_tenant_id: 'tenant-1', referred_email: 'c@example.com', status: 'active', referral_code_id: 'code-1', created_at: new Date().toISOString() },
+    {
+      id: 'sig-1',
+      referring_tenant_id: 'tenant-1',
+      referred_email: 'a@example.com',
+      status: 'active',
+      referral_code_id: 'code-1',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'sig-2',
+      referring_tenant_id: 'tenant-1',
+      referred_email: 'b@example.com',
+      status: 'active',
+      referral_code_id: 'code-1',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'sig-3',
+      referring_tenant_id: 'tenant-1',
+      referred_email: 'c@example.com',
+      status: 'active',
+      referral_code_id: 'code-1',
+      created_at: new Date().toISOString(),
+    },
   ]
 
-  const res = await request(makeApp())
-    .get('/api/referrals/signups')
+  const res = await request(makeApp()).get('/api/referrals/signups')
 
   expect(res.status).toBe(200)
-  expect(res.body.estimated_mrr).toBeCloseTo(44.70, 2)
+  expect(res.body.estimated_mrr).toBeCloseTo(44.7, 2)
   expect(res.body.total).toBe(3)
 })

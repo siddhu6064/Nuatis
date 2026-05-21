@@ -118,7 +118,7 @@ const APPT_COLUMNS = [
   { key: 'status', label: 'Status' },
   { key: 'channel', label: 'Channel' },
 ]
-const APPT_DEFAULTS = Object.fromEntries(APPT_COLUMNS.map(c => [c.key, true]))
+const APPT_DEFAULTS = Object.fromEntries(APPT_COLUMNS.map((c) => [c.key, true]))
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -372,11 +372,7 @@ export default function AppointmentsCalendar({
             </svg>
             Block Time
           </button>
-          <ColumnsButton
-            columns={APPT_COLUMNS}
-            visible={colVisible}
-            onChange={toggleCol}
-          />
+          <ColumnsButton columns={APPT_COLUMNS} visible={colVisible} onChange={toggleCol} />
           <a
             href="/appointments/new"
             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"

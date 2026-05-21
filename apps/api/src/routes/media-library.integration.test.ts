@@ -48,9 +48,7 @@ beforeEach(() => {
 describe('GET /api/media', () => {
   it('returns empty list when no files exist', async () => {
     const token = await makeToken()
-    const res = await request(makeApp())
-      .get('/api/media')
-      .set('Authorization', `Bearer ${token}`)
+    const res = await request(makeApp()).get('/api/media').set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
     expect(res.body.files).toEqual([])
@@ -85,9 +83,7 @@ describe('GET /api/media', () => {
     ]
 
     const token = await makeToken()
-    const res = await request(makeApp())
-      .get('/api/media')
-      .set('Authorization', `Bearer ${token}`)
+    const res = await request(makeApp()).get('/api/media').set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
     expect(res.body.files).toHaveLength(1)

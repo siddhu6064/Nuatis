@@ -468,7 +468,9 @@ export function createMockSupabase(store: MockStore): unknown {
           upload: store.storage.upload,
           createSignedUrl: store.storage.createSignedUrl,
           getPublicUrl: (path: string) => ({
-            data: { publicUrl: `https://mock.supabase.co/storage/v1/object/public/media-library/${path}` },
+            data: {
+              publicUrl: `https://mock.supabase.co/storage/v1/object/public/media-library/${path}`,
+            },
           }),
           remove: store.storage.remove,
         }

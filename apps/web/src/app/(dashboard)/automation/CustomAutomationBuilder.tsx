@@ -57,6 +57,7 @@ export default function CustomAutomationBuilder() {
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     void loadAutomations()
@@ -137,18 +138,28 @@ export default function CustomAutomationBuilder() {
   }
 
   async function handleActivate(id: string) {
-    await fetch(`${API_URL}/api/custom-automations/${id}/activate`, {
+    setActionError(null)
+    const res = await fetch(`${API_URL}/api/custom-automations/${id}/activate`, {
       method: 'POST',
       credentials: 'include',
     })
+    if (!res.ok) {
+      setActionError('Failed to activate automation — please try again')
+      return
+    }
     await loadAutomations()
   }
 
   async function handlePause(id: string) {
-    await fetch(`${API_URL}/api/custom-automations/${id}/pause`, {
+    setActionError(null)
+    const res = await fetch(`${API_URL}/api/custom-automations/${id}/pause`, {
       method: 'POST',
       credentials: 'include',
     })
+    if (!res.ok) {
+      setActionError('Failed to pause automation — please try again')
+      return
+    }
     await loadAutomations()
   }
 
@@ -178,6 +189,18 @@ export default function CustomAutomationBuilder() {
         </div>
 
         {loadError && <p className="text-sm text-red-600 mb-4">{loadError}</p>}
+        {actionError && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5">
+            <span className="text-sm text-red-700">{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="ml-auto text-red-400 hover:text-red-600 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {automations.length === 0 ? (
           <div className="text-center py-16 text-ink3">

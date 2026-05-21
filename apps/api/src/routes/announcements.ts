@@ -20,7 +20,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     .lte('starts_at', now)
     .or(`ends_at.is.null,ends_at.gt.${now}`)
     .order('created_at', { ascending: false })
-  if (error) { res.status(500).json({ error: error.message }); return }
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
   res.json({ announcements: data ?? [] })
 })
 

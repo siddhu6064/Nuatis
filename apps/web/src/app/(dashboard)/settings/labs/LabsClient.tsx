@@ -4,12 +4,42 @@ import { useState, useEffect } from 'react'
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 const LABS_FEATURES = [
-  { key: 'ai_automation_builder', label: 'AI Automation Builder', description: 'Natural language → automation config. Powers custom automations.', available: true },
-  { key: 'webchat_widget', label: 'Webchat AI Widget', description: 'Embeddable chat widget for your website.', available: true },
-  { key: 'outbound_calling', label: 'Outbound AI Calling', description: 'Maya proactively calls leads.', available: true },
-  { key: 'video_testimonials', label: 'Video Testimonials', description: 'Collect short video reviews from clients.', available: true },
-  { key: 'client_portal', label: 'Client Portal', description: 'White-labeled self-service portal for your clients.', available: true },
-  { key: 'ai_campaigns', label: 'AI Campaigns', description: 'AI-generated email campaigns sent to contact segments.', available: false },
+  {
+    key: 'ai_automation_builder',
+    label: 'AI Automation Builder',
+    description: 'Natural language → automation config. Powers custom automations.',
+    available: true,
+  },
+  {
+    key: 'webchat_widget',
+    label: 'Webchat AI Widget',
+    description: 'Embeddable chat widget for your website.',
+    available: true,
+  },
+  {
+    key: 'outbound_calling',
+    label: 'Outbound AI Calling',
+    description: 'Maya proactively calls leads.',
+    available: true,
+  },
+  {
+    key: 'video_testimonials',
+    label: 'Video Testimonials',
+    description: 'Collect short video reviews from clients.',
+    available: true,
+  },
+  {
+    key: 'client_portal',
+    label: 'Client Portal',
+    description: 'White-labeled self-service portal for your clients.',
+    available: true,
+  },
+  {
+    key: 'ai_campaigns',
+    label: 'AI Campaigns',
+    description: 'AI-generated email campaigns sent to contact segments.',
+    available: false,
+  },
 ]
 
 export default function LabsClient() {
@@ -19,8 +49,10 @@ export default function LabsClient() {
 
   useEffect(() => {
     fetch(`${API_URL}/api/settings/labs`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setConfig(d.labs_config ?? {}) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setConfig(d.labs_config ?? {})
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -33,7 +65,7 @@ export default function LabsClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, enabled }),
     })
-    if (res.ok) setConfig(prev => ({ ...prev, [key]: enabled }))
+    if (res.ok) setConfig((prev) => ({ ...prev, [key]: enabled }))
     setSaving(null)
   }
 
@@ -51,7 +83,7 @@ export default function LabsClient() {
         <p className="text-sm text-ink3">Loading…</p>
       ) : (
         <div className="bg-white border border-border-brand rounded-xl divide-y divide-border-brand">
-          {LABS_FEATURES.map(f => {
+          {LABS_FEATURES.map((f) => {
             const enabled = config[f.key] ?? false
             const isSaving = saving === f.key
             return (
@@ -60,9 +92,13 @@ export default function LabsClient() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-ink">{f.label}</span>
                     {f.available ? (
-                      <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-medium">Available</span>
+                      <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-medium">
+                        Available
+                      </span>
                     ) : (
-                      <span className="text-[10px] bg-gray-100 text-ink4 px-1.5 py-0.5 rounded font-medium">Coming Soon</span>
+                      <span className="text-[10px] bg-gray-100 text-ink4 px-1.5 py-0.5 rounded font-medium">
+                        Coming Soon
+                      </span>
                     )}
                   </div>
                   <p className="text-xs text-ink3 mt-0.5">{f.description}</p>

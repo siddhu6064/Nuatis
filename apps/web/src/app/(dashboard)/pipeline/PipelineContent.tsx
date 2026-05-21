@@ -628,7 +628,7 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
       ) : (
         /* Kanban board */
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="overflow-x-auto flex-1">
+          <div className="overflow-x-auto flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div
               className="flex gap-3 h-full pb-4"
               style={{
@@ -761,6 +761,7 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                                             boxShadow: dragSnapshot.isDragging
                                               ? '0 10px 25px -3px rgb(0 0 0 / 0.15)'
                                               : undefined,
+                                            touchAction: 'none',
                                           }}
                                         >
                                           {/* Name row + drag handle */}

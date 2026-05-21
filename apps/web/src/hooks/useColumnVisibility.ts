@@ -11,7 +11,7 @@ export function useColumnVisibility(storageKey: string, defaults: Record<string,
         setVisible({ ...defaults, ...JSON.parse(stored) })
       }
     } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey])
 
   function toggle(key: string, isVisible: boolean) {
