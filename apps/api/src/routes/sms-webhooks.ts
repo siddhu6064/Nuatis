@@ -299,6 +299,50 @@ async function handleMessageFinalized(req: Request, res: Response): Promise<void
     }
   }
 
+  // ── P13 campaign_sends tracking ──────────────────────────────────────────────
+  if (
+    rawStatus === 'delivered' ||
+    rawStatus === 'delivery_failed' ||
+    rawStatus === 'sending_failed'
+  ) {
+    const { data: smsCsRow } = await sb
+      .from('sms_messages')
+      .select('contact_id')
+      .eq('message_sid', messageSid)
+      .maybeSingle<{ contact_id: string | null }>()
+
+    const smsContactId = smsCsRow?.contact_id ?? null
+    if (smsContactId) {
+      const smsCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const smsNow = new Date().toISOString()
+      if (rawStatus === 'delivered') {
+        await sb
+          .from('campaign_sends')
+          .update({ status: 'delivered', delivered_at: smsNow })
+          .eq('contact_id', smsContactId)
+          .eq('channel', 'sms')
+          .eq('status', 'sent')
+          .gte('sent_at', smsCutoff)
+      } else {
+        const failReason =
+          errors.length > 0
+            ? `${errors[0]?.code ?? ''}: ${errors[0]?.title ?? 'delivery failed'}`
+            : rawStatus.replace(/_/g, ' ')
+        await sb
+          .from('campaign_sends')
+          .update({ status: 'failed', error_msg: failReason })
+          .eq('contact_id', smsContactId)
+          .eq('channel', 'sms')
+          .eq('status', 'sent')
+          .gte('sent_at', smsCutoff)
+      }
+    } else {
+      console.info(
+        `[sms-webhook] campaign_sends update skipped — no contact_id for message_sid=${messageSid} event=${rawStatus}`
+      )
+    }
+  }
+
   res.sendStatus(200)
 }
 

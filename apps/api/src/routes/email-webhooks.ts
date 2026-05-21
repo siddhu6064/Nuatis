@@ -175,6 +175,72 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     }
   }
 
+  // ── P13 campaign_sends tracking ─────────────────────────────────────────────
+  if (
+    contactId &&
+    (eventType === 'email.opened' ||
+      eventType === 'email.clicked' ||
+      eventType === 'email.bounced' ||
+      eventType === 'email.delivery_delayed')
+  ) {
+    const p13Now = new Date().toISOString()
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+
+    if (eventType === 'email.opened') {
+      const { error: openErr } = await supabase
+        .from('campaign_sends')
+        .update({ status: 'opened', opened_at: p13Now })
+        .eq('contact_id', contactId)
+        .eq('channel', 'email')
+        .neq('status', 'clicked')
+        .gte('sent_at', cutoff)
+      if (openErr) console.info('[email-webhook] campaign_sends opened update:', openErr.message)
+    } else if (eventType === 'email.clicked') {
+      // Narrow by campaign_id via UTM param when available
+      const clickData = data['click'] as Record<string, unknown> | undefined
+      const clickedUrl = clickData?.['link'] as string | undefined
+      let utmCampaignId: string | null = null
+      if (clickedUrl) {
+        try {
+          utmCampaignId = new URL(clickedUrl).searchParams.get('utm_campaign')
+        } catch {
+          // ignore URL parse errors
+        }
+      }
+      if (utmCampaignId) {
+        const { error: clickErr } = await supabase
+          .from('campaign_sends')
+          .update({ status: 'clicked', clicked_at: p13Now })
+          .eq('contact_id', contactId)
+          .eq('campaign_id', utmCampaignId)
+          .eq('channel', 'email')
+        if (clickErr)
+          console.info('[email-webhook] campaign_sends clicked update:', clickErr.message)
+      } else {
+        const { error: clickErr } = await supabase
+          .from('campaign_sends')
+          .update({ status: 'clicked', clicked_at: p13Now })
+          .eq('contact_id', contactId)
+          .eq('channel', 'email')
+          .gte('sent_at', cutoff)
+        if (clickErr)
+          console.info('[email-webhook] campaign_sends clicked update:', clickErr.message)
+      }
+    } else {
+      // bounced or delivery_delayed
+      const errorMsg = `bounce: ${bounceType ?? eventType.replace('email.', '')}`
+      const { error: bounceErr } = await supabase
+        .from('campaign_sends')
+        .update({ status: 'failed', error_msg: errorMsg })
+        .eq('contact_id', contactId)
+        .eq('channel', 'email')
+        .in('status', ['sent', 'delivered'])
+        .gte('sent_at', cutoff)
+      if (bounceErr)
+        console.info('[email-webhook] campaign_sends bounce update:', bounceErr.message)
+    }
+  }
+
   res.sendStatus(200)
 })
 
