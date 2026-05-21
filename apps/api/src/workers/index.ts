@@ -26,6 +26,7 @@ import { createCampaignSendWorker } from './campaign-send-worker.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
+import { createCampaignSenderWorker } from './campaign-sender.js'
 
 interface ManagedWorker {
   name: string
@@ -243,6 +244,11 @@ export async function startWorkers(): Promise<void> {
   const mayaMemoryExtractor = createMayaMemoryExtractor()
   managed.push({ name: 'maya-memory-extractor', ...mayaMemoryExtractor })
   console.info('[workers] maya-memory-extractor worker started')
+
+  // 26. P13 campaign sender — one-shot delayed jobs from /api/campaigns/:id/schedule
+  const campaignSender = createCampaignSenderWorker()
+  managed.push({ name: 'campaign-sender', ...campaignSender })
+  console.info('[workers] campaign-sender (P13) worker started')
 }
 
 export async function stopWorkers(): Promise<void> {
