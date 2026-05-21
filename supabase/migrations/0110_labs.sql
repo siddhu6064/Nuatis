@@ -1,3 +1,6 @@
+-- Enable pgcrypto for gen_random_bytes (used by gift_cards.code default)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- G53: Labs config column on tenants
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS labs_config JSONB DEFAULT '{}'::jsonb;
 
@@ -22,7 +25,7 @@ INSERT INTO announcements (title, body, type, cta_label, cta_url) VALUES
 CREATE TABLE gift_cards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  code TEXT NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  code TEXT NOT NULL UNIQUE DEFAULT upper(left(replace(gen_random_uuid()::text, '-', ''), 12)),
   amount_cents INTEGER NOT NULL,
   balance_cents INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'redeemed', 'expired', 'cancelled')),
