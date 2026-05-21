@@ -39,7 +39,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'maya',
     label: 'Maya',
-    items: [{ href: '/calls', label: 'Call Log', icon: '◉', requireModule: 'maya' }],
+    items: [
+      { href: '/calls', label: 'Call Log', icon: '◉', requireModule: 'maya' },
+      { href: '/outbound-calls', label: 'Outbound Calls', icon: '📞', requireModule: 'maya' },
+    ],
   },
   {
     id: 'customers',

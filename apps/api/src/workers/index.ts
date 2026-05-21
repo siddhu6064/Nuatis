@@ -23,6 +23,7 @@ import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
 import { createCampaignSendWorker } from './campaign-send-worker.js'
+import { createOutboundCallWorker } from './outbound-call-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -220,6 +221,11 @@ export async function startWorkers(): Promise<void> {
   const campaignSendWorker = createCampaignSendWorker()
   managed.push({ name: 'campaign-send', ...campaignSendWorker })
   console.info('[workers] campaign-send worker started')
+
+  // 23. Outbound call worker — one-off jobs triggered by route or auto-triggers
+  const outboundCallWorker = createOutboundCallWorker()
+  managed.push({ name: 'outbound-call', ...outboundCallWorker })
+  console.info('[workers] outbound-call worker started')
 }
 
 export async function stopWorkers(): Promise<void> {

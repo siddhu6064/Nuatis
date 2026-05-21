@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export interface ContactFields {
   id: string
@@ -51,6 +51,52 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
   const [contact, setContact] = useState(initial)
   const [editOpen, setEditOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [callJobId, setCallJobId] = useState<string | null>(null)
+  const [callStatus, setCallStatus] = useState<'idle' | 'dialing' | 'connected' | 'ended'>(
+    'idle',
+  )
+
+  useEffect(() => {
+    if (!callJobId) return
+    let polls = 0
+    const MAX_POLLS = 40 // 40 × 3s = 2 min max
+    let resetTimeout: ReturnType<typeof setTimeout> | null = null
+
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > MAX_POLLS) {
+        clearInterval(interval)
+        setCallStatus('ended')
+        setCallJobId(null)
+        return
+      }
+      try {
+        const r = await fetch(`/api/outbound-calls/${callJobId}`)
+        if (!r.ok) return
+        const d = (await r.json()) as { status: string }
+        if (d.status === 'connected') {
+          setCallStatus('connected')
+        } else if (
+          d.status === 'completed' ||
+          d.status === 'failed' ||
+          d.status === 'no_answer' ||
+          d.status === 'cancelled'
+        ) {
+          clearInterval(interval)
+          setCallStatus('ended')
+          setCallJobId(null)
+          resetTimeout = setTimeout(() => setCallStatus('idle'), 3000)
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 3000)
+
+    return () => {
+      clearInterval(interval)
+      if (resetTimeout) clearTimeout(resetTimeout)
+    }
+  }, [callJobId])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -65,13 +111,30 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
   }
 
   async function handleCall() {
-    if (!contact.phone) return
-    showToast(`Connecting call to ${contact.full_name}…`)
-    await fetch('/api/calls/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contactPhone: contact.phone }),
-    }).catch(() => {})
+    if (!contact.phone || callStatus !== 'idle') return
+    setCallStatus('dialing')
+    try {
+      const r = await fetch('/api/outbound-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          call_context: `Following up with ${contact.full_name ?? 'contact'}`,
+        }),
+      })
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string }
+        showToast(d.error ?? 'Failed to initiate call')
+        setCallStatus('idle')
+        return
+      }
+      const d = (await r.json()) as { job_id: string }
+      setCallJobId(d.job_id)
+      showToast(`Dialing ${contact.full_name ?? contact.phone}…`)
+    } catch {
+      showToast('Failed to initiate call')
+      setCallStatus('idle')
+    }
   }
 
   return (
@@ -88,29 +151,68 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
           <div className="flex items-center gap-3 mt-1 text-sm text-ink3 flex-wrap">
             {contact.email && <span>{contact.email}</span>}
             {contact.phone && <span>{contact.phone}</span>}
-            <button
-              disabled={!contact.phone}
-              onClick={() => void handleCall()}
-              title={contact.phone ? `Call ${contact.phone}` : 'No phone number'}
-              className={`inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors shrink-0 ${
-                contact.phone
-                  ? 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-                  : 'bg-bg2 text-ink4 opacity-40 cursor-not-allowed'
-              }`}
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="inline-flex items-center gap-1.5">
+              <button
+                disabled={!contact.phone || callStatus !== 'idle'}
+                onClick={() => void handleCall()}
+                title={
+                  !contact.phone
+                    ? 'No phone number'
+                    : callStatus === 'dialing'
+                      ? 'Dialing…'
+                      : callStatus === 'connected'
+                        ? 'Connected'
+                        : callStatus === 'ended'
+                          ? 'Call ended'
+                          : `Call ${contact.phone}`
+                }
+                className={`inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors shrink-0 ${
+                  callStatus === 'connected'
+                    ? 'bg-green-100 text-green-600 animate-pulse'
+                    : callStatus === 'dialing'
+                      ? 'bg-orange-100 text-orange-600 animate-pulse'
+                      : callStatus === 'ended'
+                        ? 'bg-teal-50 text-teal-600'
+                        : contact.phone
+                          ? 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                          : 'bg-bg2 text-ink4 opacity-40 cursor-not-allowed'
+                }`}
               >
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.44a2 2 0 0 1 1.95-2.17H6a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 9A16 16 0 0 0 15 16.91l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22.92 16z" />
-              </svg>
-            </button>
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.44a2 2 0 0 1 1.95-2.17H6a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 9A16 16 0 0 0 15 16.91l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22.92 16z" />
+                </svg>
+              </button>
+              {callStatus !== 'idle' && (
+                <span
+                  className={`text-xs font-medium ${
+                    callStatus === 'connected'
+                      ? 'text-green-600'
+                      : callStatus === 'dialing'
+                        ? 'text-orange-600'
+                        : callStatus === 'ended'
+                          ? 'text-teal-600'
+                          : 'text-ink4'
+                  }`}
+                >
+                  {callStatus === 'dialing'
+                    ? 'Dialing…'
+                    : callStatus === 'connected'
+                      ? 'Connected'
+                      : callStatus === 'ended'
+                        ? 'Call ended'
+                        : ''}
+                </span>
+              )}
+            </div>
             {contact.pipeline_stage && (
               <span className="px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
                 {contact.pipeline_stage}

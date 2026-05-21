@@ -91,6 +91,8 @@ import snippetsRouter from './routes/snippets.js'
 import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
 import campaignsRouter from './routes/campaigns.js'
+import outboundCallsRouter from './routes/outbound-calls.js'
+import voiceOutboundRouter from './routes/voice-outbound.js'
 import webchatRouter, { webchatSettingsRouter } from './routes/webchat.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
@@ -220,6 +222,7 @@ app.use('/api/snippets', snippetsRouter)
 app.use('/api/automation', automationOverviewRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
+app.use('/api/outbound-calls', outboundCallsRouter)
 // PUBLIC webchat routes — CORS *
 app.use('/api/webchat', cors({ origin: '*' }), webchatRouter)
 // Authenticated webchat settings
@@ -499,6 +502,9 @@ app.post('/voice/inbound', async (req, res) => {
   console.info(`[voice/inbound] unhandled event type: ${event}`)
   res.sendStatus(200)
 })
+
+// PUBLIC — Telnyx outbound call status webhook (no auth required)
+app.use('/voice/outbound-status', voiceOutboundRouter)
 
 // ── Telnyx SMS webhooks (message.received + message.finalized) ────────────────
 app.use('/webhooks/telnyx/sms', smsWebhooksRouter)

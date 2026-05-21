@@ -1038,3 +1038,41 @@ export interface WebchatConfig {
   color: string
   position: 'bottom-right' | 'bottom-left'
 }
+
+// ── Outbound Calls ────────────────────────────────────────────
+export type OutboundCallTriggerType =
+  | 'manual'
+  | 'lead_status'
+  | 'deal_stage'
+  | 'no_response'
+  | 'follow_up_sequence'
+
+export type OutboundCallStatus =
+  | 'pending'
+  | 'dialing'
+  | 'connected'
+  | 'completed'
+  | 'failed'
+  | 'no_answer'
+  | 'cancelled'
+
+export interface OutboundCallJob {
+  id: string
+  tenant_id: string
+  contact_id: string
+  trigger_type: OutboundCallTriggerType
+  trigger_config: Record<string, unknown>
+  status: OutboundCallStatus
+  call_id: string | null
+  scheduled_at: string
+  started_at: string | null
+  completed_at: string | null
+  attempts: number
+  max_attempts: number
+  error_message: string | null
+  notes: string | null
+  created_at: string
+  // joined fields (optional)
+  contact_name?: string | null
+  contact_phone?: string | null
+}

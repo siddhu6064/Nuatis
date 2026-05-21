@@ -334,6 +334,45 @@ interface PrewarmedEntry {
 export const prewarmedSessions = new Map<string, PrewarmedEntry>()
 const streamWaiters = new Map<string, (entry: PrewarmedEntry) => void>()
 
+// ── Outbound call registry ────────────────────────────────────────────────────
+
+export interface OutboundCallMeta {
+  tenantId: string
+  contactId: string
+  jobId: string
+  contactName: string | null
+  callContext: string
+}
+
+const outboundCallRegistry = new Map<string, OutboundCallMeta>()
+
+export function registerOutboundCall(callControlId: string, meta: OutboundCallMeta): void {
+  outboundCallRegistry.set(callControlId, meta)
+  // Auto-cleanup after 10 minutes (call should have connected or failed by then)
+  setTimeout(
+    () => {
+      outboundCallRegistry.delete(callControlId)
+    },
+    10 * 60 * 1000
+  )
+}
+
+function buildOutboundPromptSuffix(meta: OutboundCallMeta, businessName: string): string {
+  const name = meta.contactName ?? 'there'
+  return `
+--- OUTBOUND CALL MODE ---
+You are making an OUTBOUND call. You called ${name} on behalf of ${businessName}.
+Call purpose: ${meta.callContext}
+
+OPENING: Start immediately with: "Hi, may I speak with ${name}?" [wait for response] "Hi ${name}, this is Maya calling from ${businessName}. ${meta.callContext}"
+
+RULES:
+- If they say it's a bad time, apologize and offer to call back later, then end the call politely using the end_call tool.
+- If there is 20+ seconds of silence after connecting, assume voicemail. Leave a brief message: "Hi ${name}, this is Maya from ${businessName}. ${meta.callContext} Please call us back at your convenience. Have a great day!" Then use end_call.
+- Never say you are "receiving" a call — you placed this call.
+--- END OUTBOUND CALL MODE ---`
+}
+
 /**
  * Pre-warm a Gemini Live session before answering the call.
  * Resolves when setupComplete fires or after 3500ms (whichever first).
@@ -528,6 +567,15 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, from: ${callerId}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
 
+        // Detect outbound call
+        const outboundMeta = callControlId ? outboundCallRegistry.get(callControlId) : undefined
+        if (outboundMeta) {
+          outboundCallRegistry.delete(callControlId!)
+          console.info(
+            `[telnyx-handler] Outbound call detected — job=${outboundMeta.jobId} tenant=${outboundMeta.tenantId}`
+          )
+        }
+
         const resolvedTenantId = tenantId
 
         function wireSession(
@@ -691,14 +739,17 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 matched: fallbackCtx.matched,
                 suffixChars: preCallContextSuffix.length,
               })
+              const outboundSuffix = outboundMeta
+                ? buildOutboundPromptSuffix(outboundMeta, safeName)
+                : undefined
               const session = await createGeminiLiveSession(
                 resolvedTenantId,
                 safeVertical,
                 safeName,
                 callControlId ?? undefined,
                 undefined,
-                preCallContextSuffix,
-                preCallContactId
+                outboundSuffix ?? preCallContextSuffix,
+                outboundMeta?.contactId ?? preCallContactId
               )
               if (!isCallActive) {
                 session.close()
@@ -743,14 +794,17 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               matched: fallbackCtx.matched,
               suffixChars: preCallContextSuffix.length,
             })
+            const outboundSuffix = outboundMeta
+              ? buildOutboundPromptSuffix(outboundMeta, safeName)
+              : undefined
             const session = await createGeminiLiveSession(
               resolvedTenantId,
               safeVertical,
               safeName,
               callControlId ?? undefined,
               undefined,
-              preCallContextSuffix,
-              preCallContactId
+              outboundSuffix ?? preCallContextSuffix,
+              outboundMeta?.contactId ?? preCallContactId
             )
             if (!isCallActive) {
               session.close()
