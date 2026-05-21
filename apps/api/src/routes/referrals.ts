@@ -102,9 +102,7 @@ router.get('/signups', requireAuth, async (req: Request, res: Response): Promise
     }
 
     const allSignups = signups ?? []
-    const activeCount = allSignups.filter(
-      (s: { status: string }) => s.status === 'active'
-    ).length
+    const activeCount = allSignups.filter((s: { status: string }) => s.status === 'active').length
 
     // Fetch commission_rate from first referral code (default 10)
     const { data: codeRow } = await supabase
@@ -168,10 +166,9 @@ router.get('/track/:code', async (req: Request, res: Response): Promise<void> =>
 
 // ── POST /api/referrals/signup (public) ──────────────────────────────────────
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
-  const { code, email, business_name } = req.body as {
+  const { code, email } = req.body as {
     code?: string
     email?: string
-    business_name?: string
   }
 
   if (!email || typeof email !== 'string' || email.trim() === '') {
@@ -210,7 +207,6 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       referring_tenant_id: row.tenant_id,
       referred_email: email.trim(),
       status: 'signed_up',
-      ...(business_name ? { referred_business_name: business_name } : {}),
     })
 
     if (insertError) {
