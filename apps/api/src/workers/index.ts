@@ -24,6 +24,7 @@ import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
 import { createCampaignSendWorker } from './campaign-send-worker.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
+import { createCustomAutomationWorker } from './custom-automation-worker.js'
 
 interface ManagedWorker {
   name: string
@@ -226,6 +227,16 @@ export async function startWorkers(): Promise<void> {
   const outboundCallWorker = createOutboundCallWorker()
   managed.push({ name: 'outbound-call', ...outboundCallWorker })
   console.info('[workers] outbound-call worker started')
+
+  // 24. Custom automation scanner — every 30 minutes
+  const customAutomationWorker = createCustomAutomationWorker()
+  await customAutomationWorker.queue.add(
+    'scan',
+    {},
+    { repeat: { every: 1800000 }, jobId: 'custom-automation-repeat' }
+  )
+  managed.push({ name: 'custom-automation-scanner', ...customAutomationWorker })
+  console.info('[workers] custom-automation-scanner started, repeating every 30m')
 }
 
 export async function stopWorkers(): Promise<void> {
