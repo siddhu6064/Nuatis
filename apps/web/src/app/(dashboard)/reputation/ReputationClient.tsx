@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { Review, ReputationStats } from '@nuatis/shared'
+import VideoReviewsTab from './VideoReviewsTab'
 
 interface Props {
   connected: boolean
@@ -21,7 +22,7 @@ interface Props {
 }
 
 type Tab = 'new' | 'replied' | 'all'
-type PageTab = 'reviews' | 'requests'
+type PageTab = 'reviews' | 'requests' | 'video'
 
 // ── ConnectBanner ─────────────────────────────────────────────
 
@@ -636,15 +637,21 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
         <div className="space-y-6">
           {/* Page-level tabs */}
           <div className="flex gap-1 bg-bg rounded-lg p-1 w-fit">
-            {(['reviews', 'requests'] as PageTab[]).map((t) => (
+            {(
+              [
+                { id: 'reviews', label: 'Reviews' },
+                { id: 'requests', label: 'Requests' },
+                { id: 'video', label: 'Video Reviews' },
+              ] as Array<{ id: PageTab; label: string }>
+            ).map((t) => (
               <button
-                key={t}
-                onClick={() => setPageTab(t)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
-                  pageTab === t ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
+                key={t.id}
+                onClick={() => setPageTab(t.id)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  pageTab === t.id ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
                 }`}
               >
-                {t === 'reviews' ? 'Reviews' : 'Requests'}
+                {t.label}
               </button>
             ))}
           </div>
@@ -657,6 +664,8 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
           )}
 
           {pageTab === 'requests' && <RequestsPanel />}
+
+          {pageTab === 'video' && <VideoReviewsTab />}
         </div>
       )}
     </div>

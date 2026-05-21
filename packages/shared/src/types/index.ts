@@ -1146,3 +1146,43 @@ export interface PortalVerifyResult {
   business_name?: string | null
   portal_slug?: string | null
 }
+
+// ── Video Testimonials ────────────────────────────────────────────────────────
+
+export type VideoCollectorStatus = 'active' | 'paused' | 'archived'
+export type VideoTestimonialStatus = 'pending' | 'approved' | 'rejected' | 'featured'
+export type VideoSentiment = 'positive' | 'neutral' | 'negative'
+
+export interface VideoCollector {
+  id: string
+  tenant_id: string
+  name: string
+  slug: string
+  prompt: string
+  max_duration_seconds: number
+  status: VideoCollectorStatus
+  submission_count: number
+  created_at: string
+  // computed
+  collect_url?: string
+}
+
+export interface VideoTestimonial {
+  id: string
+  tenant_id: string
+  collector_id: string
+  contact_id: string | null
+  submitter_name: string | null
+  submitter_email: string | null
+  storage_path: string
+  thumbnail_path: string | null
+  duration_seconds: number | null
+  status: VideoTestimonialStatus
+  transcript: string | null
+  sentiment: VideoSentiment | null
+  submitted_at: string
+  reviewed_at: string | null
+  created_at: string
+  // joined / computed
+  signed_url?: string | null
+}

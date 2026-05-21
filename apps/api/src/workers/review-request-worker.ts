@@ -115,7 +115,23 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
     .replace(/\{\{business_name\}\}/g, businessName)
     .replace(/\{\{review_url\}\}/g, trackingUrl)
 
-  // 9. Fetch telnyx_number from primary location
+  // 9. Check for active video collector and optionally append P.S. to message
+  const { data: videoCollector } = await supabase
+    .from('video_collectors')
+    .select('slug')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let smsBody = resolvedMessage
+  if (videoCollector) {
+    const collectUrl = `https://app.nuatis.com/collect/${videoCollector.slug}`
+    smsBody += `\n\nP.S. Want to record a quick video instead? ${collectUrl}`
+  }
+
+  // 10. Fetch telnyx_number from primary location
   const { data: location } = await supabase
     .from('locations')
     .select('telnyx_number')
@@ -123,7 +139,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
     .eq('is_primary', true)
     .maybeSingle()
 
-  // 10. Skip if no telnyx_number
+  // 11. Skip if no telnyx_number
   if (!location?.telnyx_number) {
     console.warn(`[review-request] no telnyx_number for tenant=${tenantId}`)
     return
@@ -131,8 +147,8 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
 
   const telnyxNumber = location.telnyx_number as string
 
-  // 11. Send SMS
-  const { success } = await sendSms(telnyxNumber, contact.phone, resolvedMessage, {
+  // 12. Send SMS
+  const { success } = await sendSms(telnyxNumber, contact.phone, smsBody, {
     tenantId,
     contactId,
   })
@@ -144,7 +160,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
     return
   }
 
-  // 12. UPDATE review_request status to 'sent'
+  // 13. UPDATE review_request status to 'sent'
   await supabase
     .from('review_requests')
     .update({ status: 'sent', sent_at: new Date().toISOString() })
@@ -154,17 +170,17 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
     `[review-request] sent review request: contact=${contactId} appointment=${appointmentId} review_request=${reviewRequest.id}`
   )
 
-  // 13. Log activity
+  // 14. Log activity
   await logActivity({
     tenantId,
     contactId,
     type: 'sms',
-    body: resolvedMessage,
+    body: smsBody,
     metadata: { review_request_id: reviewRequest.id, automated: true, trigger: 'review_request' },
     actorType: 'ai',
   })
 
-  // 14. Notify owner
+  // 15. Notify owner
   await notifyOwner(tenantId, 'review_sent', {
     pushTitle: 'Review Request Sent',
     pushBody: `Review request sent to ${firstName}`,
