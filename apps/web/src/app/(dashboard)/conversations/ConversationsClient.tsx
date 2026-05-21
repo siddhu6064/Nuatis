@@ -22,6 +22,25 @@ import {
 
 type TabType = 'open' | 'resolved'
 type InboxFilter = 'all' | 'mine'
+type ChannelType = 'sms' | 'webchat'
+
+interface WebchatSessionItem {
+  id: string
+  session_token: string
+  status: 'active' | 'closed'
+  visitor_name: string | null
+  visitor_email: string | null
+  started_at: string
+  created_at: string
+}
+
+interface WebchatMsg {
+  id: string
+  session_id: string
+  role: 'user' | 'assistant' | 'agent'
+  content: string
+  created_at: string
+}
 
 interface ContactDetail {
   id: string
@@ -92,6 +111,16 @@ export default function ConversationsClient() {
   const [triggerLinks, setTriggerLinks] = useState<TriggerLink[]>([])
   const [linksLoaded, setLinksLoaded] = useState(false)
 
+  // Webchat state
+  const [channel, setChannel] = useState<ChannelType>('sms')
+  const [webchatSessions, setWebchatSessions] = useState<WebchatSessionItem[]>([])
+  const [webchatLoading, setWebchatLoading] = useState(false)
+  const [selectedSessionToken, setSelectedSessionToken] = useState<string | null>(null)
+  const [webchatMessages, setWebchatMessages] = useState<WebchatMsg[]>([])
+  const [webchatMsgLoading, setWebchatMsgLoading] = useState(false)
+  const [webchatReply, setWebchatReply] = useState('')
+  const [webchatSending, setWebchatSending] = useState(false)
+
   const fetchConversations = useCallback(async () => {
     const r = await fetch(`/api/conversations?status=${tab}&limit=50`)
     if (!r.ok) return
@@ -129,6 +158,45 @@ export default function ConversationsClient() {
     }
     setAnalyticsLoading(false)
   }, [])
+
+  const fetchWebchatSessions = useCallback(async () => {
+    setWebchatLoading(true)
+    const r = await fetch('/api/webchat/sessions')
+    if (!r.ok) {
+      setWebchatLoading(false)
+      return
+    }
+    const d = (await r.json()) as { sessions: WebchatSessionItem[] }
+    setWebchatSessions(d.sessions)
+    setWebchatLoading(false)
+  }, [])
+
+  const fetchWebchatMessages = useCallback(async (token: string) => {
+    setWebchatMsgLoading(true)
+    const r = await fetch(`/api/webchat/session/${token}`)
+    if (!r.ok) {
+      setWebchatMsgLoading(false)
+      return
+    }
+    const d = (await r.json()) as { session: WebchatSessionItem; messages: WebchatMsg[] }
+    setWebchatMessages(d.messages)
+    setWebchatMsgLoading(false)
+  }, [])
+
+  async function handleWebchatReply() {
+    if (!selectedSessionToken || !webchatReply.trim()) return
+    setWebchatSending(true)
+    const r = await fetch(`/api/webchat/session/${selectedSessionToken}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: webchatReply.trim(), role: 'agent' }),
+    })
+    if (r.ok) {
+      setWebchatReply('')
+      await fetchWebchatMessages(selectedSessionToken)
+    }
+    setWebchatSending(false)
+  }
 
   // Initial load
   useEffect(() => {
@@ -296,6 +364,19 @@ export default function ConversationsClient() {
       document.removeEventListener('keydown', handleKey)
     }
   }, [])
+
+  // Webchat effects
+  useEffect(() => {
+    if (channel === 'webchat' && mainTab === 'inbox') {
+      void fetchWebchatSessions()
+    }
+  }, [channel, mainTab, fetchWebchatSessions])
+
+  useEffect(() => {
+    if (selectedSessionToken) {
+      void fetchWebchatMessages(selectedSessionToken)
+    }
+  }, [selectedSessionToken, fetchWebchatMessages])
 
   async function handleSend() {
     if (!selectedId || !compose.trim() || sending) return
@@ -515,345 +596,483 @@ export default function ConversationsClient() {
                 {wsConnected && <span className="w-2 h-2 rounded-full bg-teal-500" title="Live" />}
               </div>
 
-              {/* Open / Resolved tabs */}
-              <div className="flex gap-1 mb-2">
-                {(['open', 'resolved'] as TabType[]).map((t) => (
+              {/* Channel selector */}
+              <div className="flex gap-1 mb-3">
+                {(['sms', 'webchat'] as ChannelType[]).map((ch) => (
                   <button
-                    key={t}
+                    key={ch}
                     onClick={() => {
-                      setTab(t)
+                      setChannel(ch)
                       setSelectedId(null)
-                      setInboxFilter('all')
+                      setSelectedSessionToken(null)
                     }}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-                      tab === t ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors uppercase ${
+                      channel === ch ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
                     }`}
                   >
-                    {t}
+                    {ch === 'sms' ? 'SMS' : 'Webchat'}
                   </button>
                 ))}
               </div>
 
-              {/* All / Mine sub-tabs (open only) */}
-              {tab === 'open' && (
-                <div className="flex gap-1 mb-3">
-                  {(['all', 'mine'] as InboxFilter[]).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setInboxFilter(f)}
-                      className={`relative flex-1 py-1 text-[11px] font-medium rounded transition-colors capitalize ${
-                        inboxFilter === f
-                          ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                          : 'text-ink4 hover:text-ink'
-                      }`}
-                    >
-                      {f}
-                      {f === 'mine' && mineCount > 0 && (
-                        <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold bg-red-500 text-white">
-                          {mineCount > 9 ? '9+' : mineCount}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or phone…"
-                className="w-full text-sm px-3 py-1.5 rounded-lg border border-border-brand bg-bg text-ink placeholder:text-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-32 text-ink4 text-sm">
-                  Loading…
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-ink4 text-sm">
-                  No {inboxFilter === 'mine' ? 'assigned' : tab} conversations
-                </div>
-              ) : (
-                filtered.map((conv) => {
-                  const active = conv.id === selectedId
-                  return (
-                    <button
-                      key={conv.id}
-                      onClick={() => setSelectedId(conv.id)}
-                      className={`w-full text-left px-4 py-3 border-b border-border-brand transition-colors ${
-                        active ? 'bg-teal-50' : 'hover:bg-bg'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {initials(conv.contact_name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span className="text-sm font-medium text-ink truncate">
-                              {conv.contact_name ?? conv.contact_phone}
-                            </span>
-                            <span className="text-[10px] text-ink4 shrink-0">
-                              {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-1">
-                            <p className="text-xs text-ink3 truncate">
-                              {conv.direction === 'outbound' ? 'You: ' : ''}
-                              {conv.last_message ?? ''}
-                            </p>
-                            {(conv.unread_count ?? 0) > 0 && (
-                              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
-                                {(conv.unread_count ?? 0) > 99 ? '99+' : conv.unread_count}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {conv.ai_handled && (
-                              <span className="text-[9px] text-teal-600 font-medium">AI</span>
-                            )}
-                            {conv.assigned_to_name && (
-                              <span className="text-[9px] text-ink4">
-                                → {conv.assigned_to_name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ── Right panel ── */}
-          {!selectedId ? (
-            <div className="flex items-center justify-center text-ink4 text-sm">
-              Select a conversation
-            </div>
-          ) : (
-            <div className="flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="px-5 py-3 border-b border-border-brand flex items-center justify-between shrink-0">
-                <div>
-                  <p className="text-sm font-semibold text-ink">
-                    {selected?.contact_name ?? contact?.name ?? ''}
-                  </p>
-                  <p className="text-xs text-ink4">
-                    {selected?.contact_phone ?? contact?.phone ?? ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Assign dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setAssignDropdownOpen((v) => !v)}
-                      className="px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors max-w-[120px] truncate"
-                    >
-                      {selected?.assigned_to_name ? `→ ${selected.assigned_to_name}` : 'Unassigned'}
-                    </button>
-                    {assignDropdownOpen && (
-                      <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white border border-border-brand rounded-lg shadow-lg py-1 text-sm">
-                        <button
-                          onClick={() => void handleAssign(null)}
-                          className="w-full text-left px-3 py-1.5 text-ink3 hover:bg-bg transition-colors"
-                        >
-                          Unassigned
-                        </button>
-                        {assignees.map((a) => (
-                          <button
-                            key={a.id}
-                            onClick={() => void handleAssign(a.id)}
-                            className={`w-full text-left px-3 py-1.5 hover:bg-bg transition-colors ${
-                              selected?.assigned_to === a.id
-                                ? 'text-teal-700 font-medium'
-                                : 'text-ink'
-                            }`}
-                          >
-                            {a.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              {channel === 'sms' && (
+                <>
+                  {/* Open / Resolved tabs */}
+                  <div className="flex gap-1 mb-2">
+                    {(['open', 'resolved'] as TabType[]).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          setTab(t)
+                          setSelectedId(null)
+                          setInboxFilter('all')
+                        }}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
+                          tab === t ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
                   </div>
 
-                  {selected?.status === 'open' ? (
-                    <button
-                      onClick={() => void handleResolve()}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                    >
-                      Resolve
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => void handleReopen()}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg border border-border-brand text-ink3 hover:text-ink transition-colors"
-                    >
-                      Reopen
-                    </button>
+                  {/* All / Mine sub-tabs (open only) */}
+                  {tab === 'open' && (
+                    <div className="flex gap-1 mb-3">
+                      {(['all', 'mine'] as InboxFilter[]).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setInboxFilter(f)}
+                          className={`relative flex-1 py-1 text-[11px] font-medium rounded transition-colors capitalize ${
+                            inboxFilter === f
+                              ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                              : 'text-ink4 hover:text-ink'
+                          }`}
+                        >
+                          {f}
+                          {f === 'mine' && mineCount > 0 && (
+                            <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold bg-red-500 text-white">
+                              {mineCount > 9 ? '9+' : mineCount}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </div>
-              </div>
 
-              {/* Messages thread */}
-              <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-                {msgLoading ? (
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name or phone…"
+                    className="w-full text-sm px-3 py-1.5 rounded-lg border border-border-brand bg-bg text-ink placeholder:text-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+                </>
+              )}
+            </div>
+
+            {channel === 'sms' ? (
+              <div className="flex-1 overflow-y-auto">
+                {loading ? (
                   <div className="flex items-center justify-center h-32 text-ink4 text-sm">
                     Loading…
                   </div>
-                ) : messages.length === 0 ? (
+                ) : filtered.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-ink4 text-sm">
-                    No messages yet
+                    No {inboxFilter === 'mine' ? 'assigned' : tab} conversations
                   </div>
                 ) : (
-                  messages.map((msg) => {
-                    const out = msg.direction === 'outbound'
+                  filtered.map((conv) => {
+                    const active = conv.id === selectedId
                     return (
-                      <div key={msg.id} className={`flex ${out ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                          className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                            out
-                              ? 'bg-teal-600 text-white rounded-br-sm'
-                              : 'bg-bg text-ink rounded-bl-sm'
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                          <div
-                            className={`flex items-center gap-1 mt-1 ${out ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <span className={`text-[10px] ${out ? 'text-teal-200' : 'text-ink4'}`}>
-                              {formatTime(msg.created_at)}
-                            </span>
-                            {msg.ai_handled && (
-                              <span
-                                className={`text-[9px] font-medium ${out ? 'text-teal-200' : 'text-teal-600'}`}
-                              >
-                                AI
+                      <button
+                        key={conv.id}
+                        onClick={() => setSelectedId(conv.id)}
+                        className={`w-full text-left px-4 py-3 border-b border-border-brand transition-colors ${
+                          active ? 'bg-teal-50' : 'hover:bg-bg'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                            {initials(conv.contact_name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                              <span className="text-sm font-medium text-ink truncate">
+                                {conv.contact_name ?? conv.contact_phone}
                               </span>
-                            )}
+                              <span className="text-[10px] text-ink4 shrink-0">
+                                {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-xs text-ink3 truncate">
+                                {conv.direction === 'outbound' ? 'You: ' : ''}
+                                {conv.last_message ?? ''}
+                              </p>
+                              {(conv.unread_count ?? 0) > 0 && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">
+                                  {(conv.unread_count ?? 0) > 99 ? '99+' : conv.unread_count}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {conv.ai_handled && (
+                                <span className="text-[9px] text-teal-600 font-medium">AI</span>
+                              )}
+                              {conv.assigned_to_name && (
+                                <span className="text-[9px] text-ink4">
+                                  → {conv.assigned_to_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     )
                   })
                 )}
               </div>
-
-              {/* Compose bar */}
-              <div className="px-4 py-3 border-t border-border-brand shrink-0">
-                {contact?.sms_opt_in === false ? (
-                  <p className="text-xs text-red-500 text-center py-2">
-                    Contact has opted out of SMS
-                  </p>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                {webchatLoading ? (
+                  <div className="flex items-center justify-center h-32 text-ink4 text-sm">
+                    Loading…
+                  </div>
+                ) : webchatSessions.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-ink4 text-sm">
+                    No webchat sessions
+                  </div>
                 ) : (
-                  <>
-                    <SnippetPicker
-                      value={compose}
-                      onChange={setCompose}
-                      textareaRef={composeRef}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault()
-                          void handleSend()
-                        }
-                      }}
-                      placeholder="Type a message… (⌘↵ to send)"
-                      rows={3}
-                      maxLength={1600}
-                      contactName={contact?.name ?? selected?.contact_name ?? undefined}
-                    />
-                    {sendError && <p className="text-xs text-red-500 mt-1">{sendError}</p>}
-                    <div
-                      className="relative flex items-center justify-between mt-2"
-                      ref={linkPickerRef}
+                  webchatSessions.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedSessionToken(s.session_token)}
+                      className={`w-full text-left px-4 py-3 border-b border-border-brand transition-colors ${
+                        s.session_token === selectedSessionToken ? 'bg-teal-50' : 'hover:bg-bg'
+                      }`}
                     >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0">
+                          💬
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-ink truncate">
+                            {s.visitor_name ?? 'Anonymous Visitor'}
+                          </p>
+                          <p className="text-xs text-ink4">
+                            {s.visitor_email ?? formatTime(s.created_at)}
+                          </p>
+                          <span
+                            className={`text-[9px] font-medium ${s.status === 'active' ? 'text-teal-600' : 'text-ink4'}`}
+                          >
+                            {s.status}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Right panel ── */}
+          {channel === 'sms' ? (
+            !selectedId ? (
+              <div className="flex items-center justify-center text-ink4 text-sm">
+                Select a conversation
+              </div>
+            ) : (
+              <div className="flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="px-5 py-3 border-b border-border-brand flex items-center justify-between shrink-0">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {selected?.contact_name ?? contact?.name ?? ''}
+                    </p>
+                    <p className="text-xs text-ink4">
+                      {selected?.contact_phone ?? contact?.phone ?? ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Assign dropdown */}
+                    <div className="relative">
                       <button
-                        type="button"
-                        onClick={() => void openLinkPicker()}
-                        className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                        onClick={() => setAssignDropdownOpen((v) => !v)}
+                        className="px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors max-w-[120px] truncate"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                        </svg>
-                        Link
+                        {selected?.assigned_to_name
+                          ? `→ ${selected.assigned_to_name}`
+                          : 'Unassigned'}
                       </button>
-                      {showLinkPicker && (
-                        <div className="absolute bottom-full left-0 mb-1 w-72 bg-white border border-border-brand rounded-lg shadow-lg z-50 overflow-hidden">
-                          {triggerLinks.length === 0 ? (
-                            <div className="px-3 py-4 text-xs text-ink4 text-center">
-                              No trigger links yet.{' '}
-                              <a
-                                href="/settings/trigger-links"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-teal-600 hover:underline"
+                      {assignDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white border border-border-brand rounded-lg shadow-lg py-1 text-sm">
+                          <button
+                            onClick={() => void handleAssign(null)}
+                            className="w-full text-left px-3 py-1.5 text-ink3 hover:bg-bg transition-colors"
+                          >
+                            Unassigned
+                          </button>
+                          {assignees.map((a) => (
+                            <button
+                              key={a.id}
+                              onClick={() => void handleAssign(a.id)}
+                              className={`w-full text-left px-3 py-1.5 hover:bg-bg transition-colors ${
+                                selected?.assigned_to === a.id
+                                  ? 'text-teal-700 font-medium'
+                                  : 'text-ink'
+                              }`}
+                            >
+                              {a.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {selected?.status === 'open' ? (
+                      <button
+                        onClick={() => void handleResolve()}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                      >
+                        Resolve
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => void handleReopen()}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                      >
+                        Reopen
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Messages thread */}
+                <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                  {msgLoading ? (
+                    <div className="flex items-center justify-center h-32 text-ink4 text-sm">
+                      Loading…
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-ink4 text-sm">
+                      No messages yet
+                    </div>
+                  ) : (
+                    messages.map((msg) => {
+                      const out = msg.direction === 'outbound'
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex ${out ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+                              out
+                                ? 'bg-teal-600 text-white rounded-br-sm'
+                                : 'bg-bg text-ink rounded-bl-sm'
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                            <div
+                              className={`flex items-center gap-1 mt-1 ${out ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <span
+                                className={`text-[10px] ${out ? 'text-teal-200' : 'text-ink4'}`}
                               >
-                                Create one in Settings →
-                              </a>
+                                {formatTime(msg.created_at)}
+                              </span>
+                              {msg.ai_handled && (
+                                <span
+                                  className={`text-[9px] font-medium ${out ? 'text-teal-200' : 'text-teal-600'}`}
+                                >
+                                  AI
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <>
-                              <div className="max-h-48 overflow-y-auto">
-                                {triggerLinks.map((link) => {
-                                  const url = `${process.env['NEXT_PUBLIC_API_URL'] ?? ''}/t/${link.slug}?cid=${selectedId ?? ''}`
-                                  return (
-                                    <button
-                                      key={link.id}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault()
-                                        insertAtCursor(url)
-                                        setShowLinkPicker(false)
-                                      }}
-                                      className="w-full text-left px-3 py-2 hover:bg-bg transition-colors flex flex-col gap-0.5"
-                                    >
-                                      <span className="text-xs font-medium text-ink">
-                                        {link.name}
-                                      </span>
-                                      <span className="text-[10px] text-ink4 truncate">{url}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                              <div className="border-t border-border-brand px-3 py-2">
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                {/* Compose bar */}
+                <div className="px-4 py-3 border-t border-border-brand shrink-0">
+                  {contact?.sms_opt_in === false ? (
+                    <p className="text-xs text-red-500 text-center py-2">
+                      Contact has opted out of SMS
+                    </p>
+                  ) : (
+                    <>
+                      <SnippetPicker
+                        value={compose}
+                        onChange={setCompose}
+                        textareaRef={composeRef}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            void handleSend()
+                          }
+                        }}
+                        placeholder="Type a message… (⌘↵ to send)"
+                        rows={3}
+                        maxLength={1600}
+                        contactName={contact?.name ?? selected?.contact_name ?? undefined}
+                      />
+                      {sendError && <p className="text-xs text-red-500 mt-1">{sendError}</p>}
+                      <div
+                        className="relative flex items-center justify-between mt-2"
+                        ref={linkPickerRef}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void openLinkPicker()}
+                          className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                          </svg>
+                          Link
+                        </button>
+                        {showLinkPicker && (
+                          <div className="absolute bottom-full left-0 mb-1 w-72 bg-white border border-border-brand rounded-lg shadow-lg z-50 overflow-hidden">
+                            {triggerLinks.length === 0 ? (
+                              <div className="px-3 py-4 text-xs text-ink4 text-center">
+                                No trigger links yet.{' '}
                                 <a
                                   href="/settings/trigger-links"
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[11px] text-ink4 hover:text-teal-600 transition-colors"
+                                  className="text-teal-600 hover:underline"
                                 >
-                                  Manage Links →
+                                  Create one in Settings →
                                 </a>
                               </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      <button
-                        onClick={() => void handleSend()}
-                        disabled={!compose.trim() || sending}
-                        className="px-4 py-2 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            ) : (
+                              <>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {triggerLinks.map((link) => {
+                                    const url = `${process.env['NEXT_PUBLIC_API_URL'] ?? ''}/t/${link.slug}?cid=${selectedId ?? ''}`
+                                    return (
+                                      <button
+                                        key={link.id}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault()
+                                          insertAtCursor(url)
+                                          setShowLinkPicker(false)
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-bg transition-colors flex flex-col gap-0.5"
+                                      >
+                                        <span className="text-xs font-medium text-ink">
+                                          {link.name}
+                                        </span>
+                                        <span className="text-[10px] text-ink4 truncate">
+                                          {url}
+                                        </span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                <div className="border-t border-border-brand px-3 py-2">
+                                  <a
+                                    href="/settings/trigger-links"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] text-ink4 hover:text-teal-600 transition-colors"
+                                  >
+                                    Manage Links →
+                                  </a>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => void handleSend()}
+                          disabled={!compose.trim() || sending}
+                          className="px-4 py-2 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {sending ? 'Sending…' : 'Send'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          ) : !selectedSessionToken ? (
+            <div className="flex items-center justify-center text-ink4 text-sm">
+              Select a webchat session
+            </div>
+          ) : (
+            /* Webchat thread */
+            <div className="flex flex-col h-full">
+              <div className="px-6 py-4 border-b border-border-brand shrink-0">
+                <h2 className="text-sm font-semibold text-ink">Webchat Session</h2>
+                <p className="text-xs text-ink4">Visitor conversation</p>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                {webchatMsgLoading ? (
+                  <div className="text-sm text-ink4">Loading…</div>
+                ) : (
+                  webchatMessages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`flex ${m.role === 'agent' || m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-xs px-3 py-2 rounded-xl text-sm ${
+                          m.role === 'user' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-ink'
+                        }`}
                       >
-                        {sending ? 'Sending…' : 'Send'}
-                      </button>
+                        {m.role !== 'user' && (
+                          <p className="text-[9px] font-medium text-ink4 mb-1 uppercase">
+                            {m.role}
+                          </p>
+                        )}
+                        {m.content}
+                      </div>
                     </div>
-                  </>
+                  ))
                 )}
+              </div>
+              <div className="px-4 py-3 border-t border-border-brand shrink-0">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={webchatReply}
+                    onChange={(e) => setWebchatReply(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void handleWebchatReply()
+                      }
+                    }}
+                    placeholder="Reply as agent…"
+                    className="flex-1 text-sm px-3 py-2 rounded-lg border border-border-brand focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+                  <button
+                    onClick={() => void handleWebchatReply()}
+                    disabled={webchatSending || !webchatReply.trim()}
+                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </div>
           )}

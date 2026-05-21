@@ -1004,3 +1004,37 @@ export interface BrandVoice {
   signature?: string // max 100 chars
   sample_message?: string // max 500 chars
 }
+
+// ── Webchat ───────────────────────────────────────────────────
+export type WebchatSessionStatus = 'active' | 'closed'
+export type WebchatMessageRole = 'user' | 'assistant' | 'agent'
+
+export interface WebchatSession {
+  id: string
+  tenant_id: string
+  location_id: string | null
+  contact_id: string | null
+  session_token: string
+  status: WebchatSessionStatus
+  visitor_name: string | null
+  visitor_email: string | null
+  started_at: string
+  ended_at: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface WebchatMessage {
+  id: string
+  session_id: string
+  role: WebchatMessageRole
+  content: string
+  created_at: string
+}
+
+export interface WebchatConfig {
+  enabled: boolean
+  greeting: string
+  color: string
+  position: 'bottom-right' | 'bottom-left'
+}

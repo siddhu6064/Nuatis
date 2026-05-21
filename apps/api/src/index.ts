@@ -1,4 +1,7 @@
 import { createServer } from 'http'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -88,6 +91,7 @@ import snippetsRouter from './routes/snippets.js'
 import automationOverviewRouter from './routes/automation-overview.js'
 import campaignsPrereqRouter from './routes/campaigns-prereq.js'
 import campaignsRouter from './routes/campaigns.js'
+import webchatRouter, { webchatSettingsRouter } from './routes/webchat.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import healthRouter from './routes/health.js'
@@ -216,6 +220,22 @@ app.use('/api/snippets', snippetsRouter)
 app.use('/api/automation', automationOverviewRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
+// PUBLIC webchat routes — CORS *
+app.use('/api/webchat', cors({ origin: '*' }), webchatRouter)
+// Authenticated webchat settings
+app.use('/api/settings/webchat', webchatSettingsRouter)
+
+// Widget JS file — served with CORS * so any website can embed it
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const widgetJs = readFileSync(join(__dirname, 'webchat-widget', 'widget.js'), 'utf8')
+
+app.get('/webchat-widget.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+  res.setHeader('Cache-Control', 'public, max-age=300') // 5 min cache
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.send(widgetJs)
+})
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Nuatis API — Front Office AI', status: 'running' })

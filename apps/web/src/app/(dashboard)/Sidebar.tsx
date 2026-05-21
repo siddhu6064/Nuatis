@@ -174,6 +174,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
       { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },
       { href: '/settings/brand-profile', label: 'Brand Voice', icon: '🎙', suiteOnly: true },
+      { href: '/settings/webchat', label: 'Webchat Widget', icon: '💬', suiteOnly: true },
       { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
       { href: '/settings/payments', label: 'Payments', icon: '💳', suiteOnly: true },
       { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },

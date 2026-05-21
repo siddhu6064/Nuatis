@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --tsconfig tsconfig.json src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/webchat-widget && cp src/webchat-widget/widget.js dist/webchat-widget/widget.js",
     "start": "node dist/index.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests --forceExit",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --passWithNoTests --forceExit",
