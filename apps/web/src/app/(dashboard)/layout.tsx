@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { SessionProvider } from 'next-auth/react'
 import Sidebar from './Sidebar'
 import DemoBanner from './DemoBanner'
+import { AnnouncementBanner } from '@/components/AnnouncementBanner'
 import { PushNotificationPrompt } from '@/components/PushNotificationPrompt'
 import { NPSSurvey } from '@/components/NPSSurvey'
 import GlobalSearch from '@/components/search/GlobalSearch'
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <kbd className="text-[10px] bg-bg2 px-1.5 py-0.5 rounded text-ink4">⌘K</kbd>
             </button>
           </div>
+          <AnnouncementBanner />
           <DemoBanner />
           <PushNotificationPrompt />
           {children}
