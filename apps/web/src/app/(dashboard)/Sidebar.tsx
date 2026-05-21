@@ -772,6 +772,19 @@ export default function Sidebar({
             )}
           </Droppable>
 
+          {/* Refer & Earn — pinned before Settings */}
+          <Link
+            href="/referrals"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-2 ${
+              path === '/referrals'
+                ? 'bg-amber-50 text-amber-700'
+                : 'text-amber-600 hover:bg-amber-50 hover:text-amber-700'
+            }`}
+          >
+            <span className="text-base leading-none">⭐</span>
+            <span>Refer & Earn</span>
+          </Link>
+
           {/* Settings — always pinned last, not draggable as a section */}
           {(() => {
             const hrefToItem = Object.fromEntries(settingsGroup.items.map((i) => [i.href, i]))
