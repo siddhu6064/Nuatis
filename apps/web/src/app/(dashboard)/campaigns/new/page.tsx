@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -102,7 +102,7 @@ const backBtnCls =
 
 // ── Main wizard component ──────────────────────────────────────────────────────
 
-export default function NewCampaignPage() {
+function NewCampaignContent() {
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
 
@@ -714,5 +714,13 @@ export default function NewCampaignPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={<div className="px-8 py-8 text-sm text-ink3">Loading…</div>}>
+      <NewCampaignContent />
+    </Suspense>
   )
 }

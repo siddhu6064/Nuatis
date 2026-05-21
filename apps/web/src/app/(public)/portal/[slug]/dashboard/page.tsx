@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
 
 type Tab = 'appointments' | 'quotes-invoices' | 'documents'
 
-export default function PortalDashboard() {
+function PortalDashboardContent() {
   const params = useParams<{ slug: string }>()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -378,5 +378,13 @@ export default function PortalDashboard() {
         <p className="text-xs text-gray-300">Powered by Nuatis</p>
       </footer>
     </div>
+  )
+}
+
+export default function PortalDashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-900" />}>
+      <PortalDashboardContent />
+    </Suspense>
   )
 }

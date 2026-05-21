@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
@@ -16,7 +16,7 @@ interface SquareStatus {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function PaymentsSettingsPage() {
+function PaymentsSettingsContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
 
@@ -203,5 +203,13 @@ export default function PaymentsSettingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PaymentsSettingsPage() {
+  return (
+    <Suspense fallback={<div className="px-8 py-8 text-sm text-ink3">Loading…</div>}>
+      <PaymentsSettingsContent />
+    </Suspense>
   )
 }

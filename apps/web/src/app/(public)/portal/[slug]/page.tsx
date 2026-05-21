@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 
 interface VerifyResult {
@@ -15,7 +15,7 @@ interface BusinessInfo {
   portal_enabled: boolean
 }
 
-export default function PortalLandingPage() {
+function PortalLandingContent() {
   const params = useParams<{ slug: string }>()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -160,5 +160,13 @@ export default function PortalLandingPage() {
         <p className="text-center text-xs text-gray-400 mt-6">Powered by Nuatis</p>
       </div>
     </div>
+  )
+}
+
+export default function PortalLandingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <PortalLandingContent />
+    </Suspense>
   )
 }
