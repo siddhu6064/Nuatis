@@ -100,3 +100,16 @@ export function buildKbFilesBlock(
   }
   return block
 }
+
+export function buildKbUrlsBlock(
+  urls: Array<{ url: string; extracted_text: string | null }>
+): string {
+  const ready = urls.filter((u) => u.extracted_text && u.extracted_text.trim())
+  if (ready.length === 0) return ''
+
+  let block = '\n\n--- WEBSITE KNOWLEDGE ---\n'
+  for (const u of ready) {
+    block += `Source: ${u.url}\n${u.extracted_text!}\n---\n`
+  }
+  return block
+}

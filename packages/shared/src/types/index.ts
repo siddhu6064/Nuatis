@@ -1186,3 +1186,20 @@ export interface VideoTestimonial {
   // joined / computed
   signed_url?: string | null
 }
+
+// ── Maya KB URLs ──────────────────────────────────────────────────────────────
+
+export type MayaKbUrlStatus = 'pending' | 'crawling' | 'ready' | 'error'
+
+export interface MayaKbUrl {
+  id: string
+  tenant_id: string
+  url: string
+  status: MayaKbUrlStatus
+  pages_crawled: number
+  extracted_text: string | null
+  error_message: string | null
+  last_crawled_at: string | null
+  created_at: string
+  updated_at: string
+}

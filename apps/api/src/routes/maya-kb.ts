@@ -165,4 +165,155 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
   }
 })
 
+// ── POST /api/maya-kb/urls — add a URL to crawl ──────────────────────────────
+router.post('/urls', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { url } = req.body as { url?: string }
+
+  if (!url?.trim()) {
+    res.status(400).json({ error: 'url is required' })
+    return
+  }
+
+  // Validate URL format
+  let normalized = url.trim()
+  if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    res.status(400).json({ error: 'URL must start with http:// or https://' })
+    return
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(normalized)
+  } catch {
+    res.status(400).json({ error: 'Invalid URL format' })
+    return
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    res.status(400).json({ error: 'URL must use http or https' })
+    return
+  }
+
+  // Strip trailing slash
+  normalized = normalized.replace(/\/$/, '')
+
+  const supabase = getSupabase()
+
+  // Max 3 URLs per tenant
+  const { count } = await supabase
+    .from('maya_kb_urls')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', authed.tenantId)
+  if ((count ?? 0) >= 3) {
+    res.status(400).json({ error: 'Maximum 3 URLs allowed per tenant' })
+    return
+  }
+
+  // Insert (catch duplicate)
+  const { data, error } = await supabase
+    .from('maya_kb_urls')
+    .insert({ tenant_id: authed.tenantId, url: normalized })
+    .select('id, url, status, pages_crawled, last_crawled_at, created_at')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      res.status(409).json({ error: 'URL already added for this account' })
+      return
+    }
+    res.status(500).json({ error: 'Failed to add URL' })
+    return
+  }
+
+  // Fire crawl async
+  import('../lib/url-crawler.js')
+    .then(({ crawlUrl }) =>
+      crawlUrl({ tenantId: authed.tenantId, urlRecordId: data.id, rootUrl: normalized })
+    )
+    .catch((err) => console.error('[maya-kb] crawl error:', err))
+
+  res.status(201).json(data)
+})
+
+// ── GET /api/maya-kb/urls — list URLs for tenant ─────────────────────────────
+router.get('/urls', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { data } = await supabase
+    .from('maya_kb_urls')
+    .select('id, url, status, pages_crawled, error_message, last_crawled_at, created_at')
+    .eq('tenant_id', authed.tenantId)
+    .order('created_at', { ascending: false })
+
+  res.json({ urls: data ?? [] })
+})
+
+// ── DELETE /api/maya-kb/urls/:id — remove a URL ───────────────────────────────
+router.delete('/urls/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { error } = await supabase
+    .from('maya_kb_urls')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('tenant_id', authed.tenantId)
+
+  if (error) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+  res.json({ ok: true })
+})
+
+// ── POST /api/maya-kb/urls/:id/refresh — re-crawl a URL ──────────────────────
+router.post(
+  '/urls/:id/refresh',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+
+    // Fetch the record first
+    const { data: record } = await supabase
+      .from('maya_kb_urls')
+      .select('id, url')
+      .eq('id', req.params.id)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (!record) {
+      res.status(404).json({ error: 'URL not found' })
+      return
+    }
+
+    // Reset to pending
+    await supabase
+      .from('maya_kb_urls')
+      .update({
+        status: 'pending',
+        error_message: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+
+    // Fire crawl async
+    const urlStr = (record as { url: string }).url
+    const recordId = req.params.id as string
+    import('../lib/url-crawler.js')
+      .then(({ crawlUrl }) =>
+        crawlUrl({
+          tenantId: authed.tenantId,
+          urlRecordId: recordId,
+          rootUrl: urlStr,
+        })
+      )
+      .catch((err) => console.error('[maya-kb] crawl error:', err))
+
+    res.json({ status: 'pending' })
+  }
+)
+
 export default router

@@ -4,6 +4,7 @@ import { VERTICALS } from '@nuatis/shared'
 import VoiceSettingsForm from './VoiceSettingsForm'
 import TestMayaPanel from './TestMayaPanel'
 import KnowledgeFilesCard from './KnowledgeFilesCard'
+import WebsiteKnowledgeCard from './WebsiteKnowledgeCard'
 
 interface DaySchedule {
   open: string
@@ -63,6 +64,12 @@ export default async function VoiceSettingsPage() {
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
 
+  const { data: kbUrls } = await supabase
+    .from('maya_kb_urls')
+    .select('id, tenant_id, url, status, pages_crawled, extracted_text, error_message, last_crawled_at, created_at, updated_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+
   const settings = {
     maya_enabled: location?.maya_enabled ?? true,
     escalation_phone: location?.escalation_phone ?? '',
@@ -90,6 +97,7 @@ export default async function VoiceSettingsPage() {
       <TestMayaPanel />
       <VoiceSettingsForm settings={settings} />
       <KnowledgeFilesCard initialFiles={kbFiles ?? []} />
+      <WebsiteKnowledgeCard initialUrls={kbUrls ?? []} />
     </div>
   )
 }

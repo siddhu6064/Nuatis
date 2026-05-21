@@ -44,7 +44,8 @@ jest.unstable_mockModule('multer', () => {
     },
   }
   const multerFn = () => multerInstance
-  ;(multerFn as unknown as { memoryStorage: () => Record<string, never> }).memoryStorage = () => ({})
+  ;(multerFn as unknown as { memoryStorage: () => Record<string, never> }).memoryStorage =
+    () => ({})
   return { default: multerFn }
 })
 
@@ -109,9 +110,7 @@ beforeEach(() => {
 // ── Test 1: GET /collect/:slug → { valid: false } for unknown slug ─────────────
 describe('GET /api/video-testimonials/collect/:slug — unknown slug', () => {
   it('returns { valid: false } when the slug does not exist', async () => {
-    const res = await request(makeApp()).get(
-      '/api/video-testimonials/collect/unknown-slug-xyz'
-    )
+    const res = await request(makeApp()).get('/api/video-testimonials/collect/unknown-slug-xyz')
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
@@ -121,9 +120,7 @@ describe('GET /api/video-testimonials/collect/:slug — unknown slug', () => {
 // ── Test 2: GET /collect/:slug → collector data for active slug ───────────────
 describe('GET /api/video-testimonials/collect/:slug — active collector', () => {
   it('returns valid=true and collector details for a known active slug', async () => {
-    const res = await request(makeApp()).get(
-      '/api/video-testimonials/collect/abc123def456'
-    )
+    const res = await request(makeApp()).get('/api/video-testimonials/collect/abc123def456')
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(true)

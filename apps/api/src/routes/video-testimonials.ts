@@ -82,9 +82,7 @@ router.post(
     const storagePath = `${collector.tenant_id}/${collector.id}/${fileId}.${ext}`
 
     // 4. Ensure bucket exists + upload
-    await supabase.storage
-      .createBucket('video-testimonials', { public: false })
-      .catch(() => null)
+    await supabase.storage.createBucket('video-testimonials', { public: false }).catch(() => null)
 
     const { error: uploadErr } = await supabase.storage
       .from('video-testimonials')
@@ -198,36 +196,32 @@ router.post('/collectors', requireAuth, async (req: Request, res: Response): Pro
 })
 
 // PUT /api/video-testimonials/collectors/:id
-router.put(
-  '/collectors/:id',
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const { name, prompt, max_duration_seconds, status } = req.body as Record<string, unknown>
-    const supabase = getSupabase()
-    const updates: Record<string, unknown> = {}
-    if (typeof name === 'string') updates['name'] = name.trim()
-    if (typeof prompt === 'string') updates['prompt'] = prompt
-    if (typeof max_duration_seconds === 'number')
-      updates['max_duration_seconds'] = max_duration_seconds
-    if (typeof status === 'string' && ['active', 'paused'].includes(status))
-      updates['status'] = status
+router.put('/collectors/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { name, prompt, max_duration_seconds, status } = req.body as Record<string, unknown>
+  const supabase = getSupabase()
+  const updates: Record<string, unknown> = {}
+  if (typeof name === 'string') updates['name'] = name.trim()
+  if (typeof prompt === 'string') updates['prompt'] = prompt
+  if (typeof max_duration_seconds === 'number')
+    updates['max_duration_seconds'] = max_duration_seconds
+  if (typeof status === 'string' && ['active', 'paused'].includes(status))
+    updates['status'] = status
 
-    const { data, error } = await supabase
-      .from('video_collectors')
-      .update(updates)
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single()
+  const { data, error } = await supabase
+    .from('video_collectors')
+    .update(updates)
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single()
 
-    if (error || !data) {
-      res.status(404).json({ error: 'Collector not found' })
-      return
-    }
-    res.json({ collector: data })
+  if (error || !data) {
+    res.status(404).json({ error: 'Collector not found' })
+    return
   }
-)
+  res.json({ collector: data })
+})
 
 // DELETE /api/video-testimonials/collectors/:id (archive)
 router.delete(

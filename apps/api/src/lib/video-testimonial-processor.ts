@@ -76,7 +76,10 @@ export async function generateTranscriptAndSentiment(testimonialId: string): Pro
 
     try {
       // Strip markdown code fences if present
-      const cleaned = rawText.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim()
+      const cleaned = rawText
+        .replace(/^```json\n?/, '')
+        .replace(/\n?```$/, '')
+        .trim()
       const parsed = JSON.parse(cleaned) as { transcript?: string; sentiment?: string }
       transcript = typeof parsed.transcript === 'string' ? parsed.transcript : null
       const raw = parsed.sentiment
@@ -93,7 +96,9 @@ export async function generateTranscriptAndSentiment(testimonialId: string): Pro
       .update({ transcript, sentiment })
       .eq('id', testimonialId)
 
-    console.info(`[video-processor] done testimonialId=${testimonialId} sentiment=${sentiment ?? 'unknown'}`)
+    console.info(
+      `[video-processor] done testimonialId=${testimonialId} sentiment=${sentiment ?? 'unknown'}`
+    )
   } catch (err) {
     console.error(`[video-processor] error processing testimonialId=${testimonialId}:`, err)
     // Don't throw — this is a fire-and-forget background job

@@ -115,6 +115,7 @@ interface LocationConfig {
   afterHoursConfig: LocationAfterHoursConfig | null
   businessProfile: BusinessProfile | null
   kbFiles: Array<{ file_name: string; extracted_text: string }> | null
+  kbUrls: Array<{ url: string; extracted_text: string | null }> | null
 }
 
 function isAfterHoursNow(
@@ -145,7 +146,12 @@ function isAfterHoursNow(
 }
 
 async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
-  const FALLBACK: LocationConfig = { afterHoursConfig: null, businessProfile: null, kbFiles: null }
+  const FALLBACK: LocationConfig = {
+    afterHoursConfig: null,
+    businessProfile: null,
+    kbFiles: null,
+    kbUrls: null,
+  }
   const FALLBACK_MESSAGE =
     'We are currently closed. Please leave your name and number and we will call you back during business hours.'
   try {
@@ -164,7 +170,7 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
 
     const query = (async (): Promise<LocationConfig> => {
       try {
-        const [locResult, kbResult] = await Promise.all([
+        const [locResult, kbResult, kbUrlResult] = await Promise.all([
           supabase
             .from('locations')
             .select(
@@ -176,6 +182,11 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
           supabase
             .from('maya_kb_files')
             .select('file_name, extracted_text')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'ready'),
+          supabase
+            .from('maya_kb_urls')
+            .select('url, extracted_text')
             .eq('tenant_id', tenantId)
             .eq('status', 'ready'),
         ])
@@ -213,10 +224,16 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
             typeof f.extracted_text === 'string' && f.extracted_text.length > 0
         )
 
+        const rawKbUrls = (kbUrlResult.data ?? []) as Array<{
+          url: string
+          extracted_text: string | null
+        }>
+
         return {
           afterHoursConfig,
           businessProfile,
           kbFiles: kbFiles.length > 0 ? kbFiles : null,
+          kbUrls: rawKbUrls.length > 0 ? rawKbUrls : null,
         }
       } catch {
         return FALLBACK
@@ -406,7 +423,7 @@ export async function prewarmGemini(
     getLocationConfig(tenantId),
   ])
   const contextSuffix = buildSystemPromptSuffix(callerContext, fromNumber)
-  const { afterHoursConfig, businessProfile } = locationConfig
+  const { afterHoursConfig, businessProfile, kbUrls } = locationConfig
 
   let afterHoursPrefix: string | undefined
   if (
@@ -429,7 +446,8 @@ export async function prewarmGemini(
     callerContext.contactId ?? null,
     afterHoursPrefix,
     businessProfile,
-    locationConfig.kbFiles
+    locationConfig.kbFiles,
+    kbUrls ?? null
   )
 
   return new Promise<void>((resolve) => {
