@@ -50,7 +50,7 @@ export default function GbpInsightsWidget() {
 
   if (loading) {
     return (
-      <div className="mt-4">
+      <div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="animate-pulse bg-gray-100 rounded-xl h-24" />
@@ -62,7 +62,7 @@ export default function GbpInsightsWidget() {
 
   if (!data || data.connected === false) {
     return (
-      <div className="mt-4">
+      <div>
         <div className="bg-white rounded-xl border border-border-brand p-5 text-sm text-ink3">
           <span className="font-medium text-ink">Google Business Profile</span> not connected.{' '}
           <a href="/settings/reputation" className="text-teal-600 underline">
@@ -77,7 +77,7 @@ export default function GbpInsightsWidget() {
   const insights = data as GbpInsights
 
   return (
-    <div className="mt-4">
+    <div>
       <div className="mb-2">
         <h2 className="text-sm font-semibold text-ink">Google Business Profile</h2>
         <p className="text-xs text-ink3 mt-0.5">Last 30 days</p>

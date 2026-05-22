@@ -1,22 +1,6 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
-import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
-import LeadSourceReport from '@/components/dashboard/LeadSourceReport'
-import GbpInsightsWidget from './GbpInsightsWidget'
-
-const COLOR: Record<string, string> = {
-  teal: 'bg-teal-50 text-teal-600',
-  blue: 'bg-blue-50 text-blue-600',
-  amber: 'bg-amber-50 text-amber-600',
-  purple: 'bg-purple-50 text-purple-600',
-}
-
-const ACTIONS = [
-  { label: 'Add Contact', icon: '+', href: '/contacts/new' },
-  { label: 'New Appointment', icon: '◷', href: '/appointments/new' },
-  { label: 'View Pipeline', icon: '◈', href: '/pipeline' },
-  { label: 'Open Demo', icon: '▶', href: '/demo/dashboard' },
-]
+import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -34,7 +18,8 @@ export default async function DashboardPage() {
       supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId),
+        .eq('tenant_id', tenantId)
+        .eq('is_archived', false),
 
       supabase
         .from('contacts')
@@ -52,7 +37,9 @@ export default async function DashboardPage() {
         .lt('start_time', tomorrow.toISOString()),
     ])
 
-  const STATS = [
+  const userName = session?.user?.name?.split(' ')[0] ?? 'there'
+
+  const stats = [
     { label: 'Total Contacts', value: String(totalContacts ?? 0), icon: '◎', color: 'teal' },
     { label: 'Open Pipeline', value: String(openPipeline ?? 0), icon: '◈', color: 'blue' },
     {
@@ -64,68 +51,5 @@ export default async function DashboardPage() {
     { label: 'Calls Handled', value: '0', icon: '◉', color: 'purple' },
   ]
 
-  return (
-    <div className="px-4 py-6 md:px-8 md:py-8">
-      <div className="mb-8">
-        <h1 className="text-xl font-bold text-ink">Dashboard</h1>
-        <p className="text-sm text-ink3 mt-0.5">Welcome back, Sid.</p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {STATS.map(({ label, value, icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-border-brand p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-ink3">{label}</p>
-              <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${COLOR[color]}`}
-              >
-                {icon}
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-ink">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <PipelineFunnel />
-        <LeadSourceReport />
-      </div>
-
-      <GbpInsightsWidget />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Recent Activity</h2>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
-              <span className="text-gray-300 text-xl">◎</span>
-            </div>
-            <p className="text-sm font-medium text-ink4">No activity yet</p>
-            <p className="text-xs text-gray-300 mt-1">
-              Activity will appear here as you add contacts
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-border-brand p-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Quick Actions</h2>
-          <div className="space-y-2">
-            {ACTIONS.map(({ label, icon, href }) => (
-              <a
-                key={label}
-                href={href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink3 hover:bg-bg hover:text-ink transition-colors"
-              >
-                <span className="w-6 h-6 rounded-md bg-bg2 flex items-center justify-center text-xs text-ink3">
-                  {icon}
-                </span>
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <DashboardClient stats={stats} userName={userName} />
 }

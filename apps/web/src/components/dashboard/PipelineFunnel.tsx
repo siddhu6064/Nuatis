@@ -62,7 +62,7 @@ export default function PipelineFunnel() {
   const maxCount = Math.max(...stages.map((s) => s.count), 1)
 
   return (
-    <div className="bg-white rounded-xl border border-border-brand p-5 mt-4">
+    <div className="bg-white rounded-xl border border-border-brand p-5 h-full">
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-ink">Pipeline Funnel</h2>
         <p className="text-xs text-ink3 mt-0.5">

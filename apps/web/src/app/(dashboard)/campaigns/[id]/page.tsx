@@ -51,7 +51,6 @@ interface DetailResponse {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const CHANNEL_LABEL: Record<string, string> = { sms: 'SMS', email: 'Email', social: 'Social' }
-const CHAR_LIMIT: Record<string, number> = { sms: 160, email: 50, social: 100 }
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return '—'
