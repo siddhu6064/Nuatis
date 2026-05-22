@@ -128,6 +128,7 @@ import {
 initSentry()
 
 const app = express()
+app.set('trust proxy', 1)
 const PORT = process.env['PORT'] ?? 3001
 
 app.use(securityHeaders)
@@ -136,7 +137,9 @@ app.use(
   cors({
     origin:
       process.env['CORS_ORIGIN'] ??
-      (process.env['NODE_ENV'] === 'production' ? 'https://nuatis.com' : 'http://localhost:3000'),
+      (process.env['NODE_ENV'] === 'production'
+        ? 'https://app.nuatis.com'
+        : 'http://localhost:3000'),
   })
 )
 // Capture raw body for Resend webhook signature verification
