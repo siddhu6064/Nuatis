@@ -11,6 +11,7 @@ import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { sendSms } from '../lib/sms.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
+import { bookingLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -215,140 +216,126 @@ router.get('/:slug/availability', async (req: Request, res: Response): Promise<v
 })
 
 // ── POST /:slug/confirm — book appointment ───────────────────────────────────
-router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void> => {
-  const { slug } = req.params
-  const body = req.body as Record<string, unknown>
+router.post(
+  '/:slug/confirm',
+  bookingLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const { slug } = req.params
+    const body = req.body as Record<string, unknown>
 
-  const {
-    serviceId,
-    date,
-    startTime,
-    firstName,
-    lastName,
-    email,
-    phone,
-    intakeFormId,
-    intakeData,
-    notes,
-    resource_id,
-  } = body as {
-    serviceId?: string
-    date?: string
-    startTime?: string
-    firstName?: string
-    lastName?: string
-    email?: string
-    phone?: string
-    intakeFormId?: string
-    intakeData?: Record<string, unknown>
-    notes?: string
-    resource_id?: string
-  }
+    const {
+      serviceId,
+      date,
+      startTime,
+      firstName,
+      lastName,
+      email,
+      phone,
+      intakeFormId,
+      intakeData,
+      notes,
+      resource_id,
+    } = body as {
+      serviceId?: string
+      date?: string
+      startTime?: string
+      firstName?: string
+      lastName?: string
+      email?: string
+      phone?: string
+      intakeFormId?: string
+      intakeData?: Record<string, unknown>
+      notes?: string
+      resource_id?: string
+    }
 
-  // Validate required fields
-  const missing: string[] = []
-  if (!serviceId) missing.push('serviceId')
-  if (!date) missing.push('date')
-  if (!startTime) missing.push('startTime')
-  if (!firstName) missing.push('firstName')
-  if (!lastName) missing.push('lastName')
-  if (!email) missing.push('email')
-  if (!phone) missing.push('phone')
+    // Validate required fields
+    const missing: string[] = []
+    if (!serviceId) missing.push('serviceId')
+    if (!date) missing.push('date')
+    if (!startTime) missing.push('startTime')
+    if (!firstName) missing.push('firstName')
+    if (!lastName) missing.push('lastName')
+    if (!email) missing.push('email')
+    if (!phone) missing.push('phone')
 
-  if (missing.length > 0) {
-    res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` })
-    return
-  }
-
-  const supabase = getSupabase()
-
-  // Look up tenant by slug
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .select(
-      'id, booking_page_enabled, booking_buffer_minutes, booking_confirmation_message, booking_accent_color'
-    )
-    .eq('booking_page_slug', slug)
-    .maybeSingle()
-
-  if (tenantError || !tenant || !tenant.booking_page_enabled) {
-    res.status(404).json({ error: 'Booking page not found' })
-    return
-  }
-
-  const tenantId: string = tenant.id as string
-  const confirmationMessage: string =
-    (tenant.booking_confirmation_message as string | null) ??
-    'Your appointment has been booked! We look forward to seeing you.'
-
-  // Get service
-  const { data: service, error: serviceError } = await supabase
-    .from('services')
-    .select('id, name, duration_minutes')
-    .eq('id', serviceId!)
-    .eq('tenant_id', tenantId)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (serviceError || !service) {
-    res.status(404).json({ error: 'Service not found' })
-    return
-  }
-
-  const durationMinutes: number = (service.duration_minutes as number | null) ?? 60
-  const serviceName: string = service.name as string
-
-  // Re-check slot availability
-  const creds = await getTenantCalendarCredentials(tenantId)
-  if (creds) {
-    const available = await isSlotAvailable(creds, date!, startTime!, durationMinutes)
-    if (!available) {
-      res.status(409).json({ error: 'This time slot is no longer available' })
+    if (missing.length > 0) {
+      res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` })
       return
     }
-  }
 
-  // Get primary location
-  const { data: primaryLocation } = await supabase
-    .from('locations')
-    .select('id, telnyx_number')
-    .eq('tenant_id', tenantId)
-    .eq('is_primary', true)
-    .maybeSingle()
+    const supabase = getSupabase()
 
-  const locationId: string | null = (primaryLocation?.id as string | null) ?? null
-  const telnyxNumber: string | null = (primaryLocation?.telnyx_number as string | null) ?? null
+    // Look up tenant by slug
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select(
+        'id, booking_page_enabled, booking_buffer_minutes, booking_confirmation_message, booking_accent_color'
+      )
+      .eq('booking_page_slug', slug)
+      .maybeSingle()
 
-  // Find or create contact — match by phone first, then email
-  let contactId: string | null = null
-  const fullName = `${firstName!.trim()} ${lastName!.trim()}`
+    if (tenantError || !tenant || !tenant.booking_page_enabled) {
+      res.status(404).json({ error: 'Booking page not found' })
+      return
+    }
 
-  const { data: byPhone } = await supabase
-    .from('contacts')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('phone', phone!)
-    .maybeSingle()
+    const tenantId: string = tenant.id as string
+    const confirmationMessage: string =
+      (tenant.booking_confirmation_message as string | null) ??
+      'Your appointment has been booked! We look forward to seeing you.'
 
-  if (byPhone) {
-    contactId = byPhone.id as string
-    // Update name
-    await supabase
-      .from('contacts')
-      .update({ full_name: fullName })
-      .eq('id', contactId)
+    // Get service
+    const { data: service, error: serviceError } = await supabase
+      .from('services')
+      .select('id, name, duration_minutes')
+      .eq('id', serviceId!)
       .eq('tenant_id', tenantId)
-  } else {
-    // Try match by email
-    const { data: byEmail } = await supabase
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (serviceError || !service) {
+      res.status(404).json({ error: 'Service not found' })
+      return
+    }
+
+    const durationMinutes: number = (service.duration_minutes as number | null) ?? 60
+    const serviceName: string = service.name as string
+
+    // Re-check slot availability
+    const creds = await getTenantCalendarCredentials(tenantId)
+    if (creds) {
+      const available = await isSlotAvailable(creds, date!, startTime!, durationMinutes)
+      if (!available) {
+        res.status(409).json({ error: 'This time slot is no longer available' })
+        return
+      }
+    }
+
+    // Get primary location
+    const { data: primaryLocation } = await supabase
+      .from('locations')
+      .select('id, telnyx_number')
+      .eq('tenant_id', tenantId)
+      .eq('is_primary', true)
+      .maybeSingle()
+
+    const locationId: string | null = (primaryLocation?.id as string | null) ?? null
+    const telnyxNumber: string | null = (primaryLocation?.telnyx_number as string | null) ?? null
+
+    // Find or create contact — match by phone first, then email
+    let contactId: string | null = null
+    const fullName = `${firstName!.trim()} ${lastName!.trim()}`
+
+    const { data: byPhone } = await supabase
       .from('contacts')
       .select('id')
       .eq('tenant_id', tenantId)
-      .eq('email', email!)
+      .eq('phone', phone!)
       .maybeSingle()
 
-    if (byEmail) {
-      contactId = byEmail.id as string
+    if (byPhone) {
+      contactId = byPhone.id as string
       // Update name
       await supabase
         .from('contacts')
@@ -356,168 +343,188 @@ router.post('/:slug/confirm', async (req: Request, res: Response): Promise<void>
         .eq('id', contactId)
         .eq('tenant_id', tenantId)
     } else {
-      // Create new contact
-      const { data: newContact, error: contactError } = await supabase
+      // Try match by email
+      const { data: byEmail } = await supabase
         .from('contacts')
-        .insert({
-          tenant_id: tenantId,
-          full_name: fullName,
-          email: email!,
-          phone: phone!,
-          source: 'booking_page',
-        })
         .select('id')
-        .single()
+        .eq('tenant_id', tenantId)
+        .eq('email', email!)
+        .maybeSingle()
 
-      if (contactError || !newContact) {
-        res.status(500).json({ error: 'Failed to create contact' })
-        return
-      }
+      if (byEmail) {
+        contactId = byEmail.id as string
+        // Update name
+        await supabase
+          .from('contacts')
+          .update({ full_name: fullName })
+          .eq('id', contactId)
+          .eq('tenant_id', tenantId)
+      } else {
+        // Create new contact
+        const { data: newContact, error: contactError } = await supabase
+          .from('contacts')
+          .insert({
+            tenant_id: tenantId,
+            full_name: fullName,
+            email: email!,
+            phone: phone!,
+            source: 'booking_page',
+            sms_opt_in: true, // Submitting phone on booking form = explicit TCPA consent
+          })
+          .select('id')
+          .single()
 
-      contactId = newContact.id as string
+        if (contactError || !newContact) {
+          res.status(500).json({ error: 'Failed to create contact' })
+          return
+        }
 
-      // Auto-enrich new contact
-      try {
-        const enrichResult = autoEnrichContact({ phone: phone!, email: email! })
-        const enrichUpdates: Record<string, unknown> = {}
-        if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
-        if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
-        if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
-        if (enrichResult.suggestedCompany) {
-          enrichUpdates['custom_fields'] = {
-            enrichment_suggested_company: enrichResult.suggestedCompany,
+        contactId = newContact.id as string
+
+        // Auto-enrich new contact
+        try {
+          const enrichResult = autoEnrichContact({ phone: phone!, email: email! })
+          const enrichUpdates: Record<string, unknown> = {}
+          if (enrichResult.updates.city) enrichUpdates['city'] = enrichResult.updates.city
+          if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
+          if (enrichResult.updates.timezone)
+            enrichUpdates['timezone'] = enrichResult.updates.timezone
+          if (enrichResult.suggestedCompany) {
+            enrichUpdates['custom_fields'] = {
+              enrichment_suggested_company: enrichResult.suggestedCompany,
+            }
           }
+          if (Object.keys(enrichUpdates).length > 0) {
+            await supabase.from('contacts').update(enrichUpdates).eq('id', contactId)
+          }
+        } catch (err) {
+          console.error('[enrichment] Failed:', err)
         }
-        if (Object.keys(enrichUpdates).length > 0) {
-          await supabase.from('contacts').update(enrichUpdates).eq('id', contactId)
-        }
-      } catch (err) {
-        console.error('[enrichment] Failed:', err)
       }
     }
-  }
 
-  // Create Google Calendar event if calendar connected
-  let googleEventId: string | null = null
-  let startIso: string | null = null
-  let endIso: string | null = null
+    // Create Google Calendar event if calendar connected
+    let googleEventId: string | null = null
+    let startIso: string | null = null
+    let endIso: string | null = null
 
-  if (creds) {
-    try {
-      const calResult = await createCalendarEvent(
-        creds,
-        date!,
-        startTime!,
-        durationMinutes,
-        `${serviceName} — ${fullName}`,
-        `Booked via online booking page\nClient: ${fullName}\nPhone: ${phone}\nEmail: ${email}${notes ? `\nNotes: ${notes}` : ''}`
-      )
-      googleEventId = calResult.googleEventId
-      startIso = calResult.startIso
-      endIso = calResult.endIso
-    } catch (err) {
-      console.error('[booking] Google Calendar event creation failed:', err)
-      // Non-fatal
+    if (creds) {
+      try {
+        const calResult = await createCalendarEvent(
+          creds,
+          date!,
+          startTime!,
+          durationMinutes,
+          `${serviceName} — ${fullName}`,
+          `Booked via online booking page\nClient: ${fullName}\nPhone: ${phone}\nEmail: ${email}${notes ? `\nNotes: ${notes}` : ''}`
+        )
+        googleEventId = calResult.googleEventId
+        startIso = calResult.startIso
+        endIso = calResult.endIso
+      } catch (err) {
+        console.error('[booking] Google Calendar event creation failed:', err)
+        // Non-fatal
+      }
     }
-  }
 
-  // Compute start/end times if not from calendar
-  if (!startIso) {
-    // Build a rough ISO from date + startTime (UTC approximation)
-    startIso = `${date}T${startTime}:00.000Z`
-    endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
-  }
+    // Compute start/end times if not from calendar
+    if (!startIso) {
+      // Build a rough ISO from date + startTime (UTC approximation)
+      startIso = `${date}T${startTime}:00.000Z`
+      endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60_000).toISOString()
+    }
 
-  // Insert appointment
-  const { data: appointment, error: appointmentError } = await supabase
-    .from('appointments')
-    .insert({
-      tenant_id: tenantId,
-      contact_id: contactId,
-      location_id: locationId,
-      title: `${serviceName} — ${fullName}`,
-      description: notes ?? '',
-      start_time: startIso,
-      end_time: endIso!,
-      status: 'confirmed',
-      google_event_id: googleEventId,
-      notes: 'Booked via online booking page',
-    })
-    .select('id')
-    .single()
+    // Insert appointment
+    const { data: appointment, error: appointmentError } = await supabase
+      .from('appointments')
+      .insert({
+        tenant_id: tenantId,
+        contact_id: contactId,
+        location_id: locationId,
+        title: `${serviceName} — ${fullName}`,
+        description: notes ?? '',
+        start_time: startIso,
+        end_time: endIso!,
+        status: 'confirmed',
+        google_event_id: googleEventId,
+        notes: 'Booked via online booking page',
+      })
+      .select('id')
+      .single()
 
-  if (appointmentError || !appointment) {
-    res.status(500).json({ error: 'Failed to create appointment' })
-    return
-  }
+    if (appointmentError || !appointment) {
+      res.status(500).json({ error: 'Failed to create appointment' })
+      return
+    }
 
-  const appointmentId: string = appointment.id as string
+    const appointmentId: string = appointment.id as string
 
-  // Insert resource booking if resource_id provided (fire-and-forget)
-  if (resource_id) {
-    void supabase.from('resource_bookings').insert({
-      tenant_id: tenantId,
-      resource_id,
-      appointment_id: appointmentId,
-      contact_id: contactId,
-      start_time: startIso,
-      end_time: endIso,
-      status: 'confirmed',
-    })
-  }
-
-  // Insert intake submission if provided
-  if (intakeFormId && intakeData) {
-    const { error: submissionError } = await supabase.from('intake_submissions').insert({
-      tenant_id: tenantId,
-      form_id: intakeFormId,
-      contact_id: contactId,
-      appointment_id: appointmentId,
-      data: intakeData,
-    })
-
-    if (!submissionError) {
-      void logActivity({
-        tenantId,
-        contactId: contactId ?? undefined,
-        type: 'system',
-        body: 'Intake form submitted via online booking page',
-        metadata: { form_id: intakeFormId, appointment_id: appointmentId },
-        actorType: 'system',
+    // Insert resource booking if resource_id provided (fire-and-forget)
+    if (resource_id) {
+      void supabase.from('resource_bookings').insert({
+        tenant_id: tenantId,
+        resource_id,
+        appointment_id: appointmentId,
+        contact_id: contactId,
+        start_time: startIso,
+        end_time: endIso,
+        status: 'confirmed',
       })
     }
+
+    // Insert intake submission if provided
+    if (intakeFormId && intakeData) {
+      const { error: submissionError } = await supabase.from('intake_submissions').insert({
+        tenant_id: tenantId,
+        form_id: intakeFormId,
+        contact_id: contactId,
+        appointment_id: appointmentId,
+        data: intakeData,
+      })
+
+      if (!submissionError) {
+        void logActivity({
+          tenantId,
+          contactId: contactId ?? undefined,
+          type: 'system',
+          body: 'Intake form submitted via online booking page',
+          metadata: { form_id: intakeFormId, appointment_id: appointmentId },
+          actorType: 'system',
+        })
+      }
+    }
+
+    // Log appointment activity
+    void logActivity({
+      tenantId,
+      contactId: contactId ?? undefined,
+      type: 'appointment',
+      body: `Booked via online booking page: ${serviceName} on ${date} at ${startTime}`,
+      metadata: { appointment_id: appointmentId, service_id: serviceId },
+      actorType: 'system',
+    })
+
+    if (contactId) enqueueScoreCompute(tenant.id, contactId, 'appointment_booked')
+
+    // Send SMS confirmation
+    if (telnyxNumber && phone) {
+      const smsBody = `Hi ${firstName}, your appointment for ${serviceName} on ${date} at ${startTime} has been confirmed. ${confirmationMessage}`
+      void sendSms(telnyxNumber, phone, smsBody, { tenantId, contactId: contactId ?? undefined })
+    }
+
+    // Send push notification to tenant
+    void sendPushNotification(tenantId, {
+      title: 'New Booking',
+      body: `${fullName} booked ${serviceName} on ${date} at ${startTime}`,
+      url: `/appointments`,
+    })
+
+    res.status(201).json({
+      success: true,
+      appointmentId,
+      confirmationMessage,
+    })
   }
-
-  // Log appointment activity
-  void logActivity({
-    tenantId,
-    contactId: contactId ?? undefined,
-    type: 'appointment',
-    body: `Booked via online booking page: ${serviceName} on ${date} at ${startTime}`,
-    metadata: { appointment_id: appointmentId, service_id: serviceId },
-    actorType: 'system',
-  })
-
-  if (contactId) enqueueScoreCompute(tenant.id, contactId, 'appointment_booked')
-
-  // Send SMS confirmation
-  if (telnyxNumber && phone) {
-    const smsBody = `Hi ${firstName}, your appointment for ${serviceName} on ${date} at ${startTime} has been confirmed. ${confirmationMessage}`
-    void sendSms(telnyxNumber, phone, smsBody, { tenantId, contactId: contactId ?? undefined })
-  }
-
-  // Send push notification to tenant
-  void sendPushNotification(tenantId, {
-    title: 'New Booking',
-    body: `${fullName} booked ${serviceName} on ${date} at ${startTime}`,
-    url: `/appointments`,
-  })
-
-  res.status(201).json({
-    success: true,
-    appointmentId,
-    confirmationMessage,
-  })
-})
+)
 
 export default router

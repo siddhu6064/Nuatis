@@ -10,6 +10,7 @@ import {
 } from '../lib/outlook-calendar.js'
 import { callSessionState } from './post-call.js'
 import { sendSms } from '../lib/sms.js'
+import { buildConfirmationSms } from '../lib/sms-templates.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 
 export interface ToolCallContext {
@@ -915,6 +916,47 @@ const handlers: Record<string, ToolHandler> = {
       }
 
       console.info(`[tool-handlers] book_appointment: appointment saved id=${appointment.id}`)
+
+      // Fire-and-forget confirmation SMS — must NEVER throw or block the tool response
+      void (async () => {
+        try {
+          if (!callerPhone) return
+
+          const [locationSms, tenantSms] = await Promise.all([
+            supabase
+              .from('locations')
+              .select('telnyx_number')
+              .eq('tenant_id', context.tenantId)
+              .eq('is_primary', true)
+              .maybeSingle(),
+            supabase.from('tenants').select('name').eq('id', context.tenantId).single(),
+          ])
+
+          const telnyxNumber = locationSms.data?.telnyx_number
+          const businessName = (tenantSms.data?.name as string | undefined) ?? 'your business'
+
+          if (!telnyxNumber) return
+
+          const smsText = buildConfirmationSms({
+            contactName: callerName || null,
+            businessName,
+            appointmentDateTime: `${date} at ${startTime}`,
+            vertical: context.vertical,
+          })
+
+          const { success } = await sendSms(telnyxNumber, callerPhone, smsText, {
+            contactId: contactId ?? undefined,
+            tenantId: context.tenantId,
+          })
+          if (success) {
+            console.info(
+              `[tool-handlers] book_appointment: confirmation SMS sent to ${callerPhone}`
+            )
+          }
+        } catch (err) {
+          console.error('[tool-handlers] book_appointment: confirmation SMS error:', err)
+        }
+      })()
 
       // Track booking in session state for post-call automation
       if (context.callControlId) {
