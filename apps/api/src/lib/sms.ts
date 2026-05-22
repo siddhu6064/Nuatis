@@ -24,13 +24,16 @@ export async function sendSms(
   options?: SendSmsOptions
 ): Promise<{ success: boolean; messageId?: string }> {
   const apiKey = process.env['TELNYX_API_KEY']
-  if (!apiKey) return { success: false }
+  if (!apiKey) {
+    console.error('[sms] TELNYX_API_KEY not configured — cannot send SMS')
+    return { success: false }
+  }
 
   try {
     if (options?.contactId && options?.tenantId) {
       const allowed = await checkTcpaOptIn(options.contactId, options.tenantId)
       if (!allowed) {
-        console.info(
+        console.warn(
           `[sendSms] TCPA suppressed: contact=${options.contactId} tenant=${options.tenantId} to=${to}`
         )
         return { success: false }

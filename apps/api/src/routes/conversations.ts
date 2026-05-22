@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendSms } from '../lib/sms.js'
+import { grantTcpaOptIn } from '../lib/tcpa.js'
 import { smsSendLimiter } from '../middleware/rate-limit.js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
 
@@ -496,10 +497,17 @@ router.post(
       return
     }
 
-    // Check SMS opt-in
+    // Check SMS opt-in: explicit opt-out blocks. Null/undefined is treated as
+    // agent-initiated consent — the agent's deliberate action to send creates
+    // an established business relationship under TCPA. Grant opt-in here so
+    // sendSms's internal TCPA check passes and so future automated replies
+    // (Maya, campaigns) can also reach this contact.
     if (contact.sms_opt_in === false) {
       res.status(403).json({ error: 'Contact has opted out of SMS' })
       return
+    }
+    if (contact.sms_opt_in !== true) {
+      await grantTcpaOptIn(contactId as string, tenantId as string)
     }
 
     // Get our phone number
@@ -525,6 +533,9 @@ router.post(
     })
 
     if (!result.success) {
+      console.warn(
+        `[conversations] manual SMS send failed: tenant=${tenantId} contact=${contactId} to=${contact.phone} from=${location.telnyx_number}`
+      )
       res.status(500).json({ error: 'Failed to send SMS' })
       return
     }
