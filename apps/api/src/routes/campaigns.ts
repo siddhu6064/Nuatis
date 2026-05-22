@@ -1203,4 +1203,100 @@ router.delete(
   }
 )
 
+// ── GET /api/campaigns/:id/performance/summary ────────────────────────────────
+router.get(
+  '/:id/performance/summary',
+  requireAuth,
+  requireModule('campaigns'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const id = req.params['id']
+
+    // Verify campaign belongs to tenant
+    const { data: campaign, error: campErr } = await supabase
+      .from('campaigns')
+      .select('id')
+      .eq('id', id)
+      .eq('tenant_id', authed.tenantId)
+      .single<{ id: string }>()
+
+    if (campErr || !campaign) {
+      res.status(404).json({ error: 'Campaign not found' })
+      return
+    }
+
+    // Fetch combined totals from campaign_sends directly (parallel count queries)
+    const [totalRes, deliveredRes, openedRes, clickedRes, optedOutRes, failedRes, perfRes] =
+      await Promise.all([
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id),
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id)
+          .in('status', ['delivered', 'opened', 'clicked']),
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id)
+          .in('status', ['opened', 'clicked']),
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id)
+          .eq('status', 'clicked'),
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id)
+          .eq('status', 'opted_out'),
+        supabase
+          .from('campaign_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id)
+          .eq('status', 'failed'),
+        supabase.from('campaign_performance').select('*').eq('campaign_id', id),
+      ])
+
+    const totalSent = totalRes.count ?? 0
+    const delivered = deliveredRes.count ?? 0
+    const opened = openedRes.count ?? 0
+    const clicked = clickedRes.count ?? 0
+    const optedOut = optedOutRes.count ?? 0
+    const failed = failedRes.count ?? 0
+
+    function rate(num: number, den: number): number {
+      if (den === 0) return 0
+      return Math.round((num / den) * 1000) / 10
+    }
+
+    type PerfRow = {
+      channel: string
+      total_sent: number
+      delivered: number
+      opened: number
+      clicked: number
+      opted_out: number
+      failed: number
+    }
+
+    res.json({
+      total_sent: totalSent,
+      delivered,
+      opened,
+      clicked,
+      opted_out: optedOut,
+      failed,
+      delivery_rate: rate(delivered, totalSent),
+      open_rate: rate(opened, delivered),
+      click_rate: rate(clicked, opened),
+      opt_out_rate: rate(optedOut, totalSent),
+      by_channel: (perfRes.data ?? []) as PerfRow[],
+    })
+  }
+)
+
 export default router
