@@ -5,7 +5,10 @@ let _queue: Queue | null = null
 
 function getMayaMemoryQueue(): Queue {
   if (!_queue) {
-    _queue = new Queue('voice-session-complete', { connection: createBullMQConnection() })
+    _queue = new Queue('voice-session-complete', {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   }
   return _queue
 }

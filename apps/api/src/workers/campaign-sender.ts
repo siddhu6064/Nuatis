@@ -370,7 +370,7 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
 export function createCampaignSenderWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue('campaign-send', { connection })
+  const queue = new Queue('campaign-send', { connection, skipVersionCheck: true })
 
   const worker = new Worker<CampaignSenderJobData>(
     'campaign-send',
@@ -378,7 +378,7 @@ export function createCampaignSenderWorker(): { queue: Queue; worker: Worker } {
       const data = job.data
       await processCampaignSend(data)
     },
-    { connection, concurrency: 1 }
+    { connection, concurrency: 1, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

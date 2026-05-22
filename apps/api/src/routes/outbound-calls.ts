@@ -15,7 +15,11 @@ function getSupabase() {
 
 let _queue: Queue | null = null
 function getOutboundQueue(): Queue {
-  if (!_queue) _queue = new Queue('outbound-calls', { connection: createBullMQConnection() })
+  if (!_queue)
+    _queue = new Queue('outbound-calls', {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   return _queue
 }
 

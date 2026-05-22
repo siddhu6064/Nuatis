@@ -82,7 +82,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             .from('outbound_call_jobs')
             .update({ status: 'pending', attempts })
             .eq('id', jobId)
-          const queue = new Queue('outbound-calls', { connection: createBullMQConnection() })
+          const queue = new Queue('outbound-calls', {
+            connection: createBullMQConnection(),
+            skipVersionCheck: true,
+          })
           await queue.add('dial', { jobId }, { delay: 30 * 60 * 1000 })
           await queue.close()
           console.info(

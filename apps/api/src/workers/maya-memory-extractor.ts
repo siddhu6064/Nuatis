@@ -192,7 +192,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 export function createMayaMemoryExtractor(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
 
   const worker = new Worker(
     QUEUE_NAME,
@@ -208,7 +208,7 @@ export function createMayaMemoryExtractor(): { queue: Queue; worker: Worker } {
         )
       }
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

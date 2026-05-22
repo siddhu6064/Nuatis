@@ -5,7 +5,10 @@ let _queue: Queue | null = null
 
 export function getLeadScoreQueue(): Queue {
   if (!_queue) {
-    _queue = new Queue('lead-score-compute', { connection: createBullMQConnection() })
+    _queue = new Queue('lead-score-compute', {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   }
   return _queue
 }
@@ -14,7 +17,10 @@ let _bulkQueue: Queue | null = null
 
 export function getLeadScoreBulkQueue(): Queue {
   if (!_bulkQueue) {
-    _bulkQueue = new Queue('lead-score-bulk', { connection: createBullMQConnection() })
+    _bulkQueue = new Queue('lead-score-bulk', {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   }
   return _bulkQueue
 }

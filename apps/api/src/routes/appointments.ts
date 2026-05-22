@@ -513,7 +513,10 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
           .eq('id', authed.tenantId)
           .single()
         if (tenantData?.review_automation_enabled && existing.contact_id) {
-          const reviewQueue = new Queue('review-request', { connection: createBullMQConnection() })
+          const reviewQueue = new Queue('review-request', {
+            connection: createBullMQConnection(),
+            skipVersionCheck: true,
+          })
           await reviewQueue.add(
             'send-review',
             {

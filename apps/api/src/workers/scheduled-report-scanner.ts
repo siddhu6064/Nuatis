@@ -68,7 +68,10 @@ export async function scanScheduledReports(): Promise<void> {
     return
   }
 
-  const reportQueue = new Queue(REPORT_QUEUE, { connection: createBullMQConnection() })
+  const reportQueue = new Queue(REPORT_QUEUE, {
+    connection: createBullMQConnection(),
+    skipVersionCheck: true,
+  })
 
   for (const r of due) {
     const report = r as ScheduledReport
@@ -91,8 +94,11 @@ export async function scanScheduledReports(): Promise<void> {
 export function createScheduledReportScanner(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(SCANNER_QUEUE, { connection })
-  const worker = new Worker(SCANNER_QUEUE, async () => scanScheduledReports(), { connection })
+  const queue = new Queue(SCANNER_QUEUE, { connection, skipVersionCheck: true })
+  const worker = new Worker(SCANNER_QUEUE, async () => scanScheduledReports(), {
+    connection,
+    skipVersionCheck: true,
+  })
 
   worker.on('failed', (job, err) => {
     console.error(`[scheduled-report-scanner] job ${job?.id} failed:`, err)

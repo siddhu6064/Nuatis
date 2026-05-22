@@ -9,7 +9,10 @@ let retryQueue: Queue | null = null
 
 export function getRetryQueue(): Queue {
   if (!retryQueue) {
-    retryQueue = new Queue(QUEUE_NAME, { connection: createBullMQConnection() })
+    retryQueue = new Queue(QUEUE_NAME, {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   }
   return retryQueue
 }
@@ -73,7 +76,7 @@ export function createWebhookRetryWorker(): { queue: Queue; worker: Worker } {
       const payload = job.data as OpsActivityEvent
       await processRetry(payload)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

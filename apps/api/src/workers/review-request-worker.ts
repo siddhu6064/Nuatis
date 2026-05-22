@@ -190,7 +190,7 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
 export function createReviewRequestWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
@@ -201,7 +201,7 @@ export function createReviewRequestWorker(): { queue: Queue; worker: Worker } {
       }
       await processReviewRequest(job.data as ReviewRequestJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

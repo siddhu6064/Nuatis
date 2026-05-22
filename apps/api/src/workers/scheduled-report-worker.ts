@@ -403,13 +403,13 @@ export async function processScheduledReport(data: ScheduledReportJobData): Prom
 export function createScheduledReportWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
       await processScheduledReport(job.data as ScheduledReportJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

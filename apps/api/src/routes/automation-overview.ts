@@ -46,7 +46,7 @@ async function fetchScannerStatus(
   name: string,
   tenantId: string
 ): Promise<ScannerStatus> {
-  const q = new Queue(key, { connection: createBullMQConnection() })
+  const q = new Queue(key, { connection: createBullMQConnection(), skipVersionCheck: true })
   try {
     const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed', 'paused')
     const [failedJobs, completedJobs] = await Promise.all([
@@ -202,7 +202,7 @@ router.post(
       res.status(400).json({ error: 'Unknown scanner key' })
       return
     }
-    const q = new Queue(key, { connection: createBullMQConnection() })
+    const q = new Queue(key, { connection: createBullMQConnection(), skipVersionCheck: true })
     try {
       const failedJobs = await q.getFailed(0, -1)
       let retried = 0
@@ -231,7 +231,7 @@ router.post(
       res.status(400).json({ error: 'Unknown scanner key' })
       return
     }
-    const q = new Queue(key, { connection: createBullMQConnection() })
+    const q = new Queue(key, { connection: createBullMQConnection(), skipVersionCheck: true })
     try {
       const cleaned = await q.clean(0, 100, 'failed')
       res.json({ cleared: cleaned.length })

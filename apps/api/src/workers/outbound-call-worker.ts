@@ -164,13 +164,13 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
 
 export function createOutboundCallWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
-  const queue = new Queue('outbound-calls', { connection })
+  const queue = new Queue('outbound-calls', { connection, skipVersionCheck: true })
   const worker = new Worker(
     'outbound-calls',
     async (job) => {
       await processOutboundCall(job.data as OutboundCallJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
   worker.on('failed', (job, err) => {
     console.error(`[outbound-call] job ${job?.id} failed:`, err)

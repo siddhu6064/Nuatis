@@ -59,7 +59,10 @@ let _campaignQueue: Queue | null = null
 
 function getCampaignQueue(): Queue {
   if (!_campaignQueue) {
-    _campaignQueue = new Queue('campaign-send', { connection: createBullMQConnection() })
+    _campaignQueue = new Queue('campaign-send', {
+      connection: createBullMQConnection(),
+      skipVersionCheck: true,
+    })
   }
   return _campaignQueue
 }

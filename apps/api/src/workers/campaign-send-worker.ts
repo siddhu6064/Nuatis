@@ -257,13 +257,13 @@ export async function processCampaignSend(data: CampaignSendJobData): Promise<vo
 export function createCampaignSendWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue('campaign-send', { connection })
+  const queue = new Queue('campaign-send', { connection, skipVersionCheck: true })
   const worker = new Worker(
     'campaign-send',
     async (job) => {
       await processCampaignSend(job.data as CampaignSendJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

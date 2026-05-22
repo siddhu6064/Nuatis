@@ -11,7 +11,7 @@ let _queue: Queue | null = null
 /** Lazily create and return the shared task-reminder queue. */
 export function getTaskReminderQueue(): Queue {
   if (!_queue) {
-    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection() })
+    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection(), skipVersionCheck: true })
   }
   return _queue
 }
@@ -110,7 +110,7 @@ export async function cancelTaskReminder(jobId: string): Promise<void> {
 export function createTaskReminderWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
   _queue = queue
 
   const worker = new Worker(
@@ -118,7 +118,7 @@ export function createTaskReminderWorker(): { queue: Queue; worker: Worker } {
     async (job) => {
       await processReminder(job.data as TaskReminderJob)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

@@ -139,8 +139,11 @@ async function processWeeklyDigest(): Promise<void> {
 export function createWeeklyDigestWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
-  const worker = new Worker(QUEUE_NAME, async () => processWeeklyDigest(), { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
+  const worker = new Worker(QUEUE_NAME, async () => processWeeklyDigest(), {
+    connection,
+    skipVersionCheck: true,
+  })
 
   worker.on('failed', (job, err) => {
     console.error(`[weekly-digest] job ${job?.id} failed:`, err)

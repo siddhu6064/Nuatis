@@ -73,8 +73,8 @@ export async function scan(): Promise<void> {
 export function createDataRetentionWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
-  const worker = new Worker(QUEUE_NAME, async () => scan(), { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
+  const worker = new Worker(QUEUE_NAME, async () => scan(), { connection, skipVersionCheck: true })
 
   worker.on('failed', (job, err) => {
     console.error(`[data-retention] job ${job?.id} failed:`, err)

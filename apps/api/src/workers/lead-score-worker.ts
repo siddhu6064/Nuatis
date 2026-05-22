@@ -158,13 +158,13 @@ export async function processDecay(): Promise<void> {
 export function createLeadScoreComputeWorker(): { queues: Queue[]; workers: Worker[] } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(COMPUTE_QUEUE_NAME, { connection })
+  const queue = new Queue(COMPUTE_QUEUE_NAME, { connection, skipVersionCheck: true })
   const worker = new Worker(
     COMPUTE_QUEUE_NAME,
     async (job) => {
       await processCompute(job.data as ComputeJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {
@@ -177,13 +177,13 @@ export function createLeadScoreComputeWorker(): { queues: Queue[]; workers: Work
 export function createLeadScoreBulkWorker(): { queues: Queue[]; workers: Worker[] } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(BULK_QUEUE_NAME, { connection })
+  const queue = new Queue(BULK_QUEUE_NAME, { connection, skipVersionCheck: true })
   const worker = new Worker(
     BULK_QUEUE_NAME,
     async (job) => {
       await processBulk(job.data as BulkJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {
@@ -196,8 +196,11 @@ export function createLeadScoreBulkWorker(): { queues: Queue[]; workers: Worker[
 export function createLeadScoreDecayWorker(): { queues: Queue[]; workers: Worker[] } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(DECAY_QUEUE_NAME, { connection })
-  const worker = new Worker(DECAY_QUEUE_NAME, async () => processDecay(), { connection })
+  const queue = new Queue(DECAY_QUEUE_NAME, { connection, skipVersionCheck: true })
+  const worker = new Worker(DECAY_QUEUE_NAME, async () => processDecay(), {
+    connection,
+    skipVersionCheck: true,
+  })
 
   worker.on('failed', (job, err) => {
     console.error(`[lead-score-decay] job ${job?.id} failed:`, err)

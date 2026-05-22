@@ -10,7 +10,7 @@ let _queue: Queue | null = null
 
 export function getExportQueue(): Queue {
   if (!_queue) {
-    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection() })
+    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection(), skipVersionCheck: true })
   }
   return _queue
 }
@@ -235,7 +235,7 @@ export async function processExport(data: ExportJobData): Promise<void> {
 export function createExportWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
   _queue = queue
 
   const worker = new Worker(
@@ -243,7 +243,7 @@ export function createExportWorker(): { queue: Queue; worker: Worker } {
     async (job) => {
       await processExport(job.data as ExportJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {

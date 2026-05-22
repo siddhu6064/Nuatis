@@ -11,7 +11,7 @@ let _queue: Queue | null = null
 /** Lazily create and return the shared followup queue (for enqueuing from routes). */
 export function getFollowupQueue(): Queue {
   if (!_queue) {
-    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection() })
+    _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection(), skipVersionCheck: true })
   }
   return _queue
 }
@@ -105,7 +105,7 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
 export function createQuoteFollowupWorker(): { queue: Queue; worker: Worker } {
   const connection = createBullMQConnection()
 
-  const queue = new Queue(QUEUE_NAME, { connection })
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
   // Store reference so getFollowupQueue() returns this instance when workers are running
   _queue = queue
 
@@ -119,7 +119,7 @@ export function createQuoteFollowupWorker(): { queue: Queue; worker: Worker } {
       }
       await processFollowup(job.data as FollowupJobData)
     },
-    { connection }
+    { connection, skipVersionCheck: true }
   )
 
   worker.on('failed', (job, err) => {
