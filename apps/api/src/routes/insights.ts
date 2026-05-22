@@ -1412,4 +1412,147 @@ router.get('/staff', requireAuth, async (_req: Request, res: Response): Promise<
   }
 })
 
+// ── GET /api/insights/campaigns ──────────────────────────────────────────────
+router.get('/campaigns', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Campaigns module gate — soft: return null summary instead of 403
+    const campaignsEnabled = await isModuleEnabled(authed.tenantId, 'campaigns')
+    if (!campaignsEnabled) {
+      res.json({ summary: null, by_day: [], recent_campaigns: [] })
+      return
+    }
+
+    // Period param: 7d | 30d | 90d
+    const periodParam = (req.query['period'] as string) || '30d'
+    const days = periodParam === '7d' ? 7 : periodParam === '90d' ? 90 : 30
+    const from = new Date(Date.now() - days * 86400000).toISOString()
+    const to = new Date().toISOString()
+
+    // All campaigns for this tenant
+    const { data: campaignsData } = await supabase
+      .from('campaigns')
+      .select('id, name, status, sent_at')
+      .eq('tenant_id', authed.tenantId)
+
+    const allCampaigns = campaignsData ?? []
+    const campaignIds = allCampaigns.map((c) => c.id)
+
+    if (campaignIds.length === 0) {
+      res.json({
+        summary: {
+          total_campaigns: 0,
+          total_sent: 0,
+          avg_delivery_rate: 0,
+          avg_open_rate: 0,
+          top_channel: null,
+        },
+        by_day: [],
+        recent_campaigns: [],
+      })
+      return
+    }
+
+    // Sends within period (cap to 200 campaign IDs for safety)
+    const { data: sendsData } = await supabase
+      .from('campaign_sends')
+      .select('campaign_id, status, channel, sent_at')
+      .in('campaign_id', campaignIds.slice(0, 200))
+      .gte('sent_at', from)
+      .lte('sent_at', to)
+
+    const sends = sendsData ?? []
+
+    // by_day aggregation
+    const dailyMap = new Map<string, { sent: number; delivered: number }>()
+    for (const s of sends) {
+      if (!s.sent_at) continue
+      const date = (s.sent_at as string).slice(0, 10)
+      const day = dailyMap.get(date) ?? { sent: 0, delivered: 0 }
+      day.sent++
+      if (['delivered', 'opened', 'clicked'].includes(s.status as string)) day.delivered++
+      dailyMap.set(date, day)
+    }
+    const by_day = Array.from(dailyMap.entries())
+      .map(([date, v]) => ({ date, ...v }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    // Per-campaign stats
+    const campaignStats = new Map<
+      string,
+      { sent: number; delivered: number; opened: number; opted_out: number }
+    >()
+    const channelMap = new Map<string, number>()
+
+    for (const s of sends) {
+      const cid = s.campaign_id as string
+      const stat = campaignStats.get(cid) ?? { sent: 0, delivered: 0, opened: 0, opted_out: 0 }
+      stat.sent++
+      if (['delivered', 'opened', 'clicked'].includes(s.status as string)) stat.delivered++
+      if (['opened', 'clicked'].includes(s.status as string)) stat.opened++
+      if (s.status === 'opted_out') stat.opted_out++
+      campaignStats.set(cid, stat)
+      if (s.channel)
+        channelMap.set(s.channel as string, (channelMap.get(s.channel as string) ?? 0) + 1)
+    }
+
+    // Avg rates across campaigns with sends
+    let deliverySum = 0
+    let openSum = 0
+    let statCount = 0
+    for (const [, stat] of campaignStats) {
+      if (stat.sent > 0) {
+        deliverySum += (stat.delivered / stat.sent) * 100
+        openSum += (stat.opened / stat.sent) * 100
+        statCount++
+      }
+    }
+    const avgDeliveryRate = statCount > 0 ? Math.round((deliverySum / statCount) * 10) / 10 : 0
+    const avgOpenRate = statCount > 0 ? Math.round((openSum / statCount) * 10) / 10 : 0
+    const topChannel =
+      channelMap.size > 0
+        ? ([...channelMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null)
+        : null
+
+    // Recent campaigns sorted by sent_at desc
+    const recent_campaigns = [...campaignStats.entries()]
+      .map(([id, stat]) => {
+        const campaign = allCampaigns.find((c) => c.id === id)
+        return {
+          id,
+          name: (campaign?.name as string) ?? 'Unknown',
+          status: (campaign?.status as string) ?? 'unknown',
+          total_sent: stat.sent,
+          delivery_rate: stat.sent > 0 ? Math.round((stat.delivered / stat.sent) * 1000) / 10 : 0,
+          opt_out_rate: stat.sent > 0 ? Math.round((stat.opted_out / stat.sent) * 1000) / 10 : 0,
+          sent_at: (campaign?.sent_at as string | null) ?? null,
+        }
+      })
+      .sort((a, b) => {
+        if (a.sent_at && b.sent_at) return b.sent_at.localeCompare(a.sent_at)
+        if (a.sent_at) return -1
+        if (b.sent_at) return 1
+        return 0
+      })
+      .slice(0, 10)
+
+    res.json({
+      summary: {
+        total_campaigns: allCampaigns.length,
+        total_sent: sends.length,
+        avg_delivery_rate: avgDeliveryRate,
+        avg_open_rate: avgOpenRate,
+        top_channel: topChannel,
+      },
+      by_day,
+      recent_campaigns,
+    })
+  } catch (err) {
+    console.error('[insights] campaigns error:', err)
+    res.status(500).json({ error: 'Failed to fetch campaign insights' })
+  }
+})
+
 export default router
