@@ -49,13 +49,10 @@ export default function AutomationOverviewClient() {
   }
 
   async function resumeScanner(key: string) {
-    const res = await fetch(
-      `/api/automation/scanners/${key}/pause`,
-      {
-        method: 'DELETE',
-        credentials: 'include',
-      }
-    )
+    const res = await fetch(`/api/automation/scanners/${key}/pause`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
     if (!res.ok) {
       console.error(`[pause] resume failed: ${res.status}`)
       return
@@ -68,19 +65,16 @@ export default function AutomationOverviewClient() {
     const from = new Date(pauseForm.paused_from)
     const until = new Date(pauseForm.paused_until)
     if (until <= from) return
-    const res = await fetch(
-      `/api/automation/scanners/${key}/pause`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paused_from: from.toISOString(),
-          paused_until: until.toISOString(),
-          ...(pauseForm.reason ? { reason: pauseForm.reason } : {}),
-        }),
-      }
-    )
+    const res = await fetch(`/api/automation/scanners/${key}/pause`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paused_from: from.toISOString(),
+        paused_until: until.toISOString(),
+        ...(pauseForm.reason ? { reason: pauseForm.reason } : {}),
+      }),
+    })
     if (!res.ok) {
       console.error(`[pause] pause failed: ${res.status}`)
       return
