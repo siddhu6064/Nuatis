@@ -78,6 +78,7 @@ export interface StatItem {
   value: string
   icon: string
   color: string
+  href?: string
 }
 
 interface Props {
@@ -129,19 +130,31 @@ export default function DashboardClient({ stats, userName }: Props) {
       case 'stat-cards':
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map(({ label, value, icon, color }) => (
-              <div key={label} className="bg-white rounded-xl border border-border-brand p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-medium text-ink3">{label}</p>
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${COLOR[color]}`}
-                  >
-                    {icon}
+            {stats.map(({ label, value, icon, color, href }) => {
+              const cardClass = `bg-white rounded-xl border border-border-brand p-5${href ? ' hover:shadow-md hover:border-teal-300 transition-all cursor-pointer' : ''}`
+              const inner = (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-medium text-ink3">{label}</p>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${COLOR[color]}`}
+                    >
+                      {icon}
+                    </div>
                   </div>
+                  <p className="text-2xl font-bold text-ink">{value}</p>
+                </>
+              )
+              return href ? (
+                <Link key={label} href={href} className={`block ${cardClass}`}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={label} className={cardClass}>
+                  {inner}
                 </div>
-                <p className="text-2xl font-bold text-ink">{value}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       case 'pipeline-funnel':

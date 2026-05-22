@@ -40,15 +40,28 @@ export default async function DashboardPage() {
   const userName = session?.user?.name?.split(' ')[0] ?? 'there'
 
   const stats = [
-    { label: 'Total Contacts', value: String(totalContacts ?? 0), icon: '◎', color: 'teal' },
-    { label: 'Open Pipeline', value: String(openPipeline ?? 0), icon: '◈', color: 'blue' },
+    {
+      label: 'Total Contacts',
+      value: String(totalContacts ?? 0),
+      icon: '◎',
+      color: 'teal',
+      href: '/contacts',
+    },
+    {
+      label: 'Open Pipeline',
+      value: String(openPipeline ?? 0),
+      icon: '◈',
+      color: 'blue',
+      href: '/pipeline',
+    },
     {
       label: 'Appointments Today',
       value: String(appointmentsToday ?? 0),
       icon: '◷',
       color: 'amber',
+      href: '/appointments',
     },
-    { label: 'Calls Handled', value: '0', icon: '◉', color: 'purple' },
+    { label: 'Calls Handled', value: '0', icon: '◉', color: 'purple', href: '/calls' },
   ]
 
   return <DashboardClient stats={stats} userName={userName} />
