@@ -65,7 +65,7 @@ export default function GbpInsightsWidget() {
       <div>
         <div className="bg-white rounded-xl border border-border-brand p-5 text-sm text-ink3">
           <span className="font-medium text-ink">Google Business Profile</span> not connected.{' '}
-          <a href="/settings/reputation" className="text-teal-600 underline">
+          <a href="/reputation" className="text-teal-600 underline">
             Connect in Settings → Reputation
           </a>{' '}
           to see search insights.

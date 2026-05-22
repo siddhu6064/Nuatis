@@ -490,7 +490,7 @@ function RequestsPanel() {
         <p className="text-sm font-medium text-ink">No review requests yet</p>
         <p className="text-xs text-ink3 max-w-sm">
           Review requests will appear here after Maya sends them. Enable review requests in{' '}
-          <a href="/settings/reputation" className="text-teal-600 underline">
+          <a href="/reputation" className="text-teal-600 underline">
             Automation settings
           </a>
           .

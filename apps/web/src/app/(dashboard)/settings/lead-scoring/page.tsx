@@ -85,7 +85,7 @@ function AddRuleModal({ onClose, onSave, authHeaders }: AddRuleModalProps) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/settings/lead-scoring/rules', {
+      const res = await fetch('/api/lead-scoring/rules', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ category, rule_key: ruleKey, label, points, description }),
@@ -203,7 +203,7 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
 
   async function savePoints(val: number) {
     try {
-      await fetch(`/api/settings/lead-scoring/rules/${rule.id}`, {
+      await fetch(`/api/lead-scoring/rules/${rule.id}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify({ points: val }),
@@ -224,7 +224,7 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
     const next = !rule.active
     onUpdate(rule.id, { active: next })
     try {
-      await fetch(`/api/settings/lead-scoring/rules/${rule.id}`, {
+      await fetch(`/api/lead-scoring/rules/${rule.id}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify({ active: next }),
@@ -237,7 +237,7 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
   async function handleDelete() {
     setDeleting(true)
     try {
-      await fetch(`/api/settings/lead-scoring/rules/${rule.id}`, {
+      await fetch(`/api/lead-scoring/rules/${rule.id}`, {
         method: 'DELETE',
         headers: authHeaders,
       })
@@ -324,10 +324,8 @@ export default function LeadScoringSettingsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/settings/lead-scoring', { headers: authHeaders }).then((r) =>
-        r.ok ? r.json() : null
-      ),
-      fetch('/api/settings/lead-scoring/distribution', { headers: authHeaders }).then((r) =>
+      fetch('/api/lead-scoring', { headers: authHeaders }).then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/lead-scoring/distribution', { headers: authHeaders }).then((r) =>
         r.ok ? r.json() : null
       ),
     ])
@@ -372,7 +370,7 @@ export default function LeadScoringSettingsPage() {
 
     setRescoring(true)
     try {
-      const res = await fetch('/api/settings/lead-scoring/rescore-all', {
+      const res = await fetch('/api/lead-scoring/rescore-all', {
         method: 'POST',
         headers: authHeaders,
       })
@@ -380,7 +378,7 @@ export default function LeadScoringSettingsPage() {
         const d = (await res.json()) as { count?: number }
         showToast('success', `Re-scored ${d.count ?? 'all'} contacts successfully.`)
         // Refresh distribution
-        const distRes = await fetch('/api/settings/lead-scoring/distribution', {
+        const distRes = await fetch('/api/lead-scoring/distribution', {
           headers: authHeaders,
         })
         if (distRes.ok) {
