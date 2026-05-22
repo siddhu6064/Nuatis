@@ -11,7 +11,10 @@ const router = Router()
 // Signature format: "v1,<base64-hmac-sha256>"
 function verifyWebhookSignature(req: Request): boolean {
   const secret = process.env['RESEND_WEBHOOK_SECRET']
-  if (!secret) return true // verification disabled — skip
+  if (!secret) {
+    console.error('[email-webhook] RESEND_WEBHOOK_SECRET not configured — rejecting')
+    return false
+  }
 
   const svixId = req.headers['svix-id'] as string | undefined
   const svixTimestamp = req.headers['svix-timestamp'] as string | undefined
@@ -43,7 +46,12 @@ function verifyWebhookSignature(req: Request): boolean {
 }
 
 router.post('/', async (req: Request, res: Response): Promise<void> => {
-  // Verify signature if secret is configured
+  // Fail-closed: refuse to process the webhook if the signing secret is unset
+  // (defense-in-depth even though verifyWebhookSignature also rejects in that case)
+  if (!process.env['RESEND_WEBHOOK_SECRET']) {
+    res.sendStatus(500)
+    return
+  }
   if (!verifyWebhookSignature(req)) {
     res.sendStatus(401)
     return

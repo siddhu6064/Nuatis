@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-const NEXT_PUBLIC_API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001'
+const NEXT_PUBLIC_API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'https://api.nuatis.com'
 
 const ACTION_LABELS: Record<string, string> = {
   confirm_appointment: 'Confirm Appointment',

@@ -595,7 +595,14 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
 })
 
 // ── GET /api/insights/plg ─────────────────────────────────────────────────────
-router.get('/plg', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+// Owner-only: returns global PLG funnel counts across all tenants. Restricted to
+// workspace owners to prevent cross-tenant business-intelligence disclosure.
+router.get('/plg', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  if (authed.role !== 'owner') {
+    res.status(403).json({ error: 'Owner role required' })
+    return
+  }
   const supabase = getSupabase()
 
   try {

@@ -36,3 +36,30 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false,
   skip: isTestEnv,
 })
+
+export const sessionInitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many session requests. Try again shortly.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+})
+
+export const bookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many booking attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+})
+
+export const phoneProvisionLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 2,
+  message: { error: 'Phone provisioning limit reached for today.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+})

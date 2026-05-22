@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { logActivity } from '../lib/activity.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
-import { aiGenerationLimiter } from '../middleware/rate-limit.js'
+import { aiGenerationLimiter, sessionInitLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -15,7 +15,7 @@ function getSupabase() {
 }
 
 // ── POST /init — initialize chat session ─────────────────────────────────────
-router.post('/init', async (req: Request, res: Response): Promise<void> => {
+router.post('/init', sessionInitLimiter, async (req: Request, res: Response): Promise<void> => {
   const { tenantId } = req.body as { tenantId?: string }
 
   if (!tenantId) {

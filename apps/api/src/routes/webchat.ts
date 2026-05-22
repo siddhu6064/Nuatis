@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
-import { aiGenerationLimiter } from '../middleware/rate-limit.js'
+import { aiGenerationLimiter, sessionInitLimiter } from '../middleware/rate-limit.js'
 
 // ── Supabase factory ──────────────────────────────────────────────────────────
 function getSupabase() {
@@ -16,73 +16,77 @@ function getSupabase() {
 const router = Router()
 
 // ── POST /session/init ────────────────────────────────────────────────────────
-router.post('/session/init', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { tenant_id, location_id, visitor_name, visitor_email } = req.body as {
-      tenant_id?: string
-      location_id?: string
-      visitor_name?: string
-      visitor_email?: string
-    }
+router.post(
+  '/session/init',
+  sessionInitLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tenant_id, location_id, visitor_name, visitor_email } = req.body as {
+        tenant_id?: string
+        location_id?: string
+        visitor_name?: string
+        visitor_email?: string
+      }
 
-    if (!tenant_id) {
-      res.status(400).json({ error: 'tenant_id is required' })
-      return
-    }
+      if (!tenant_id) {
+        res.status(400).json({ error: 'tenant_id is required' })
+        return
+      }
 
-    const supabase = getSupabase()
+      const supabase = getSupabase()
 
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, webchat_enabled, webchat_greeting, webchat_color, webchat_position'
-      )
-      .eq('id', tenant_id)
-      .maybeSingle()
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select(
+          'id, business_name, webchat_enabled, webchat_greeting, webchat_color, webchat_position'
+        )
+        .eq('id', tenant_id)
+        .maybeSingle()
 
-    if (tenantError || !tenant) {
-      res.status(404).json({ error: 'Tenant not found' })
-      return
-    }
+      if (tenantError || !tenant) {
+        res.status(404).json({ error: 'Tenant not found' })
+        return
+      }
 
-    if (!tenant.webchat_enabled) {
-      res.status(403).json({ error: 'Webchat not enabled' })
-      return
-    }
+      if (!tenant.webchat_enabled) {
+        res.status(403).json({ error: 'Webchat not enabled' })
+        return
+      }
 
-    const session_token = randomUUID()
+      const session_token = randomUUID()
 
-    const { data: session, error: sessionError } = await supabase
-      .from('webchat_sessions')
-      .insert({
-        tenant_id,
-        location_id: location_id ?? null,
+      const { data: session, error: sessionError } = await supabase
+        .from('webchat_sessions')
+        .insert({
+          tenant_id,
+          location_id: location_id ?? null,
+          session_token,
+          status: 'active',
+          visitor_name: visitor_name ?? null,
+          visitor_email: visitor_email ?? null,
+        })
+        .select('id')
+        .single()
+
+      if (sessionError || !session) {
+        console.error('[webchat/session/init] error', sessionError)
+        res.status(500).json({ error: 'Failed to create session' })
+        return
+      }
+
+      res.status(201).json({
         session_token,
-        status: 'active',
-        visitor_name: visitor_name ?? null,
-        visitor_email: visitor_email ?? null,
+        greeting: tenant.webchat_greeting,
+        color: tenant.webchat_color,
+        position: tenant.webchat_position,
+        business_name: tenant.business_name,
       })
-      .select('id')
-      .single()
-
-    if (sessionError || !session) {
-      console.error('[webchat/session/init] error', sessionError)
-      res.status(500).json({ error: 'Failed to create session' })
-      return
+    } catch (err) {
+      console.error('[webchat/session/init] error', err)
+      res.status(500).json({ error: 'Internal server error' })
     }
-
-    res.status(201).json({
-      session_token,
-      greeting: tenant.webchat_greeting,
-      color: tenant.webchat_color,
-      position: tenant.webchat_position,
-      business_name: tenant.business_name,
-    })
-  } catch (err) {
-    console.error('[webchat/session/init] error', err)
-    res.status(500).json({ error: 'Internal server error' })
   }
-})
+)
 
 // ── POST /session/:token/message ──────────────────────────────────────────────
 router.post(

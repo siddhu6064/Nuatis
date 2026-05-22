@@ -4,8 +4,8 @@ import { Suspense, useState, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-const DEMO_EMAIL = 'demo@nuatis.com'
-const DEMO_PASSWORD = 'Nuatis@2026!'
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? ''
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? ''
 
 // Lucide-style SVG icons — no extra dependency
 function IconCopy() {

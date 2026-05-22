@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { phoneProvisionLimiter } from '../middleware/rate-limit.js'
 // config/urls.js available for future phone configuration
 
 const router = Router()
@@ -13,99 +14,104 @@ function getSupabase() {
 }
 
 // ── POST /api/provisioning/provision-phone ────────────────────────────────────
-router.post('/provision-phone', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const areaCode = typeof req.body?.area_code === 'string' ? req.body.area_code : '512'
-  const apiKey = process.env['TELNYX_API_KEY']
+router.post(
+  '/provision-phone',
+  phoneProvisionLimiter,
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const areaCode = typeof req.body?.area_code === 'string' ? req.body.area_code : '512'
+    const apiKey = process.env['TELNYX_API_KEY']
 
-  if (!apiKey) {
-    res.status(503).json({ error: 'Phone provisioning not configured' })
-    return
+    if (!apiKey) {
+      res.status(503).json({ error: 'Phone provisioning not configured' })
+      return
+    }
+
+    try {
+      // 1. Search for available numbers
+      const searchParams = new URLSearchParams({
+        'filter[country_code]': 'US',
+        'filter[national_destination_code]': areaCode,
+        'filter[features][]': 'sms',
+        'filter[limit]': '5',
+      })
+
+      const searchRes = await fetch(
+        `https://api.telnyx.com/v2/available_phone_numbers?${searchParams}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      )
+
+      if (!searchRes.ok) {
+        const body = await searchRes.text()
+        console.error(`[provisioning] search failed (${searchRes.status}): ${body}`)
+        res.status(502).json({ error: 'Failed to search available numbers' })
+        return
+      }
+
+      const searchData = (await searchRes.json()) as {
+        data?: Array<{ phone_number: string }>
+      }
+      const available = searchData.data ?? []
+
+      if (available.length === 0) {
+        res.status(404).json({ error: `No numbers available for area code ${areaCode}` })
+        return
+      }
+
+      const selectedNumber = available[0]!.phone_number
+
+      // 2. Order the number
+      const orderBody: Record<string, unknown> = {
+        phone_numbers: [{ phone_number: selectedNumber }],
+      }
+
+      const connectionId = process.env['TELNYX_CONNECTION_ID']
+      if (connectionId) orderBody['connection_id'] = connectionId
+
+      const orderRes = await fetch('https://api.telnyx.com/v2/number_orders', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderBody),
+      })
+
+      if (!orderRes.ok) {
+        const body = await orderRes.text()
+        console.error(`[provisioning] order failed (${orderRes.status}): ${body}`)
+        res.status(502).json({ error: 'Failed to order phone number' })
+        return
+      }
+
+      // 3. Update locations table
+      const supabase = getSupabase()
+      const { error: updateErr } = await supabase
+        .from('locations')
+        .update({ telnyx_number: selectedNumber })
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_primary', true)
+
+      if (updateErr) {
+        console.error(`[provisioning] location update error: ${updateErr.message}`)
+      }
+
+      // 4. Update TELNYX_TENANT_MAP would need manual config — log for now
+      console.info(
+        `[provisioning] phone provisioned: number=${selectedNumber} tenant=${authed.tenantId}`
+      )
+      console.info(
+        `[provisioning] ACTION REQUIRED: Add ${selectedNumber}:${authed.tenantId} to TELNYX_TENANT_MAP`
+      )
+
+      res.json({ phone_number: selectedNumber, area_code: areaCode })
+    } catch (err) {
+      console.error('[provisioning] provision-phone error:', err)
+      res.status(500).json({ error: 'Phone provisioning failed' })
+    }
   }
-
-  try {
-    // 1. Search for available numbers
-    const searchParams = new URLSearchParams({
-      'filter[country_code]': 'US',
-      'filter[national_destination_code]': areaCode,
-      'filter[features][]': 'sms',
-      'filter[limit]': '5',
-    })
-
-    const searchRes = await fetch(
-      `https://api.telnyx.com/v2/available_phone_numbers?${searchParams}`,
-      { headers: { Authorization: `Bearer ${apiKey}` } }
-    )
-
-    if (!searchRes.ok) {
-      const body = await searchRes.text()
-      console.error(`[provisioning] search failed (${searchRes.status}): ${body}`)
-      res.status(502).json({ error: 'Failed to search available numbers' })
-      return
-    }
-
-    const searchData = (await searchRes.json()) as {
-      data?: Array<{ phone_number: string }>
-    }
-    const available = searchData.data ?? []
-
-    if (available.length === 0) {
-      res.status(404).json({ error: `No numbers available for area code ${areaCode}` })
-      return
-    }
-
-    const selectedNumber = available[0]!.phone_number
-
-    // 2. Order the number
-    const orderBody: Record<string, unknown> = {
-      phone_numbers: [{ phone_number: selectedNumber }],
-    }
-
-    const connectionId = process.env['TELNYX_CONNECTION_ID']
-    if (connectionId) orderBody['connection_id'] = connectionId
-
-    const orderRes = await fetch('https://api.telnyx.com/v2/number_orders', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(orderBody),
-    })
-
-    if (!orderRes.ok) {
-      const body = await orderRes.text()
-      console.error(`[provisioning] order failed (${orderRes.status}): ${body}`)
-      res.status(502).json({ error: 'Failed to order phone number' })
-      return
-    }
-
-    // 3. Update locations table
-    const supabase = getSupabase()
-    const { error: updateErr } = await supabase
-      .from('locations')
-      .update({ telnyx_number: selectedNumber })
-      .eq('tenant_id', authed.tenantId)
-      .eq('is_primary', true)
-
-    if (updateErr) {
-      console.error(`[provisioning] location update error: ${updateErr.message}`)
-    }
-
-    // 4. Update TELNYX_TENANT_MAP would need manual config — log for now
-    console.info(
-      `[provisioning] phone provisioned: number=${selectedNumber} tenant=${authed.tenantId}`
-    )
-    console.info(
-      `[provisioning] ACTION REQUIRED: Add ${selectedNumber}:${authed.tenantId} to TELNYX_TENANT_MAP`
-    )
-
-    res.json({ phone_number: selectedNumber, area_code: areaCode })
-  } catch (err) {
-    console.error('[provisioning] provision-phone error:', err)
-    res.status(500).json({ error: 'Phone provisioning failed' })
-  }
-})
+)
 
 // ── GET /api/provisioning/onboarding-status ───────────────────────────────────
 router.get(
