@@ -83,6 +83,12 @@ export default function ConversationsClient() {
   const { data: session } = useSession()
   const sessionAny = session as (typeof session & { accessToken?: string }) | null
 
+  // Avoid SSR/CSR mismatches: the inbox depends entirely on session, WebSocket
+  // state, and fetched data — none of which exist on the server. Defer the full
+  // tree until after mount so the SSR output is a stable skeleton.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const [tab, setTab] = useState<TabType>('open')
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all')
   const [search, setSearch] = useState('')
@@ -475,6 +481,17 @@ export default function ConversationsClient() {
   ).length
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null
+
+  if (!mounted) {
+    return (
+      <div
+        className="flex items-center justify-center text-ink4 text-sm"
+        style={{ height: 'calc(100vh - 49px)' }}
+      >
+        Loading…
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 49px)' }}>
