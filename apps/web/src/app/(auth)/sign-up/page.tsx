@@ -81,7 +81,7 @@ function SignUpForm() {
     setError('')
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/tenants`, {
+      const res = await fetch(`/api/tenants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

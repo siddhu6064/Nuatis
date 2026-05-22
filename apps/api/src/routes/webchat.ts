@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { aiGenerationLimiter } from '../middleware/rate-limit.js'
 
 // ── Supabase factory ──────────────────────────────────────────────────────────
 function getSupabase() {
@@ -84,131 +85,135 @@ router.post('/session/init', async (req: Request, res: Response): Promise<void> 
 })
 
 // ── POST /session/:token/message ──────────────────────────────────────────────
-router.post('/session/:token/message', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { token } = req.params
-    const { content, role: bodyRole } = req.body as {
-      content?: string
-      role?: 'user' | 'agent'
-    }
+router.post(
+  '/session/:token/message',
+  aiGenerationLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { token } = req.params
+      const { content, role: bodyRole } = req.body as {
+        content?: string
+        role?: 'user' | 'agent'
+      }
 
-    if (!content) {
-      res.status(400).json({ error: 'content is required' })
-      return
-    }
+      if (!content) {
+        res.status(400).json({ error: 'content is required' })
+        return
+      }
 
-    const role = bodyRole ?? 'user'
-    const supabase = getSupabase()
+      const role = bodyRole ?? 'user'
+      const supabase = getSupabase()
 
-    // Lookup session
-    const { data: session, error: sessionError } = await supabase
-      .from('webchat_sessions')
-      .select('id, tenant_id, status')
-      .eq('session_token', token)
-      .maybeSingle()
+      // Lookup session
+      const { data: session, error: sessionError } = await supabase
+        .from('webchat_sessions')
+        .select('id, tenant_id, status')
+        .eq('session_token', token)
+        .maybeSingle()
 
-    if (sessionError || !session) {
-      res.status(404).json({ error: 'Session not found' })
-      return
-    }
+      if (sessionError || !session) {
+        res.status(404).json({ error: 'Session not found' })
+        return
+      }
 
-    if (session.status !== 'active') {
-      res.status(400).json({ error: 'Session closed' })
-      return
-    }
+      if (session.status !== 'active') {
+        res.status(400).json({ error: 'Session closed' })
+        return
+      }
 
-    // Insert user/agent message
-    const { data: message, error: msgError } = await supabase
-      .from('webchat_messages')
-      .insert({
-        session_id: session.id,
-        role,
-        content,
-      })
-      .select('id, role, content, created_at')
-      .single()
+      // Insert user/agent message
+      const { data: message, error: msgError } = await supabase
+        .from('webchat_messages')
+        .insert({
+          session_id: session.id,
+          role,
+          content,
+        })
+        .select('id, role, content, created_at')
+        .single()
 
-    if (msgError || !message) {
-      console.error('[webchat/session/message] insert error', msgError)
-      res.status(500).json({ error: 'Failed to save message' })
-      return
-    }
+      if (msgError || !message) {
+        console.error('[webchat/session/message] insert error', msgError)
+        res.status(500).json({ error: 'Failed to save message' })
+        return
+      }
 
-    // If agent message — no AI reply needed
-    if (role !== 'user') {
-      res.status(201).json({ message })
-      return
-    }
+      // If agent message — no AI reply needed
+      if (role !== 'user') {
+        res.status(201).json({ message })
+        return
+      }
 
-    // Generate AI reply
-    const { data: historyRows } = await supabase
-      .from('webchat_messages')
-      .select('role, content')
-      .eq('session_id', session.id)
-      .order('created_at', { ascending: false })
-      .limit(10)
+      // Generate AI reply
+      const { data: historyRows } = await supabase
+        .from('webchat_messages')
+        .select('role, content')
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
 
-    const history = (historyRows ?? []).reverse()
+      const history = (historyRows ?? []).reverse()
 
-    // Fetch business name for prompt
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('business_name')
-      .eq('id', session.tenant_id)
-      .maybeSingle()
+      // Fetch business name for prompt
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('business_name')
+        .eq('id', session.tenant_id)
+        .maybeSingle()
 
-    const businessName = tenant?.business_name ?? 'this business'
+      const businessName = tenant?.business_name ?? 'this business'
 
-    const historyText = history
-      .map((m: { role: string; content: string }) =>
-        m.role === 'user' ? `User: ${m.content}` : `Assistant: ${m.content}`
-      )
-      .join('\n')
+      const historyText = history
+        .map((m: { role: string; content: string }) =>
+          m.role === 'user' ? `User: ${m.content}` : `Assistant: ${m.content}`
+        )
+        .join('\n')
 
-    const fullPrompt = `You are a friendly AI assistant for ${businessName}. Answer visitor questions helpfully and concisely. Keep replies under 3 sentences.
+      const fullPrompt = `You are a friendly AI assistant for ${businessName}. Answer visitor questions helpfully and concisely. Keep replies under 3 sentences.
 
 ${historyText}
 
 User: ${content}
 Assistant:`
 
-    let aiReply = ''
-    try {
-      const { GoogleGenAI } = await import('@google/genai')
-      const ai = new GoogleGenAI({ apiKey: process.env['GEMINI_API_KEY'] ?? '' })
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      })
-      aiReply = result.text ?? ''
-    } catch (aiErr) {
-      console.error('[webchat/session/message] Gemini error', aiErr)
-      aiReply = "I'm sorry, I'm having trouble responding right now. Please try again shortly."
+      let aiReply = ''
+      try {
+        const { GoogleGenAI } = await import('@google/genai')
+        const ai = new GoogleGenAI({ apiKey: process.env['GEMINI_API_KEY'] ?? '' })
+        const result = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        })
+        aiReply = result.text ?? ''
+      } catch (aiErr) {
+        console.error('[webchat/session/message] Gemini error', aiErr)
+        aiReply = "I'm sorry, I'm having trouble responding right now. Please try again shortly."
+      }
+
+      // Insert AI reply
+      const { data: reply, error: replyError } = await supabase
+        .from('webchat_messages')
+        .insert({
+          session_id: session.id,
+          role: 'assistant',
+          content: aiReply,
+        })
+        .select('id, role, content, created_at')
+        .single()
+
+      if (replyError || !reply) {
+        console.error('[webchat/session/message] reply insert error', replyError)
+        res.status(500).json({ error: 'Failed to save AI reply' })
+        return
+      }
+
+      res.status(201).json({ message, reply })
+    } catch (err) {
+      console.error('[webchat/session/message] error', err)
+      res.status(500).json({ error: 'Internal server error' })
     }
-
-    // Insert AI reply
-    const { data: reply, error: replyError } = await supabase
-      .from('webchat_messages')
-      .insert({
-        session_id: session.id,
-        role: 'assistant',
-        content: aiReply,
-      })
-      .select('id, role, content, created_at')
-      .single()
-
-    if (replyError || !reply) {
-      console.error('[webchat/session/message] reply insert error', replyError)
-      res.status(500).json({ error: 'Failed to save AI reply' })
-      return
-    }
-
-    res.status(201).json({ message, reply })
-  } catch (err) {
-    console.error('[webchat/session/message] error', err)
-    res.status(500).json({ error: 'Internal server error' })
   }
-})
+)
 
 // ── GET /session/:token ───────────────────────────────────────────────────────
 router.get('/session/:token', async (req: Request, res: Response): Promise<void> => {

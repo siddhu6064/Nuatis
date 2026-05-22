@@ -33,7 +33,7 @@ export default function AutomationOverviewClient() {
   }
 
   async function retryFailed(key: string) {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/retry-failed`, {
+    await fetch(`/api/automation/scanners/${key}/retry-failed`, {
       method: 'POST',
       credentials: 'include',
     })
@@ -41,7 +41,7 @@ export default function AutomationOverviewClient() {
   }
 
   async function clearFailed(key: string) {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/clear-failed`, {
+    await fetch(`/api/automation/scanners/${key}/clear-failed`, {
       method: 'POST',
       credentials: 'include',
     })
@@ -50,7 +50,7 @@ export default function AutomationOverviewClient() {
 
   async function resumeScanner(key: string) {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`,
+      `/api/automation/scanners/${key}/pause`,
       {
         method: 'DELETE',
         credentials: 'include',
@@ -69,7 +69,7 @@ export default function AutomationOverviewClient() {
     const until = new Date(pauseForm.paused_until)
     if (until <= from) return
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/automation/scanners/${key}/pause`,
+      `/api/automation/scanners/${key}/pause`,
       {
         method: 'POST',
         credentials: 'include',
@@ -94,10 +94,10 @@ export default function AutomationOverviewClient() {
     setLoading(true)
     try {
       const [overviewRes, customRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/overview`, {
+        fetch(`/api/automation/overview`, {
           credentials: 'include',
         }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-automations`, {
+        fetch(`/api/custom-automations`, {
           credentials: 'include',
         }),
       ])

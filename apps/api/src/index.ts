@@ -108,6 +108,8 @@ import voiceOutboundRouter from './routes/voice-outbound.js'
 import webchatRouter, { webchatSettingsRouter } from './routes/webchat.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
+import { verifyTelnyxWebhook } from './middleware/verify-telnyx-webhook.js'
+import { generalLimiter, authLimiter } from './middleware/rate-limit.js'
 import healthRouter from './routes/health.js'
 import adminRouter from './routes/admin.js'
 import { createClient } from '@supabase/supabase-js'
@@ -141,6 +143,17 @@ app.use(
 app.use('/api/webhooks/email', express.raw({ type: '*/*' }))
 // Capture raw body for Stripe webhook signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }))
+// Telnyx webhooks: parse JSON + capture raw body for Ed25519 signature verification.
+// Mount this BEFORE the global express.json so req.rawBody is populated and
+// the global parser then sees req._body=true and skips re-parsing.
+const telnyxBodyCapture = express.json({
+  verify: (req, _res, buf) => {
+    ;(req as unknown as { rawBody: Buffer }).rawBody = buf
+  },
+})
+app.use('/voice/inbound', telnyxBodyCapture, verifyTelnyxWebhook)
+app.use('/voice/outbound-status', telnyxBodyCapture, verifyTelnyxWebhook)
+app.use('/webhooks/telnyx/sms', telnyxBodyCapture, verifyTelnyxWebhook)
 app.use(express.json())
 app.use(auditLoggerMiddleware)
 
@@ -148,9 +161,13 @@ app.use(auditLoggerMiddleware)
 app.use('/health', healthRouter)
 app.use('/admin', adminRouter)
 
+// Global baseline rate limit — applies after health/admin so probes never get
+// throttled. Per-IP, 100 req/min. Skipped in NODE_ENV=test.
+app.use(generalLimiter)
+
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
-app.use('/api/auth/mobile', mobileAuthRouter)
+app.use('/api/auth/mobile', authLimiter, mobileAuthRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/knowledge', knowledgeRouter)
 app.use('/api/calls', callsRouter)

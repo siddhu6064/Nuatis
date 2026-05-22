@@ -1,10 +1,14 @@
 /**
  * campaign-sender.ts — P13 AI Campaigns BullMQ worker
  *
- * Listens on queue: 'campaign-send' (shared with legacy campaign-send-worker).
- * IMPORTANT: This worker guards on campaign.channels — if channels is null/empty
- * it returns early, leaving the job completed without action. Legacy email-only
- * campaigns (no channels[]) are handled by campaign-send-worker.ts.
+ * Listens on queue: 'campaign-send' (shared with legacy campaign-send-worker.ts).
+ * IMPORTANT: Mutual-exclusion contract with the legacy worker:
+ *   - This worker (P13) processes jobs where campaign.channels is a non-empty
+ *     array. If channels is null/empty, it returns early (legacy campaign).
+ *   - Legacy worker (campaign-send-worker.ts) does the inverse: returns early
+ *     when channels is non-empty.
+ * BullMQ load-balances jobs between both workers on the shared queue, so the
+ * guards must stay symmetric to avoid corruption.
  *
  * Concurrency: 1 — campaigns are large batch jobs, not high-frequency micro-jobs.
  */

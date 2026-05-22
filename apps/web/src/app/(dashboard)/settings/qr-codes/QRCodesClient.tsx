@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const API_URL = ''
 
 const PRESETS = [
   { label: 'Booking Page', urlPath: '/book' },

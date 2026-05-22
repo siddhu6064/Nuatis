@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { smsSendLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -24,91 +25,96 @@ function getOutboundQueue(): Queue {
 }
 
 // ── POST /api/outbound-calls — create + enqueue outbound call ────────────────
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const { contact_id, call_context } = req.body as {
-    contact_id?: string
-    call_context?: string
-  }
+router.post(
+  '/',
+  smsSendLimiter,
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const { contact_id, call_context } = req.body as {
+      contact_id?: string
+      call_context?: string
+    }
 
-  if (!contact_id) {
-    res.status(400).json({ error: 'contact_id is required' })
-    return
-  }
+    if (!contact_id) {
+      res.status(400).json({ error: 'contact_id is required' })
+      return
+    }
 
-  const supabase = getSupabase()
+    const supabase = getSupabase()
 
-  // Fetch contact
-  const { data: contact, error: contactError } = await supabase
-    .from('contacts')
-    .select('phone, full_name')
-    .eq('id', contact_id)
-    .eq('tenant_id', authed.tenantId)
-    .maybeSingle()
+    // Fetch contact
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('phone, full_name')
+      .eq('id', contact_id)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
 
-  if (contactError) {
-    res.status(500).json({ error: contactError.message })
-    return
-  }
+    if (contactError) {
+      res.status(500).json({ error: contactError.message })
+      return
+    }
 
-  if (!contact) {
-    res.status(404).json({ error: 'Contact not found' })
-    return
-  }
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
 
-  if (!contact.phone) {
-    res.status(400).json({ error: 'Contact has no phone number' })
-    return
-  }
+    if (!contact.phone) {
+      res.status(400).json({ error: 'Contact has no phone number' })
+      return
+    }
 
-  // Verify tenant has a telnyx_number
-  const { data: location, error: locationError } = await supabase
-    .from('locations')
-    .select('telnyx_number')
-    .eq('tenant_id', authed.tenantId)
-    .eq('is_primary', true)
-    .maybeSingle()
+    // Verify tenant has a telnyx_number
+    const { data: location, error: locationError } = await supabase
+      .from('locations')
+      .select('telnyx_number')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_primary', true)
+      .maybeSingle()
 
-  if (locationError) {
-    res.status(500).json({ error: locationError.message })
-    return
-  }
+    if (locationError) {
+      res.status(500).json({ error: locationError.message })
+      return
+    }
 
-  if (!location?.telnyx_number) {
-    res.status(400).json({ error: 'No Telnyx number configured for this account' })
-    return
-  }
+    if (!location?.telnyx_number) {
+      res.status(400).json({ error: 'No Telnyx number configured for this account' })
+      return
+    }
 
-  // Insert outbound_call_jobs row
-  const { data: job, error: insertError } = await supabase
-    .from('outbound_call_jobs')
-    .insert({
-      tenant_id: authed.tenantId,
-      contact_id,
-      trigger_type: 'manual',
-      trigger_config: { call_context: call_context ?? 'A team member requested this call' },
+    // Insert outbound_call_jobs row
+    const { data: job, error: insertError } = await supabase
+      .from('outbound_call_jobs')
+      .insert({
+        tenant_id: authed.tenantId,
+        contact_id,
+        trigger_type: 'manual',
+        trigger_config: { call_context: call_context ?? 'A team member requested this call' },
+        status: 'pending',
+        scheduled_at: new Date().toISOString(),
+        max_attempts: 3,
+      })
+      .select('id')
+      .single()
+
+    if (insertError || !job) {
+      res.status(500).json({ error: insertError?.message ?? 'Failed to create job' })
+      return
+    }
+
+    // Enqueue to BullMQ
+    await getOutboundQueue().add('dial', { jobId: job.id }, { jobId: job.id })
+
+    res.status(201).json({
+      job_id: job.id,
       status: 'pending',
-      scheduled_at: new Date().toISOString(),
-      max_attempts: 3,
+      contact_name: contact.full_name,
+      to_number: contact.phone,
     })
-    .select('id')
-    .single()
-
-  if (insertError || !job) {
-    res.status(500).json({ error: insertError?.message ?? 'Failed to create job' })
-    return
   }
-
-  // Enqueue to BullMQ
-  await getOutboundQueue().add('dial', { jobId: job.id }, { jobId: job.id })
-
-  res.status(201).json({
-    job_id: job.id,
-    status: 'pending',
-    contact_name: contact.full_name,
-    to_number: contact.phone,
-  })
-})
+)
 
 // ── GET /api/outbound-calls — list recent jobs for tenant ───────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {

@@ -1,3 +1,13 @@
+/**
+ * campaign-send-worker.ts — Legacy email-only campaign BullMQ worker.
+ *
+ * Listens on queue: 'campaign-send' (shared with P13 campaign-sender.ts).
+ * IMPORTANT: This worker guards on campaign.channels — if channels is a
+ * non-empty array the campaign is a P13 multi-channel campaign and is handled
+ * by campaign-sender.ts. We return early to keep the two workers mutually
+ * exclusive on the shared queue. The inverse guard lives in campaign-sender.ts.
+ */
+
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
@@ -39,13 +49,24 @@ export async function processCampaignSend(data: CampaignSendJobData): Promise<vo
     // Step 1: Fetch campaign from DB. If not found or cancelled, return early.
     const { data: campaign, error: campaignErr } = await supabase
       .from('campaigns')
-      .select('id, status, subject, body_html, smart_list_id')
+      .select('id, status, subject, body_html, smart_list_id, channels')
       .eq('id', campaignId)
       .eq('tenant_id', tenantId)
       .single()
 
     if (campaignErr || !campaign) {
       console.warn(`[campaign-send] campaign not found: id=${campaignId}`)
+      return
+    }
+
+    // Inverse of campaign-sender.ts guard: P13 multi-channel campaigns have
+    // channels[] populated and are handled by that worker. Skip here so the two
+    // workers stay mutually exclusive on the shared 'campaign-send' queue.
+    const campaignChannels = (campaign as { channels?: string[] | null }).channels
+    if (Array.isArray(campaignChannels) && campaignChannels.length > 0) {
+      console.info(
+        `[campaign-send] campaign ${campaignId} has P13 channels — skipping (handled by campaign-sender)`
+      )
       return
     }
 

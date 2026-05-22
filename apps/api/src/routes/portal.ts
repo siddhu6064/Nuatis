@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { authLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -166,7 +167,7 @@ router.get('/by-slug/:slug', async (req: Request, res: Response): Promise<void> 
 })
 
 // POST /api/portal/request-access
-router.post('/request-access', async (req: Request, res: Response): Promise<void> => {
+router.post('/request-access', authLimiter, async (req: Request, res: Response): Promise<void> => {
   const { slug, email } = req.body as { slug?: string; email?: string }
   if (!slug || !email) {
     res.status(400).json({ error: 'slug and email required' })

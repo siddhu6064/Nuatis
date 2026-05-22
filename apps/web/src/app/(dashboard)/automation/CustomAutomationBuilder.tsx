@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { CustomAutomation, GeneratedAutomation } from '@nuatis/shared'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const API_URL = ''
 
 function humanLabel(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())

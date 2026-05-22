@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendSms } from '../lib/sms.js'
+import { smsSendLimiter } from '../middleware/rate-limit.js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
 
 const router = Router()
@@ -457,93 +458,98 @@ router.post(
 )
 
 // ── POST /api/conversations/:contactId/send ───────────────────────────────────
-router.post('/:contactId/send', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const tenantId = authed.tenantId
-  const supabase = getSupabase()
-  const { contactId } = req.params
+router.post(
+  '/:contactId/send',
+  smsSendLimiter,
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const tenantId = authed.tenantId
+    const supabase = getSupabase()
+    const { contactId } = req.params
 
-  // Validate body
-  const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
-  if (!body) {
-    res.status(400).json({ error: 'body is required' })
-    return
-  }
-  if (body.length > 1600) {
-    res.status(400).json({ error: 'body must be 1600 characters or less' })
-    return
-  }
+    // Validate body
+    const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
+    if (!body) {
+      res.status(400).json({ error: 'body is required' })
+      return
+    }
+    if (body.length > 1600) {
+      res.status(400).json({ error: 'body must be 1600 characters or less' })
+      return
+    }
 
-  // Fetch contact (must belong to tenant)
-  const { data: contact, error: contactError } = await supabase
-    .from('contacts')
-    .select('id, phone, full_name, sms_opt_in')
-    .eq('id', contactId)
-    .eq('tenant_id', tenantId)
-    .maybeSingle()
+    // Fetch contact (must belong to tenant)
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('id, phone, full_name, sms_opt_in')
+      .eq('id', contactId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
 
-  if (contactError) {
-    res.status(500).json({ error: contactError.message })
-    return
-  }
-  if (!contact) {
-    res.status(404).json({ error: 'Contact not found' })
-    return
-  }
+    if (contactError) {
+      res.status(500).json({ error: contactError.message })
+      return
+    }
+    if (!contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
 
-  // Check SMS opt-in
-  if (contact.sms_opt_in === false) {
-    res.status(403).json({ error: 'Contact has opted out of SMS' })
-    return
-  }
+    // Check SMS opt-in
+    if (contact.sms_opt_in === false) {
+      res.status(403).json({ error: 'Contact has opted out of SMS' })
+      return
+    }
 
-  // Get our phone number
-  const { data: location, error: locationError } = await supabase
-    .from('locations')
-    .select('telnyx_number')
-    .eq('tenant_id', tenantId)
-    .eq('is_primary', true)
-    .maybeSingle()
+    // Get our phone number
+    const { data: location, error: locationError } = await supabase
+      .from('locations')
+      .select('telnyx_number')
+      .eq('tenant_id', tenantId)
+      .eq('is_primary', true)
+      .maybeSingle()
 
-  if (locationError) {
-    res.status(500).json({ error: locationError.message })
-    return
-  }
-  if (!location?.telnyx_number) {
-    res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
-    return
-  }
+    if (locationError) {
+      res.status(500).json({ error: locationError.message })
+      return
+    }
+    if (!location?.telnyx_number) {
+      res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
+      return
+    }
 
-  const result = await sendSms(location.telnyx_number, contact.phone, body, {
-    tenantId,
-    contactId,
-  })
+    const result = await sendSms(location.telnyx_number, contact.phone, body, {
+      tenantId,
+      contactId,
+    })
 
-  if (!result.success) {
-    res.status(500).json({ error: 'Failed to send SMS' })
-    return
-  }
+    if (!result.success) {
+      res.status(500).json({ error: 'Failed to send SMS' })
+      return
+    }
 
-  broadcastToTenant(tenantId as string, {
-    type: 'new_message',
-    conversation_id: contactId as string,
-    message: {
-      id: result.messageId ?? crypto.randomUUID(),
-      direction: 'outbound',
-      body,
-      from_number: location.telnyx_number!,
-      to_number: contact.phone!,
-      status: 'sent',
-      ai_handled: false,
+    broadcastToTenant(tenantId as string, {
+      type: 'new_message',
+      conversation_id: contactId as string,
+      message: {
+        id: result.messageId ?? crypto.randomUUID(),
+        direction: 'outbound',
+        body,
+        from_number: location.telnyx_number!,
+        to_number: contact.phone!,
+        status: 'sent',
+        ai_handled: false,
+        created_at: new Date().toISOString(),
+      },
+    })
+
+    res.json({
+      message_sid: result.messageId ?? null,
       created_at: new Date().toISOString(),
-    },
-  })
-
-  res.json({
-    message_sid: result.messageId ?? null,
-    created_at: new Date().toISOString(),
-  })
-})
+    })
+  }
+)
 
 // ── POST /api/conversations/:contactId/assign ─────────────────────────────────
 router.post(

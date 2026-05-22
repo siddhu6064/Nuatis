@@ -325,7 +325,7 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const API_URL = ''
 
 export default function GiftCardsClient() {
   const [giftCards, setGiftCards] = useState<GiftCard[]>([])

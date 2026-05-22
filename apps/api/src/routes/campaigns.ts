@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { requireAuth, requireModule, type AuthenticatedRequest } from '../lib/auth.js'
+import { aiGenerationLimiter } from '../middleware/rate-limit.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { buildBrandVoicePromptBlock } from '../lib/brand-voice.js'
 import {
@@ -366,6 +367,7 @@ router.put(
 // Bifurcated: P13 multi-channel if campaign.channels is set; legacy email otherwise.
 router.post(
   '/:id/generate',
+  aiGenerationLimiter,
   requireAuth,
   requireModule('campaigns'),
   async (req: Request, res: Response): Promise<void> => {

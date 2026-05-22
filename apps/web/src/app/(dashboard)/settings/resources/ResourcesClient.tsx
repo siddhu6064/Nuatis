@@ -44,7 +44,7 @@ const TYPE_CLASSES: Record<string, string> = {
   other: 'bg-gray-100 text-ink4',
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const API_URL = ''
 
 // Hours 8am–6pm in 30-min slots = 20 slots
 const HOUR_LABELS = Array.from({ length: 10 }, (_, i) => {

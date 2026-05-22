@@ -10,6 +10,7 @@ import {
 import { z } from 'zod'
 import { seedSampleData } from '../lib/seed-sample-data.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { authLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -30,7 +31,7 @@ const CreateTenantSchema = z.object({
 })
 
 // ── POST /api/tenants ─────────────────────────────────────────
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+router.post('/', authLimiter, async (req: Request, res: Response): Promise<void> => {
   // 0. Internal flags (read before schema strip)
   const skipSampleData = (req.body as Record<string, unknown>)['skipSampleData'] === true
 
@@ -93,7 +94,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       name: business_name,
       slug: uniqueSlug,
       vertical: vertical_slug,
-      auth_provider: 'authjs',
       timezone,
       subscription_status: 'active',
       subscription_plan: 'starter',

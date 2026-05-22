@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const API_URL = ''
 
 interface Signup {
   email: string

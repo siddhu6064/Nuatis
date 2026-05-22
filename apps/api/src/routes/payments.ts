@@ -46,8 +46,10 @@ router.get('/ledger', requireAuth, async (req: Request, res: Response): Promise<
     try {
       const charges = await stripe.charges.list({ limit: 100 })
       for (const charge of charges.data) {
-        // Only include charges whose metadata tenantId matches this tenant
-        if (charge.metadata['tenantId'] && charge.metadata['tenantId'] !== authed.tenantId) continue
+        // Only include charges whose metadata tenantId matches this tenant.
+        // Charges without metadata.tenantId are skipped (safe default — Stripe
+        // account is shared across tenants).
+        if (charge.metadata['tenantId'] !== authed.tenantId) continue
         entries.push({
           id: `stripe_${charge.id}`,
           source: 'stripe',
@@ -162,7 +164,7 @@ router.get('/summary', requireAuth, async (req: Request, res: Response): Promise
         created: { gte: Math.floor(Date.now() / 1000 - 30 * 24 * 60 * 60) },
       })
       for (const c of charges.data) {
-        if (c.metadata['tenantId'] && c.metadata['tenantId'] !== authed.tenantId) continue
+        if (c.metadata['tenantId'] !== authed.tenantId) continue
         if (c.status === 'succeeded') {
           stripeTotal += c.amount / 100
           stripeCount++

@@ -266,7 +266,7 @@ export async function createGeminiLiveSession(
     '## CURRENT DATE AND TIME',
     `Today is ${dateStr}. Current time is ${timeStr} Central Time.`,
     'Use this as your authoritative reference for all date and time calculations.',
-    "When a caller says \"tomorrow\", calculate from today's date above.",
+    'When a caller says "tomorrow", calculate from today\'s date above.',
     'The company name is Nuatis — spelled N-U-A-T-I-S, pronounced "new-AY-tiss".',
     '',
   ].join('\n')
