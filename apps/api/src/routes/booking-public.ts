@@ -9,6 +9,7 @@ import {
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { sendSms } from '../lib/sms.js'
+import { buildConfirmationSms } from '../lib/sms-templates.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { bookingLimiter } from '../middleware/rate-limit.js'
@@ -270,7 +271,7 @@ router.post(
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .select(
-        'id, booking_page_enabled, booking_buffer_minutes, booking_confirmation_message, booking_accent_color'
+        'id, booking_page_enabled, booking_buffer_minutes, booking_confirmation_message, booking_accent_color, name, vertical'
       )
       .eq('booking_page_slug', slug)
       .maybeSingle()
@@ -508,7 +509,12 @@ router.post(
 
     // Send SMS confirmation
     if (telnyxNumber && phone) {
-      const smsBody = `Hi ${firstName}, your appointment for ${serviceName} on ${date} at ${startTime} has been confirmed. ${confirmationMessage}`
+      const smsBody = buildConfirmationSms({
+        contactName: firstName ?? null,
+        businessName: (tenant.name as string | undefined) ?? 'your business',
+        appointmentDateTime: `${date} at ${startTime}`,
+        vertical: (tenant.vertical as string | undefined) ?? 'sales_crm',
+      })
       void sendSms(telnyxNumber, phone, smsBody, { tenantId, contactId: contactId ?? undefined })
     }
 

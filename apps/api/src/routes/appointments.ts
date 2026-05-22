@@ -14,6 +14,8 @@ import { logActivity } from '../lib/activity.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { checkResourceAvailable } from '../lib/resource-availability.js'
+import { sendSms } from '../lib/sms.js'
+import { buildConfirmationSms } from '../lib/sms-templates.js'
 
 const router = Router()
 
@@ -399,6 +401,65 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     actorType: 'user',
     actorId: authed.userId,
   })
+
+  // Fire-and-forget confirmation SMS — never blocks the response or throws
+  void (async () => {
+    try {
+      const firstName = (contact?.full_name as string | undefined)?.split(' ')[0] ?? null
+
+      const [contactPhone, locationSms, tenantSms] = await Promise.all([
+        supabase
+          .from('contacts')
+          .select('phone')
+          .eq('id', contact_id)
+          .eq('tenant_id', authed.tenantId)
+          .single(),
+        supabase
+          .from('locations')
+          .select('telnyx_number')
+          .eq('tenant_id', authed.tenantId)
+          .eq('is_primary', true)
+          .maybeSingle(),
+        supabase.from('tenants').select('name, vertical').eq('id', authed.tenantId).single(),
+      ])
+
+      const phone = contactPhone.data?.phone as string | undefined
+      const telnyxNumber = locationSms.data?.telnyx_number as string | undefined
+      const businessName = (tenantSms.data?.name as string | undefined) ?? 'your business'
+      const vertical = (tenantSms.data?.vertical as string | undefined) ?? 'sales_crm'
+
+      if (!phone || !telnyxNumber) return
+
+      const dt = new Date(start_time).toLocaleString('en-US', {
+        timeZone: 'America/Chicago',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+
+      const smsText = buildConfirmationSms({
+        contactName: firstName,
+        businessName,
+        appointmentDateTime: dt,
+        vertical,
+      })
+
+      const { success } = await sendSms(telnyxNumber, phone, smsText, {
+        contactId: contact_id,
+        tenantId: authed.tenantId,
+      })
+
+      if (success) {
+        console.info(
+          `[appointments] confirmation SMS sent: contact=${contact_id} appt=${String(appointment.id)}`
+        )
+      }
+    } catch (err) {
+      console.warn('[appointments] confirmation SMS failed (non-fatal):', err)
+    }
+  })()
 
   res.status(201).json({ data: appointment })
 })
