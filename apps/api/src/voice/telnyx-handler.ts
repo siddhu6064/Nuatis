@@ -117,6 +117,7 @@ interface LocationConfig {
   businessProfile: BusinessProfile | null
   kbFiles: Array<{ file_name: string; extracted_text: string }> | null
   kbUrls: Array<{ url: string; extracted_text: string | null }> | null
+  timezone: string
 }
 
 function isAfterHoursNow(
@@ -152,6 +153,7 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
     businessProfile: null,
     kbFiles: null,
     kbUrls: null,
+    timezone: 'America/Chicago',
   }
   const FALLBACK_MESSAGE =
     'We are currently closed. Please leave your name and number and we will call you back during business hours.'
@@ -235,6 +237,7 @@ async function getLocationConfig(tenantId: string): Promise<LocationConfig> {
           businessProfile,
           kbFiles: kbFiles.length > 0 ? kbFiles : null,
           kbUrls: rawKbUrls.length > 0 ? rawKbUrls : null,
+          timezone: d.timezone ?? 'America/Chicago',
         }
       } catch {
         return FALLBACK
@@ -480,7 +483,8 @@ export async function prewarmGemini(
     businessProfile,
     locationConfig.kbFiles,
     kbUrls ?? null,
-    callerPhoneE164
+    callerPhoneE164,
+    locationConfig.timezone
   )
 
   return new Promise<void>((resolve) => {

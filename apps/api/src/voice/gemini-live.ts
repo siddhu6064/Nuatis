@@ -142,7 +142,8 @@ export async function createGeminiLiveSession(
   businessProfile?: BusinessProfile | null,
   kbFiles?: Array<{ file_name: string; extracted_text: string }> | null,
   kbUrls?: Array<{ url: string; extracted_text: string | null }> | null,
-  callerPhone?: string
+  callerPhone?: string,
+  timezone?: string
 ): Promise<GeminiLiveSession> {
   const apiKey = process.env['GEMINI_API_KEY']
   if (!apiKey) {
@@ -245,6 +246,31 @@ export async function createGeminiLiveSession(
     }
   }
 
+  // ── Build date/time block — injected first so Maya knows the current date ────
+  const tz = timezone ?? 'America/Chicago'
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: tz,
+  })
+  const timeStr = now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: tz,
+  })
+  const dateBlock = [
+    '## CURRENT DATE AND TIME',
+    `Today is ${dateStr}. Current time is ${timeStr} Central Time.`,
+    'Use this as your authoritative reference for all date and time calculations.',
+    "When a caller says \"tomorrow\", calculate from today's date above.",
+    'The company name is Nuatis — spelled N-U-A-T-I-S, pronounced "new-AY-tiss".',
+    '',
+  ].join('\n')
+
   const client = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } })
 
   let audioCallback: ((chunk: Buffer) => void) | null = null
@@ -316,7 +342,7 @@ export async function createGeminiLiveSession(
         activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
       },
       systemInstruction: {
-        parts: [{ text: memoryBlock + systemPrompt + (promptSuffix ?? '') }],
+        parts: [{ text: dateBlock + memoryBlock + systemPrompt + (promptSuffix ?? '') }],
       },
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     },
