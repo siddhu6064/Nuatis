@@ -18,7 +18,7 @@ CREATE TABLE announcements (
 );
 
 INSERT INTO announcements (title, body, type, cta_label, cta_url) VALUES
-('AI Campaigns are here', 'Send AI-generated email campaigns to your contact segments. Set up your brand voice first.', 'feature', 'Set up Brand Voice', '/settings/brand-voice'),
+('AI Campaigns are here', 'Send AI-generated email campaigns to your contact segments. Set up your brand voice first.', 'feature', 'Set up Brand Voice', '/settings/brand-profile'),
 ('Maya now makes outbound calls', 'Enable outbound calling to have Maya proactively reach out to leads.', 'feature', 'Try it now', '/outbound-calls');
 
 -- G86: Gift cards
