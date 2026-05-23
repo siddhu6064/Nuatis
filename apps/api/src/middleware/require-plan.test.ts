@@ -97,9 +97,9 @@ describe('requirePlan — subscription status gating', () => {
     expect(payload.status).toBe('past_due')
   })
 
-  it('blocks cancelled tenants', async () => {
+  it('blocks canceled tenants', async () => {
     const requirePlan = await loadRequirePlan({
-      subscription_status: 'cancelled',
+      subscription_status: 'canceled',
       modules: { campaigns: true },
     })
 

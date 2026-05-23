@@ -1,15 +1,7 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 
-type SubscriptionStatus =
-  | 'trialing'
-  | 'active'
-  | 'past_due'
-  | 'canceled'
-  | 'cancelled'
-  | 'unpaid'
-  | 'paused'
-  | 'incomplete'
+type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'paused'
 type SubscriptionPlan = 'core' | 'pro' | 'scale'
 
 interface Tenant {
@@ -34,10 +26,8 @@ const STATUS_STYLE: Record<SubscriptionStatus, string> = {
   trialing: 'bg-amber-50 text-amber-700',
   past_due: 'bg-red-50 text-red-600',
   canceled: 'bg-red-50 text-red-600',
-  cancelled: 'bg-red-50 text-red-600',
   unpaid: 'bg-red-50 text-red-600',
   paused: 'bg-bg2 text-ink3',
-  incomplete: 'bg-amber-50 text-amber-700',
 }
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -45,10 +35,8 @@ const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   trialing: 'Trialing',
   past_due: 'Past Due',
   canceled: 'Canceled',
-  cancelled: 'Cancelled',
   unpaid: 'Unpaid',
   paused: 'Paused',
-  incomplete: 'Incomplete',
 }
 
 const PLAN_LABEL: Record<SubscriptionPlan, string> = {

@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import BillingClient from './BillingClient'
 
 type PlanKey = 'core' | 'pro' | 'scale'
-type Status = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'paused' | 'incomplete'
+type Status = 'trialing' | 'active' | 'past_due' | 'canceled' | 'paused' | 'unpaid'
 
 interface TenantBilling {
   subscription_plan: PlanKey | null

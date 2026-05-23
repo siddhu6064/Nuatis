@@ -6,7 +6,7 @@ import Link from 'next/link'
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? ''
 
 type PlanKey = 'core' | 'pro' | 'scale'
-type Status = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'paused' | 'incomplete'
+type Status = 'trialing' | 'active' | 'past_due' | 'canceled' | 'paused' | 'unpaid'
 
 interface Props {
   plan: PlanKey | null
@@ -24,9 +24,9 @@ const STATUS_STYLE: Record<Status, { bg: string; fg: string; label: string }> = 
   trialing: { bg: '#fef3c7', fg: '#92400e', label: 'Trialing' },
   active: { bg: '#dcfce7', fg: '#166534', label: 'Active' },
   past_due: { bg: '#fee2e2', fg: '#b91c1c', label: 'Past due' },
-  cancelled: { bg: '#fee2e2', fg: '#b91c1c', label: 'Cancelled' },
+  canceled: { bg: '#fee2e2', fg: '#b91c1c', label: 'Canceled' },
   paused: { bg: '#f3f4f6', fg: '#374151', label: 'Paused' },
-  incomplete: { bg: '#fef3c7', fg: '#92400e', label: 'Incomplete' },
+  unpaid: { bg: '#fef3c7', fg: '#92400e', label: 'Unpaid' },
 }
 
 function daysUntil(iso: string | null): number | null {
@@ -150,7 +150,7 @@ export default function BillingClient(props: Props) {
             className="text-sm py-3 flex justify-between"
             style={{ color: 'var(--ink3)', borderTop: '1px solid var(--border)' }}
           >
-            <span>{props.status === 'cancelled' ? 'Access until' : 'Next billing date'}</span>
+            <span>{props.status === 'canceled' ? 'Access until' : 'Next billing date'}</span>
             <span style={{ color: 'var(--ink)' }}>{formatDate(props.currentPeriodEnd)}</span>
           </div>
 

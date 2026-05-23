@@ -270,7 +270,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         await supabase
           .from('tenants')
           .update({
-            subscription_status: 'cancelled',
+            subscription_status: 'canceled',
             subscription_plan: null,
             modules: graceModules,
           })
@@ -279,8 +279,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         if (tenant?.billing_email) {
           void sendEmail({
             to: tenant.billing_email,
-            subject: 'Your Nuatis subscription has been cancelled',
-            html: `<p>Hi,</p><p>Your Nuatis subscription has been cancelled. Maya call handling will remain active for 7 days so any in-flight calls don't get cut off.</p><p>If this was a mistake, you can re-subscribe at any time: <a href="${process.env['WEB_URL'] ?? 'https://app.nuatis.com'}/pricing">View plans</a></p><p>— Nuatis</p>`,
+            subject: 'Your Nuatis subscription has been canceled',
+            html: `<p>Hi,</p><p>Your Nuatis subscription has been canceled. Maya call handling will remain active for 7 days so any in-flight calls don't get cut off.</p><p>If this was a mistake, you can re-subscribe at any time: <a href="${process.env['WEB_URL'] ?? 'https://app.nuatis.com'}/pricing">View plans</a></p><p>— Nuatis</p>`,
             tenantId: tenant.id,
           })
         }
@@ -288,7 +288,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         if (tenant?.id) {
           await logAuditEvent({
             tenantId: tenant.id,
-            action: 'subscription.cancelled',
+            action: 'subscription.canceled',
             resourceType: 'subscription',
             resourceId: sub.id,
           })
