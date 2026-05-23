@@ -10,12 +10,13 @@ const PRODUCTS = [
   {
     name: 'Maya AI',
     tagline: 'AI-powered virtual receptionist',
-    features: ['24/7 call answering', 'Google Calendar booking', 'Multilingual', '7 industries'],
+    features: ['24/7 call answering', 'Google Calendar booking', 'Multilingual', '16 industries'],
     status: 'Live',
     statusColor: 'bg-green-50 text-green-700',
     icon: '📞',
-    cta: 'Try Maya',
-    href: '/maya',
+    cta: 'Learn more',
+    href: 'https://nuatis.com/why-maya.html',
+    external: true,
   },
   {
     name: 'Nuatis Suite',

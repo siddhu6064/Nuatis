@@ -13,15 +13,27 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <span className="text-sm font-bold text-ink">Nuatis</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-ink3">
-            <Link href="/maya#features" className="hover:text-ink">
+            {/* Marketing nav points at the nuatis.com brochure site for
+                product content; pricing + auth stay inside the app. */}
+            <a
+              href="https://nuatis.com/modules.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink"
+            >
               Features
-            </Link>
+            </a>
             <Link href="/pricing" className="hover:text-ink">
               Pricing
             </Link>
-            <Link href="/maya#how-it-works" className="hover:text-ink">
+            <a
+              href="https://nuatis.com/why-maya.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink"
+            >
               How It Works
-            </Link>
+            </a>
             <Link href="/sign-in" className="hover:text-ink">
               Sign In
             </Link>
