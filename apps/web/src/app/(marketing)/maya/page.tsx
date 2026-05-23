@@ -5,7 +5,7 @@ import MayaFAQ from './MayaFAQ'
 export const metadata: Metadata = {
   title: 'Maya AI — AI Virtual Receptionist for Small Businesses',
   description:
-    '24/7 AI phone answering that books appointments on your Google Calendar. Built for dental, salon, contractor, law firm, real estate, and more. From $49/mo.',
+    '24/7 AI phone answering that books appointments on your Google Calendar. Built for dental, salon, contractor, law firm, real estate, and more. From $149/mo.',
   openGraph: {
     title: 'Maya AI — Your 24/7 Virtual Receptionist',
     description:
@@ -28,7 +28,7 @@ const FEATURES = [
   {
     icon: '🌐',
     title: 'Speaks Their Language',
-    desc: 'Automatic language detection. English, Spanish, Hindi, Telugu and more.',
+    desc: 'Automatic multilingual detection — Maya responds in the caller’s language.',
   },
   {
     icon: '🧠',
@@ -51,7 +51,7 @@ const STEPS = [
   {
     num: '1',
     title: 'Sign up & pick your industry',
-    desc: 'Choose from 7 verticals. Maya customizes her persona.',
+    desc: 'Choose from 16 verticals. Maya customizes her persona.',
   },
   {
     num: '2',
@@ -102,7 +102,7 @@ export default function MayaLandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 rounded-full text-xs text-teal-700 font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-            Now live &middot; 7 industries supported
+            Now live &middot; 16 industries supported
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-ink leading-tight mb-4">
             Maya AI &mdash; Your 24/7
@@ -135,9 +135,9 @@ export default function MayaLandingPage() {
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-8 text-center">
           {[
             ['< 1.5s', 'response time'],
-            ['per-call pricing', 'no monthly cap'],
-            ['7', 'industries'],
-            ['4', 'languages'],
+            ['$149', '/ month'],
+            ['16', 'industries'],
+            ['Auto', 'multilingual'],
           ].map(([value, label]) => (
             <div key={label}>
               <p className="text-lg font-bold text-ink">{value}</p>
@@ -212,48 +212,56 @@ export default function MayaLandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing — Core plan as the Maya entry point */}
       <section id="pricing" className="py-20 px-6 bg-bg">
         <div className="max-w-lg mx-auto text-center">
-          <h2 className="text-2xl font-bold text-ink mb-8">Simple pricing</h2>
-          <div className="bg-white rounded-2xl border border-border-brand p-8 shadow-sm">
-            <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide mb-2">
-              Maya AI
-            </p>
-            <div className="flex items-end justify-center gap-1 mb-2">
-              <span className="text-2xl font-bold text-ink">Founding Member Pricing</span>
+          <h2 className="text-2xl font-bold text-ink mb-2">Simple pricing</h2>
+          <p className="text-sm text-ink3 mb-8">
+            Start with Core — Maya plus the full CRM front office.
+          </p>
+
+          <div className="bg-white rounded-2xl border-2 border-teal-600 p-8 shadow-sm text-left">
+            <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide mb-2">Core</p>
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-4xl font-bold text-ink">$149</span>
+              <span className="text-sm text-ink3">/ month</span>
             </div>
             <p className="text-sm text-ink3 mb-4">
-              Contact us to lock in your rate before public launch.
+              300 Maya minutes included &middot; $0.05 per extra minute
             </p>
-            <ul className="text-sm text-ink3 space-y-2 mb-6 text-left">
+
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700 mb-6">
+              7-day free trial
+            </span>
+
+            <ul className="text-sm text-ink2 space-y-2 mb-6">
               {[
-                'Unlimited calls',
+                'Maya AI receptionist — 24/7',
                 'Google Calendar booking',
                 'SMS confirmations',
+                'CRM contacts + companies',
+                'Pipeline + deals',
                 'Call logs & analytics',
-                'Knowledge base (FAQ)',
-                'Multilingual (4 languages)',
-                '7 industry verticals',
+                'Auto multilingual',
+                '16 industry verticals',
               ].map((f) => (
                 <li key={f} className="flex items-center gap-2">
-                  <span className="text-teal-500">&#10003;</span> {f}
+                  <span className="text-teal-600">&#10003;</span> {f}
                 </li>
               ))}
             </ul>
+
             <Link
-              href="/sign-up?product=maya_only"
-              className="block w-full py-3 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition-colors"
+              href="/pricing"
+              className="block w-full text-center py-3 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition-colors"
             >
               Start Free Trial
             </Link>
           </div>
-          <div className="mt-6 p-4 bg-white rounded-xl border border-border-brand">
-            <p className="text-sm text-ink3">
-              Want full CRM with pipeline, automation, and quotes?
-            </p>
-            <Link href="/upgrade" className="text-sm text-teal-600 font-medium hover:text-teal-700">
-              Compare plans &rarr;
+
+          <div className="mt-6">
+            <Link href="/pricing" className="text-sm text-teal-600 font-medium hover:text-teal-700">
+              Compare all plans &rarr;
             </Link>
           </div>
         </div>

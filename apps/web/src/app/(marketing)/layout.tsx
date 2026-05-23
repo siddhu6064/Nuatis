@@ -16,7 +16,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/maya#features" className="hover:text-ink">
               Features
             </Link>
-            <Link href="/maya#pricing" className="hover:text-ink">
+            <Link href="/pricing" className="hover:text-ink">
               Pricing
             </Link>
             <Link href="/maya#how-it-works" className="hover:text-ink">
