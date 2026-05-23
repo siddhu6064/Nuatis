@@ -315,34 +315,39 @@ export default function PricingClient() {
           <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: 'var(--ink)' }}>
             Compare plans
           </h2>
+
+          {/* overflow-x-auto wrapper for mobile */}
           <div
             className="overflow-x-auto rounded-xl border"
             style={{ borderColor: 'var(--border)' }}
           >
-            <table className="w-full bg-white">
+            <table className="w-full bg-white min-w-[640px]">
               <thead>
-                <tr style={{ background: 'var(--bg2)' }}>
+                <tr className="bg-gray-50">
                   <th
                     className="text-left text-sm font-semibold px-6 py-4"
-                    style={{ color: 'var(--ink2)' }}
+                    style={{ color: 'var(--ink)' }}
                   >
                     Feature
                   </th>
                   <th
                     className="text-center text-sm font-semibold px-6 py-4"
-                    style={{ color: 'var(--ink2)' }}
+                    style={{ color: 'var(--ink)' }}
                   >
                     Core
                   </th>
+                  {/* Pro column header — teal tint + teal text + top accent
+                      border so it visually ties back to the "Most popular"
+                      tier card above. */}
                   <th
-                    className="text-center text-sm font-semibold px-6 py-4"
-                    style={{ color: 'var(--teal-dark)' }}
+                    className="text-center text-sm font-semibold px-6 py-4 bg-teal-50 border-t-2"
+                    style={{ color: 'var(--teal-dark)', borderTopColor: 'var(--teal)' }}
                   >
                     Pro
                   </th>
                   <th
                     className="text-center text-sm font-semibold px-6 py-4"
-                    style={{ color: 'var(--ink2)' }}
+                    style={{ color: 'var(--ink)' }}
                   >
                     Scale
                   </th>
@@ -352,17 +357,18 @@ export default function PricingClient() {
                 {COMPARISON.map((row, i) => (
                   <tr
                     key={row.feature}
-                    style={{
-                      borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-                    }}
+                    className={i % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'}
+                    style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}
                   >
-                    <td className="text-sm px-6 py-3" style={{ color: 'var(--ink2)' }}>
+                    <td className="text-sm px-6 py-3 font-medium" style={{ color: 'var(--ink)' }}>
                       {row.feature}
                     </td>
                     <td className="text-center px-6 py-3">
                       <Check active={row.core} />
                     </td>
-                    <td className="text-center px-6 py-3">
+                    {/* Pro column cell — same teal tint as the header for a
+                        full-height column highlight. */}
+                    <td className="text-center px-6 py-3 bg-teal-50">
                       <Check active={row.pro} />
                     </td>
                     <td className="text-center px-6 py-3">

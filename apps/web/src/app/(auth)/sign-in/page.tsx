@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState, useRef } from 'react'
+import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -266,6 +267,19 @@ function SignInForm() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          {/* New-account CTA — divider + link to the existing sign-up flow */}
+          <div className="mt-6 pt-5 border-t border-border-brand text-center">
+            <p className="text-xs text-ink3 mb-3">New to Nuatis?</p>
+            <Link
+              href="/sign-up"
+              className="block w-full bg-white hover:bg-gray-50 border border-teal-600
+                         text-teal-700 text-sm font-medium py-2.5 rounded-lg
+                         transition-colors"
+            >
+              Start your 7-day free trial
+            </Link>
+          </div>
         </div>
 
         <p className="text-center text-xs text-gray-300 mt-6">Nuatis LLC · Front Office AI</p>
