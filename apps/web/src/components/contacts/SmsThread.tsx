@@ -16,6 +16,7 @@ interface SmsMessage {
 interface Props {
   contactId: string
   contactName: string
+  refreshKey?: number
 }
 
 function formatTime(dateStr: string): string {
@@ -43,7 +44,7 @@ function isSameDay(a: string, b: string): boolean {
   )
 }
 
-export default function SmsThread({ contactId, contactName }: Props) {
+export default function SmsThread({ contactId, contactName, refreshKey }: Props) {
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [input, setInput] = useState('')
@@ -64,6 +65,12 @@ export default function SmsThread({ contactId, contactName }: Props) {
     // Mark as read (fire-and-forget)
     void fetch(`/api/contacts/${contactId}/sms/read`, { method: 'POST' })
   }, [contactId, fetchMessages])
+
+  // Re-fetch when parent signals a refresh (e.g., after outer compose-bar send)
+  useEffect(() => {
+    if (refreshKey === undefined) return
+    void fetchMessages()
+  }, [refreshKey, fetchMessages])
 
   // Auto-scroll to bottom
   useEffect(() => {

@@ -303,6 +303,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
   const [composeTab, setComposeTab] = useState<'sms' | 'note'>('sms')
   const [smsText, setSmsText] = useState('')
   const [smsSending, setSmsSending] = useState(false)
+  const [smsError, setSmsError] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
 
@@ -645,14 +646,25 @@ export default function ContactDetailClient({ contact: initial }: Props) {
     const text = smsText.trim()
     if (!text || !headerContact.phone || !smsOptIn) return
     setSmsSending(true)
-    await fetch(`/api/contacts/${contactId}/sms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
-    }).catch(() => {})
-    setSmsText('')
-    setRefreshKey((k) => k + 1)
-    setSmsSending(false)
+    setSmsError(null)
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        setSmsError(body?.error ?? 'Failed to send SMS')
+        return
+      }
+      setSmsText('')
+      setRefreshKey((k) => k + 1)
+    } catch (err) {
+      setSmsError(err instanceof Error ? err.message : 'Failed to send SMS')
+    } finally {
+      setSmsSending(false)
+    }
   }
 
   const handleSaveNote = async () => {
@@ -1484,7 +1496,11 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                 <ActivityTimeline contactId={contactId} refreshKey={refreshKey} />
               )}
               {activeTab === 'messages' && (
-                <SmsThread contactId={contactId} contactName={contactName} />
+                <SmsThread
+                  contactId={contactId}
+                  contactName={contactName}
+                  refreshKey={refreshKey}
+                />
               )}
               {activeTab === 'files' && <FileAttachments contactId={contactId} />}
             </div>
@@ -1540,6 +1556,9 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                   )}
                   {!smsOptIn && (
                     <span className="text-[11px] text-rose-500 font-medium">SMS opted out</span>
+                  )}
+                  {smsError && (
+                    <span className="text-[11px] text-red-600 font-medium">{smsError}</span>
                   )}
                 </div>
                 <button
