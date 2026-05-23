@@ -1,8 +1,12 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requirePlan } from '../middleware/require-plan.js'
 
 const router = Router()
+
+// Phase 9: subscription + module gate. 'automation' is in Pro + Scale.
+router.use(requireAuth, requirePlan('automation'))
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

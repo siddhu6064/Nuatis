@@ -96,7 +96,7 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
       vertical: vertical_slug,
       timezone,
       subscription_status: 'active',
-      subscription_plan: 'starter',
+      subscription_plan: 'core',
       product,
       modules:
         product === 'maya_only'

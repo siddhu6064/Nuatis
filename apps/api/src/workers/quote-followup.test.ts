@@ -31,6 +31,15 @@ function seedBase(): void {
   store.tables['locations'] = [
     { id: randomUUID(), tenant_id: TENANT_ID, telnyx_number: '+15550000000', is_primary: true },
   ]
+  store.tables['telnyx_numbers'] = [
+    {
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      phone_number: '+15550000000',
+      status: 'active',
+      is_primary: true,
+    },
+  ]
 }
 
 beforeEach(() => {

@@ -1,8 +1,12 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requirePlan } from '../middleware/require-plan.js'
 
 const router = Router()
+
+// Phase 9: subscription + module gate. 'cpq' is in Scale only.
+router.use(requireAuth, requirePlan('cpq'))
 
 const DEFAULT_CPQ_SETTINGS = {
   max_discount_pct: 20,

@@ -77,6 +77,8 @@ import googleReserveRouter from './routes/google-reserve.js'
 import invoicesRouter, { publicRouter as invoicesPublicRouter } from './routes/invoices.js'
 import subscriptionsRouter from './routes/subscriptions.js'
 import stripeWebhooksRouter from './routes/stripe-webhooks.js'
+import billingRouter from './routes/billing.js'
+import stripeBillingWebhooksRouter from './routes/stripe-billing-webhooks.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import smsWebhooksRouter from './routes/sms-webhooks.js'
 import smsHealthRouter from './routes/sms-health.js'
@@ -146,6 +148,13 @@ app.use(
 app.use('/api/webhooks/email', express.raw({ type: '*/*' }))
 // Capture raw body for Stripe webhook signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }))
+// SaaS billing webhooks (Nuatis-as-vendor) — must also be mounted BEFORE
+// express.json() so Stripe signature verification sees the raw body.
+app.use(
+  '/api/webhooks/stripe-billing',
+  express.raw({ type: 'application/json' }),
+  stripeBillingWebhooksRouter
+)
 // Telnyx webhooks: parse JSON + capture raw body for Ed25519 signature verification.
 // Mount this BEFORE the global express.json so req.rawBody is populated and
 // the global parser then sees req._body=true and skips re-parsing.
@@ -195,6 +204,7 @@ app.use('/api/invoices/public', invoicesPublicRouter)
 app.use('/api/invoices', invoicesRouter)
 app.use('/api/subscriptions', subscriptionsRouter)
 app.use('/api/webhooks/stripe', stripeWebhooksRouter)
+app.use('/api/billing', billingRouter)
 app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/nps', npsRouter)

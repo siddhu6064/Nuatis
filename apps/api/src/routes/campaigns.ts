@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
-import { requireAuth, requireModule, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requirePlan } from '../middleware/require-plan.js'
 import { aiGenerationLimiter } from '../middleware/rate-limit.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { buildBrandVoicePromptBlock } from '../lib/brand-voice.js'
@@ -72,88 +73,86 @@ function getCampaignQueue(): Queue {
 
 const router = Router()
 
+// Phase 9: subscription + module gate. 'campaigns' is in Pro + Scale.
+router.use(requireAuth, requirePlan('campaigns'))
+
 // ── POST /api/campaigns ───────────────────────────────────────────────────────
 // Accepts both old format { name, type } and new P13 format { name, objective, channels }.
-router.post(
-  '/',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
 
-    const body = req.body as Record<string, unknown>
-    const name = typeof body['name'] === 'string' ? body['name'].trim() : ''
+  const body = req.body as Record<string, unknown>
+  const name = typeof body['name'] === 'string' ? body['name'].trim() : ''
 
-    if (!name) {
-      res.status(400).json({ error: 'name is required' })
-      return
-    }
-
-    // ── P13 fields ────────────────────────────────────────────────────────────
-    const objective = body['objective'] as string | undefined
-    const channels = body['channels'] as unknown[] | undefined
-    const segment_id = typeof body['segment_id'] === 'string' ? body['segment_id'] : undefined
-
-    if (objective !== undefined) {
-      if (!VALID_OBJECTIVES.includes(objective as CampaignObjective)) {
-        res.status(400).json({
-          error: `objective must be one of: ${VALID_OBJECTIVES.join(', ')}`,
-        })
-        return
-      }
-    }
-
-    if (channels !== undefined) {
-      if (!Array.isArray(channels) || channels.length === 0) {
-        res.status(400).json({ error: 'channels must be a non-empty array' })
-        return
-      }
-      const invalid = channels.filter((c) => !VALID_CHANNELS.includes(c as CampaignChannel))
-      if (invalid.length > 0) {
-        res.status(400).json({
-          error: `invalid channel(s): ${invalid.join(', ')}. Must be: ${VALID_CHANNELS.join(', ')}`,
-        })
-        return
-      }
-    }
-
-    // ── Old fields (backward compat) ──────────────────────────────────────────
-    const type = (typeof body['type'] === 'string' ? body['type'] : 'email') as
-      | 'email'
-      | 'sms'
-      | undefined
-    const subject = typeof body['subject'] === 'string' ? body['subject'] : undefined
-    const smart_list_id =
-      typeof body['smart_list_id'] === 'string' ? body['smart_list_id'] : undefined
-
-    const insert: Record<string, unknown> = {
-      tenant_id: authed.tenantId,
-      name,
-      status: 'draft',
-      created_by: authed.userId,
-      type: type ?? 'email',
-    }
-    if (objective) insert['objective'] = objective
-    if (channels) insert['channels'] = channels
-    if (segment_id) insert['segment_id'] = segment_id
-    if (subject) insert['subject'] = subject
-    if (smart_list_id) insert['smart_list_id'] = smart_list_id
-
-    const { data, error } = await supabase
-      .from('campaigns')
-      .insert(insert)
-      .select('*')
-      .single<Campaign>()
-
-    if (error || !data) {
-      res.status(500).json({ error: error?.message ?? 'Failed to create campaign' })
-      return
-    }
-
-    res.status(201).json({ campaign: data })
+  if (!name) {
+    res.status(400).json({ error: 'name is required' })
+    return
   }
-)
+
+  // ── P13 fields ────────────────────────────────────────────────────────────
+  const objective = body['objective'] as string | undefined
+  const channels = body['channels'] as unknown[] | undefined
+  const segment_id = typeof body['segment_id'] === 'string' ? body['segment_id'] : undefined
+
+  if (objective !== undefined) {
+    if (!VALID_OBJECTIVES.includes(objective as CampaignObjective)) {
+      res.status(400).json({
+        error: `objective must be one of: ${VALID_OBJECTIVES.join(', ')}`,
+      })
+      return
+    }
+  }
+
+  if (channels !== undefined) {
+    if (!Array.isArray(channels) || channels.length === 0) {
+      res.status(400).json({ error: 'channels must be a non-empty array' })
+      return
+    }
+    const invalid = channels.filter((c) => !VALID_CHANNELS.includes(c as CampaignChannel))
+    if (invalid.length > 0) {
+      res.status(400).json({
+        error: `invalid channel(s): ${invalid.join(', ')}. Must be: ${VALID_CHANNELS.join(', ')}`,
+      })
+      return
+    }
+  }
+
+  // ── Old fields (backward compat) ──────────────────────────────────────────
+  const type = (typeof body['type'] === 'string' ? body['type'] : 'email') as
+    | 'email'
+    | 'sms'
+    | undefined
+  const subject = typeof body['subject'] === 'string' ? body['subject'] : undefined
+  const smart_list_id =
+    typeof body['smart_list_id'] === 'string' ? body['smart_list_id'] : undefined
+
+  const insert: Record<string, unknown> = {
+    tenant_id: authed.tenantId,
+    name,
+    status: 'draft',
+    created_by: authed.userId,
+    type: type ?? 'email',
+  }
+  if (objective) insert['objective'] = objective
+  if (channels) insert['channels'] = channels
+  if (segment_id) insert['segment_id'] = segment_id
+  if (subject) insert['subject'] = subject
+  if (smart_list_id) insert['smart_list_id'] = smart_list_id
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert(insert)
+    .select('*')
+    .single<Campaign>()
+
+  if (error || !data) {
+    res.status(500).json({ error: error?.message ?? 'Failed to create campaign' })
+    return
+  }
+
+  res.status(201).json({ campaign: data })
+})
 
 // ── GET /api/campaigns ────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -257,111 +256,101 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 })
 
 // ── PATCH /api/campaigns/:id ──────────────────────────────────────────────────
-router.patch(
-  '/:id',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
-    const id = req.params['id']
+router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const id = req.params['id']
 
-    const { data: existing, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('id, status')
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .single<Pick<Campaign, 'id' | 'status'>>()
+  const { data: existing, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('id, status')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .single<Pick<Campaign, 'id' | 'status'>>()
 
-    if (fetchErr || !existing) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (!['draft', 'scheduled'].includes(existing.status)) {
-      res.status(400).json({
-        error: `Cannot edit a campaign with status '${existing.status}'`,
-      })
-      return
-    }
-
-    const body = req.body as Record<string, unknown>
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (typeof body['name'] === 'string') updates['name'] = body['name']
-    if (typeof body['schedule_at'] === 'string') updates['schedule_at'] = body['schedule_at']
-
-    const { data, error } = await supabase
-      .from('campaigns')
-      .update(updates)
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single<Campaign>()
-
-    if (error || !data) {
-      res.status(500).json({ error: error?.message ?? 'Failed to update campaign' })
-      return
-    }
-
-    res.json({ campaign: data })
+  if (fetchErr || !existing) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
   }
-)
+
+  if (!['draft', 'scheduled'].includes(existing.status)) {
+    res.status(400).json({
+      error: `Cannot edit a campaign with status '${existing.status}'`,
+    })
+    return
+  }
+
+  const body = req.body as Record<string, unknown>
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (typeof body['name'] === 'string') updates['name'] = body['name']
+  if (typeof body['schedule_at'] === 'string') updates['schedule_at'] = body['schedule_at']
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update(updates)
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (error || !data) {
+    res.status(500).json({ error: error?.message ?? 'Failed to update campaign' })
+    return
+  }
+
+  res.json({ campaign: data })
+})
 
 // ── PUT /api/campaigns/:id — kept for backward compat ────────────────────────
-router.put(
-  '/:id',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
 
-    const { data: existing, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('id, status')
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .single<Pick<Campaign, 'id' | 'status'>>()
+  const { data: existing, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('id, status')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single<Pick<Campaign, 'id' | 'status'>>()
 
-    if (fetchErr || !existing) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (existing.status !== 'draft') {
-      res.status(400).json({ error: 'Only draft campaigns can be edited' })
-      return
-    }
-
-    const { name, subject, body_html, body_text, smart_list_id, scheduled_at } = req.body as Record<
-      string,
-      string | undefined
-    >
-
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (name !== undefined) updates['name'] = name
-    if (subject !== undefined) updates['subject'] = subject
-    if (body_html !== undefined) updates['body_html'] = body_html
-    if (body_text !== undefined) updates['body_text'] = body_text
-    if (smart_list_id !== undefined) updates['smart_list_id'] = smart_list_id
-    if (scheduled_at !== undefined) updates['scheduled_at'] = scheduled_at
-
-    const { data, error } = await supabase
-      .from('campaigns')
-      .update(updates)
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single<Campaign>()
-
-    if (error || !data) {
-      res.status(500).json({ error: error?.message ?? 'Failed to update campaign' })
-      return
-    }
-
-    res.json({ campaign: data })
+  if (fetchErr || !existing) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
   }
-)
+
+  if (existing.status !== 'draft') {
+    res.status(400).json({ error: 'Only draft campaigns can be edited' })
+    return
+  }
+
+  const { name, subject, body_html, body_text, smart_list_id, scheduled_at } = req.body as Record<
+    string,
+    string | undefined
+  >
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (name !== undefined) updates['name'] = name
+  if (subject !== undefined) updates['subject'] = subject
+  if (body_html !== undefined) updates['body_html'] = body_html
+  if (body_text !== undefined) updates['body_text'] = body_text
+  if (smart_list_id !== undefined) updates['smart_list_id'] = smart_list_id
+  if (scheduled_at !== undefined) updates['scheduled_at'] = scheduled_at
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update(updates)
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (error || !data) {
+    res.status(500).json({ error: error?.message ?? 'Failed to update campaign' })
+    return
+  }
+
+  res.json({ campaign: data })
+})
 
 // ── POST /api/campaigns/:id/generate ─────────────────────────────────────────
 // Bifurcated: P13 multi-channel if campaign.channels is set; legacy email otherwise.
@@ -369,7 +358,6 @@ router.post(
   '/:id/generate',
   aiGenerationLimiter,
   requireAuth,
-  requireModule('campaigns'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getSupabase()
@@ -555,7 +543,6 @@ router.post(
 router.patch(
   '/:id/messages/:msgId',
   requireAuth,
-  requireModule('campaigns'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getSupabase()
@@ -615,223 +602,129 @@ router.patch(
 )
 
 // ── POST /api/campaigns/:id/approve ──────────────────────────────────────────
-router.post(
-  '/:id/approve',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
-    const id = req.params['id']
+router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const id = req.params['id']
 
-    // Verify campaign and fetch channels
+  // Verify campaign and fetch channels
+  const { data: campaign, error: campErr } = await supabase
+    .from('campaigns')
+    .select('id, channels')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .single<{ id: string; channels: string[] | null }>()
+
+  if (campErr || !campaign) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
+  }
+
+  const channels = campaign.channels ?? []
+
+  // Check all channels have a message
+  const { data: messages } = await supabase
+    .from('campaign_messages')
+    .select('id, channel, approved')
+    .eq('campaign_id', id)
+
+  type MsgRow = { id: string; channel: string; approved: boolean }
+  const existingChannels = new Set(((messages ?? []) as MsgRow[]).map((m) => m.channel))
+
+  for (const channel of channels) {
+    if (!existingChannels.has(channel)) {
+      res.status(400).json({ error: `Missing message for channel: ${channel}` })
+      return
+    }
+  }
+
+  const now = new Date().toISOString()
+  const { data: updated, error: updateErr } = await supabase
+    .from('campaign_messages')
+    .update({ approved: true, approved_by: authed.userId, approved_at: now })
+    .eq('campaign_id', id)
+    .select('*')
+
+  if (updateErr) {
+    res.status(500).json({ error: updateErr.message })
+    return
+  }
+
+  res.json({ messages: updated ?? [] })
+})
+
+// ── POST /api/campaigns/:id/schedule ─────────────────────────────────────────
+router.post('/:id/schedule', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const id = req.params['id']
+
+  const body = req.body as Record<string, unknown>
+
+  // ── P13 schedule path: expects schedule_at ─────────────────────────────────
+  const scheduleAt = body['schedule_at'] as string | undefined
+
+  // ── Legacy schedule path: expects scheduled_at ─────────────────────────────
+  const scheduledAt = body['scheduled_at'] as string | undefined
+
+  // P13 path
+  if (scheduleAt !== undefined) {
+    const scheduleDate = new Date(scheduleAt)
+    if (isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now()) {
+      res.status(400).json({ error: 'schedule_at must be a valid future ISO timestamp' })
+      return
+    }
+
     const { data: campaign, error: campErr } = await supabase
       .from('campaigns')
-      .select('id, channels')
+      .select('id, status, channels, segment_id')
       .eq('id', id)
       .eq('tenant_id', authed.tenantId)
-      .single<{ id: string; channels: string[] | null }>()
+      .single<{
+        id: string
+        status: string
+        channels: string[] | null
+        segment_id: string | null
+      }>()
 
     if (campErr || !campaign) {
       res.status(404).json({ error: 'Campaign not found' })
       return
     }
 
-    const channels = campaign.channels ?? []
+    if (!['draft', 'scheduled'].includes(campaign.status)) {
+      res.status(400).json({
+        error: `Cannot schedule a campaign with status '${campaign.status}'`,
+      })
+      return
+    }
 
-    // Check all channels have a message
+    // All messages must be approved
     const { data: messages } = await supabase
       .from('campaign_messages')
-      .select('id, channel, approved')
+      .select('channel, approved')
       .eq('campaign_id', id)
 
-    type MsgRow = { id: string; channel: string; approved: boolean }
-    const existingChannels = new Set(((messages ?? []) as MsgRow[]).map((m) => m.channel))
-
-    for (const channel of channels) {
-      if (!existingChannels.has(channel)) {
-        res.status(400).json({ error: `Missing message for channel: ${channel}` })
-        return
-      }
+    type MsgRow = { channel: string; approved: boolean }
+    const unapproved = ((messages ?? []) as MsgRow[]).filter((m) => !m.approved)
+    if (unapproved.length > 0) {
+      res.status(400).json({ error: 'Approve all messages before scheduling' })
+      return
     }
 
-    const now = new Date().toISOString()
+    // Snapshot contact_count
+    let contactCount: number | null = null
+    if (campaign.segment_id) {
+      const desc = await resolveSegmentDescription(campaign.segment_id, authed.tenantId)
+      contactCount = parseContactCount(desc)
+    }
+
     const { data: updated, error: updateErr } = await supabase
-      .from('campaign_messages')
-      .update({ approved: true, approved_by: authed.userId, approved_at: now })
-      .eq('campaign_id', id)
-      .select('*')
-
-    if (updateErr) {
-      res.status(500).json({ error: updateErr.message })
-      return
-    }
-
-    res.json({ messages: updated ?? [] })
-  }
-)
-
-// ── POST /api/campaigns/:id/schedule ─────────────────────────────────────────
-router.post(
-  '/:id/schedule',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
-    const id = req.params['id']
-
-    const body = req.body as Record<string, unknown>
-
-    // ── P13 schedule path: expects schedule_at ─────────────────────────────────
-    const scheduleAt = body['schedule_at'] as string | undefined
-
-    // ── Legacy schedule path: expects scheduled_at ─────────────────────────────
-    const scheduledAt = body['scheduled_at'] as string | undefined
-
-    // P13 path
-    if (scheduleAt !== undefined) {
-      const scheduleDate = new Date(scheduleAt)
-      if (isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now()) {
-        res.status(400).json({ error: 'schedule_at must be a valid future ISO timestamp' })
-        return
-      }
-
-      const { data: campaign, error: campErr } = await supabase
-        .from('campaigns')
-        .select('id, status, channels, segment_id')
-        .eq('id', id)
-        .eq('tenant_id', authed.tenantId)
-        .single<{
-          id: string
-          status: string
-          channels: string[] | null
-          segment_id: string | null
-        }>()
-
-      if (campErr || !campaign) {
-        res.status(404).json({ error: 'Campaign not found' })
-        return
-      }
-
-      if (!['draft', 'scheduled'].includes(campaign.status)) {
-        res.status(400).json({
-          error: `Cannot schedule a campaign with status '${campaign.status}'`,
-        })
-        return
-      }
-
-      // All messages must be approved
-      const { data: messages } = await supabase
-        .from('campaign_messages')
-        .select('channel, approved')
-        .eq('campaign_id', id)
-
-      type MsgRow = { channel: string; approved: boolean }
-      const unapproved = ((messages ?? []) as MsgRow[]).filter((m) => !m.approved)
-      if (unapproved.length > 0) {
-        res.status(400).json({ error: 'Approve all messages before scheduling' })
-        return
-      }
-
-      // Snapshot contact_count
-      let contactCount: number | null = null
-      if (campaign.segment_id) {
-        const desc = await resolveSegmentDescription(campaign.segment_id, authed.tenantId)
-        contactCount = parseContactCount(desc)
-      }
-
-      const { data: updated, error: updateErr } = await supabase
-        .from('campaigns')
-        .update({
-          status: 'scheduled',
-          schedule_at: scheduleDate.toISOString(),
-          contact_count: contactCount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .eq('tenant_id', authed.tenantId)
-        .select('*')
-        .single<Campaign>()
-
-      if (updateErr || !updated) {
-        res.status(500).json({ error: updateErr?.message ?? 'Failed to schedule campaign' })
-        return
-      }
-
-      try {
-        const delay = Math.max(0, scheduleDate.getTime() - Date.now())
-        await getCampaignQueue().add(
-          'send',
-          { campaignId: id, tenantId: authed.tenantId },
-          { delay }
-        )
-      } catch (err) {
-        console.error('[campaigns/schedule] BullMQ enqueue error:', err)
-        // Non-fatal — campaign is marked scheduled in DB
-      }
-
-      res.json({ campaign: updated })
-      return
-    }
-
-    // ── Legacy path: expects scheduled_at + validates smart_list_id/subject/body ─
-    if (!scheduledAt) {
-      res.status(400).json({ error: 'scheduled_at is required' })
-      return
-    }
-
-    const scheduledDate = new Date(scheduledAt)
-    if (isNaN(scheduledDate.getTime())) {
-      res.status(400).json({ error: 'scheduled_at must be a valid ISO date string' })
-      return
-    }
-
-    const minScheduleTime = Date.now() + 5 * 60 * 1000
-    if (scheduledDate.getTime() <= minScheduleTime) {
-      res.status(400).json({ error: 'scheduled_at must be at least 5 minutes in the future' })
-      return
-    }
-
-    const { data: campaignLegacy, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .single<Campaign>()
-
-    if (fetchErr || !campaignLegacy) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (campaignLegacy.status !== 'draft' && campaignLegacy.status !== 'scheduled') {
-      res.status(400).json({
-        error: 'Only draft or scheduled campaigns can be (re)scheduled',
-      })
-      return
-    }
-
-    if (!campaignLegacy.subject) {
-      res.status(400).json({ error: 'Campaign must have a subject before scheduling' })
-      return
-    }
-    if (!campaignLegacy.body_html) {
-      res.status(400).json({ error: 'Campaign must have email body before scheduling' })
-      return
-    }
-    if (!campaignLegacy.smart_list_id) {
-      res.status(400).json({
-        error: 'Campaign must have a recipient list before scheduling',
-      })
-      return
-    }
-
-    const { data: updatedLegacy, error: updateErr } = await supabase
       .from('campaigns')
       .update({
         status: 'scheduled',
-        scheduled_at: scheduledDate.toISOString(),
+        schedule_at: scheduleDate.toISOString(),
+        contact_count: contactCount,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -839,142 +732,212 @@ router.post(
       .select('*')
       .single<Campaign>()
 
-    if (updateErr || !updatedLegacy) {
+    if (updateErr || !updated) {
       res.status(500).json({ error: updateErr?.message ?? 'Failed to schedule campaign' })
       return
     }
 
     try {
-      const delay = scheduledDate.getTime() - Date.now()
-      await getCampaignQueue().add(
-        'campaign-send',
-        { campaignId: campaignLegacy.id, tenantId: authed.tenantId },
-        { delay }
-      )
+      const delay = Math.max(0, scheduleDate.getTime() - Date.now())
+      await getCampaignQueue().add('send', { campaignId: id, tenantId: authed.tenantId }, { delay })
     } catch (err) {
       console.error('[campaigns/schedule] BullMQ enqueue error:', err)
+      // Non-fatal — campaign is marked scheduled in DB
     }
 
-    res.json({ campaign: updatedLegacy })
+    res.json({ campaign: updated })
+    return
   }
-)
+
+  // ── Legacy path: expects scheduled_at + validates smart_list_id/subject/body ─
+  if (!scheduledAt) {
+    res.status(400).json({ error: 'scheduled_at is required' })
+    return
+  }
+
+  const scheduledDate = new Date(scheduledAt)
+  if (isNaN(scheduledDate.getTime())) {
+    res.status(400).json({ error: 'scheduled_at must be a valid ISO date string' })
+    return
+  }
+
+  const minScheduleTime = Date.now() + 5 * 60 * 1000
+  if (scheduledDate.getTime() <= minScheduleTime) {
+    res.status(400).json({ error: 'scheduled_at must be at least 5 minutes in the future' })
+    return
+  }
+
+  const { data: campaignLegacy, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('*')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .single<Campaign>()
+
+  if (fetchErr || !campaignLegacy) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
+  }
+
+  if (campaignLegacy.status !== 'draft' && campaignLegacy.status !== 'scheduled') {
+    res.status(400).json({
+      error: 'Only draft or scheduled campaigns can be (re)scheduled',
+    })
+    return
+  }
+
+  if (!campaignLegacy.subject) {
+    res.status(400).json({ error: 'Campaign must have a subject before scheduling' })
+    return
+  }
+  if (!campaignLegacy.body_html) {
+    res.status(400).json({ error: 'Campaign must have email body before scheduling' })
+    return
+  }
+  if (!campaignLegacy.smart_list_id) {
+    res.status(400).json({
+      error: 'Campaign must have a recipient list before scheduling',
+    })
+    return
+  }
+
+  const { data: updatedLegacy, error: updateErr } = await supabase
+    .from('campaigns')
+    .update({
+      status: 'scheduled',
+      scheduled_at: scheduledDate.toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (updateErr || !updatedLegacy) {
+    res.status(500).json({ error: updateErr?.message ?? 'Failed to schedule campaign' })
+    return
+  }
+
+  try {
+    const delay = scheduledDate.getTime() - Date.now()
+    await getCampaignQueue().add(
+      'campaign-send',
+      { campaignId: campaignLegacy.id, tenantId: authed.tenantId },
+      { delay }
+    )
+  } catch (err) {
+    console.error('[campaigns/schedule] BullMQ enqueue error:', err)
+  }
+
+  res.json({ campaign: updatedLegacy })
+})
 
 // ── POST /api/campaigns/:id/cancel ────────────────────────────────────────────
-router.post(
-  '/:id/cancel',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
-    const id = req.params['id']
+router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const id = req.params['id']
 
-    const { data: existing, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('id, status')
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .single<Pick<Campaign, 'id' | 'status'>>()
+  const { data: existing, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('id, status')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .single<Pick<Campaign, 'id' | 'status'>>()
 
-    if (fetchErr || !existing) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (existing.status !== 'scheduled' && existing.status !== 'sending') {
-      res.status(400).json({
-        error: 'Only scheduled or sending campaigns can be cancelled',
-      })
-      return
-    }
-
-    const { data: updated, error: updateErr } = await supabase
-      .from('campaigns')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single<Campaign>()
-
-    if (updateErr || !updated) {
-      res.status(500).json({ error: updateErr?.message ?? 'Failed to cancel campaign' })
-      return
-    }
-
-    // Best-effort: remove delayed BullMQ job if findable
-    try {
-      const queue = getCampaignQueue()
-      const delayed = await queue.getDelayed()
-      const job = delayed.find((j) => (j.data as { campaignId?: string }).campaignId === id)
-      if (job) await job.remove()
-    } catch {
-      // Silently ignored — worker checks campaign status before sending
-    }
-
-    res.json({ campaign: updated })
+  if (fetchErr || !existing) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
   }
-)
+
+  if (existing.status !== 'scheduled' && existing.status !== 'sending') {
+    res.status(400).json({
+      error: 'Only scheduled or sending campaigns can be cancelled',
+    })
+    return
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('campaigns')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (updateErr || !updated) {
+    res.status(500).json({ error: updateErr?.message ?? 'Failed to cancel campaign' })
+    return
+  }
+
+  // Best-effort: remove delayed BullMQ job if findable
+  try {
+    const queue = getCampaignQueue()
+    const delayed = await queue.getDelayed()
+    const job = delayed.find((j) => (j.data as { campaignId?: string }).campaignId === id)
+    if (job) await job.remove()
+  } catch {
+    // Silently ignored — worker checks campaign status before sending
+  }
+
+  res.json({ campaign: updated })
+})
 
 // ── POST /api/campaigns/:id/send-now — legacy, kept for compat ────────────────
-router.post(
-  '/:id/send-now',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+router.post('/:id/send-now', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
 
-    const { data: campaign, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .single<Campaign>()
+  const { data: campaign, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('*')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single<Campaign>()
 
-    if (fetchErr || !campaign) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (!campaign.subject) {
-      res.status(400).json({ error: 'Campaign must have a subject before sending' })
-      return
-    }
-    if (!campaign.body_html) {
-      res.status(400).json({ error: 'Campaign must have email body before sending' })
-      return
-    }
-    if (!campaign.smart_list_id) {
-      res.status(400).json({ error: 'Campaign must have a recipient list before sending' })
-      return
-    }
-
-    const { data: updated, error: updateErr } = await supabase
-      .from('campaigns')
-      .update({ status: 'sending', updated_at: new Date().toISOString() })
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single<Campaign>()
-
-    if (updateErr || !updated) {
-      res.status(500).json({ error: updateErr?.message ?? 'Failed to update campaign status' })
-      return
-    }
-
-    try {
-      await getCampaignQueue().add(
-        'campaign-send',
-        { campaignId: campaign.id, tenantId: authed.tenantId },
-        { delay: 0 }
-      )
-    } catch (err) {
-      console.error('[campaigns/send-now] BullMQ enqueue error:', err)
-    }
-
-    res.json({ campaign: updated })
+  if (fetchErr || !campaign) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
   }
-)
+
+  if (!campaign.subject) {
+    res.status(400).json({ error: 'Campaign must have a subject before sending' })
+    return
+  }
+  if (!campaign.body_html) {
+    res.status(400).json({ error: 'Campaign must have email body before sending' })
+    return
+  }
+  if (!campaign.smart_list_id) {
+    res.status(400).json({ error: 'Campaign must have a recipient list before sending' })
+    return
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('campaigns')
+    .update({ status: 'sending', updated_at: new Date().toISOString() })
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (updateErr || !updated) {
+    res.status(500).json({ error: updateErr?.message ?? 'Failed to update campaign status' })
+    return
+  }
+
+  try {
+    await getCampaignQueue().add(
+      'campaign-send',
+      { campaignId: campaign.id, tenantId: authed.tenantId },
+      { delay: 0 }
+    )
+  } catch (err) {
+    console.error('[campaigns/send-now] BullMQ enqueue error:', err)
+  }
+
+  res.json({ campaign: updated })
+})
 
 // ── GET /api/campaigns/:id/stats — legacy, kept for compat ───────────────────
 router.get('/:id/stats', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -1168,51 +1131,45 @@ router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): 
 })
 
 // ── DELETE /api/campaigns/:id — legacy soft-delete, kept for compat ───────────
-router.delete(
-  '/:id',
-  requireAuth,
-  requireModule('campaigns'),
-  async (req: Request, res: Response): Promise<void> => {
-    const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
 
-    const { data: existing, error: fetchErr } = await supabase
-      .from('campaigns')
-      .select('id, status')
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .single<Pick<Campaign, 'id' | 'status'>>()
+  const { data: existing, error: fetchErr } = await supabase
+    .from('campaigns')
+    .select('id, status')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .single<Pick<Campaign, 'id' | 'status'>>()
 
-    if (fetchErr || !existing) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (existing.status === 'sent') {
-      res.status(400).json({ error: 'Sent campaigns cannot be deleted' })
-      return
-    }
-
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-
-    if (error) {
-      res.status(500).json({ error: error.message })
-      return
-    }
-
-    res.json({ success: true })
+  if (fetchErr || !existing) {
+    res.status(404).json({ error: 'Campaign not found' })
+    return
   }
-)
+
+  if (existing.status === 'sent') {
+    res.status(400).json({ error: 'Sent campaigns cannot be deleted' })
+    return
+  }
+
+  const { error } = await supabase
+    .from('campaigns')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.json({ success: true })
+})
 
 // ── GET /api/campaigns/:id/performance/summary ────────────────────────────────
 router.get(
   '/:id/performance/summary',
   requireAuth,
-  requireModule('campaigns'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getSupabase()

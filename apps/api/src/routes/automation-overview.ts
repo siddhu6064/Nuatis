@@ -2,11 +2,15 @@ import { Router, type Request, type Response } from 'express'
 import { Queue } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requirePlan } from '../middleware/require-plan.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import type { AutomationOverview, ScannerStatus, ScannerPause } from '@nuatis/shared'
 import { getActivePause } from '../lib/scanner-pause.js'
 
 const router = Router()
+
+// Phase 9: subscription + module gate. 'automation' is in Pro + Scale.
+router.use(requireAuth, requirePlan('automation'))
 
 // ── Queue metadata ─────────────────────────────────────────────────────────────
 

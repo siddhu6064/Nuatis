@@ -154,8 +154,10 @@ describe('POST /:id/schedule — unapproved messages guard', () => {
 // ── Test 2 — POST /api/campaigns returns 403 when modules.campaigns is false ──────
 // Note: GET / has no requireModule guard; POST / does.
 describe('POST /api/campaigns — module gate', () => {
-  it('returns 403 when tenant has campaigns module explicitly disabled', async () => {
-    // Disable the campaigns module for this tenant
+  it('returns 402 when tenant has campaigns module explicitly disabled', async () => {
+    // Disable the campaigns module for this tenant. Phase 9 changed the
+    // gate from requireModule (→ 403) to requirePlan (→ 402, with an
+    // upgrade_url payload).
     ;(store.tables['tenants'] as Row[])[0]!['modules'] = { campaigns: false }
 
     const res = await request(makeApp())
@@ -163,7 +165,7 @@ describe('POST /api/campaigns — module gate', () => {
       .send({ name: 'Test Campaign', objective: 'custom', channels: ['sms'] })
       .set('Content-Type', 'application/json')
 
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(402)
   })
 
   it('returns 200 when tenant has campaigns module enabled (modules: {})', async () => {
