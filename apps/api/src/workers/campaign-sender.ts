@@ -171,23 +171,25 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
 
   // ── STEP 4: Resolve contacts ──────────────────────────────────────────────────
 
-  // Fetch tenant name + primary location Telnyx number (once, before loop)
-  const [{ data: tenantRow }, { data: locationRow }] = await Promise.all([
+  // Fetch tenant name + primary Telnyx number (once, before loop)
+  const [{ data: tenantRow }, { data: telnyxNumRow }] = await Promise.all([
     supabase
       .from('tenants')
       .select('name')
       .eq('id', tenantId)
       .maybeSingle<{ name: string | null }>(),
     supabase
-      .from('locations')
-      .select('telnyx_number')
+      .from('telnyx_numbers')
+      .select('phone_number')
       .eq('tenant_id', tenantId)
-      .eq('is_primary', true)
-      .maybeSingle<{ telnyx_number: string | null }>(),
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .limit(1)
+      .maybeSingle<{ phone_number: string | null }>(),
   ])
 
   const businessName = tenantRow?.name ?? 'Us'
-  const smsFromNumber = locationRow?.telnyx_number ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
+  const smsFromNumber = telnyxNumRow?.phone_number ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
 
   // Query contacts — simple fallback: all active contacts for tenant.
   // Smart-list filter execution is deferred to a future iteration.

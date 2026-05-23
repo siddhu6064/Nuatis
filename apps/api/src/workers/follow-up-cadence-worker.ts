@@ -97,14 +97,16 @@ export async function scan(): Promise<void> {
         if (recentAppt) continue
 
         // Get tenant's Telnyx number for SMS
-        const { data: location } = await supabase
-          .from('locations')
-          .select('telnyx_number')
+        const { data: telnyxNumRow } = await supabase
+          .from('telnyx_numbers')
+          .select('phone_number')
           .eq('tenant_id', contact.tenant_id)
-          .eq('is_primary', true)
+          .eq('status', 'active')
+          .order('is_primary', { ascending: false })
+          .limit(1)
           .maybeSingle()
 
-        const telnyxNumber = location?.telnyx_number ?? ''
+        const telnyxNumber = telnyxNumRow?.phone_number ?? ''
         const contactName = contact.full_name || 'there'
         const vars: Record<string, string> = {
           name: contactName,

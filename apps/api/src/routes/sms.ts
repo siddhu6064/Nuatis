@@ -93,20 +93,22 @@ router.post(
       return
     }
 
-    // Get tenant's Telnyx number
-    const { data: location } = await supabase
-      .from('locations')
-      .select('telnyx_number')
+    // Get tenant's Telnyx number (from telnyx_numbers table)
+    const { data: telnyxNum } = await supabase
+      .from('telnyx_numbers')
+      .select('phone_number')
       .eq('tenant_id', authed.tenantId)
-      .eq('is_primary', true)
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
-    if (!location?.telnyx_number) {
+    if (!telnyxNum?.phone_number) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
       return
     }
 
-    const result = await sendSms(location.telnyx_number, contact.phone, message, {
+    const result = await sendSms(telnyxNum.phone_number, contact.phone, message, {
       tenantId: authed.tenantId,
       contactId,
     })

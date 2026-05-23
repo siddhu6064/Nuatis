@@ -976,15 +976,17 @@ router.post('/bulk-sms', requireAuth, async (req: Request, res: Response): Promi
     return
   }
 
-  const { data: location } = await supabase
-    .from('locations')
-    .select('telnyx_number')
+  const { data: telnyxNum } = await supabase
+    .from('telnyx_numbers')
+    .select('phone_number')
     .eq('tenant_id', authed.tenantId)
-    .eq('is_primary', true)
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const apiKey = process.env['TELNYX_API_KEY']
-  if (!location?.telnyx_number || !apiKey) {
+  if (!telnyxNum?.phone_number || !apiKey) {
     res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
     return
   }
@@ -1020,7 +1022,7 @@ router.post('/bulk-sms', requireAuth, async (req: Request, res: Response): Promi
         await fetch('https://api.telnyx.com/v2/messages', {
           method: 'POST',
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: location.telnyx_number, to: c.phone, text: substituted }),
+          body: JSON.stringify({ from: telnyxNum.phone_number, to: c.phone, text: substituted }),
         })
         void logActivity({
           tenantId: authed.tenantId,
@@ -1162,15 +1164,17 @@ router.post('/bulk/sms', requireAuth, async (req: Request, res: Response): Promi
     return
   }
 
-  const { data: location } = await supabase
-    .from('locations')
-    .select('telnyx_number')
+  const { data: telnyxNum } = await supabase
+    .from('telnyx_numbers')
+    .select('phone_number')
     .eq('tenant_id', authed.tenantId)
-    .eq('is_primary', true)
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const apiKey = process.env['TELNYX_API_KEY']
-  if (!location?.telnyx_number || !apiKey) {
+  if (!telnyxNum?.phone_number || !apiKey) {
     res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
     return
   }
@@ -1198,7 +1202,7 @@ router.post('/bulk/sms', requireAuth, async (req: Request, res: Response): Promi
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: location.telnyx_number,
+          from: telnyxNum.phone_number,
           to: c.phone,
           text: substituted,
         }),

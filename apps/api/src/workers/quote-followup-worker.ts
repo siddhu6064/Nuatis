@@ -62,11 +62,13 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
   }
 
   // Look up tenant's Telnyx number
-  const { data: location } = await supabase
-    .from('locations')
-    .select('telnyx_number')
+  const { data: telnyxNum } = await supabase
+    .from('telnyx_numbers')
+    .select('phone_number')
     .eq('tenant_id', tenantId)
-    .eq('is_primary', true)
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
@@ -74,7 +76,7 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
   const businessName = tenant?.name ?? ''
   const apiKey = process.env['TELNYX_API_KEY']
 
-  if (!location?.telnyx_number || !apiKey) {
+  if (!telnyxNum?.phone_number || !apiKey) {
     console.warn(`[quote-followup] no Telnyx number or API key for tenant=${tenantId}`)
     return
   }
@@ -85,7 +87,7 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: location.telnyx_number,
+      from: telnyxNum.phone_number,
       to: contactPhone,
       text: `Hi ${contactName}, just following up — your quote ${quoteNumber} from ${businessName} is ready for review: ${shareUrl}`,
     }),
