@@ -360,19 +360,25 @@ export default function PricingClient() {
                     className={i % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'}
                     style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}
                   >
-                    <td className="text-sm px-6 py-3 font-medium" style={{ color: 'var(--ink)' }}>
+                    <td className="text-sm px-6 py-4 font-medium" style={{ color: 'var(--ink)' }}>
                       {row.feature}
                     </td>
-                    <td className="text-center px-6 py-3">
-                      <Check active={row.core} />
+                    <td className="text-center align-middle py-4 px-6">
+                      <div className="flex justify-center items-center">
+                        <Check active={row.core} />
+                      </div>
                     </td>
                     {/* Pro column cell — same teal tint as the header for a
                         full-height column highlight. */}
-                    <td className="text-center px-6 py-3 bg-teal-50">
-                      <Check active={row.pro} />
+                    <td className="text-center align-middle py-4 px-6 bg-teal-50">
+                      <div className="flex justify-center items-center">
+                        <Check active={row.pro} />
+                      </div>
                     </td>
-                    <td className="text-center px-6 py-3">
-                      <Check active={row.scale} />
+                    <td className="text-center align-middle py-4 px-6">
+                      <div className="flex justify-center items-center">
+                        <Check active={row.scale} />
+                      </div>
                     </td>
                   </tr>
                 ))}
