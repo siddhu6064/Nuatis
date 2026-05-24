@@ -9,8 +9,12 @@ interface Turn {
   text: string
 }
 
+// Gemini 2.0 Flash Live is served from the v1beta BidiGenerateContent
+// endpoint. The earlier v1alpha path silently accepted the WebSocket
+// upgrade but never produced server frames for the v2 models — the
+// connection just sat idle until the client gave up.
 const GEMINI_WS_BASE =
-  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent'
+  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
 
 function float32ToInt16(buf: Float32Array): Int16Array {
   const out = new Int16Array(buf.length)
@@ -282,22 +286,22 @@ export default function TestMayaPanel() {
 
     ws.onopen = () => {
       // 1. Send Gemini Live setup frame.
-      ws.send(
-        JSON.stringify({
-          setup: {
-            model,
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Erinome' } },
-              },
-            },
-            systemInstruction: {
-              parts: [{ text: systemPrompt }],
+      const setupMsg = {
+        setup: {
+          model,
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } },
             },
           },
-        })
-      )
+          systemInstruction: {
+            parts: [{ text: systemPrompt }],
+          },
+        },
+      }
+      console.info('[test-maya] setup sent:', JSON.stringify(setupMsg))
+      ws.send(JSON.stringify(setupMsg))
 
       // 2. Transition UI to active immediately. The previous build only
       //    flipped to 'active' on a `setupComplete` server message, but
@@ -312,19 +316,25 @@ export default function TestMayaPanel() {
       //    before Gemini acks `setupComplete` is harmlessly dropped.
       void startMicCapture(stream)
 
-      // 4. Kick off the greeting turn so Maya starts the conversation.
-      ws.send(
-        JSON.stringify({
-          clientContent: {
-            turns: [{ role: 'user', parts: [{ text: '[call connected]' }] }],
-            turnComplete: true,
-          },
-        })
-      )
+      // 4. Kick off the conversation with a plain text turn — confirms
+      //    end-to-end model wiring before mic audio arrives. The
+      //    previous "[call connected]" wording read as a status note
+      //    and the model sometimes stayed silent; "Hello" reliably
+      //    elicits a spoken greeting.
+      const greetMsg = {
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+          turnComplete: true,
+        },
+      }
+      ws.send(JSON.stringify(greetMsg))
+      console.info('[test-maya] greeting turn sent')
     }
 
     ws.onmessage = (e) => {
-      handleServerMessage(typeof e.data === 'string' ? e.data : '')
+      const raw = typeof e.data === 'string' ? e.data : ''
+      console.info('[test-maya] raw WS msg:', raw)
+      handleServerMessage(raw)
     }
 
     ws.onerror = () => {
