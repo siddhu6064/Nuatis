@@ -112,36 +112,79 @@ export default function TestMayaPanel() {
     setMayaTalking(false)
   }, [])
 
-  function scheduleAudio(pcm16Data: string) {
-    const ctx = playCtxRef.current
-    if (!ctx) {
-      console.warn('[test-maya] dropped Gemini audio chunk — playback context not ready')
-      return
+  async function scheduleAudio(pcm16Data: string): Promise<void> {
+    try {
+      const ctx = playCtxRef.current
+      if (!ctx) {
+        console.warn('[test-maya] dropped Gemini audio chunk — playback context not ready')
+        return
+      }
+
+      // 1. base64 -> Uint8Array -> ArrayBuffer
+      const raw = base64ToArrayBuffer(pcm16Data)
+      console.info(
+        `[test-maya] audio chunk bytes: ${pcm16Data.length} (b64) -> ${raw.byteLength} (bin)`
+      )
+
+      // Int16Array requires an even byteLength. Gemini 24 kHz PCM
+      // frames are always even, but defend anyway so a bad chunk
+      // can't blow up the playback pipeline.
+      if (raw.byteLength % 2 !== 0) {
+        console.warn(
+          `[test-maya] dropped audio chunk — odd byteLength ${raw.byteLength}, expected multiple of 2`
+        )
+        return
+      }
+
+      // 2. Int16Array -> Float32Array (sample / 32768)
+      const float32 = int16ToFloat32(raw)
+      if (float32.length === 0) {
+        console.warn('[test-maya] dropped audio chunk — empty after decode')
+        return
+      }
+
+      // 3. AudioBuffer at 24 kHz, 1 channel (Gemini output rate)
+      const buf = ctx.createBuffer(1, float32.length, 24000)
+      buf.copyToChannel(float32 as Float32Array<ArrayBuffer>, 0)
+      console.info(
+        `[test-maya] buffer duration: ${buf.duration.toFixed(3)}s sampleRate: ${buf.sampleRate}`
+      )
+
+      // 4. Source + connect + (re-)resume the context. Some browsers
+      //    auto-suspend an AudioContext that's been silent for a few
+      //    seconds; resume() before start() is the safe pattern.
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(ctx.destination)
+
+      if (ctx.state === 'suspended') {
+        try {
+          await ctx.resume()
+        } catch (err) {
+          console.warn('[test-maya] resume() before start() failed:', err)
+        }
+      }
+
+      // 5. Schedule on the playback clock so chunks stitch together
+      //    seamlessly even if they arrive faster than realtime.
+      const now = ctx.currentTime
+      const startAt = Math.max(now, nextPlayTimeRef.current)
+      src.start(startAt)
+      nextPlayTimeRef.current = startAt + buf.duration
+
+      console.info(
+        `[test-maya] scheduled ${buf.duration.toFixed(2)}s of Gemini audio at t=${startAt.toFixed(3)} (ctx.state=${ctx.state})`
+      )
+
+      setMayaTalking(true)
+      stopMayaTalkingTimer()
+      mayaTalkingTimerRef.current = setTimeout(
+        () => setMayaTalking(false),
+        (buf.duration + 0.3) * 1000
+      )
+    } catch (err) {
+      console.error('[test-maya] audio playback error:', err)
     }
-
-    const raw = base64ToArrayBuffer(pcm16Data)
-    const float32 = int16ToFloat32(raw)
-    const buf = ctx.createBuffer(1, float32.length, 24000)
-    buf.copyToChannel(float32 as Float32Array<ArrayBuffer>, 0)
-    const src = ctx.createBufferSource()
-    src.buffer = buf
-    src.connect(ctx.destination)
-
-    const now = ctx.currentTime
-    const startAt = Math.max(now, nextPlayTimeRef.current)
-    src.start(startAt)
-    nextPlayTimeRef.current = startAt + buf.duration
-
-    console.info(
-      `[test-maya] scheduled ${buf.duration.toFixed(2)}s of Gemini audio (ctx.state=${ctx.state})`
-    )
-
-    setMayaTalking(true)
-    stopMayaTalkingTimer()
-    mayaTalkingTimerRef.current = setTimeout(
-      () => setMayaTalking(false),
-      (buf.duration + 0.3) * 1000
-    )
   }
 
   function handleServerMessage(raw: string) {
@@ -201,7 +244,7 @@ export default function TestMayaPanel() {
       let textAccum = ''
       for (const part of serverContent.modelTurn.parts) {
         if (part.inlineData?.data) {
-          scheduleAudio(part.inlineData.data)
+          void scheduleAudio(part.inlineData.data)
         }
         if (part.text) {
           textAccum += part.text
