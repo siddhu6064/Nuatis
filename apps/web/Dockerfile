@@ -21,8 +21,10 @@ RUN npm run build --workspace=packages/shared
 # Build-time public env vars — inlined into the Next.js client bundle.
 ARG NEXT_PUBLIC_DEMO_EMAIL=""
 ARG NEXT_PUBLIC_DEMO_PASSWORD=""
+ARG NEXT_PUBLIC_GEMINI_API_KEY=""
 ENV NEXT_PUBLIC_DEMO_EMAIL=$NEXT_PUBLIC_DEMO_EMAIL
 ENV NEXT_PUBLIC_DEMO_PASSWORD=$NEXT_PUBLIC_DEMO_PASSWORD
+ENV NEXT_PUBLIC_GEMINI_API_KEY=$NEXT_PUBLIC_GEMINI_API_KEY
 
 # Build Next.js (produces .next/standalone via output: 'standalone')
 RUN npm run build --workspace=apps/web

@@ -252,6 +252,7 @@ export default function TestMayaPanel() {
     startTimeRef.current = Date.now()
 
     ws.onopen = () => {
+      // 1. Send Gemini Live setup frame.
       ws.send(
         JSON.stringify({
           setup: {
@@ -268,31 +269,33 @@ export default function TestMayaPanel() {
           },
         })
       )
+
+      // 2. Transition UI to active immediately. The previous build only
+      //    flipped to 'active' on a `setupComplete` server message, but
+      //    in practice that frame's shape varies across Gemini Live API
+      //    versions and the UI would stay stuck on "Initializing Maya…".
+      //    The WS is open and the setup frame is enqueued — that's the
+      //    user-visible "ready" point.
+      setState('active')
+
+      // 3. Start mic capture so audio begins flowing. The capture loop
+      //    already guards on ws.readyState === OPEN; any audio sent
+      //    before Gemini acks `setupComplete` is harmlessly dropped.
+      startMicCapture(stream)
+
+      // 4. Kick off the greeting turn so Maya starts the conversation.
+      ws.send(
+        JSON.stringify({
+          clientContent: {
+            turns: [{ role: 'user', parts: [{ text: '[call connected]' }] }],
+            turnComplete: true,
+          },
+        })
+      )
     }
 
     ws.onmessage = (e) => {
       handleServerMessage(typeof e.data === 'string' ? e.data : '')
-
-      // Detect setupComplete — wire mic after setup
-      let parsed: Record<string, unknown> = {}
-      try {
-        parsed = JSON.parse(typeof e.data === 'string' ? e.data : '{}') as Record<string, unknown>
-      } catch {
-        /* ignore */
-      }
-      if ('setupComplete' in parsed) {
-        setState('active')
-        startMicCapture(stream)
-        // Greet Maya
-        ws.send(
-          JSON.stringify({
-            clientContent: {
-              turns: [{ role: 'user', parts: [{ text: '[call connected]' }] }],
-              turnComplete: true,
-            },
-          })
-        )
-      }
     }
 
     ws.onerror = () => {
