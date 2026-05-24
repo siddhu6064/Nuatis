@@ -53,7 +53,10 @@ export default function TestMayaPanel() {
   const wsRef = useRef<WebSocket | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const captureCtxRef = useRef<AudioContext | null>(null)
-  const processorRef = useRef<ScriptProcessorNode | null>(null)
+  // AudioWorkletNode replaces the deprecated ScriptProcessorNode.
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const captureSinkRef = useRef<GainNode | null>(null)
+  const sentChunkCountRef = useRef<number>(0)
   const playCtxRef = useRef<AudioContext | null>(null)
   const nextPlayTimeRef = useRef<number>(0)
   const transcriptEndRef = useRef<HTMLDivElement | null>(null)
@@ -76,9 +79,14 @@ export default function TestMayaPanel() {
 
   const cleanup = useCallback(() => {
     stopMayaTalkingTimer()
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
+    if (workletNodeRef.current) {
+      workletNodeRef.current.port.onmessage = null
+      workletNodeRef.current.disconnect()
+      workletNodeRef.current = null
+    }
+    if (captureSinkRef.current) {
+      captureSinkRef.current.disconnect()
+      captureSinkRef.current = null
     }
     if (captureCtxRef.current) {
       captureCtxRef.current.close().catch(() => undefined)
@@ -96,12 +104,16 @@ export default function TestMayaPanel() {
       playCtxRef.current.close().catch(() => undefined)
       playCtxRef.current = null
     }
+    sentChunkCountRef.current = 0
     setMayaTalking(false)
   }, [])
 
   function scheduleAudio(pcm16Data: string) {
     const ctx = playCtxRef.current
-    if (!ctx) return
+    if (!ctx) {
+      console.warn('[test-maya] dropped Gemini audio chunk — playback context not ready')
+      return
+    }
 
     const raw = base64ToArrayBuffer(pcm16Data)
     const float32 = int16ToFloat32(raw)
@@ -116,6 +128,10 @@ export default function TestMayaPanel() {
     src.start(startAt)
     nextPlayTimeRef.current = startAt + buf.duration
 
+    console.info(
+      `[test-maya] scheduled ${buf.duration.toFixed(2)}s of Gemini audio (ctx.state=${ctx.state})`
+    )
+
     setMayaTalking(true)
     stopMayaTalkingTimer()
     mayaTalkingTimerRef.current = setTimeout(
@@ -129,8 +145,11 @@ export default function TestMayaPanel() {
     try {
       msg = JSON.parse(raw) as Record<string, unknown>
     } catch {
+      console.warn('[test-maya] received non-JSON WS frame, ignoring')
       return
     }
+
+    console.info('[test-maya] WS message received:', Object.keys(msg).join(','))
 
     // Tool calls — respond with mock success so Maya continues naturally
     const toolCall = msg['toolCall'] as
@@ -241,10 +260,20 @@ export default function TestMayaPanel() {
     }
     streamRef.current = stream
 
-    // Playback context (24 kHz — Gemini output rate)
+    // Playback context (24 kHz — Gemini output rate).
+    // Explicit resume() defends against browsers that auto-suspend new
+    // AudioContexts even when created in a user-gesture handler.
     const playCtx = new AudioContext({ sampleRate: 24000 })
     playCtxRef.current = playCtx
     nextPlayTimeRef.current = 0
+    try {
+      await playCtx.resume()
+    } catch (err) {
+      console.warn('[test-maya] playCtx.resume() failed:', err)
+    }
+    console.info(
+      `[test-maya] playback ctx ready: state=${playCtx.state} rate=${playCtx.sampleRate}`
+    )
 
     // Open WebSocket
     const ws = new WebSocket(`${GEMINI_WS_BASE}?key=${apiKey}`)
@@ -281,7 +310,7 @@ export default function TestMayaPanel() {
       // 3. Start mic capture so audio begins flowing. The capture loop
       //    already guards on ws.readyState === OPEN; any audio sent
       //    before Gemini acks `setupComplete` is harmlessly dropped.
-      startMicCapture(stream)
+      void startMicCapture(stream)
 
       // 4. Kick off the greeting turn so Maya starts the conversation.
       ws.send(
@@ -313,16 +342,76 @@ export default function TestMayaPanel() {
     }
   }
 
-  function startMicCapture(stream: MediaStream) {
+  // Inline AudioWorkletProcessor source. Loaded as a Blob URL so we
+  // don't have to ship a second JS file or wire up a public/ asset.
+  // The processor forwards each render quantum (typically 128 samples)
+  // back to the main thread as a Float32Array. Conversion to PCM16 +
+  // base64 + WS.send happens here so audio-thread work stays minimal.
+  const CAPTURE_WORKLET_SOURCE = `
+    class PCMCaptureProcessor extends AudioWorkletProcessor {
+      process(inputs) {
+        const input = inputs[0];
+        if (!input || !input[0]) return true;
+        const ch = input[0];
+        const copy = new Float32Array(ch.length);
+        copy.set(ch);
+        this.port.postMessage(copy, [copy.buffer]);
+        return true;
+      }
+    }
+    registerProcessor('pcm-capture', PCMCaptureProcessor);
+  `
+
+  async function startMicCapture(stream: MediaStream) {
+    // 16 kHz mono — matches what Gemini Live expects on the input side.
+    // The browser resamples the device's native rate down to 16 kHz
+    // when we set sampleRate on the AudioContext.
     const captureCtx = new AudioContext({ sampleRate: 16000 })
     captureCtxRef.current = captureCtx
-    const source = captureCtx.createMediaStreamSource(stream)
-    const processor = captureCtx.createScriptProcessor(4096, 1, 1)
-    processorRef.current = processor
 
-    processor.onaudioprocess = (e) => {
+    try {
+      await captureCtx.resume()
+    } catch (err) {
+      console.warn('[test-maya] captureCtx.resume() failed:', err)
+    }
+
+    const blob = new Blob([CAPTURE_WORKLET_SOURCE], { type: 'application/javascript' })
+    const workletUrl = URL.createObjectURL(blob)
+    try {
+      await captureCtx.audioWorklet.addModule(workletUrl)
+    } catch (err) {
+      console.error('[test-maya] audioWorklet.addModule failed:', err)
+      setError('Audio worklet failed to load — the browser may not support AudioWorklet.')
+      setState('error')
+      cleanup()
+      return
+    } finally {
+      URL.revokeObjectURL(workletUrl)
+    }
+
+    const source = captureCtx.createMediaStreamSource(stream)
+    const workletNode = new AudioWorkletNode(captureCtx, 'pcm-capture')
+    workletNodeRef.current = workletNode
+
+    // Audio graph: mic → worklet → silent sink → destination. The sink
+    // gain is 0 so we don't echo the mic to the speakers, but the node
+    // still has to be connected to the destination for the worklet's
+    // process() to keep running in most browsers.
+    const sink = captureCtx.createGain()
+    sink.gain.value = 0
+    captureSinkRef.current = sink
+
+    source.connect(workletNode)
+    workletNode.connect(sink).connect(captureCtx.destination)
+
+    workletNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
+      const float32 = e.data
+      if (!float32 || float32.length === 0) return
       if (wsRef.current?.readyState !== WebSocket.OPEN) return
-      const float32 = e.inputBuffer.getChannelData(0)
+
+      // PCM 16-bit little-endian, 16 kHz, mono — Int16Array is host
+      // endian, and every browser we ship to runs on little-endian
+      // CPUs (x86 + ARM). No byte-swap needed.
       const int16 = float32ToInt16(float32)
       const b64 = arrayBufferToBase64(int16.buffer as ArrayBuffer)
       wsRef.current.send(
@@ -332,6 +421,14 @@ export default function TestMayaPanel() {
           },
         })
       )
+
+      sentChunkCountRef.current += 1
+      if (sentChunkCountRef.current === 1 || sentChunkCountRef.current % 50 === 0) {
+        console.info(
+          `[test-maya] sent ${sentChunkCountRef.current} mic chunks (last=${int16.length} samples / ${(int16.length / 16).toFixed(0)}ms)`
+        )
+      }
+
       // Show user bubble on first audio chunk after Maya finishes
       if (!userSpeakingRef.current && !mayaRespondingRef.current) {
         userSpeakingRef.current = true
@@ -339,8 +436,9 @@ export default function TestMayaPanel() {
       }
     }
 
-    source.connect(processor)
-    processor.connect(captureCtx.destination)
+    console.info(
+      `[test-maya] mic capture started: ctx.state=${captureCtx.state} rate=${captureCtx.sampleRate}`
+    )
   }
 
   function endTest() {
