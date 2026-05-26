@@ -1357,7 +1357,11 @@ const handlers: Record<string, ToolHandler> = {
         if (!bookResult['booked']) {
           return JSON.stringify({
             rescheduled: false,
-            message: String(bookResult['error'] ?? 'Failed to book new appointment'),
+            message: String(
+              bookResult['error'] ??
+                bookResult['message'] ??
+                'Your appointment was cancelled but we were unable to book the new time. Someone will call you back to confirm.'
+            ),
           })
         }
 

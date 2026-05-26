@@ -29,8 +29,8 @@ const FAILURE_THRESHOLD = 3
 const COOLDOWN_MS = 60_000
 export const TOOL_TIMEOUT_MS = 8_000
 
-// Caller-facing messages — never mention "error" or "internal".
-// Gemini will speak these verbatim when the circuit is OPEN.
+// Caller-facing messages — stored as plain strings for human readability.
+// getFallback() wraps these in a JSON object so callers always receive valid JSON.
 const FALLBACK_MESSAGES: Record<string, string> = {
   check_availability:
     "I'm having a brief issue checking availability. Let me grab your details and have someone confirm the time slot with you directly.",
@@ -50,7 +50,8 @@ const FALLBACK_MESSAGES: Record<string, string> = {
 }
 
 function getFallback(toolName: string): string {
-  return FALLBACK_MESSAGES[toolName] ?? FALLBACK_MESSAGES['default']!
+  const message = FALLBACK_MESSAGES[toolName] ?? FALLBACK_MESSAGES['default']!
+  return JSON.stringify({ _breaker_open: true, message })
 }
 
 export class MayaCircuitBreaker {

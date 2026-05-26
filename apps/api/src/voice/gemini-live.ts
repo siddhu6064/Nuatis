@@ -406,6 +406,11 @@ export async function createGeminiLiveSession(
           for (const fc of msg.toolCall.functionCalls) {
             void (async () => {
               const result = await executeToolCall(fc.name ?? 'unknown', fc.args ?? {}, toolContext)
+              if (result['_breaker_open']) {
+                console.warn(
+                  `[gemini-live] breaker OPEN for tool=${fc.name} — sending fallback to Gemini`
+                )
+              }
               session.sendToolResponse({
                 functionResponses: [{ id: fc.id, name: fc.name, response: result }],
               })
