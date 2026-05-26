@@ -7,6 +7,7 @@ import { logCall } from './call-logger.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { handlePostCall, callSessionState } from './post-call.js'
 import { persistVoiceSession } from './call-session-logger.js'
+import type { LatencyBreakdown } from './maya-latency-tracker.js'
 import { lookupCaller, buildSystemPromptSuffix, type CallerContext } from './pre-call-lookup.js'
 import { Sentry } from '../lib/sentry.js'
 import type { BusinessProfile } from '@nuatis/shared'
@@ -944,7 +945,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       if (!isCallActive) return
       isCallActive = false
 
+      let latencyBreakdown: LatencyBreakdown | null = null
       if (geminiSession) {
+        latencyBreakdown = geminiSession.getLatencyBreakdown()
         geminiSession.close()
         geminiSession = null
       }
@@ -999,6 +1002,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           callQualityMos: hangup?.callQualityMos ?? null,
           language: 'en',
           startedAt: callStartTime ? new Date(callStartTime) : new Date(),
+          latencyBreakdown,
         }).catch((err) => console.error('[call-logger] error:', err))
       }
 
