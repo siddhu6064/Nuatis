@@ -1551,4 +1551,61 @@ router.get('/campaigns', requireAuth, async (req: Request, res: Response): Promi
   }
 })
 
+// ── GET /api/insights/maya-latency ─────────────────────────────────────────
+router.get('/maya-latency', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  try {
+    // Fetch sessions with latency_breakdown from last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString()
+
+    const { data, error } = await supabase
+      .from('voice_sessions')
+      .select('latency_breakdown')
+      .eq('tenant_id', authed.tenantId)
+      .not('latency_breakdown', 'is', null)
+      .gte('started_at', thirtyDaysAgo)
+
+    if (error) {
+      console.error('[insights] maya-latency error:', error.message)
+      res.status(500).json({ error: 'Failed to fetch latency data' })
+      return
+    }
+
+    const sessions = data ?? []
+    if (sessions.length === 0) {
+      res.json({ avg_agent_response_ms: null, p95_agent_response_ms: null, session_count: 0 })
+      return
+    }
+
+    // Compute avg and p95 from each session's avg_agent_response_ms
+    const avgs = sessions
+      .map((s) => {
+        const lb = s.latency_breakdown as { avg_agent_response_ms?: number } | null
+        return lb?.avg_agent_response_ms ?? null
+      })
+      .filter((v): v is number => v !== null)
+
+    if (avgs.length === 0) {
+      res.json({ avg_agent_response_ms: null, p95_agent_response_ms: null, session_count: 0 })
+      return
+    }
+
+    const avg = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length)
+    const sorted = [...avgs].sort((a, b) => a - b)
+    const p95Idx = Math.ceil(0.95 * sorted.length) - 1
+    const p95 = sorted[Math.max(0, p95Idx)] ?? null
+
+    res.json({
+      avg_agent_response_ms: avg,
+      p95_agent_response_ms: p95,
+      session_count: sessions.length,
+    })
+  } catch (err) {
+    console.error('[insights] maya-latency error:', err)
+    res.status(500).json({ error: 'Failed to fetch latency data' })
+  }
+})
+
 export default router

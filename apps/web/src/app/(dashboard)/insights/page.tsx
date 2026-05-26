@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import InsightsDashboard from './InsightsDashboard'
 import ReferralInsights from '@/components/insights/ReferralInsights'
+import MayaLatencyInsights from '@/components/insights/MayaLatencyInsights'
 import DealsForecast from '@/components/insights/DealsForecast'
 import StockHealthInsights from '@/components/insights/StockHealthInsights'
 import TeamScheduleInsights from '@/components/insights/TeamScheduleInsights'
@@ -84,6 +85,7 @@ export default async function InsightsPage() {
         packageRecords={pkgRecordsRes.data ?? []}
         vertical={vertical}
       />
+      <MayaLatencyInsights />
       <ReferralInsights />
       <DealsForecast />
       {crmEnabled && <StockHealthInsights />}
