@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { PLANS, PLAN_KEYS, type PlanKey } from '../config/stripe-plans.js'
 
 const router = Router()
 
@@ -66,12 +67,49 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  // Merge into existing modules jsonb
+  // Fetch current tenant row — includes plan fields needed for the gate below.
   const { data: current } = await supabase
     .from('tenants')
-    .select('modules')
+    .select('modules, subscription_plan, subscription_status')
     .eq('id', authed.tenantId)
     .single()
+
+  // ── Plan gate ─────────────────────────────────────────────────────────────
+  // Only runs when *enabling* a module — disabling is always permitted so
+  // owners can freely turn off features they no longer need.
+  // Fails open on DB/lookup errors to avoid blocking legacy/custom tenants.
+  if (enabled === true) {
+    try {
+      const subscriptionPlan = current?.subscription_plan as string | null | undefined
+      const subscriptionStatus = current?.subscription_status as string | null | undefined
+
+      // Null/unknown plan → legacy or custom tenant: allow through.
+      if (subscriptionPlan) {
+        // Trial tenants get unrestricted access to every module.
+        if (subscriptionStatus !== 'trialing') {
+          const plan = PLANS[subscriptionPlan as PlanKey] ?? null
+          if (plan && !(plan.modules as ReadonlyArray<string>).includes(moduleName)) {
+            // Identify the lowest tier that includes the requested module.
+            const requiredPlan =
+              PLAN_KEYS.find((k) =>
+                (PLANS[k].modules as ReadonlyArray<string>).includes(moduleName)
+              ) ?? null
+
+            res.status(402).json({
+              error: 'Plan upgrade required to enable this module',
+              module: moduleName,
+              current_plan: subscriptionPlan,
+              required_plan: requiredPlan,
+              upgrade_url: '/pricing',
+            })
+            return
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Plan check failed, allowing module update:', error)
+    }
+  }
 
   const currentModules = (current?.modules as Record<string, boolean>) ?? {}
   const updated = { ...currentModules, [moduleName]: enabled }

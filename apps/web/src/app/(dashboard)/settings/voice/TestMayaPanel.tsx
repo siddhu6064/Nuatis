@@ -9,12 +9,12 @@ interface Turn {
   text: string
 }
 
-// Gemini 2.0 Flash Live is served from the v1beta BidiGenerateContent
-// endpoint. The earlier v1alpha path silently accepted the WebSocket
-// upgrade but never produced server frames for the v2 models — the
-// connection just sat idle until the client gave up.
-const GEMINI_WS_BASE =
-  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
+// API base URL — used to derive the WebSocket proxy URL.
+// The server-side proxy at /api/voice/live injects the Gemini API key so
+// it never needs to be present in the browser bundle.
+const API_BASE = (process.env['NEXT_PUBLIC_API_URL'] ?? '')
+  .replace(/^http:/, 'ws:')
+  .replace(/^https:/, 'wss:')
 
 function float32ToInt16(buf: Float32Array): Int16Array {
   const out = new Int16Array(buf.length)
@@ -268,13 +268,6 @@ export default function TestMayaPanel() {
   }
 
   async function startTest() {
-    const apiKey = process.env['NEXT_PUBLIC_GEMINI_API_KEY']
-    if (!apiKey) {
-      setError('NEXT_PUBLIC_GEMINI_API_KEY is not set. Add it to your .env.local file.')
-      setState('error')
-      return
-    }
-
     setState('connecting')
     setError(null)
     setTranscript([])
@@ -322,8 +315,8 @@ export default function TestMayaPanel() {
       `[test-maya] playback ctx ready: state=${playCtx.state} rate=${playCtx.sampleRate}`
     )
 
-    // Open WebSocket
-    const ws = new WebSocket(`${GEMINI_WS_BASE}?key=${apiKey}`)
+    // Open WebSocket via server-side proxy — key injected by the API server.
+    const ws = new WebSocket(`${API_BASE}/api/voice/live`)
     wsRef.current = ws
     startTimeRef.current = Date.now()
 

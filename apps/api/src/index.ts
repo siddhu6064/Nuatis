@@ -67,6 +67,7 @@ import smartListsRouter from './routes/smart-lists.js'
 import followUpTemplatesRouter from './routes/follow-up-templates.js'
 import mobileAuthRouter from './routes/mobile-auth.js'
 import voiceTestRouter from './routes/voice-test.js'
+import voiceLiveProxyRouter, { voiceLiveProxy } from './routes/voice-live-proxy.js'
 import scheduledReportsRouter from './routes/scheduled-reports.js'
 import paymentLinksRouter from './routes/payment-links.js'
 import paymentsRouter from './routes/payments.js'
@@ -166,6 +167,9 @@ const telnyxBodyCapture = express.json({
 app.use('/voice/inbound', telnyxBodyCapture, verifyTelnyxWebhook)
 app.use('/voice/outbound-status', telnyxBodyCapture, verifyTelnyxWebhook)
 app.use('/webhooks/telnyx/sms', telnyxBodyCapture, verifyTelnyxWebhook)
+// Voice Live proxy — must be BEFORE express.json() so the raw WebSocket
+// upgrade is not disrupted by body parsing middleware.
+app.use('/api/voice/live', voiceLiveProxyRouter)
 app.use(express.json())
 app.use(auditLoggerMiddleware)
 
@@ -572,6 +576,17 @@ const wss = new WebSocketServer({ server, path: '/voice/stream' })
 registerVoiceWebSocket(wss)
 setWssRef(wss)
 initConversationsWs(server)
+
+// Forward WebSocket upgrades for the Gemini Live proxy.
+// This path bypasses the Express middleware stack (including requireAuth),
+// so only the proxyReqWs key-injection guard runs.
+server.on('upgrade', (req, socket, head) => {
+  if (req.url?.startsWith('/api/voice/live')) {
+    // Node types the upgrade socket as Duplex; http-proxy-middleware expects
+    // net.Socket.  In practice upgrade sockets are always net.Socket instances.
+    voiceLiveProxy.upgrade(req, socket as import('net').Socket, head)
+  }
+})
 
 // ── Background workers ──────────────────────────────────────────────────────
 import { startWorkers, stopWorkers } from './workers/index.js'
