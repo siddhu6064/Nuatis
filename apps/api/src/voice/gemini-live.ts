@@ -17,6 +17,7 @@ import {
   buildKbUrlsBlock,
 } from './business-knowledge.js'
 import type { BusinessProfile } from '@nuatis/shared'
+import { MayaLatencyTracker, type LatencyBreakdown } from './maya-latency-tracker.js'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -128,6 +129,7 @@ export interface GeminiLiveSession {
   sendText(text: string): void
   close(): void
   onClose(cb: (code: number) => void): void
+  getLatencyBreakdown(): LatencyBreakdown | null
 }
 
 export async function createGeminiLiveSession(
@@ -288,6 +290,8 @@ export async function createGeminiLiveSession(
   let hungUp = false
   let greetingDone = false
 
+  const latencyTracker = new MayaLatencyTracker()
+
   function triggerHangup(reason: string): void {
     if (hungUp) return
     hungUp = true
@@ -375,6 +379,7 @@ export async function createGeminiLiveSession(
         }
 
         if (msg.serverContent?.interrupted) {
+          latencyTracker.onInterrupted()
           console.info('[gemini-live] Maya interrupted by caller')
           if (silenceTimer) {
             clearTimeout(silenceTimer)
@@ -423,6 +428,7 @@ export async function createGeminiLiveSession(
         for (const part of parts) {
           if (part.inlineData?.data) {
             const decoded = Buffer.from(part.inlineData.data, 'base64')
+            latencyTracker.onFirstOutputAudio()
             if (greetingDone && silenceTimer) {
               clearTimeout(silenceTimer)
               silenceTimer = null
@@ -442,6 +448,7 @@ export async function createGeminiLiveSession(
         }
 
         if (isTurnComplete) {
+          latencyTracker.onTurnComplete()
           if (turnCompleteCallback) turnCompleteCallback()
           const text = turnTextAccum.trim()
           console.info(`[gemini-live] turnComplete — accumulated text: "${text}"`)
@@ -494,6 +501,7 @@ export async function createGeminiLiveSession(
         mimeType: 'audio/pcm;rate=16000',
       }
       session.sendRealtimeInput({ audio: blob })
+      latencyTracker.onInputAudioSent()
     },
 
     onAudio(cb: (chunk: Buffer) => void): void {
@@ -524,6 +532,10 @@ export async function createGeminiLiveSession(
 
     onClose(cb: (code: number) => void): void {
       closeCallback = cb
+    },
+
+    getLatencyBreakdown(): LatencyBreakdown | null {
+      return latencyTracker.getStats()
     },
 
     close(): void {
