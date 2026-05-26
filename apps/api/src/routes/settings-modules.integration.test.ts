@@ -120,3 +120,45 @@ describe('PUT /api/settings/modules', () => {
     expect(modules.deals).toBe(true)
   })
 })
+
+describe('PUT /api/settings/modules — plan gate', () => {
+  it('returns 402 when Core tenant tries to enable cpq', async () => {
+    store.tables['tenants'] = [
+      {
+        id: TENANT_ID,
+        modules: { maya: true, crm: true, cpq: false },
+        subscription_plan: 'core',
+        subscription_status: 'active',
+      },
+    ]
+    const token = await makeToken('owner')
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'cpq', enabled: true })
+
+    expect(res.status).toBe(402)
+    expect(res.body.required_plan).toBe('scale')
+    expect(res.body.current_plan).toBe('core')
+    expect(res.body.module).toBe('cpq')
+  })
+
+  it('allows module enable during trial regardless of plan', async () => {
+    store.tables['tenants'] = [
+      {
+        id: TENANT_ID,
+        modules: { maya: true, crm: true, cpq: false },
+        subscription_plan: 'core',
+        subscription_status: 'trialing',
+      },
+    ]
+    const token = await makeToken('owner')
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'cpq', enabled: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.modules.cpq).toBe(true)
+  })
+})
