@@ -56,6 +56,7 @@ function getFallback(toolName: string): string {
 export class MayaCircuitBreaker {
   private readonly threshold: number
   private readonly cooldownMs: number
+  private readonly timeoutMs: number
   private readonly clock: () => number
   private readonly registry = new Map<string, PerToolState>()
 
@@ -63,11 +64,13 @@ export class MayaCircuitBreaker {
     opts: {
       failureThreshold?: number
       cooldownMs?: number
+      timeoutMs?: number // inject for deterministic tests
       clock?: () => number // inject for deterministic tests
     } = {}
   ) {
     this.threshold = opts.failureThreshold ?? FAILURE_THRESHOLD
     this.cooldownMs = opts.cooldownMs ?? COOLDOWN_MS
+    this.timeoutMs = opts.timeoutMs ?? TOOL_TIMEOUT_MS
     this.clock = opts.clock ?? Date.now
   }
 
@@ -127,18 +130,21 @@ export class MayaCircuitBreaker {
       return getFallback(toolName)
     }
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Tool '${toolName}' timed out after ${TOOL_TIMEOUT_MS}ms`)),
-        TOOL_TIMEOUT_MS
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error(`Tool '${toolName}' timed out after ${this.timeoutMs}ms`)),
+        this.timeoutMs
       )
-    )
+    })
 
     try {
       const result = await Promise.race([fn(), timeoutPromise])
+      clearTimeout(timeoutHandle)
       this.recordSuccess(toolName)
       return result
     } catch (err) {
+      clearTimeout(timeoutHandle)
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[maya-breaker] ${toolName} error: ${msg}`)
       this.recordFailure(toolName)
