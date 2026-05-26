@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import type { ToolCallRecord } from './post-call.js'
+import type { LatencyBreakdown } from './maya-latency-tracker.js'
 import { enqueueMayaMemoryExtraction } from '../lib/maya-memory-queue.js'
 
 export interface VoiceSessionParams {
@@ -23,6 +24,7 @@ export interface VoiceSessionParams {
   callQualityMos: number | null
   language?: string
   startedAt: Date
+  latencyBreakdown?: LatencyBreakdown | null
 }
 
 function getSupabase() {
@@ -70,6 +72,7 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
         hangup_source: params.hangupSource,
         hangup_cause: params.hangupCause,
         language_detected: params.language ?? 'en',
+        latency_breakdown: params.latencyBreakdown ?? null,
         metadata: { vertical: params.vertical },
       })
       .select('id')
