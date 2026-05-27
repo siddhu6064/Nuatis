@@ -15,7 +15,6 @@ interface OutboundCallJob {
   trigger_type: string
   trigger_config: { call_context?: string } | null
   status: string
-  call_context: string | null
   max_attempts: number
   attempts: number
 }
@@ -43,7 +42,7 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   const { data: job, error: jobErr } = await supabase
     .from('outbound_call_jobs')
     .select(
-      'id, tenant_id, contact_id, trigger_type, trigger_config, status, call_context, max_attempts, attempts'
+      'id, tenant_id, contact_id, trigger_type, trigger_config, status, max_attempts, attempts'
     )
     .eq('id', jobId)
     .single()
