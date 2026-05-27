@@ -244,6 +244,10 @@ const DEFAULT_ORDER = [
   'lang_sources',
   'followup',
   'quotes',
+  'pipeline_forecast',
+  'custom_reports',
+  'territory_perf',
+  'campaign_perf',
 ]
 
 const LS_KEY = 'nuatis_insights_order'
@@ -1319,65 +1323,9 @@ export default function InsightsDashboard({
           </div>
         )
 
-      default:
-        return null
-    }
-  }
-
-  return (
-    <DragDropContext onDragEnd={handleWidgetDragEnd}>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-ink">Insights</h1>
-            <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
-          </div>
-          <button
-            type="button"
-            onClick={resetWidgetOrder}
-            className="text-xs text-ink4 hover:text-ink3 transition-colors px-3 py-1.5 rounded-lg border border-border-brand hover:bg-bg"
-          >
-            Reset layout
-          </button>
-        </div>
-
-        {/* Draggable widget sections */}
-        <Droppable droppableId="insights-widgets" type="widget">
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-6">
-              {widgetOrder.map((id, index) => (
-                <Draggable key={id} draggableId={id} index={index}>
-                  {(dragProvided, dragSnapshot) => (
-                    <div
-                      ref={dragProvided.innerRef}
-                      {...dragProvided.draggableProps}
-                      className="relative group/widget"
-                      style={{
-                        opacity: dragSnapshot.isDragging ? 0.85 : 1,
-                        ...dragProvided.draggableProps.style,
-                      }}
-                    >
-                      {/* Drag handle — desktop only, visible on hover */}
-                      <span
-                        {...dragProvided.dragHandleProps}
-                        className="hidden md:inline-flex absolute top-0 right-0 z-10 items-center gap-1 px-2 py-1 text-[11px] text-ink4 opacity-0 group-hover/widget:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none bg-white border border-border-brand rounded-bl-lg rounded-tr-xl"
-                        aria-label="Drag to reorder"
-                      >
-                        ⠿
-                      </span>
-                      {renderWidget(id)}
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-
-        {/* Pipeline Forecast — conditional, static below draggables */}
-        {pipelines.length > 0 && (
+      case 'pipeline_forecast':
+        if (pipelines.length === 0) return null
+        return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1532,10 +1480,10 @@ export default function InsightsDashboard({
               </div>
             )}
           </div>
-        )}
+        )
 
-        {/* Custom Reports */}
-        {pinnedReports.length > 0 ? (
+      case 'custom_reports':
+        return pinnedReports.length > 0 ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-ink">Custom Reports</h2>
@@ -1676,10 +1624,11 @@ export default function InsightsDashboard({
               Pin custom reports to see them here →
             </a>
           </p>
-        )}
+        )
 
-        {/* Territory Performance */}
-        {!territoryLoading && hasTerritoryData && (
+      case 'territory_perf':
+        if (territoryLoading || !hasTerritoryData) return null
+        return (
           <div className="bg-white rounded-xl border border-border-brand p-6">
             <h2 className="text-sm font-semibold text-ink mb-4">Territory Performance</h2>
 
@@ -1747,204 +1696,262 @@ export default function InsightsDashboard({
               </table>
             </div>
           </div>
-        )}
-      </div>
+        )
 
-      {/* Campaigns Performance */}
-      {campaignInsights && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-ink">Campaign Performance</h2>
-              <p className="text-xs text-ink4 mt-0.5">AI-powered multi-channel campaigns</p>
-            </div>
-            {campaignInsights.summary !== null && (
-              <a
-                href="/campaigns"
-                className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-              >
-                View Campaigns →
-              </a>
-            )}
-          </div>
-
-          {campaignInsights.summary === null ? (
-            <div className="bg-white rounded-xl border border-border-brand px-8 py-12 text-center">
-              <div className="text-4xl mb-3">📣</div>
-              <h3 className="text-sm font-semibold text-ink mb-2">Campaigns not enabled</h3>
-              <p className="text-sm text-ink3 mb-4 max-w-xs mx-auto">
-                Enable AI-powered campaigns to reach clients via SMS and email.
-              </p>
-              <a
-                href="/settings/modules"
-                className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                Enable Campaigns →
-              </a>
-            </div>
-          ) : (
-            <>
-              {/* Stat tiles */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  label="Campaigns"
-                  value={String(campaignInsights.summary.total_campaigns)}
-                  sub="total"
-                />
-                <StatCard
-                  label="Messages Sent"
-                  value={campaignInsights.summary.total_sent.toLocaleString()}
-                />
-                <StatCard
-                  label="Avg Delivery Rate"
-                  value={`${campaignInsights.summary.avg_delivery_rate}%`}
-                  color={
-                    campaignInsights.summary.avg_delivery_rate >= 90
-                      ? 'text-green-600'
-                      : campaignInsights.summary.avg_delivery_rate >= 70
-                        ? 'text-amber-600'
-                        : 'text-red-600'
-                  }
-                />
-                <StatCard
-                  label="Avg Open Rate"
-                  value={`${campaignInsights.summary.avg_open_rate}%`}
-                  color="text-teal-600"
-                  sub={
-                    campaignInsights.summary.top_channel
-                      ? `Top channel: ${campaignInsights.summary.top_channel}`
-                      : undefined
-                  }
-                />
+      case 'campaign_perf':
+        if (!campaignInsights) return null
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-ink">Campaign Performance</h2>
+                <p className="text-xs text-ink4 mt-0.5">AI-powered multi-channel campaigns</p>
               </div>
+              {campaignInsights.summary !== null && (
+                <a
+                  href="/campaigns"
+                  className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                >
+                  View Campaigns →
+                </a>
+              )}
+            </div>
 
-              {/* Daily send volume chart */}
-              {campaignInsights.by_day.length > 0 && (
-                <div className="bg-white rounded-xl border border-border-brand p-6">
-                  <h3 className="text-sm font-semibold text-ink mb-4">Daily Send Volume</h3>
-                  <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
-                    <div style={{ minWidth: 320 }}>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <LineChart data={campaignInsights.by_day}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                          <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
-                          <Tooltip />
-                          <Line
-                            type="monotone"
-                            dataKey="sent"
-                            stroke="#3b82f6"
-                            strokeWidth={2}
-                            dot={false}
-                            name="Sent"
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="delivered"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={false}
-                            name="Delivered"
-                          />
-                          <Legend />
-                        </LineChart>
-                      </ResponsiveContainer>
+            {campaignInsights.summary === null ? (
+              <div className="bg-white rounded-xl border border-border-brand px-8 py-12 text-center">
+                <div className="text-4xl mb-3">📣</div>
+                <h3 className="text-sm font-semibold text-ink mb-2">Campaigns not enabled</h3>
+                <p className="text-sm text-ink3 mb-4 max-w-xs mx-auto">
+                  Enable AI-powered campaigns to reach clients via SMS and email.
+                </p>
+                <a
+                  href="/settings/modules"
+                  className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  Enable Campaigns →
+                </a>
+              </div>
+            ) : (
+              <>
+                {/* Stat tiles */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    label="Campaigns"
+                    value={String(campaignInsights.summary.total_campaigns)}
+                    sub="total"
+                  />
+                  <StatCard
+                    label="Messages Sent"
+                    value={campaignInsights.summary.total_sent.toLocaleString()}
+                  />
+                  <StatCard
+                    label="Avg Delivery Rate"
+                    value={`${campaignInsights.summary.avg_delivery_rate}%`}
+                    color={
+                      campaignInsights.summary.avg_delivery_rate >= 90
+                        ? 'text-green-600'
+                        : campaignInsights.summary.avg_delivery_rate >= 70
+                          ? 'text-amber-600'
+                          : 'text-red-600'
+                    }
+                  />
+                  <StatCard
+                    label="Avg Open Rate"
+                    value={`${campaignInsights.summary.avg_open_rate}%`}
+                    color="text-teal-600"
+                    sub={
+                      campaignInsights.summary.top_channel
+                        ? `Top channel: ${campaignInsights.summary.top_channel}`
+                        : undefined
+                    }
+                  />
+                </div>
+
+                {/* Daily send volume chart */}
+                {campaignInsights.by_day.length > 0 && (
+                  <div className="bg-white rounded-xl border border-border-brand p-6">
+                    <h3 className="text-sm font-semibold text-ink mb-4">Daily Send Volume</h3>
+                    <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
+                      <div style={{ minWidth: 320 }}>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <LineChart data={campaignInsights.by_day}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                            <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" allowDecimals={false} />
+                            <Tooltip />
+                            <Line
+                              type="monotone"
+                              dataKey="sent"
+                              stroke="#3b82f6"
+                              strokeWidth={2}
+                              dot={false}
+                              name="Sent"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="delivered"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              dot={false}
+                              name="Delivered"
+                            />
+                            <Legend />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Recent campaigns table */}
-              {campaignInsights.recent_campaigns.length > 0 && (
-                <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
-                  <div className="px-6 py-4 border-b border-border-brand">
-                    <h3 className="text-sm font-semibold text-ink">Recent Campaigns</h3>
-                  </div>
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border-brand">
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
-                          Name
-                        </th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
-                          Sent
-                        </th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
-                          Delivery
-                        </th>
-                        <th className="text-right px-6 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
-                          Opt-out
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {campaignInsights.recent_campaigns.map((c) => (
-                        <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-6 py-3">
-                            <a
-                              href={`/campaigns/${c.id}/performance`}
-                              className="text-sm font-medium text-ink hover:text-teal-700 transition-colors"
-                            >
-                              {c.name}
-                            </a>
-                            {c.sent_at && (
-                              <p className="text-xs text-ink4 mt-0.5">
-                                {new Date(c.sent_at).toLocaleDateString()}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-ink2">
-                            {c.total_sent.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm">
-                            <span
-                              className={
-                                c.delivery_rate >= 90
-                                  ? 'text-green-600'
-                                  : c.delivery_rate >= 70
-                                    ? 'text-amber-600'
-                                    : 'text-red-600'
-                              }
-                            >
-                              {c.delivery_rate}%
-                            </span>
-                          </td>
-                          <td className="px-6 py-3 text-right text-sm">
-                            <span
-                              className={
-                                c.opt_out_rate > 3
-                                  ? 'text-red-600 font-medium'
-                                  : c.opt_out_rate > 1
-                                    ? 'text-amber-600'
-                                    : 'text-ink3'
-                              }
-                            >
-                              {c.opt_out_rate}%
-                            </span>
-                          </td>
+                {/* Recent campaigns table */}
+                {campaignInsights.recent_campaigns.length > 0 && (
+                  <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border-brand">
+                      <h3 className="text-sm font-semibold text-ink">Recent Campaigns</h3>
+                    </div>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border-brand">
+                          <th className="text-left px-6 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
+                            Name
+                          </th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
+                            Sent
+                          </th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
+                            Delivery
+                          </th>
+                          <th className="text-right px-6 py-3 text-xs font-semibold text-ink4 uppercase tracking-wide">
+                            Opt-out
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {campaignInsights.recent_campaigns.length === 0 &&
-                campaignInsights.by_day.length === 0 && (
-                  <div className="bg-white rounded-xl border border-border-brand px-8 py-12 text-center">
-                    <p className="text-sm text-ink3">No campaign data in the selected period.</p>
-                    <a
-                      href="/campaigns/new"
-                      className="mt-4 inline-block text-sm text-teal-600 hover:text-teal-700 font-medium"
-                    >
-                      Create your first campaign →
-                    </a>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {campaignInsights.recent_campaigns.map((c) => (
+                          <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-6 py-3">
+                              <a
+                                href={`/campaigns/${c.id}/performance`}
+                                className="text-sm font-medium text-ink hover:text-teal-700 transition-colors"
+                              >
+                                {c.name}
+                              </a>
+                              {c.sent_at && (
+                                <p className="text-xs text-ink4 mt-0.5">
+                                  {new Date(c.sent_at).toLocaleDateString()}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-ink2">
+                              {c.total_sent.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm">
+                              <span
+                                className={
+                                  c.delivery_rate >= 90
+                                    ? 'text-green-600'
+                                    : c.delivery_rate >= 70
+                                      ? 'text-amber-600'
+                                      : 'text-red-600'
+                                }
+                              >
+                                {c.delivery_rate}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-3 text-right text-sm">
+                              <span
+                                className={
+                                  c.opt_out_rate > 3
+                                    ? 'text-red-600 font-medium'
+                                    : c.opt_out_rate > 1
+                                      ? 'text-amber-600'
+                                      : 'text-ink3'
+                                }
+                              >
+                                {c.opt_out_rate}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-            </>
-          )}
+
+                {campaignInsights.recent_campaigns.length === 0 &&
+                  campaignInsights.by_day.length === 0 && (
+                    <div className="bg-white rounded-xl border border-border-brand px-8 py-12 text-center">
+                      <p className="text-sm text-ink3">No campaign data in the selected period.</p>
+                      <a
+                        href="/campaigns/new"
+                        className="mt-4 inline-block text-sm text-teal-600 hover:text-teal-700 font-medium"
+                      >
+                        Create your first campaign →
+                      </a>
+                    </div>
+                  )}
+              </>
+            )}
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  return (
+    <DragDropContext onDragEnd={handleWidgetDragEnd}>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-ink">Insights</h1>
+            <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
+          </div>
+          <button
+            type="button"
+            onClick={resetWidgetOrder}
+            className="text-xs text-ink4 hover:text-ink3 transition-colors px-3 py-1.5 rounded-lg border border-border-brand hover:bg-bg"
+          >
+            Reset layout
+          </button>
         </div>
-      )}
+
+        {/* Draggable widget sections */}
+        <Droppable droppableId="insights-widgets" type="widget">
+          {(provided) => (
+            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-6">
+              {widgetOrder.map((id, index) => (
+                <Draggable key={id} draggableId={id} index={index}>
+                  {(dragProvided, dragSnapshot) => (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      className="relative group/widget"
+                      style={{
+                        opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                        ...dragProvided.draggableProps.style,
+                      }}
+                    >
+                      {/* Drag handle — desktop only, visible on hover */}
+                      <span
+                        {...dragProvided.dragHandleProps}
+                        className="hidden md:inline-flex absolute top-0 right-0 z-10 items-center gap-1 px-2 py-1 text-[11px] text-ink4 opacity-0 group-hover/widget:opacity-100 transition-opacity cursor-grab active:cursor-grabbing select-none bg-white border border-border-brand rounded-bl-lg rounded-tr-xl"
+                        aria-label="Drag to reorder"
+                      >
+                        ⠿
+                      </span>
+                      {renderWidget(id)}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </div>
     </DragDropContext>
   )
 }
