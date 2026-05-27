@@ -28,10 +28,6 @@ interface ContactRow {
   is_archived: boolean | null
 }
 
-interface LocationRow {
-  telnyx_number: string | null
-}
-
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
@@ -122,14 +118,16 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   }
 
   // Step 6: Fetch fromNumber (tenant's primary telnyx_number)
-  const { data: location } = await supabase
-    .from('locations')
-    .select('telnyx_number')
+  const { data: telnyxNum } = await supabase
+    .from('telnyx_numbers')
+    .select('phone_number')
     .eq('tenant_id', tenantId)
-    .eq('is_primary', true)
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  const fromNumber = (location as unknown as LocationRow | null)?.telnyx_number ?? null
+  const fromNumber = (telnyxNum as { phone_number: string | null } | null)?.phone_number ?? null
 
   if (!fromNumber) {
     await supabase

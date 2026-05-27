@@ -67,19 +67,21 @@ router.post(
     }
 
     // Verify tenant has a telnyx_number
-    const { data: location, error: locationError } = await supabase
-      .from('locations')
-      .select('telnyx_number')
+    const { data: telnyxNum, error: telnyxNumError } = await supabase
+      .from('telnyx_numbers')
+      .select('phone_number')
       .eq('tenant_id', authed.tenantId)
-      .eq('is_primary', true)
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
-    if (locationError) {
-      res.status(500).json({ error: locationError.message })
+    if (telnyxNumError) {
+      res.status(500).json({ error: telnyxNumError.message })
       return
     }
 
-    if (!location?.telnyx_number) {
+    if (!telnyxNum?.phone_number) {
       res.status(400).json({ error: 'No Telnyx number configured for this account' })
       return
     }
