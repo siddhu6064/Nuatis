@@ -38,6 +38,8 @@ Thumbs.db
 *.swp
 *.swo
 
+.claude/settings.local.json
+
 # Vercel
 .vercel
 
@@ -52,4 +54,8 @@ apps/web/.env.local
 .worktrees/
 supabase/.temp/
 
-
+PENDING_ENV_VARS.md
+NUATIS_PENDING_TASKS.md
+MIGRATIONS_TO_APPLY.md
+audit-report.json
+secrets-report.json

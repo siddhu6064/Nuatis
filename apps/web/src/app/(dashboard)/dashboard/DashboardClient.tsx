@@ -11,6 +11,7 @@ import {
 import Link from 'next/link'
 import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
 import LeadSourceReport from '@/components/dashboard/LeadSourceReport'
+import RecentActivity from '@/components/dashboard/RecentActivity'
 import GbpInsightsWidget from './GbpInsightsWidget'
 
 // ── Widget IDs ─────────────────────────────────────────────────────────────────
@@ -166,18 +167,7 @@ export default function DashboardClient({ stats, userName }: Props) {
       case 'activity-actions':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6">
-              <h2 className="text-sm font-semibold text-ink mb-4">Recent Activity</h2>
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-10 h-10 rounded-full bg-bg flex items-center justify-center mb-3">
-                  <span className="text-gray-300 text-xl">◎</span>
-                </div>
-                <p className="text-sm font-medium text-ink4">No activity yet</p>
-                <p className="text-xs text-gray-300 mt-1">
-                  Activity will appear here as you add contacts
-                </p>
-              </div>
-            </div>
+            <RecentActivity />
             <div className="bg-white rounded-xl border border-border-brand p-6">
               <h2 className="text-sm font-semibold text-ink mb-4">Quick Actions</h2>
               <div className="space-y-2">

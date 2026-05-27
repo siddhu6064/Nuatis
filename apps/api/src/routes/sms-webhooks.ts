@@ -45,9 +45,9 @@ async function handleMessageReceived(req: Request, res: Response): Promise<void>
   // Dedup check
   if (telnyxMessageId) {
     const { data: existing } = await sb
-      .from('inbound_sms')
+      .from('sms_messages')
       .select('id')
-      .eq('telnyx_message_id', telnyxMessageId)
+      .eq('message_sid', telnyxMessageId)
       .maybeSingle()
     if (existing) {
       res.sendStatus(200)
@@ -106,19 +106,7 @@ async function handleMessageReceived(req: Request, res: Response): Promise<void>
     }
   }
 
-  // Insert SMS record
-  await sb.from('inbound_sms').insert({
-    tenant_id: tenantId,
-    contact_id: contactId,
-    from_number: fromNumber,
-    to_number: toNumber,
-    body,
-    direction: 'inbound',
-    telnyx_message_id: telnyxMessageId || null,
-    status: 'received',
-  })
-
-  // Log to sms_messages table
+  // Insert to sms_messages
   const { error: smsInsertErr } = await sb.from('sms_messages').insert({
     tenant_id: tenantId,
     contact_id: contactId,

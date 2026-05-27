@@ -14,7 +14,7 @@ interface SendSmsOptions {
 }
 
 /**
- * Send an SMS via Telnyx and optionally log to inbound_sms table.
+ * Send an SMS via Telnyx and log to sms_messages table.
  * Backward-compatible: existing callers that don't pass options still work.
  */
 export async function sendSms(
@@ -63,39 +63,22 @@ export async function sendSms(
     const data = (await res.json()) as { data?: { id?: string } }
     const messageId = data?.data?.id ?? undefined
 
-    // Log outbound SMS to inbound_sms table for thread view
+    // Log outbound SMS to sms_messages for thread view
     if (options?.tenantId) {
       try {
         const supabase = getSupabase()
-        await supabase.from('inbound_sms').insert({
+        const { error: smsErr } = await supabase.from('sms_messages').insert({
           tenant_id: options.tenantId,
           contact_id: options.contactId ?? null,
+          direction: 'outbound',
+          body: text,
           from_number: from,
           to_number: to,
-          body: text,
-          direction: 'outbound',
-          telnyx_message_id: messageId ?? null,
-          status: 'read',
-          read_at: new Date().toISOString(),
+          message_sid: messageId ?? null,
+          status: 'sent',
+          ai_handled: false,
         })
-
-        // Also log to sms_messages for AI-aware thread view
-        try {
-          const { error: smsErr } = await supabase.from('sms_messages').insert({
-            tenant_id: options.tenantId,
-            contact_id: options.contactId ?? null,
-            direction: 'outbound',
-            body: text,
-            from_number: from,
-            to_number: to,
-            message_sid: messageId ?? null,
-            status: 'sent',
-            ai_handled: false,
-          })
-          if (smsErr) console.error('[sms] failed to log to sms_messages:', smsErr)
-        } catch (err) {
-          console.error('[sms] failed to log to sms_messages:', err)
-        }
+        if (smsErr) console.error('[sms] failed to log to sms_messages:', smsErr)
       } catch (err) {
         console.error('[sms] failed to log outbound SMS:', err)
       }

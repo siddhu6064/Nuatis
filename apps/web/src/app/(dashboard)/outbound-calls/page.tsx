@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 type JobStatus =
   | 'pending'
@@ -158,6 +159,12 @@ export default function OutboundCallsPage() {
         <div className="bg-white rounded-xl border border-border-brand px-8 py-16 text-center">
           <p className="text-sm text-ink3">No outbound calls yet.</p>
           <p className="text-xs text-ink4 mt-1">Initiate a call from a contact&apos;s profile.</p>
+          <Link
+            href="/contacts"
+            className="inline-block mt-5 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-[var(--teal)] hover:opacity-90 transition-opacity"
+          >
+            Start a call
+          </Link>
         </div>
       )}
 

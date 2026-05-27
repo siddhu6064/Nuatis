@@ -216,11 +216,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   if (hasUnreadSms && contacts.length > 0) {
     const contactIds = contacts.map((c) => c.id)
     const { data: unreadSms } = await supabase
-      .from('inbound_sms')
+      .from('sms_messages')
       .select('contact_id')
       .eq('tenant_id', authed.tenantId)
       .eq('direction', 'inbound')
-      .eq('status', 'received')
+      .is('read_at', null)
       .in('contact_id', contactIds)
 
     if (unreadSms) {

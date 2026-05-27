@@ -398,17 +398,13 @@ export default function Sidebar({
   }, [path, onClose])
 
   useEffect(() => {
-    void fetch('/api/sms/unread-count')
-      .then((r) => r.json())
-      .then((d: { count: number }) => setUnreadSms(d.count))
-      .catch(() => {})
-  }, [path])
-
-  useEffect(() => {
     void fetch('/api/conversations?status=open&limit=1')
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { total?: number } | null) => {
-        if (d && typeof d.total === 'number') setOpenConversations(d.total)
+        if (d && typeof d.total === 'number') {
+          setUnreadSms(d.total)
+          setOpenConversations(d.total)
+        }
       })
       .catch(() => {})
   }, [path])

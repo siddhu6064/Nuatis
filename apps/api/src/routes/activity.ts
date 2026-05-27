@@ -11,6 +11,60 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// ── GET /api/activity ─────────────────────────────────────────────────────────
+// Tenant-wide recent activity feed (dashboard widget)
+router.get('/activity', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+  const limit = Math.min(20, Math.max(1, parseInt(String(req.query['limit'] ?? '10'), 10) || 10))
+
+  const { data: items, error } = await supabase
+    .from('activity_log')
+    .select('id, contact_id, type, body, actor_type, actor_id, created_at, contacts(id, full_name)')
+    .eq('tenant_id', authed.tenantId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  // Resolve actor names for user actors
+  const userIds = [
+    ...new Set(
+      (items ?? [])
+        .filter((i) => i.actor_type === 'user' && i.actor_id)
+        .map((i) => i.actor_id as string)
+    ),
+  ]
+  let userMap: Record<string, string> = {}
+  if (userIds.length > 0) {
+    const { data: users } = await supabase.from('users').select('id, full_name').in('id', userIds)
+    if (users) userMap = Object.fromEntries(users.map((u) => [u.id, u.full_name]))
+  }
+
+  const enriched = (items ?? []).map((item) => ({
+    id: item.id,
+    contact_id: item.contact_id,
+    contact_name: (item.contacts as { full_name: string }[] | null)?.[0]?.full_name ?? null,
+    type: item.type,
+    body: item.body,
+    actor_type: item.actor_type,
+    actor_name:
+      item.actor_type === 'user' && item.actor_id
+        ? (userMap[item.actor_id] ?? null)
+        : item.actor_type === 'ai'
+          ? 'Maya AI'
+          : item.actor_type === 'contact'
+            ? 'Client'
+            : null,
+    created_at: item.created_at,
+  }))
+
+  res.json({ items: enriched })
+})
+
 // ── GET /api/contacts/:contactId/activity ────────────────────────────────────
 router.get(
   '/contacts/:contactId/activity',

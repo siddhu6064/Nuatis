@@ -42,36 +42,24 @@ export default function InboxList() {
 
   const fetchSmsThreads = useCallback(async (): Promise<InboxThread[]> => {
     try {
-      const smsRes = await fetch('/api/contacts?has_unread_sms=true&limit=50')
-      if (!smsRes.ok) return []
-      const data = (await smsRes.json()) as {
-        contacts: Array<{ id: string; full_name: string }>
-      }
-
-      const threadPromises = data.contacts.map(async (c) => {
-        const threadRes = await fetch(`/api/contacts/${c.id}/sms`)
-        if (!threadRes.ok) return null
-        const threadData = (await threadRes.json()) as {
-          messages: Array<{ body: string; created_at: string; direction: string }>
+      const res = await fetch('/api/conversations?status=open&limit=50')
+      if (!res.ok) return []
+      const data = (await res.json()) as {
+        conversations: Array<{
+          contact_id: string
+          contact_name: string | null
+          last_message: string | null
+          last_message_at: string | null
           unread_count: number
-        }
-        const lastMsg = threadData.messages[threadData.messages.length - 1]
-        return {
-          contact_id: c.id,
-          contact_name: c.full_name,
-          last_message: lastMsg?.body ?? '',
-          last_message_at: lastMsg?.created_at ?? '',
-          unread_count: threadData.unread_count,
-        }
-      })
-
-      const results = (await Promise.all(threadPromises)).filter(
-        (t): t is InboxThread => t !== null && t.unread_count > 0
-      )
-      results.sort(
-        (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
-      )
-      return results
+        }>
+      }
+      return (data.conversations ?? []).map((c) => ({
+        contact_id: c.contact_id,
+        contact_name: c.contact_name ?? 'Unknown',
+        last_message: c.last_message ?? '',
+        last_message_at: c.last_message_at ?? '',
+        unread_count: c.unread_count,
+      }))
     } catch {
       return []
     }
@@ -174,7 +162,7 @@ export default function InboxList() {
       {totalVisible === 0 ? (
         <div className="py-12 text-center">
           <span className="text-3xl">{'\u2713'}</span>
-          <p className="text-sm font-medium text-ink3 mt-2">No unread messages</p>
+          <p className="text-sm font-medium text-ink3 mt-2">No open conversations</p>
           <p className="text-xs text-ink4 mt-1">All caught up</p>
         </div>
       ) : (

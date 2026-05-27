@@ -35,7 +35,7 @@ router.get(
     }
 
     const { data: messages, error } = await supabase
-      .from('inbound_sms')
+      .from('sms_messages')
       .select('*')
       .eq('contact_id', contactId)
       .eq('tenant_id', authed.tenantId)
@@ -47,12 +47,12 @@ router.get(
     }
 
     const { count: unreadCount } = await supabase
-      .from('inbound_sms')
+      .from('sms_messages')
       .select('id', { count: 'exact', head: true })
       .eq('contact_id', contactId)
       .eq('tenant_id', authed.tenantId)
       .eq('direction', 'inbound')
-      .eq('status', 'received')
+      .is('read_at', null)
 
     res.json({ messages: messages ?? [], unread_count: unreadCount ?? 0 })
   }
@@ -141,12 +141,12 @@ router.post(
     const { contactId } = req.params
 
     const { count } = await supabase
-      .from('inbound_sms')
-      .update({ status: 'read', read_at: new Date().toISOString() })
+      .from('sms_messages')
+      .update({ read_at: new Date().toISOString() })
       .eq('contact_id', contactId)
       .eq('tenant_id', authed.tenantId)
       .eq('direction', 'inbound')
-      .eq('status', 'received')
+      .is('read_at', null)
 
     res.json({ updated: count ?? 0 })
   }
@@ -158,11 +158,11 @@ router.get('/sms/unread-count', requireAuth, async (req: Request, res: Response)
   const supabase = getSupabase()
 
   const { count } = await supabase
-    .from('inbound_sms')
+    .from('sms_messages')
     .select('contact_id', { count: 'exact', head: true })
     .eq('tenant_id', authed.tenantId)
     .eq('direction', 'inbound')
-    .eq('status', 'received')
+    .is('read_at', null)
 
   res.json({ count: count ?? 0 })
 })

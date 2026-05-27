@@ -116,7 +116,8 @@ router.get(
       .from('pipelines')
       .select('id')
       .eq('tenant_id', authed.tenantId)
-      .eq('is_default', true)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(1)
 
     const pipelineId = pipelines?.[0]?.id as string | undefined
