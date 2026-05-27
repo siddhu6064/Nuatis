@@ -36,6 +36,7 @@ function getSupabase() {
 
 export async function processOutboundCall(data: OutboundCallJobData): Promise<void> {
   const { jobId } = data
+  console.info(`[outbound-call] picked up job=${jobId}`)
   const supabase = getSupabase()
 
   // Step 1: Fetch the job row
@@ -48,7 +49,9 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     .single()
 
   if (jobErr || !job) {
-    console.warn(`[outbound-call] job not found: ${jobId}`)
+    console.warn(
+      `[outbound-call] job not found: jobId=${jobId} supabaseError=${jobErr?.message ?? 'no row'}`
+    )
     return
   }
 
@@ -138,8 +141,11 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   }
 
   // Step 7: Initiate the call
+  console.info(
+    `[outbound-call] calling initiateOutboundCall: job=${jobId} to=${phone} from=${fromNumber} tenant=${tenantId}`
+  )
   try {
-    await initiateOutboundCall({
+    const result = await initiateOutboundCall({
       tenantId,
       contactId,
       jobId,
@@ -147,14 +153,16 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
       fromNumber,
       callContext,
     })
-    console.info(`[outbound-call] initiated: job=${jobId} to=${phone}`)
+    console.info(
+      `[outbound-call] initiated: job=${jobId} to=${phone} callControlId=${result.callControlId} callLegId=${result.callLegId}`
+    )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     await supabase
       .from('outbound_call_jobs')
       .update({ status: 'failed', error_message: msg })
       .eq('id', jobId)
-    console.error(`[outbound-call] failed to initiate: job=${jobId}`, err)
+    console.error(`[outbound-call] failed to initiate: job=${jobId} error=${msg}`, err)
     throw err
   }
 }

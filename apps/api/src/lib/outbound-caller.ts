@@ -34,6 +34,29 @@ export async function initiateOutboundCall(
   if (!apiKey) throw new Error('TELNYX_API_KEY not configured')
   if (!connectionId) throw new Error('TELNYX_CONNECTION_ID not configured')
 
+  const webhookUrl = `${API_BASE_URL}/voice/outbound-status`
+  const streamUrl = VOICE_WS_URL
+
+  const payload = {
+    connection_id: connectionId,
+    to: toNumber,
+    from: fromNumber,
+    webhook_url: webhookUrl,
+    stream_url: streamUrl,
+    stream_track: 'both_tracks',
+    custom_headers: [
+      { name: 'X-Tenant-Id', value: tenantId },
+      { name: 'X-Contact-Id', value: contactId },
+      { name: 'X-Job-Id', value: jobId },
+      { name: 'X-Call-Type', value: 'outbound' },
+      { name: 'X-Call-Context', value: callContext },
+    ],
+  }
+
+  console.info(
+    `[outbound-caller] Telnyx POST /v2/calls payload: ${JSON.stringify({ ...payload, connection_id: connectionId })}`
+  )
+
   // POST to Telnyx to initiate the call
   const res = await fetch('https://api.telnyx.com/v2/calls', {
     method: 'POST',
@@ -41,25 +64,14 @@ export async function initiateOutboundCall(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      connection_id: connectionId,
-      to: toNumber,
-      from: fromNumber,
-      webhook_url: `${API_BASE_URL}/voice/outbound-status`,
-      stream_url: VOICE_WS_URL,
-      stream_track: 'both_tracks',
-      custom_headers: [
-        { name: 'X-Tenant-Id', value: tenantId },
-        { name: 'X-Contact-Id', value: contactId },
-        { name: 'X-Job-Id', value: jobId },
-        { name: 'X-Call-Type', value: 'outbound' },
-        { name: 'X-Call-Context', value: callContext },
-      ],
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
     const body = await res.text()
+    console.error(
+      `[outbound-caller] Telnyx error ${res.status}: ${body} | connection_id=${connectionId} to=${toNumber} from=${fromNumber} webhook=${webhookUrl}`
+    )
     throw new Error(`Telnyx API error ${res.status}: ${body}`)
   }
 
@@ -69,6 +81,10 @@ export async function initiateOutboundCall(
       call_leg_id: string
     }
   }
+
+  console.info(
+    `[outbound-caller] Telnyx response: call_control_id=${data.data.call_control_id} call_leg_id=${data.data.call_leg_id}`
+  )
 
   const callControlId = data.data.call_control_id
   const callLegId = data.data.call_leg_id
