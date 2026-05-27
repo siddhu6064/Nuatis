@@ -53,9 +53,10 @@ export default async function InsightsPage() {
       .eq('is_archived', false),
 
     supabase
-      .from('pipeline_entries')
-      .select('status, pipeline_stages(name)')
-      .eq('tenant_id', tenantId),
+      .from('deals')
+      .select('pipeline_stages(name), is_closed_won, is_closed_lost, is_archived')
+      .eq('tenant_id', tenantId)
+      .eq('is_archived', false),
 
     supabase
       .from('quotes')
@@ -78,7 +79,12 @@ export default async function InsightsPage() {
         sessions={sessionsRes.data ?? []}
         appointments={appointmentsRes.data ?? []}
         contacts={contactsRes.data ?? []}
-        pipelineEntries={entriesRes.data ?? []}
+        pipelineEntries={(entriesRes.data ?? []).map(
+          (d: { pipeline_stages: unknown; is_closed_won: boolean; is_closed_lost: boolean }) => ({
+            status: d.is_closed_won ? 'won' : d.is_closed_lost ? 'lost' : 'open',
+            pipeline_stages: d.pipeline_stages as { name: string } | { name: string }[] | null,
+          })
+        )}
         quotes={quotesRes.data ?? []}
         quoteViews={quoteViewsRes.data ?? []}
         packageLineItems={pkgLineItemsRes.data ?? []}

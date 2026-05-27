@@ -761,7 +761,8 @@ router.get('/deals', requireAuth, async (req: Request, res: Response): Promise<v
         name: string
         color: string
       } | null
-      const name = stage?.name ?? 'Unknown'
+      const name = stage?.name
+      if (!name) continue
       const color = stage?.color ?? '#9ca3af'
       const existing = stageMap.get(name) ?? {
         stage_name: name,

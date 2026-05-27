@@ -350,13 +350,15 @@ export default function InsightsDashboard({
     const stageMap = new Map<string, number>()
     let wonCount = 0
     for (const e of pipelineEntries) {
-      const stages = e.pipeline_stages
-      const stageName =
-        stages && typeof stages === 'object' && 'name' in stages
-          ? String((stages as { name: string }).name)
-          : 'Unknown'
-      stageMap.set(stageName, (stageMap.get(stageName) ?? 0) + 1)
       if (e.status === 'won') wonCount++
+      const stages = e.pipeline_stages
+      const stageName = stages
+        ? Array.isArray(stages)
+          ? ((stages[0] as { name: string } | undefined)?.name ?? null)
+          : ((stages as { name: string }).name ?? null)
+        : null
+      if (!stageName) continue
+      stageMap.set(stageName, (stageMap.get(stageName) ?? 0) + 1)
     }
     const stageDistribution = Array.from(stageMap.entries()).map(([stage, count]) => ({
       stage,
