@@ -120,6 +120,15 @@ beforeEach(() => {
       is_primary: true,
     },
   ]
+  store.tables['telnyx_numbers'] = [
+    {
+      id: 'tnum-1',
+      tenant_id: 'tenant-1',
+      phone_number: '+15559876543',
+      status: 'active',
+      is_primary: true,
+    },
+  ]
   store.tables['tenants'] = [{ id: 'tenant-1', name: 'Test Biz' }]
   mockQueueAdd.mockClear()
   mockInitiateOutboundCall.mockClear()
