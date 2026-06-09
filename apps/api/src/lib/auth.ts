@@ -1,12 +1,46 @@
 import type { Request, Response, NextFunction } from 'express'
 import { jwtVerify } from 'jose'
+import { createClient } from '@supabase/supabase-js'
 
 export interface AuthenticatedRequest extends Request {
   tenantId: string
   userId: string
+  /** public.users.id — the domain UUID that FKs reference. Resolved from
+   *  public.users WHERE authjs_user_id = token.sub. Null if not found. */
+  appUserId: string | null
   role: string
   vertical: string
   authProvider: 'authjs'
+}
+
+function getAppUserIdCache(): Map<string, string> {
+  const g = globalThis as typeof globalThis & { __appUserIdCache?: Map<string, string> }
+  if (!g.__appUserIdCache) g.__appUserIdCache = new Map()
+  return g.__appUserIdCache
+}
+
+async function resolveAppUserId(sub: string, tenantId: string): Promise<string | null> {
+  const cache = getAppUserIdCache()
+  const cacheKey = `${tenantId}:${sub}`
+  const cached = cache.get(cacheKey)
+  if (cached !== undefined) return cached
+
+  const url = process.env['SUPABASE_URL']
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
+  if (!url || !key) return null
+
+  const supabase = createClient(url, key)
+  const { data } = await supabase
+    .from('users')
+    .select('id')
+    .eq('authjs_user_id', sub)
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .maybeSingle()
+
+  const appUserId = (data as { id: string } | null)?.id ?? null
+  if (appUserId) cache.set(cacheKey, appUserId)
+  return appUserId
 }
 
 async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>> {
@@ -45,8 +79,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     const authedReq = req as AuthenticatedRequest
+    const sub = (payload['sub'] as string) ?? ''
     authedReq.tenantId = tenantId
-    authedReq.userId = (payload['sub'] as string) ?? ''
+    authedReq.userId = sub
+    authedReq.appUserId = sub ? await resolveAppUserId(sub, tenantId) : null
     authedReq.role = (payload['role'] as string) ?? 'staff'
     authedReq.vertical = (payload['vertical'] as string) ?? ''
     authedReq.authProvider = 'authjs'

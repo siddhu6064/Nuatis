@@ -229,7 +229,7 @@ router.get('/analytics', requireAuth, async (req: Request, res: Response): Promi
 
   // AI handled stats (over 30-day inbound messages)
   const inboundMsgs = msgs.filter((m) => m.direction === 'inbound')
-  const aiHandledCount = msgs.filter((m) => m.ai_handled).length
+  const aiHandledCount = inboundMsgs.filter((m) => m.ai_handled).length
   const aiHandledPct =
     inboundMsgs.length > 0 ? Math.round((aiHandledCount / inboundMsgs.length) * 100) : 0
 
@@ -386,7 +386,7 @@ router.post(
         tenant_id: tenantId,
         contact_id: contactId,
         resolved_at: now,
-        resolved_by: authed.userId ?? null,
+        resolved_by: authed.appUserId ?? null,
         updated_at: now,
       },
       { onConflict: 'tenant_id,contact_id' }
