@@ -85,12 +85,17 @@ const result = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.tenantId = (user as Record<string, unknown>).tenantId
-        token.role = (user as Record<string, unknown>).role
-        token.vertical = (user as Record<string, unknown>).vertical
-        token.businessName = (user as Record<string, unknown>).businessName
-        token.subscriptionStatus = (user as Record<string, unknown>).subscriptionStatus
-        token.modules = (user as Record<string, unknown>).modules
+        const u = user as Record<string, unknown>
+        token.tenantId = u.tenantId
+        token.role = u.role
+        token.vertical = u.vertical
+        token.businessName = u.businessName
+        token.subscriptionStatus = u.subscriptionStatus
+        token.modules = u.modules
+        // public.users.id — the domain UUID FKs reference. Available here
+        // because authorize() already fetched it; storing it avoids a per-request
+        // DB lookup in the API auth middleware.
+        token.appUserId = u.id as string
       }
 
       // Re-read vertical + modules from DB on every token rotation so demo
@@ -123,6 +128,7 @@ const result = NextAuth({
             vertical: token.vertical,
             businessName: token.businessName,
             subscriptionStatus: token.subscriptionStatus,
+            ...(token.appUserId ? { appUserId: token.appUserId } : {}),
           })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
