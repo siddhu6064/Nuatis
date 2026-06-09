@@ -204,7 +204,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
       { href: '/settings/reports', label: 'Scheduled Reports', icon: '📨', suiteOnly: true },
       { href: '/settings/import', label: 'Import', icon: '↑', suiteOnly: true },
-      { href: '/settings/chat-widget', label: 'Chat Widget', icon: '💬', suiteOnly: true },
       { href: '/settings/trigger-links', label: 'Trigger Links', icon: '🔗', suiteOnly: true },
       { href: '/settings/snippets', label: 'Snippets', icon: '✂', suiteOnly: true },
       { href: '/settings/labs', label: 'Labs', icon: '🧪', suiteOnly: true },

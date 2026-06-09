@@ -132,7 +132,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     .from('reports')
     .insert({
       tenant_id: authed.tenantId,
-      created_by: authed.userId,
+      created_by: authed.appUserId ?? null,
       name,
       description: typeof b['description'] === 'string' ? b['description'].trim() : null,
       object,

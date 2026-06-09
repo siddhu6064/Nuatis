@@ -131,7 +131,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     tenant_id: authed.tenantId,
     name,
     status: 'draft',
-    created_by: authed.userId,
+    created_by: authed.appUserId ?? null,
     type: type ?? 'email',
   }
   if (objective) insert['objective'] = objective
@@ -641,7 +641,7 @@ router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Pr
   const now = new Date().toISOString()
   const { data: updated, error: updateErr } = await supabase
     .from('campaign_messages')
-    .update({ approved: true, approved_by: authed.userId, approved_at: now })
+    .update({ approved: true, approved_by: authed.appUserId ?? null, approved_at: now })
     .eq('campaign_id', id)
     .select('*')
 

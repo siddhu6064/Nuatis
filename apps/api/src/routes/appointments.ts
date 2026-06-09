@@ -368,7 +368,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
         contact_id,
         start_time,
         end_time,
-        booked_by: authed.userId,
+        booked_by: authed.appUserId ?? null,
         status: 'confirmed',
       })
     }

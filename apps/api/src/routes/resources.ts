@@ -377,7 +377,7 @@ router.post('/:id/book', requireAuth, async (req: Request, res: Response): Promi
       start_time,
       end_time,
       notes: notes ?? null,
-      booked_by: authed.userId,
+      booked_by: authed.appUserId ?? null,
       status: 'confirmed',
     })
     .select('id')

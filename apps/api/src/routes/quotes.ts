@@ -698,7 +698,7 @@ router.post(
         notes: original.notes,
         valid_until: new Date(Date.now() + 30 * 86400000).toISOString(),
         share_token: randomUUID(),
-        created_by: authed.userId,
+        created_by: authed.appUserId ?? null,
       })
       .select('*')
       .single()
@@ -1485,7 +1485,7 @@ router.post(
       .from('quotes')
       .update({
         approval_status: 'approved',
-        approved_by: authed.userId,
+        approved_by: authed.appUserId ?? null,
         approved_at: new Date().toISOString(),
         approval_note: note,
       })
@@ -1697,7 +1697,7 @@ router.post(
         provider: method,
         reference,
         notes,
-        recorded_by: authed.userId ?? null,
+        recorded_by: authed.appUserId ?? null,
         ...(squarePaymentId ? { square_payment_id: squarePaymentId } : {}),
       })
       .select('*')
