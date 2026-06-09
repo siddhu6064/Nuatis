@@ -22,9 +22,10 @@ const EXPECTED_TABLES = [
   'knowledge_docs',
   'knowledge_chunks',
   'schema_versions',
+  'announcements',
 ]
 
-const TABLES_WITH_RLS = EXPECTED_TABLES.filter((t) => t !== 'schema_versions')
+const TABLES_WITH_RLS = EXPECTED_TABLES
 
 describe('Schema migration tests', () => {
   const supabaseUrl = process.env['SUPABASE_URL']
