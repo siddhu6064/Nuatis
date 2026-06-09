@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 
 interface WebchatConfig {
   webchat_enabled: boolean
@@ -19,6 +20,8 @@ const COLOR_PRESETS = [
 ]
 
 export default function WebchatSettingsPage() {
+  const { data: session } = useSession()
+  const tenantId = session?.user?.tenantId ?? ''
   const [config, setConfig] = useState<WebchatConfig>({
     webchat_enabled: false,
     webchat_greeting: 'Hi! How can we help you today?',
@@ -62,7 +65,7 @@ export default function WebchatSettingsPage() {
   // The embed snippet they copy-paste onto their website
   const embedSnippet = `<script
   src="https://api.nuatis.com/webchat-widget.js"
-  data-tenant-id="YOUR_TENANT_ID"
+  data-tenant-id="${tenantId || 'YOUR_TENANT_ID'}"
   data-color="${config.webchat_color}"
   data-greeting="${config.webchat_greeting}"
   data-position="${config.webchat_position}"
