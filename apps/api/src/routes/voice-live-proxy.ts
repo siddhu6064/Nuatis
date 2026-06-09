@@ -26,7 +26,11 @@ const GEMINI_WS_PATH =
 export const voiceLiveProxy = createProxyMiddleware({
   target: GEMINI_TARGET,
   changeOrigin: true,
-  ws: true,
+  // ws:true intentionally omitted — it causes http-proxy-middleware v4 to
+  // auto-subscribe to the server's upgrade event for ALL paths (default
+  // pathFilter '/'), destroying /voice/stream sockets on arrival.
+  // WebSocket upgrades are routed manually in server.on('upgrade') below.
+  pathFilter: '/api/voice/live',
   // Always rewrite to the Gemini BidiGenerateContent WS path regardless of
   // how Express strips (or doesn't strip) the mount prefix.
   pathRewrite: (_path: string) => GEMINI_WS_PATH,

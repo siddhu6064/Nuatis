@@ -572,19 +572,36 @@ Sentry.setupExpressErrorHandler(app)
 
 const server = createServer(app)
 
-const wss = new WebSocketServer({ server, path: '/voice/stream' })
+// Both WebSocket servers use noServer:true so the ws library never subscribes
+// to the HTTP server's upgrade event on its own.  A single upgrade handler
+// below does all routing — this prevents any library from intercepting upgrades
+// meant for another path (the root cause of the /voice/stream outage).
+const wss = new WebSocketServer({ noServer: true })
 registerVoiceWebSocket(wss)
 setWssRef(wss)
-initConversationsWs(server)
+const conversationsWss = initConversationsWs()
 
-// Forward WebSocket upgrades for the Gemini Live proxy.
-// This path bypasses the Express middleware stack (including requireAuth),
-// so only the proxyReqWs key-injection guard runs.
+// ── Authoritative WebSocket upgrade router ────────────────────────────────────
+// All three WebSocket paths are handled here and nowhere else.
+// voiceLiveProxy has ws:true removed, so it never auto-subscribes.
 server.on('upgrade', (req, socket, head) => {
-  if (req.url?.startsWith('/api/voice/live')) {
+  const pathname = req.url ? new URL(req.url, 'http://x').pathname : ''
+
+  if (pathname === '/voice/stream') {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req)
+    })
+  } else if (pathname === '/ws/conversations') {
+    conversationsWss.handleUpgrade(req, socket, head, (ws) => {
+      conversationsWss.emit('connection', ws, req)
+    })
+  } else if (pathname.startsWith('/api/voice/live')) {
     // Node types the upgrade socket as Duplex; http-proxy-middleware expects
     // net.Socket.  In practice upgrade sockets are always net.Socket instances.
     voiceLiveProxy.upgrade(req, socket as import('net').Socket, head)
+  } else {
+    // Unknown path — reject cleanly rather than leaving the socket dangling.
+    socket.destroy()
   }
 })
 

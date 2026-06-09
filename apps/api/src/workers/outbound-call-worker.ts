@@ -23,7 +23,7 @@ interface ContactRow {
   id: string
   full_name: string | null
   phone: string | null
-  sms_opt_out: boolean | null
+  sms_opt_in: boolean | null
   is_archived: boolean | null
 }
 
@@ -48,6 +48,10 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     .eq('id', jobId)
     .single()
 
+  console.info(
+    `[outbound-call] job DB query done: jobId=${jobId} hasRow=${!!job} hasErr=${!!jobErr} errMsg=${jobErr?.message ?? 'none'}`
+  )
+
   if (jobErr || !job) {
     console.warn(
       `[outbound-call] job not found: jobId=${jobId} supabaseError=${jobErr?.message ?? 'no row'}`
@@ -56,6 +60,9 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   }
 
   const typedJob = job as unknown as OutboundCallJob
+  console.info(
+    `[outbound-call] job record: job=${jobId} status=${typedJob.status} tenant=${typedJob.tenant_id} contact=${typedJob.contact_id}`
+  )
 
   // Step 2: Check status still pending
   if (typedJob.status !== 'pending') {
@@ -75,27 +82,34 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   }
 
   // Step 4: Fetch contact
-  const { data: contact } = await supabase
+  const { data: contact, error: contactErr } = await supabase
     .from('contacts')
-    .select('id, full_name, phone, sms_opt_out, is_archived')
+    .select('id, full_name, phone, sms_opt_in, is_archived')
     .eq('id', contactId)
     .eq('tenant_id', tenantId)
-    .single()
+    .maybeSingle()
 
-  if (!contact) {
+  console.info(
+    `[outbound-call] contact query done: contactId=${contactId} hasRow=${!!contact} hasErr=${!!contactErr} errMsg=${contactErr?.message ?? 'none'} errCode=${contactErr?.code ?? 'none'}`
+  )
+
+  if (contactErr || !contact) {
+    console.warn(
+      `[outbound-call] contact not found: contactId=${contactId} job=${jobId} supabaseError=${contactErr?.message ?? 'no row'}`
+    )
     await supabase
       .from('outbound_call_jobs')
-      .update({ status: 'failed', error_message: 'Contact not found' })
+      .update({ status: 'failed', error_message: contactErr?.message ?? 'Contact not found' })
       .eq('id', jobId)
     return
   }
 
   const typedContact = contact as unknown as ContactRow
   const phone = typedContact.phone
-  const optedOut = typedContact.sms_opt_out
+  const optedIn = typedContact.sms_opt_in
   const archived = typedContact.is_archived
 
-  // Step 5: Validate phone exists and not opted out
+  // Step 5: Validate phone exists and contact opted in
   if (!phone) {
     await supabase
       .from('outbound_call_jobs')
@@ -105,22 +119,22 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
     return
   }
 
-  if (optedOut || archived) {
+  if (optedIn !== true || archived) {
     await supabase
       .from('outbound_call_jobs')
       .update({
         status: 'cancelled',
-        error_message: optedOut ? 'Contact opted out' : 'Contact archived',
+        error_message: optedIn !== true ? 'Contact not opted in to calls' : 'Contact archived',
       })
       .eq('id', jobId)
     console.info(
-      `[outbound-call] contact ${contactId} opted_out=${optedOut} archived=${archived} — job ${jobId} cancelled`
+      `[outbound-call] contact ${contactId} optedIn=${optedIn} archived=${archived} — job ${jobId} cancelled`
     )
     return
   }
 
   // Step 6: Fetch fromNumber (tenant's primary telnyx_number)
-  const { data: telnyxNum } = await supabase
+  const { data: telnyxNum, error: telnyxNumErr } = await supabase
     .from('telnyx_numbers')
     .select('phone_number')
     .eq('tenant_id', tenantId)
@@ -131,19 +145,22 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
 
   const fromNumber = (telnyxNum as { phone_number: string | null } | null)?.phone_number ?? null
 
-  if (!fromNumber) {
+  if (telnyxNumErr || !fromNumber) {
     await supabase
       .from('outbound_call_jobs')
-      .update({ status: 'failed', error_message: 'No Telnyx number configured' })
+      .update({
+        status: 'failed',
+        error_message: telnyxNumErr?.message ?? 'No Telnyx number configured',
+      })
       .eq('id', jobId)
-    console.warn(`[outbound-call] no telnyx_number for tenant=${tenantId} — job ${jobId} failed`)
+    console.warn(
+      `[outbound-call] no telnyx_number for tenant=${tenantId} — job ${jobId} failed errMsg=${telnyxNumErr?.message ?? 'no row'}`
+    )
     return
   }
 
   // Step 7: Initiate the call
-  console.info(
-    `[outbound-call] calling initiateOutboundCall: job=${jobId} to=${phone} from=${fromNumber} tenant=${tenantId}`
-  )
+  console.info(`[outbound-call] initiating call: job=${jobId} tenant=${tenantId}`)
   try {
     const result = await initiateOutboundCall({
       tenantId,
@@ -154,7 +171,7 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
       callContext,
     })
     console.info(
-      `[outbound-call] initiated: job=${jobId} to=${phone} callControlId=${result.callControlId} callLegId=${result.callLegId}`
+      `[outbound-call] initiated: job=${jobId} callControlId=${result.callControlId} callLegId=${result.callLegId}`
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

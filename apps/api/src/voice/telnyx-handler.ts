@@ -324,7 +324,12 @@ export async function getTenantConfig(
 interface TelnyxStartEvent {
   event: 'start'
   stream_id: string
-  start: { call_sid: string; from: string; to: string }
+  start: {
+    call_sid: string
+    from: string
+    to: string
+    custom_headers?: Array<{ name: string; value: string }>
+  }
 }
 
 interface TelnyxMediaEvent {
@@ -581,6 +586,16 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let preCallContactId: string | null = null
     let preCallContextSuffix = ''
     let callDepartment = 'general'
+    let startEventReceived = false
+
+    // Warn if Telnyx never sends a start event — helps diagnose stream setup failures.
+    const startEventTimeout = setTimeout(() => {
+      if (!startEventReceived && isCallActive) {
+        console.warn(
+          '[telnyx-handler] no start event within 10s of connection open — stream may have failed'
+        )
+      }
+    }, 10_000)
 
     // Azure Container Apps kills idle WebSocket connections after 4 minutes.
     // Ping every 30 seconds to keep the connection alive during call pauses.
@@ -591,7 +606,11 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     }, 30_000)
 
     ws.on('close', () => {
+      clearTimeout(startEventTimeout)
       clearInterval(pingInterval)
+      if (!startEventReceived) {
+        console.warn('[telnyx-handler] WebSocket closed before start event was received')
+      }
     })
 
     ws.on('message', async (data: Buffer) => {
@@ -599,30 +618,74 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       try {
         event = JSON.parse(data.toString()) as TelnyxEvent
       } catch {
+        console.warn(
+          '[telnyx-handler] received non-JSON message, ignoring:',
+          data.toString().slice(0, 120)
+        )
         return
       }
 
+      // Log every message type for diagnostics (media excluded — too frequent)
+      if (event.event !== 'media') {
+        console.info(`[telnyx-handler] message: event=${event.event}`)
+      }
+
       if (event.event === 'start') {
+        startEventReceived = true
+        clearTimeout(startEventTimeout)
+        // Log raw start payload to diagnose outbound tenant resolution and
+        // confirm whether custom_headers are present in the WebSocket stream.
+        console.info('[telnyx-handler] raw start event:', JSON.stringify(event.start))
+
         streamId = event.stream_id ?? null
         const toNumber = event.start.to
 
+        callStartTime = Date.now()
+        callControlId = event.start.call_sid ?? null
+        callerId = event.start.from ?? null
+
+        // Extract custom headers first — needed to determine call direction
+        // before tenant lookup so we use the correct number.
+        // NOTE: event.start.call_sid is the call_leg_id, not call_control_id, so the
+        // outboundCallRegistry (keyed by call_control_id) cannot be used here for tenant lookup.
+        const customHeaders: Array<{ name: string; value: string }> =
+          event.start.custom_headers ?? []
+        const headerCallType = customHeaders.find((h) => h.name === 'X-Call-Type')?.value
+        const headerTenantId = customHeaders.find((h) => h.name === 'X-Tenant-Id')?.value
+
+        // For inbound calls our Telnyx number is TO (the number the caller dialed).
+        // For outbound calls our Telnyx number is FROM (we dialed the contact).
+        // Always look up by our number so getTenantByPhoneNumber can match.
+        const ourNumber = headerCallType === 'outbound' ? event.start.from : toNumber
+
         // Try DB lookup first, then env var fallback
-        const phoneResult = await getTenantByPhoneNumber(toNumber)
+        const phoneResult = await getTenantByPhoneNumber(ourNumber)
         if (phoneResult) {
           tenantId = phoneResult.tenantId
           callDepartment = phoneResult.department
         } else {
           console.warn(
-            `[telnyx-handler] No tenant found for number ${toNumber} — using dev fallback`
+            `[telnyx-handler] No tenant found for number ${ourNumber} — using dev fallback`
           )
           tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
         }
 
-        callStartTime = Date.now()
-        callControlId = event.start.call_sid ?? null
-        callerId = event.start.from ?? null
+        // X-Tenant-Id header (outbound only) takes precedence over DB lookup.
+        if (headerCallType === 'outbound') {
+          if (headerTenantId) {
+            tenantId = headerTenantId
+            console.info(
+              `[telnyx-handler] outbound call — tenant_id from X-Tenant-Id header: ${tenantId}`
+            )
+          } else {
+            console.warn(
+              '[telnyx-handler] outbound call detected but X-Tenant-Id missing from custom_headers'
+            )
+          }
+        }
+
         console.info(
-          `[telnyx-handler] Call started — tenant: ${tenantId}, to: ${toNumber}, from: ${callerId}, stream_id: ${streamId}, call_control_id: ${callControlId}`
+          `[telnyx-handler] Call started — tenant: ${tenantId}, stream_id: ${streamId}, call_control_id: ${callControlId}`
         )
 
         // ── Pure call forwarding (maya_enabled=false + forwarding_number set) ────
@@ -658,8 +721,11 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         const outboundMeta = callControlId ? outboundCallRegistry.get(callControlId) : undefined
         if (outboundMeta) {
           outboundCallRegistry.delete(callControlId!)
+          // For outbound calls, toNumber is the contact's phone — getTenantByPhoneNumber
+          // will not match it. Override tenantId from the registered call metadata.
+          tenantId = outboundMeta.tenantId
           console.info(
-            `[telnyx-handler] Outbound call detected — job=${outboundMeta.jobId} tenant=${outboundMeta.tenantId}`
+            `[telnyx-handler] Outbound call detected — job=${outboundMeta.jobId} tenant=${outboundMeta.tenantId} (overriding tenantId from registry)`
           )
         }
 
@@ -694,7 +760,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 JSON.stringify({
                   event: 'media',
                   stream_id: streamId,
-                  media: { payload: frame.toString('base64'), track: 'outbound' },
+                  media: { payload: frame.toString('base64') },
                 }),
                 (err) => {
                   if (err) console.error('[telnyx-handler] send error', err)
@@ -917,9 +983,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
         // Telnyx → Gemini: base64 PCMU 8kHz → PCM16 16kHz
         const pcmuBuffer = Buffer.from(event.media.payload, 'base64')
-        console.info(
-          `[telnyx-handler] inbound audio chunk: ${pcmuBuffer.length}b, first4=${pcmuBuffer.subarray(0, 4).toString('hex')}`
-        )
         const pcm16 = pcmuToLinear16(pcmuBuffer)
         if (!sessionReady) {
           mediaQueue.push(pcm16)
@@ -928,6 +991,10 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
         }
       } else if (event.event === 'stop') {
         handleCallEnd()
+      } else {
+        console.warn(
+          `[telnyx-handler] unhandled event type: ${(event as { event?: string }).event}`
+        )
       }
     })
 

@@ -1,4 +1,3 @@
-import type http from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { jwtVerify } from 'jose'
 import type { ConversationsWsEvent } from '@nuatis/shared'
@@ -6,8 +5,10 @@ import type { ConversationsWsEvent } from '@nuatis/shared'
 // tenantId → connected clients
 const tenantClients = new Map<string, Set<WebSocket>>()
 
-export function initConversationsWs(server: http.Server): void {
-  const wss = new WebSocketServer({ server, path: '/ws/conversations' })
+export function initConversationsWs(): WebSocketServer {
+  // noServer:true — upgrade routing is handled centrally in index.ts so
+  // the ws library does not subscribe to the HTTP server's upgrade event.
+  const wss = new WebSocketServer({ noServer: true })
 
   wss.on('connection', (ws) => {
     let authenticated = false
@@ -74,6 +75,7 @@ export function initConversationsWs(server: http.Server): void {
   })
 
   console.info('Conversations WebSocket listening at /ws/conversations')
+  return wss
 }
 
 export function broadcastToTenant(tenantId: string, event: ConversationsWsEvent): void {

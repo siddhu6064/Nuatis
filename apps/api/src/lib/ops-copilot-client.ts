@@ -32,7 +32,8 @@ export interface OpsActivityEvent {
  * Never throws — all failures are silently logged so the caller's job is never blocked.
  */
 export async function publishActivityEvent(payload: OpsActivityEvent): Promise<void> {
-  const baseUrl = process.env['OPS_COPILOT_URL'] ?? 'http://localhost:8001'
+  const baseUrl = process.env['OPS_COPILOT_URL']
+  if (!baseUrl) return // sidecar not configured — skip silently
   const controller = new AbortController()
   const timeoutHandle = setTimeout(() => controller.abort(), 3000)
 

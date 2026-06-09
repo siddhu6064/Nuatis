@@ -17,6 +17,8 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export function logCall(entry: CallLogEntry): void {
   console.info(
     JSON.stringify({
@@ -27,6 +29,13 @@ export function logCall(entry: CallLogEntry): void {
       timestamp: entry.timestamp.toISOString(),
     })
   )
+
+  if (!UUID_RE.test(entry.tenant_id)) {
+    console.warn(
+      `[call-logger] skipping DB insert — tenant_id is not a valid UUID: "${entry.tenant_id}"`
+    )
+    return
+  }
 
   const supabase = getSupabase()
   void Promise.resolve(
