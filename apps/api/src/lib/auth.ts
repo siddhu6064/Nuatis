@@ -109,6 +109,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Fast path: appUserId was embedded at login time (tokens issued after the
     // authjs.ts change carry this claim). Fall back to DB lookup for older tokens.
     authedReq.appUserId = claimedAppUserId ?? (sub ? await resolveAppUserId(sub, tenantId) : null)
+    // TEMP DIAGNOSTIC — remove after appUserId debug
+    console.info('[DIAG appUserId] auth', {
+      claim: claimedAppUserId,
+      sub: sub || null,
+      final: authedReq.appUserId,
+    })
     authedReq.role = (payload['role'] as string) ?? 'staff'
     authedReq.vertical = (payload['vertical'] as string) ?? ''
     authedReq.authProvider = 'authjs'
