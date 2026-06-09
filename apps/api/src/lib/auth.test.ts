@@ -1,12 +1,34 @@
+import { describe, it, expect, jest } from '@jest/globals'
 import { config } from 'dotenv'
 import { resolve } from 'path'
-import request from 'supertest'
-import express from 'express'
 import { SignJWT } from 'jose'
-import { requireAuth } from './auth.js'
 import type { AuthenticatedRequest } from './auth.js'
 
 config({ path: resolve(process.cwd(), '.env') })
+
+// ── Supabase mock ─────────────────────────────────────────────────────────────
+// Prevents resolveAppUserId from making a real DB call (which would hang in CI
+// where there is no live Supabase connection). Auth tests assert tenantId/role,
+// not appUserId, so null is the correct no-op return here.
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
+  createClient: () => {
+    const chain: Record<string, (...args: unknown[]) => unknown> = {}
+    chain['from'] = () => chain
+    chain['select'] = () => chain
+    chain['eq'] = () => chain
+    chain['limit'] = () => chain
+    chain['maybeSingle'] = () => Promise.resolve({ data: null, error: null })
+    chain['single'] = () => Promise.resolve({ data: null, error: null })
+    return chain
+  },
+}))
+
+// Dynamic imports must come after jest.unstable_mockModule calls
+const [{ default: express }, { default: request }, { requireAuth }] = await Promise.all([
+  import('express'),
+  import('supertest'),
+  import('./auth.js'),
+])
 
 // ── Test app with a protected route ──────────────────────────
 const testApp = express()

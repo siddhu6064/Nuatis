@@ -30,15 +30,38 @@ async function resolveAppUserId(sub: string, tenantId: string): Promise<string |
   if (!url || !key) return null
 
   const supabase = createClient(url, key)
-  const { data } = await supabase
-    .from('users')
-    .select('id')
-    .eq('authjs_user_id', sub)
-    .eq('tenant_id', tenantId)
-    .limit(1)
-    .maybeSingle()
 
-  const appUserId = (data as { id: string } | null)?.id ?? null
+  let timerHandle: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<null>((resolve) => {
+    timerHandle = setTimeout(() => {
+      console.warn('[auth] resolveAppUserId timed out after 2s — proceeding without appUserId')
+      resolve(null)
+    }, 2000)
+    // unref so this timer never prevents the process from exiting cleanly
+    timerHandle.unref()
+  })
+
+  const lookup: Promise<string | null> = Promise.resolve(
+    supabase
+      .from('users')
+      .select('id')
+      .eq('authjs_user_id', sub)
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .maybeSingle()
+  ).then(
+    (result) => (result.data as { id: string } | null)?.id ?? null,
+    (_err: unknown) => {
+      console.warn('[auth] resolveAppUserId error:', _err)
+      return null
+    }
+  )
+
+  const appUserId = await Promise.race([lookup, timeout])
+  // Always clear — no-op if timer already fired, cancels it if lookup won
+  clearTimeout(timerHandle)
+
+  // Only cache a real id — null stays uncached so a later request can retry
   if (appUserId) cache.set(cacheKey, appUserId)
   return appUserId
 }
