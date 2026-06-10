@@ -70,6 +70,7 @@ const result = NextAuth({
 
         return {
           id: user.id,
+          appUserId: user.id,
           email: data.user.email!,
           name: user.full_name,
           tenantId: user.tenant_id,
@@ -95,7 +96,7 @@ const result = NextAuth({
         // public.users.id — the domain UUID FKs reference. Available here
         // because authorize() already fetched it; storing it avoids a per-request
         // DB lookup in the API auth middleware.
-        token.appUserId = u.id as string
+        token.appUserId = u.appUserId as string
       }
 
       // Re-read vertical + modules from DB on every token rotation so demo
