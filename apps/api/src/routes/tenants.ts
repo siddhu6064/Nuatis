@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { seedSampleData } from '../lib/seed-sample-data.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { authLimiter } from '../middleware/rate-limit.js'
+import { capture } from '../lib/posthog.js'
 
 const router = Router()
 
@@ -133,21 +134,34 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
   const tenantId = tenant.id as string
 
   // 6. Create owner user row
-  const { error: userError } = await supabase.from('users').insert({
-    tenant_id: tenantId,
-    authjs_user_id: supabaseUserId,
-    email: owner_email,
-    full_name: owner_name,
-    role: 'owner',
-  })
+  const { data: ownerUser, error: userError } = await supabase
+    .from('users')
+    .insert({
+      tenant_id: tenantId,
+      authjs_user_id: supabaseUserId,
+      email: owner_email,
+      full_name: owner_name,
+      role: 'owner',
+    })
+    .select('id')
+    .single()
 
-  if (userError) {
+  if (userError || !ownerUser) {
     // Rollback both
     await supabase.auth.admin.deleteUser(supabaseUserId)
     await supabase.from('tenants').delete().eq('id', tenantId)
     res.status(500).json({ error: 'Failed to create user record' })
     return
   }
+
+  // Activation funnel: tenant signed up. distinctId = domain user id (appUserId)
+  // to stitch with the client identify() in 1b. Fire-and-forget — never blocks
+  // signup. Replaces the dead signup_started; analytics_events untouched.
+  capture(ownerUser.id as string, 'tenant_signed_up', {
+    tenant_id: tenantId,
+    vertical: vertical_slug,
+    product,
+  })
 
   // 6b. Create tenant_users record (RBAC foundation)
   await supabase.from('tenant_users').insert({

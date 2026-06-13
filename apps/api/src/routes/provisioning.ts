@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { phoneProvisionLimiter } from '../middleware/rate-limit.js'
+import { capture } from '../lib/posthog.js'
 // config/urls.js available for future phone configuration
 
 const router = Router()
@@ -178,6 +179,15 @@ router.post('/complete-step', requireAuth, async (req: Request, res: Response): 
     if (step >= 6) updates['onboarding_completed'] = true
 
     await supabase.from('tenants').update(updates).eq('id', authed.tenantId)
+
+    // Activation funnel: onboarding finished. distinctId = appUserId (stitches
+    // with 1b client identify). Fire-and-forget — never blocks the response.
+    if (step >= 6) {
+      capture(authed.appUserId ?? `tenant:${authed.tenantId}`, 'onboarding_completed', {
+        tenant_id: authed.tenantId,
+        vertical: authed.vertical,
+      })
+    }
 
     res.json({ step: step + 1, completed: step >= 6 })
   } catch (err) {

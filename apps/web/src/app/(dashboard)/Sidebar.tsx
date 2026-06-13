@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import posthog from 'posthog-js'
 import { trackEvent } from '@/lib/analytics'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
@@ -904,7 +905,12 @@ export default function Sidebar({
             <div className="border-t border-border-brand" />
             <button
               type="button"
-              onClick={() => void signOut({ callbackUrl: '/api/auth/signin' })}
+              onClick={() => {
+                // Clear identity + super props before sign-out so the next user
+                // on a shared device starts anonymous. No-op when uninitialized.
+                if (posthog.__loaded) posthog.reset()
+                void signOut({ callbackUrl: '/api/auth/signin' })
+              }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
             >
               <svg

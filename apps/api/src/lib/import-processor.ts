@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { logActivity } from './activity.js'
+import { capture } from './posthog.js'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -41,7 +42,8 @@ export async function processImportRows(
   rows: Record<string, string>[],
   mapping: Record<string, string>,
   options: ImportOptions,
-  onProgress?: (imported: number, skipped: number, errorCount: number) => Promise<void>
+  onProgress?: (imported: number, skipped: number, errorCount: number) => Promise<void>,
+  actorAppUserId?: string | null
 ): Promise<ImportResult> {
   const supabase = getSupabase()
   let imported = 0
@@ -178,6 +180,13 @@ export async function processImportRows(
       await onProgress(imported, skipped, errors.length)
     }
   }
+
+  // Activation funnel: import finished. distinctId = importing user's appUserId
+  // when in scope (sync route), else tenant (queue worker path). Fire-and-forget.
+  capture(actorAppUserId ?? `tenant:${tenantId}`, 'contact_import_completed', {
+    tenant_id: tenantId,
+    row_count: imported,
+  })
 
   return { imported, skipped, errors }
 }

@@ -16,6 +16,7 @@ import { isModuleEnabled } from '../lib/modules.js'
 import { checkResourceAvailable } from '../lib/resource-availability.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
+import { capture } from '../lib/posthog.js'
 
 const router = Router()
 
@@ -356,6 +357,14 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     res.status(500).json({ error: error.message })
     return
   }
+
+  // Activation funnel: appointment booked. distinctId = acting user's appUserId
+  // when present, else tenant. This route is the manual/admin booking path.
+  // Fire-and-forget — never blocks the response.
+  capture(authed.appUserId ?? `tenant:${authed.tenantId}`, 'appointment_created', {
+    tenant_id: authed.tenantId,
+    channel: 'manual',
+  })
 
   // Book resources for this appointment
   if (resource_ids && resource_ids.length > 0 && appointment?.id) {

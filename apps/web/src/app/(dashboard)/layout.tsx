@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import DemoBanner from './DemoBanner'
 import { AnnouncementBanner } from '@/components/AnnouncementBanner'
 import { PushNotificationPrompt } from '@/components/PushNotificationPrompt'
+import { PostHogIdentify } from '@/components/PostHogIdentify'
 import { NPSSurvey } from '@/components/NPSSurvey'
 import GlobalSearch from '@/components/search/GlobalSearch'
 import QuickActionsButton from '@/components/layout/QuickActionsButton'
@@ -16,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SessionProvider>
+      <PostHogIdentify />
       <div className="flex h-screen bg-bg overflow-hidden">
         <div
           className={`fixed inset-0 z-20 md:hidden transition-opacity duration-200 ${sidebarOpen ? 'bg-black/40 pointer-events-auto' : 'pointer-events-none opacity-0'}`}

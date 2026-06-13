@@ -82,10 +82,17 @@ router.post('/contacts', requireAuth, async (req: Request, res: Response): Promi
 
   // Small import: process synchronously
   if (rows.length <= 100) {
-    const result = await processImportRows(authed.tenantId, rows, mapping, {
-      skip_duplicates: skipDuplicates,
-      update_existing: updateExisting,
-    })
+    const result = await processImportRows(
+      authed.tenantId,
+      rows,
+      mapping,
+      {
+        skip_duplicates: skipDuplicates,
+        update_existing: updateExisting,
+      },
+      undefined,
+      authed.appUserId
+    )
     void logBulkAction({
       tenantId: authed.tenantId,
       userId: authed.userId,

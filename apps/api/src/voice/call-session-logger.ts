@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import type { ToolCallRecord } from './post-call.js'
 import type { LatencyBreakdown } from './maya-latency-tracker.js'
 import { enqueueMayaMemoryExtraction } from '../lib/maya-memory-queue.js'
+import { capture } from '../lib/posthog.js'
 
 export interface VoiceSessionParams {
   tenantId: string
@@ -90,6 +91,11 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
     // Enqueue memory extraction — fire and forget, must never affect call flow
     enqueueMayaMemoryExtraction(params.tenantId, data.id, params.callerPhone)
 
+    // Activation funnel: Maya handled a call. No HTTP user → distinctId keyed on
+    // tenant. Detached (void) so neither the count query nor capture can block or
+    // throw into the call-logging path.
+    void emitMayaCallLogged(supabase, params.tenantId)
+
     // Maya minute tracking + Stripe overage reporting.
     // NEVER throw out of this — call-session persistence has already happened
     // and billing errors must not poison the call pipeline.
@@ -101,6 +107,26 @@ export async function persistVoiceSession(params: VoiceSessionParams): Promise<v
   } catch (err) {
     console.error('[call-logger] error persisting voice session:', err)
   }
+}
+
+/**
+ * Emit maya_call_logged with best-effort is_first. The count query is cheap
+ * (head-only) but wrapped so a failure simply omits is_first rather than
+ * losing the event or throwing. Always fired via void — never on the await
+ * chain of the call-logging path.
+ */
+async function emitMayaCallLogged(supabase: LooseSupabase, tenantId: string): Promise<void> {
+  const props: Record<string, unknown> = { tenant_id: tenantId }
+  try {
+    const { count } = await supabase
+      .from('voice_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+    if (typeof count === 'number') props['is_first'] = count === 1
+  } catch (err) {
+    console.warn('[call-logger] is_first count failed — omitting:', err)
+  }
+  capture(`tenant:${tenantId}`, 'maya_call_logged', props)
 }
 
 interface TenantBillingSnapshot {

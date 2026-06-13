@@ -141,6 +141,7 @@ const result = NextAuth({
       return token
     },
     async session({ session, token }) {
+      session.user.appUserId = token.appUserId as string
       session.user.tenantId = token.tenantId as string
       session.user.role = token.role as string
       session.user.vertical = token.vertical as string
