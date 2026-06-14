@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
 /**
@@ -21,10 +22,14 @@ export default function MarketingNav() {
     <header className="border-b border-border-brand bg-white">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/products" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">N</span>
-          </div>
-          <span className="text-sm font-bold text-ink">Nuatis</span>
+          <Image
+            src="/nuatis-lockup-teal.png"
+            alt="Nuatis"
+            width={120}
+            height={38}
+            priority
+            className="object-contain"
+          />
         </Link>
         <nav className="hidden md:flex items-center gap-6 text-sm text-ink3">
           <a

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import posthog from 'posthog-js'
@@ -666,17 +667,16 @@ export default function Sidebar({
       {/* Brand */}
       <div className="px-5 py-5 border-b border-border-brand">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center shrink-0">
-            <span className="text-white text-sm font-bold">N</span>
-          </div>
-          <div>
-            <p className="font-display font-bold text-[22px] tracking-tight text-ink leading-none">
-              Nu<span className="text-teal-brand">atis</span>
-            </p>
-            <p className="text-[10px] text-ink4 mt-0.5 leading-none">
-              {isMayaOnly ? 'Maya AI' : 'Front Office AI'}
-            </p>
-          </div>
+          <Link href="/dashboard">
+            <Image
+              src="/nuatis-lockup-teal.png"
+              alt="Nuatis"
+              width={120}
+              height={38}
+              priority
+              className="object-contain"
+            />
+          </Link>
           <button
             type="button"
             onClick={onClose}
