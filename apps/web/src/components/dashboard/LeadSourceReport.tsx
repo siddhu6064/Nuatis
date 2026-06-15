@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { formatCurrencyWhole } from '@nuatis/shared'
 
 interface SourceRow {
   source: string
@@ -30,11 +31,7 @@ function sourceLabel(s: string): string {
 }
 
 function formatValue(v: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(v)
+  return formatCurrencyWhole(v)
 }
 
 function winRateBadge(rate: number, leadCount: number): React.ReactNode {

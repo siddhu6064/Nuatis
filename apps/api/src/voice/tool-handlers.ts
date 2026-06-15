@@ -1,6 +1,6 @@
 import { Type, type FunctionDeclaration } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
-import { VERTICALS } from '@nuatis/shared'
+import { VERTICALS, dateAtHour, formatHHMM } from '@nuatis/shared'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from '../lib/calendar-provider.js'
 import {
@@ -313,59 +313,12 @@ function getHoursForDate(date: Date, vertical: string): { open: number; close: n
 }
 
 /** Build a Date for a given date string + hour in a timezone, return ISO string */
-function dateAtHour(dateStr: string, hour: number, minute: number, tz: string): string {
-  // Build a wall-clock time in the target timezone
-  const d = new Date(
-    `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
-  )
-  // Use Intl to get the UTC offset for this timezone on this date
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  // Find offset by comparing: we want the ISO instant where local time = hour:minute in tz
-  // Strategy: create date in UTC, then adjust by the tz offset
-  const utcGuess = new Date(
-    `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`
-  )
-  const parts = formatter.formatToParts(utcGuess)
-  const getPart = (t: string) => parts.find((p) => p.type === t)?.value ?? '0'
-  const localHour = parseInt(getPart('hour'), 10)
-  const localMinute = parseInt(getPart('minute'), 10)
-  // Offset in minutes: localTime - utcTime (as seen from UTC guess)
-  const offsetMinutes =
-    localHour * 60 + localMinute - (utcGuess.getUTCHours() * 60 + utcGuess.getUTCMinutes())
-  // We want: result_utc + offset = desired_local, so result_utc = desired_local_as_utc - offset
-  const result = new Date(utcGuess.getTime() - offsetMinutes * 60_000)
-  void d // not used directly
-  return result.toISOString()
-}
-
 /** Format an hour number (0-23) as a human-readable string, e.g. 8 → "8:00 AM", 17 → "5:00 PM" */
 function formatHourAmPm(hour: number): string {
   if (hour === 0) return '12:00 AM'
   if (hour < 12) return `${hour}:00 AM`
   if (hour === 12) return '12:00 PM'
   return `${hour - 12}:00 PM`
-}
-
-/** Format a Date to HH:MM in a given timezone */
-function formatHHMM(d: Date, tz: string): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d)
-  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
-  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
-  return `${h}:${m}`
 }
 
 type ToolHandler = (

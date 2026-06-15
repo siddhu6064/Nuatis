@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { formatCurrency } from '@nuatis/shared'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,13 +28,6 @@ interface ContactSuggestion {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatCurrency(value: number): string {
-  return (
-    '$' +
-    Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  )
-}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'

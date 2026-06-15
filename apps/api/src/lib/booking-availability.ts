@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { dateAtHour, formatHHMM } from '@nuatis/shared'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from './calendar-provider.js'
 import {
@@ -72,45 +73,6 @@ function getHoursForDateStr(dateStr: string): { open: number; close: number } | 
 /**
  * Build the UTC ISO instant where the wall-clock time in `tz` equals `hour:minute` on `dateStr`.
  */
-function dateAtHour(dateStr: string, hour: number, minute: number, tz: string): string {
-  // Start with an UTC guess treating the local wall-clock time as if it were UTC
-  const utcGuess = new Date(
-    `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`
-  )
-  // Find what local time that UTC instant maps to in `tz`
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = formatter.formatToParts(utcGuess)
-  const getPart = (t: string) => parts.find((p) => p.type === t)?.value ?? '0'
-  const localHour = parseInt(getPart('hour'), 10)
-  const localMinute = parseInt(getPart('minute'), 10)
-  // offsetMinutes = local - utc (so we can back-solve for the correct UTC instant)
-  const offsetMinutes =
-    localHour * 60 + localMinute - (utcGuess.getUTCHours() * 60 + utcGuess.getUTCMinutes())
-  return new Date(utcGuess.getTime() - offsetMinutes * 60_000).toISOString()
-}
-
-/** Format a Date as "HH:MM" in the given IANA timezone */
-function formatHHMM(d: Date, tz: string): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d)
-  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
-  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
-  return `${h}:${m}`
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**

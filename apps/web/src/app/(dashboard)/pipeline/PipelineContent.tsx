@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
+import { formatCurrencyWhole } from '@nuatis/shared'
 
 interface Pipeline {
   id: string
@@ -47,14 +48,8 @@ interface PopoverState {
   left: number
 }
 
-const currencyFmt = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-})
-
 function formatColumnValue(amount: number): string {
-  return currencyFmt.format(amount)
+  return formatCurrencyWhole(amount)
 }
 
 function toTitle(slug: string): string {

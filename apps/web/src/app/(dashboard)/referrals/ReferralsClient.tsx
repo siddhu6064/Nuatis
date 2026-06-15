@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
+import { formatCurrency } from '@nuatis/shared'
 
 const API_URL = ''
 
@@ -16,9 +17,6 @@ function maskEmail(email: string): string {
   if (!local || !domain) return email
   return `${local.slice(0, 2)}***@${domain}`
 }
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 
 const STATUS_CLASSES: Record<string, string> = {
   signed_up: 'bg-gray-100 text-gray-600',

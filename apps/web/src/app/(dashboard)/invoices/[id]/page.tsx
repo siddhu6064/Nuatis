@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { formatCurrency } from '@nuatis/shared'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,13 +48,6 @@ interface ContactResult {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatCurrency(value: number): string {
-  return (
-    '$' +
-    Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  )
-}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
