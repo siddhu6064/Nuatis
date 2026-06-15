@@ -3,11 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { invalidateStaffCache } from '../lib/staff-cache.js'
+import { DATE_RE, validateShiftBody } from './staff-logic.js'
 
 const router = Router()
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -335,51 +333,6 @@ router.get(
     res.json({ data: data ?? [] })
   }
 )
-
-function validateShiftBody(
-  b: Record<string, unknown>,
-  partial: boolean
-):
-  | { ok: true; date?: string; start_time?: string; end_time?: string; notes?: string | null }
-  | { ok: false; error: string } {
-  const date = typeof b['date'] === 'string' ? b['date'] : null
-  const startTime = typeof b['start_time'] === 'string' ? b['start_time'] : null
-  const endTime = typeof b['end_time'] === 'string' ? b['end_time'] : null
-
-  if (!partial) {
-    if (!date || !DATE_RE.test(date)) return { ok: false, error: 'date must be YYYY-MM-DD' }
-    if (!startTime || !TIME_RE.test(startTime))
-      return { ok: false, error: 'start_time must be HH:MM' }
-    if (!endTime || !TIME_RE.test(endTime)) return { ok: false, error: 'end_time must be HH:MM' }
-  } else {
-    if (date !== null && !DATE_RE.test(date)) return { ok: false, error: 'date must be YYYY-MM-DD' }
-    if (startTime !== null && !TIME_RE.test(startTime))
-      return { ok: false, error: 'start_time must be HH:MM' }
-    if (endTime !== null && !TIME_RE.test(endTime))
-      return { ok: false, error: 'end_time must be HH:MM' }
-  }
-
-  if (startTime && endTime && !(endTime > startTime)) {
-    return { ok: false, error: 'end_time must be after start_time' }
-  }
-
-  const notes = typeof b['notes'] === 'string' ? b['notes'] : b['notes'] === null ? null : undefined
-
-  const result: {
-    ok: true
-    date?: string
-    start_time?: string
-    end_time?: string
-    notes?: string | null
-  } = {
-    ok: true,
-  }
-  if (date) result.date = date
-  if (startTime) result.start_time = startTime
-  if (endTime) result.end_time = endTime
-  if (notes !== undefined) result.notes = notes
-  return result
-}
 
 // ── POST /api/staff/:id/shifts ───────────────────────────────────────────────
 router.post(

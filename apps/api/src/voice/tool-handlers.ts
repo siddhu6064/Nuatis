@@ -1,6 +1,7 @@
 import { Type, type FunctionDeclaration } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 import { VERTICALS, dateAtHour, formatHHMM } from '@nuatis/shared'
+import { normalizePhone } from '../lib/phone.js'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from '../lib/calendar-provider.js'
 import {
@@ -281,11 +282,6 @@ function timeWithinAnyShift(
 }
 
 /** Strip everything except digits and leading +, e.g. "+1 (763) 340-6385" → "+17633406385" */
-export function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[^\d+]/g, '')
-  return digits.startsWith('+') ? digits : `+${digits}`
-}
-
 const DEFAULT_HOURS = { mon_fri: '9am-5pm', sat: 'closed', sun: 'closed' }
 const DEFAULT_TZ = 'America/Chicago'
 

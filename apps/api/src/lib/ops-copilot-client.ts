@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto'
+import type { OpsActivityEvent } from './ops-copilot-types.js'
+
+export type { OpsActivityEvent } from './ops-copilot-types.js'
 
 /**
  * Lazy retry enqueue — uses dynamic import to avoid circular deps and to
@@ -12,19 +15,6 @@ async function enqueueRetryIfAvailable(payload: OpsActivityEvent): Promise<void>
   } catch {
     // Redis not available or worker not initialized — silently skip
   }
-}
-
-export interface OpsActivityEvent {
-  tenant_id: string
-  event_id: string
-  event_type:
-    | 'booking.failed'
-    | 'call.failed'
-    | 'call.completed'
-    | 'lead.stalled'
-    | 'appointment.no_show'
-    | 'follow_up.missed'
-  payload_json: Record<string, unknown>
 }
 
 /**

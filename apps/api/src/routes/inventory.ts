@@ -4,11 +4,9 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
+import { VALID_UNITS, type Unit } from './inventory-logic.js'
 
 const router = Router()
-
-const VALID_UNITS = ['each', 'box', 'kg', 'L', 'bag', 'roll', 'other'] as const
-type Unit = (typeof VALID_UNITS)[number]
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

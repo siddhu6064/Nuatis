@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { normalizePhone } from './tool-handlers.js'
+import { normalizePhone } from '../lib/phone.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'

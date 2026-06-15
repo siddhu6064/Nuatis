@@ -1,7 +1,7 @@
 import { Queue, Worker } from 'bullmq'
 import { randomUUID } from 'crypto'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
-import type { OpsActivityEvent } from '../lib/ops-copilot-client.js'
+import type { OpsActivityEvent } from '../lib/ops-copilot-types.js'
 
 const QUEUE_NAME = 'ops-copilot-retry'
 
