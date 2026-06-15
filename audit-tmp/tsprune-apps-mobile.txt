@@ -1,0 +1,15 @@
+apps/mobile/lib/api.ts:51 - apiDelete
+apps/mobile/lib/api.ts:53 - API_URL (used in module)
+apps/mobile/app/_layout.tsx:35 - default
+apps/mobile/app/(auth)/_layout.tsx:3 - default
+apps/mobile/app/(auth)/login.tsx:15 - default
+apps/mobile/app/(tabs)/_layout.tsx:6 - default
+apps/mobile/app/(tabs)/appointments.tsx:75 - default
+apps/mobile/app/(tabs)/contacts.tsx:27 - default
+apps/mobile/app/(tabs)/index.tsx:32 - default
+apps/mobile/app/(tabs)/inventory.tsx:38 - default
+apps/mobile/app/(tabs)/notifications.tsx:23 - default
+apps/mobile/app/(tabs)/pipeline.tsx:46 - default
+apps/mobile/app/(tabs)/staff.tsx:88 - default
+apps/mobile/app/(tabs)/appointments/[id].tsx:75 - default
+apps/mobile/app/(tabs)/contacts/[id].tsx:38 - default

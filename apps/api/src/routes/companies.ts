@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -44,7 +45,7 @@ router.get(
 
     if (!archived) query = query.eq('is_archived', false)
 
-    const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : null
+    const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : null
     if (q) {
       query = query.or(`name.ilike.%${q}%,domain.ilike.%${q}%`)
     }

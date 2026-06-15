@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import { randomUUID } from 'node:crypto'
 import {
   createStore,
@@ -7,6 +7,7 @@ import {
   type MockStore,
   type Row,
 } from './__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from './__test-support__/tenant-fixture.js'
 
 let store: MockStore = createStore()
 
@@ -22,12 +23,10 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 const [{ default: express }, { default: request }, { default: insightsRouter }] = await Promise.all(
@@ -86,6 +85,7 @@ function seedPipeline(opts: {
 
 beforeEach(() => {
   store = createStore()
+  seedEntitledTenant(store, TENANT_ID)
   store.tables['pipelines'] = []
   store.tables['pipeline_stages'] = []
   store.tables['deals'] = []

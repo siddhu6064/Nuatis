@@ -22,36 +22,121 @@ beforeEach(() => {
   store.tables['tenants'] = []
 })
 
-describe('isModuleEnabled', () => {
-  it('returns true when module key is true in modules jsonb', async () => {
-    store.tables['tenants']!.push({ id: TENANT_ID, modules: { crm: true } })
+describe('isModuleEnabled — explicit overrides', () => {
+  it('returns false when the module key is explicitly false (even if the tier grants it)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { cpq: false },
+      subscription_plan: 'scale',
+      product: 'suite',
+    })
 
-    const result = await isModuleEnabled(TENANT_ID, 'crm')
-
-    expect(result).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'cpq')).toBe(false)
   })
 
-  it('returns false when module key is false', async () => {
-    store.tables['tenants']!.push({ id: TENANT_ID, modules: { cpq: false } })
+  it('honors an explicit true comp on a lower tier (cpq:true on core)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { cpq: true },
+      subscription_plan: 'core',
+      product: 'suite',
+    })
 
-    const result = await isModuleEnabled(TENANT_ID, 'cpq')
+    expect(await isModuleEnabled(TENANT_ID, 'cpq')).toBe(true)
+  })
+})
 
-    expect(result).toBe(false)
+describe('isModuleEnabled — base suite modules (derived)', () => {
+  it('allows an absent base module on a suite tenant (appointments)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'core',
+      product: 'suite',
+    })
+
+    expect(await isModuleEnabled(TENANT_ID, 'appointments')).toBe(true)
   })
 
-  it('returns true (fail-open) when modules jsonb is null', async () => {
-    store.tables['tenants']!.push({ id: TENANT_ID, modules: null })
+  it('allows absent companies and deals on a suite tenant', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'core',
+      product: 'suite',
+    })
 
-    const result = await isModuleEnabled(TENANT_ID, 'crm')
+    expect(await isModuleEnabled(TENANT_ID, 'companies')).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'deals')).toBe(true)
+  })
+})
 
-    expect(result).toBe(true)
+describe('isModuleEnabled — tier-gated modules (derived)', () => {
+  it('blocks absent tier-gated modules on core (campaigns, cpq)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'core',
+      product: 'suite',
+    })
+
+    expect(await isModuleEnabled(TENANT_ID, 'campaigns')).toBe(false)
+    expect(await isModuleEnabled(TENANT_ID, 'cpq')).toBe(false)
   })
 
-  it('returns true when module key is absent from jsonb (undefined → fail-open)', async () => {
-    store.tables['tenants']!.push({ id: TENANT_ID, modules: { maya: true } })
+  it('allows absent tier-gated modules on scale (campaigns, cpq)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'scale',
+      product: 'suite',
+    })
 
-    const result = await isModuleEnabled(TENANT_ID, 'crm')
+    expect(await isModuleEnabled(TENANT_ID, 'campaigns')).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'cpq')).toBe(true)
+  })
 
-    expect(result).toBe(true)
+  it('fails closed for a tier-gated module on an unknown plan', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'mystery',
+      product: 'suite',
+    })
+
+    expect(await isModuleEnabled(TENANT_ID, 'campaigns')).toBe(false)
+  })
+})
+
+describe('isModuleEnabled — product / unprovisioned', () => {
+  it('product maya_only → only maya is enabled', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: { maya: true },
+      subscription_plan: 'core',
+      product: 'maya_only',
+    })
+
+    expect(await isModuleEnabled(TENANT_ID, 'maya')).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'crm')).toBe(false)
+    expect(await isModuleEnabled(TENANT_ID, 'appointments')).toBe(false)
+  })
+
+  it('modules entirely null → only maya is enabled (fail closed)', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      modules: null,
+      subscription_plan: 'core',
+      product: 'suite',
+    })
+
+    expect(await isModuleEnabled(TENANT_ID, 'maya')).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'crm')).toBe(false)
+  })
+
+  it('missing tenant row (query error) → only maya is enabled', async () => {
+    // no rows pushed → single() returns data:null
+    expect(await isModuleEnabled(TENANT_ID, 'maya')).toBe(true)
+    expect(await isModuleEnabled(TENANT_ID, 'crm')).toBe(false)
   })
 })

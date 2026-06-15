@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import {
   createStore,
   createMockSupabase,
@@ -21,12 +21,10 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 // Dynamic imports — must happen AFTER jest.unstable_mockModule above.
@@ -124,12 +122,10 @@ describe('GET /api/inventory — vertical filtering', () => {
   })
 
   it('returns all items when tenant has no vertical set', async () => {
-    const secretBytes = new TextEncoder().encode(SECRET)
-    const noVerticalToken = await new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner' })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .sign(secretBytes)
+    const noVerticalToken = await mintTestToken(
+      { sub: USER_ID, tenantId: TENANT_ID, role: 'owner' },
+      { secret: SECRET }
+    )
     // tenant row has no vertical — beforeEach seeds it without one
 
     store.tables['inventory_items'] = [

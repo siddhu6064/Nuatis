@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import {
   createStore,
   createMockSupabase,
@@ -22,13 +22,16 @@ process.env['AUTH_SECRET'] = SECRET
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
+// Inbound webhook is gated on a shared secret (fail-closed); see
+// __tests__/email-inbound.test.ts for the rejection cases.
+const INBOUND_SECRET = 'test-inbound-secret'
+process.env['INBOUND_WEBHOOK_SECRET'] = INBOUND_SECRET
+
 async function makeToken(): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 const [
@@ -104,7 +107,7 @@ describe('POST /api/webhooks/email-inbound', () => {
     })
 
     const res = await request(makeApp())
-      .post('/api/webhooks/email-inbound')
+      .post(`/api/webhooks/email-inbound?secret=${INBOUND_SECRET}`)
       .send({
         from: 'sender@example.com',
         to: ['log-abc@mail.nuatis.com'],
@@ -127,7 +130,7 @@ describe('POST /api/webhooks/email-inbound', () => {
     })
 
     const res = await request(makeApp())
-      .post('/api/webhooks/email-inbound')
+      .post(`/api/webhooks/email-inbound?secret=${INBOUND_SECRET}`)
       .send({
         from: 'stranger@elsewhere.com',
         to: ['log-no-contact@mail.nuatis.com'],
@@ -143,7 +146,7 @@ describe('POST /api/webhooks/email-inbound', () => {
 
   it('returns 200 even when no tenant matches the to address (graceful miss)', async () => {
     const res = await request(makeApp())
-      .post('/api/webhooks/email-inbound')
+      .post(`/api/webhooks/email-inbound?secret=${INBOUND_SECRET}`)
       .send({
         from: 'anyone@example.com',
         to: ['unknown@mail.nuatis.com'],

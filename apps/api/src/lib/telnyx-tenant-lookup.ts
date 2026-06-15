@@ -99,3 +99,53 @@ export async function getTenantByPhoneNumber(
     return null
   }
 }
+
+/**
+ * Returns the primary active outbound phone number for a tenant,
+ * or null if none found. Wraps query in a 2s timeout per codebase convention.
+ * Source of truth for all outbound SMS/voice from-number lookups.
+ */
+export async function getTenantPhoneNumber(tenantId: string): Promise<string | null> {
+  try {
+    const supabase = getSupabase()
+    let timedOut = false
+    const timeout = new Promise<null>((resolve) =>
+      setTimeout(() => {
+        timedOut = true
+        resolve(null)
+      }, 2000)
+    )
+
+    const query = (async (): Promise<string | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('telnyx_numbers')
+          .select('phone_number')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'active')
+          .order('is_primary', { ascending: false })
+          .limit(1)
+          .maybeSingle<{ phone_number: string | null }>()
+
+        if (timedOut) return null
+        if (error) {
+          console.warn(
+            '[getTenantPhoneNumber] lookup failed for tenant %s: %s',
+            tenantId,
+            error.message
+          )
+          return null
+        }
+        return data?.phone_number ?? null
+      } catch (err) {
+        console.warn('[getTenantPhoneNumber] lookup failed for tenant %s: %s', tenantId, err)
+        return null
+      }
+    })()
+
+    return await Promise.race([query, timeout])
+  } catch (err) {
+    console.warn('[getTenantPhoneNumber] lookup failed for tenant %s: %s', tenantId, err)
+    return null
+  }
+}

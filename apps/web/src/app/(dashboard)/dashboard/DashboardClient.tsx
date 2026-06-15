@@ -74,7 +74,7 @@ const ACTIONS = [
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface StatItem {
+interface StatItem {
   label: string
   value: string
   icon: string

@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import { randomUUID } from 'node:crypto'
 import {
   createStore,
@@ -24,12 +24,10 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 const [{ default: express }, { default: request }, { default: dealsRouter }] = await Promise.all([
@@ -132,5 +130,74 @@ describe('PUT /api/deals/:id', () => {
       (c) => (c[0] as { type?: string }).type === 'stage_change'
     )
     expect(stageChangeCall).toBeDefined()
+  })
+})
+
+// ── ENUM-1: pipeline_stages tenant scope on ?pipeline_id= ─────────────────────
+describe('ENUM-1 — pipeline_id filter is tenant-scoped', () => {
+  const B_TENANT = 'bbbbbbbb-0000-0000-0000-0000000dl00b1'
+  const A_PIPELINE = 'pipe-a-dl'
+  const B_PIPELINE = 'pipe-b-dl'
+  const A_STAGE = 'stage-a-dl'
+  const A_STAGE2 = 'stage-a2-dl'
+  const B_STAGE = 'stage-b-dl'
+
+  function seedADeal(id: string, stageId: string): void {
+    ;(store.tables['deals'] as Row[]).push({
+      id,
+      tenant_id: TENANT_ID,
+      title: id,
+      pipeline_stage_id: stageId,
+      is_archived: false,
+      is_closed_won: false,
+      is_closed_lost: false,
+      contact_id: null,
+      company_id: null,
+    })
+  }
+
+  it("a foreign tenant's pipeline_id resolves to zero stages and does NOT filter A's deals", async () => {
+    seedDealsEnabled()
+    ;(store.tables['pipeline_stages'] as Row[]).push(
+      { id: A_STAGE, tenant_id: TENANT_ID, pipeline_id: A_PIPELINE, name: 'AWon', color: '#1' },
+      { id: B_STAGE, tenant_id: B_TENANT, pipeline_id: B_PIPELINE, name: 'BWon', color: '#2' }
+    )
+    seedADeal('d1', A_STAGE)
+    seedADeal('d2', A_STAGE)
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get(`/api/deals?pipeline_id=${B_PIPELINE}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    // B's pipeline yields no stages for A → no pipeline_stage_id filter → both returned.
+    expect((res.body.deals as Array<unknown>).length).toBe(2)
+  })
+
+  it("POSITIVE CONTROL: A's own pipeline_id filters A's deals by its stages", async () => {
+    seedDealsEnabled()
+    ;(store.tables['pipeline_stages'] as Row[]).push(
+      { id: A_STAGE, tenant_id: TENANT_ID, pipeline_id: A_PIPELINE, name: 'AWon', color: '#1' },
+      {
+        id: A_STAGE2,
+        tenant_id: TENANT_ID,
+        pipeline_id: 'pipe-a-other',
+        name: 'AOther',
+        color: '#3',
+      }
+    )
+    seedADeal('d1', A_STAGE)
+    seedADeal('d2', A_STAGE)
+    seedADeal('d3', A_STAGE2)
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get(`/api/deals?pipeline_id=${A_PIPELINE}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const idsOut = (res.body.deals as Array<{ id: string }>).map((d) => d.id).sort()
+    expect(idsOut).toEqual(['d1', 'd2'])
   })
 })

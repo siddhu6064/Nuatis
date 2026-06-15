@@ -48,6 +48,5 @@ export const apiPost = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: 'POST', body: JSON.stringify(body) })
 export const apiPut = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(body) })
-export const apiDelete = (path: string) => apiFetch<void>(path, { method: 'DELETE' })
 
 export { API_URL }

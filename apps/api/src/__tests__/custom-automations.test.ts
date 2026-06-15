@@ -5,6 +5,7 @@ import {
   type MockStore,
   type Row,
 } from '../routes/__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from '../routes/__test-support__/tenant-fixture.js'
 
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
@@ -57,6 +58,7 @@ function makeApp() {
 
 beforeEach(() => {
   store = createStore()
+  seedEntitledTenant(store, 'tenant-1')
   store.tables['custom_automations'] = []
 })
 

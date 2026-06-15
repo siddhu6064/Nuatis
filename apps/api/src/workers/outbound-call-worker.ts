@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { isScannerPaused } from '../lib/scanner-pause.js'
 import { initiateOutboundCall } from '../lib/outbound-caller.js'
 
@@ -134,28 +135,17 @@ export async function processOutboundCall(data: OutboundCallJobData): Promise<vo
   }
 
   // Step 6: Fetch fromNumber (tenant's primary telnyx_number)
-  const { data: telnyxNum, error: telnyxNumErr } = await supabase
-    .from('telnyx_numbers')
-    .select('phone_number')
-    .eq('tenant_id', tenantId)
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const fromNumber = await getTenantPhoneNumber(tenantId)
 
-  const fromNumber = (telnyxNum as { phone_number: string | null } | null)?.phone_number ?? null
-
-  if (telnyxNumErr || !fromNumber) {
+  if (!fromNumber) {
     await supabase
       .from('outbound_call_jobs')
       .update({
         status: 'failed',
-        error_message: telnyxNumErr?.message ?? 'No Telnyx number configured',
+        error_message: 'No Telnyx number configured',
       })
       .eq('id', jobId)
-    console.warn(
-      `[outbound-call] no telnyx_number for tenant=${tenantId} — job ${jobId} failed errMsg=${telnyxNumErr?.message ?? 'no row'}`
-    )
+    console.warn(`[outbound-call] no telnyx_number for tenant=${tenantId} — job ${jobId} failed`)
     return
   }
 

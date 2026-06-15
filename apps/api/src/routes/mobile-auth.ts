@@ -71,6 +71,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
+      .setIssuer('nuatis-mobile')
+      .setAudience('nuatis-api')
       .setExpirationTime('30d')
       .sign(secretKey)
 

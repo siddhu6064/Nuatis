@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
 
@@ -15,7 +16,7 @@ function getSupabase() {
 // ── GET /api/search?q=<query> ────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : ''
+  const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   if (q.length < 2) {
     res.status(400).json({ error: 'q must be at least 2 characters' })

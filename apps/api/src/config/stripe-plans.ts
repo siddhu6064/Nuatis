@@ -99,3 +99,41 @@ export function modulesForPlan(plan: PlanKey): Record<string, boolean> {
   for (const m of PLANS[plan].modules) out[m] = true
   return out
 }
+
+/**
+ * Canonical entitlement model used by the API gates (isModuleEnabled +
+ * requirePlan). Derives access from plan/product instead of relying on
+ * explicitly-stored flags, so an absent key fails CLOSED for tier-gated
+ * modules rather than open.
+ */
+// Suite base features — available to any provisioned (non-maya_only) tenant.
+export const BASE_SUITE = new Set([
+  'maya',
+  'crm',
+  'scheduling',
+  'appointments',
+  'pipeline',
+  'companies',
+  'deals',
+])
+
+// Tier-gated features — only available when the tenant's plan includes them.
+export const TIER_GATED = new Set(['automation', 'insights', 'campaigns', 'cpq'])
+
+/**
+ * Default entitlement for a module given the tenant's plan + product, used
+ * when no explicit boolean override is stored on tenants.modules.
+ */
+export function defaultEntitlement(
+  module: string,
+  plan: string | null,
+  product: string | null
+): boolean {
+  if (product === 'maya_only') return module === 'maya' // maya_only = maya only
+  if (BASE_SUITE.has(module)) return true // suite base features
+  if (TIER_GATED.has(module)) {
+    const p = plan && PLANS[plan as PlanKey]
+    return p ? (p.modules as readonly string[]).includes(module) : false // unknown plan → fail closed
+  }
+  return false // unknown module → fail closed
+}

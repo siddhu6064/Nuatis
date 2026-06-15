@@ -793,7 +793,7 @@ export default function ReportsPage() {
 
               {/* Step indicators */}
               <div className="flex items-center gap-1">
-                {STEP_LABELS.map((label, i) => {
+                {STEP_LABELS.map((_label, i) => {
                   const step = i + 1
                   const active = wizardStep === step
                   const done = wizardStep > step

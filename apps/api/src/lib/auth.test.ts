@@ -2,6 +2,7 @@ import { describe, it, expect, jest } from '@jest/globals'
 import { config } from 'dotenv'
 import { resolve } from 'path'
 import { SignJWT } from 'jose'
+import { mintTestToken } from '../routes/__test-support__/jwt.js'
 import type { AuthenticatedRequest } from './auth.js'
 
 config({ path: resolve(process.cwd(), '.env') })
@@ -51,12 +52,7 @@ async function makeToken(
   payload: Record<string, unknown>,
   expiresIn: string = '1h'
 ): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(expiresIn)
-    .sign(secretBytes)
+  return mintTestToken(payload, { secret: SECRET, expiresIn })
 }
 
 const TENANT_A = 'aaaaaaaa-0000-0000-0000-000000000001'
@@ -133,6 +129,52 @@ describe('Auth middleware — Auth.js path', () => {
     const res = await request(testApp).get('/protected').set('Authorization', 'Bearer not.a.jwt')
 
     expect(res.status).toBe(401)
+  })
+})
+
+describe('Auth middleware — iss/aud binding', () => {
+  const BASE = { sub: 'user-001', tenantId: TENANT_A, role: 'owner', vertical: 'dental' }
+
+  it('accepts a web token (iss nuatis-web, aud nuatis-api)', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, issuer: 'nuatis-web' })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.tenantId).toBe(TENANT_A)
+  })
+
+  it('accepts a mobile token (iss nuatis-mobile, aud nuatis-api)', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, issuer: 'nuatis-mobile' })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.tenantId).toBe(TENANT_A)
+  })
+
+  it('rejects a token missing iss', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, issuer: null })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe('Invalid token')
+  })
+
+  it('rejects a token missing aud', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, audience: null })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe('Invalid token')
+  })
+
+  it('rejects a token with an unknown iss', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, issuer: 'evil' })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe('Invalid token')
+  })
+
+  it('rejects a token with the wrong aud', async () => {
+    const token = await mintTestToken(BASE, { secret: SECRET, audience: 'some-other-api' })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe('Invalid token')
   })
 })
 

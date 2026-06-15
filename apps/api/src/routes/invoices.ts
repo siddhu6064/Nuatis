@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express'
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
@@ -375,6 +376,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       contact_id: (b['contact_id'] as string) || null,
       deal_id: (b['deal_id'] as string) || null,
       invoice_number: invoiceNumber,
+      share_token: randomUUID(),
       status: 'draft',
       issue_date: (b['issue_date'] as string) || new Date().toISOString().split('T')[0],
       due_date: (b['due_date'] as string) || null,
@@ -532,7 +534,7 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
   // Send email if contact has email
   if (contact?.email) {
     const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
-    const publicUrl = `${webUrl}/invoices/public/${invoice.id}`
+    const publicUrl = `${webUrl}/invoices/public/${invoice.share_token}`
     const dueDate = invoice.due_date
       ? new Date(invoice.due_date as string).toLocaleDateString('en-US', {
           month: 'long',
@@ -765,11 +767,13 @@ export async function processVoidInvoice(
   return { status: 200, data: { voided_at: voidedAt } }
 }
 
-// ── PUBLIC: GET /api/invoices/public/:id ─────────────────────────────────────
-// NOTE: This route is mounted separately as invoicesPublicRouter in index.ts
+// ── PUBLIC: GET /api/invoices/public/:token ──────────────────────────────────
+// NOTE: This route is mounted separately as invoicesPublicRouter in index.ts.
+// Keyed on the unguessable share_token (NOT the raw PK) so a leaked URL is not a
+// forever-valid credential. The raw id no longer resolves on this public route.
 export const publicRouter = Router()
 
-publicRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
+publicRouter.get('/:token', async (req: Request, res: Response): Promise<void> => {
   const supabase = getSupabase()
 
   const { data: invoice, error } = await supabase
@@ -777,7 +781,7 @@ publicRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
     .select(
       'id, invoice_number, status, issue_date, due_date, subtotal, tax_rate, tax_amount, total, amount_paid, notes, contact_id, tenant_id'
     )
-    .eq('id', req.params['id'])
+    .eq('share_token', req.params['token'])
     .single()
 
   if (error || !invoice) {

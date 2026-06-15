@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { API_BASE_URL } from '../config/urls.js'
 import { isScannerPaused } from '../lib/scanner-pause.js'
 
@@ -62,21 +63,14 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
   }
 
   // Look up tenant's Telnyx number
-  const { data: telnyxNum } = await supabase
-    .from('telnyx_numbers')
-    .select('phone_number')
-    .eq('tenant_id', tenantId)
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const fromNumber = await getTenantPhoneNumber(tenantId)
 
   const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
 
   const businessName = tenant?.name ?? ''
   const apiKey = process.env['TELNYX_API_KEY']
 
-  if (!telnyxNum?.phone_number || !apiKey) {
+  if (!fromNumber || !apiKey) {
     console.warn(`[quote-followup] no Telnyx number or API key for tenant=${tenantId}`)
     return
   }
@@ -87,7 +81,7 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: telnyxNum.phone_number,
+      from: fromNumber,
       to: contactPhone,
       text: `Hi ${contactName}, just following up — your quote ${quoteNumber} from ${businessName} is ready for review: ${shareUrl}`,
     }),

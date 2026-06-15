@@ -1,0 +1,8 @@
+- Finding files
+Processed 365 files (6s) 
+
+✖ Found 2 circular dependencies!
+
+1) lib/ops-copilot-client.ts > workers/webhook-retry-worker.ts
+2) voice/tool-handlers.ts > voice/post-call.ts
+

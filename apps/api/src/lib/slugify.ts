@@ -8,16 +8,19 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-export async function generateTriggerSlug(): Promise<string> {
+// Public trigger-link token: full-alphabet nanoid(16). Never lowercased —
+// case-folding nanoid's 64-char alphabet would halve the per-char entropy
+// and make tokens enumerable.
+export async function generateTriggerToken(): Promise<string> {
   const supabase = getSupabase()
   for (let i = 0; i < 3; i++) {
-    const slug = nanoid(8).toLowerCase()
+    const token = nanoid(16)
     const { data } = await supabase
       .from('trigger_links')
       .select('id')
-      .eq('slug', slug)
+      .eq('slug', token)
       .maybeSingle()
-    if (!data) return slug
+    if (!data) return token
   }
-  throw new Error('Failed to generate unique slug after 3 attempts')
+  throw new Error('Failed to generate unique token after 3 attempts')
 }

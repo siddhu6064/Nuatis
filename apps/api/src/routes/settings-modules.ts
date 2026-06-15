@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
-import { PLANS, PLAN_KEYS, type PlanKey } from '../config/stripe-plans.js'
+import { PLANS, PLAN_KEYS, BASE_SUITE, type PlanKey } from '../config/stripe-plans.js'
 
 const router = Router()
 
@@ -67,47 +67,60 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  // Fetch current tenant row — includes plan fields needed for the gate below.
-  const { data: current } = await supabase
+  // Fetch current tenant row — includes the plan field needed for the gate below.
+  const { data: current, error: currentError } = await supabase
     .from('tenants')
-    .select('modules, subscription_plan, subscription_status')
+    .select('modules, subscription_plan')
     .eq('id', authed.tenantId)
     .single()
 
   // ── Plan gate ─────────────────────────────────────────────────────────────
   // Only runs when *enabling* a module — disabling is always permitted so
   // owners can freely turn off features they no longer need.
-  // Fails open on DB/lookup errors to avoid blocking legacy/custom tenants.
+  //
+  // Fails CLOSED on every uncertain path: trial tenants are gated by their
+  // plan like paying tenants; a null/unknown plan permits only BASE_SUITE
+  // modules; lookup errors deny rather than allow. Comp overrides are
+  // unaffected — admin/service-role writes bypass this endpoint entirely and
+  // already-stored explicit `true` values are never touched here.
   if (enabled === true) {
+    if (currentError || !current) {
+      console.error(
+        '[settings-modules] tenant lookup failed — failing closed:',
+        currentError?.message ?? 'tenant not found'
+      )
+      res.status(503).json({ error: 'Cannot verify entitlement. Try again shortly.' })
+      return
+    }
+
     try {
-      const subscriptionPlan = current?.subscription_plan as string | null | undefined
-      const subscriptionStatus = current?.subscription_status as string | null | undefined
+      const subscriptionPlan = (current.subscription_plan as string | null | undefined) ?? null
+      const plan = subscriptionPlan ? (PLANS[subscriptionPlan as PlanKey] ?? null) : null
 
-      // Null/unknown plan → legacy or custom tenant: allow through.
-      if (subscriptionPlan) {
-        // Trial tenants get unrestricted access to every module.
-        if (subscriptionStatus !== 'trialing') {
-          const plan = PLANS[subscriptionPlan as PlanKey] ?? null
-          if (plan && !(plan.modules as ReadonlyArray<string>).includes(moduleName)) {
-            // Identify the lowest tier that includes the requested module.
-            const requiredPlan =
-              PLAN_KEYS.find((k) =>
-                (PLANS[k].modules as ReadonlyArray<string>).includes(moduleName)
-              ) ?? null
+      // Known plan → its module list decides. Null/unknown plan → base suite only.
+      const allowed = plan
+        ? (plan.modules as ReadonlyArray<string>).includes(moduleName)
+        : BASE_SUITE.has(moduleName)
 
-            res.status(402).json({
-              error: 'Plan upgrade required to enable this module',
-              module: moduleName,
-              current_plan: subscriptionPlan,
-              required_plan: requiredPlan,
-              upgrade_url: '/pricing',
-            })
-            return
-          }
-        }
+      if (!allowed) {
+        // Identify the lowest tier that includes the requested module.
+        const requiredPlan =
+          PLAN_KEYS.find((k) => (PLANS[k].modules as ReadonlyArray<string>).includes(moduleName)) ??
+          null
+
+        res.status(402).json({
+          error: 'Plan upgrade required to enable this module',
+          module: moduleName,
+          current_plan: subscriptionPlan,
+          required_plan: requiredPlan,
+          upgrade_url: '/pricing',
+        })
+        return
       }
     } catch (error) {
-      console.warn('Plan check failed, allowing module update:', error)
+      console.error('[settings-modules] plan check failed — failing closed:', error)
+      res.status(503).json({ error: 'Cannot verify entitlement. Try again shortly.' })
+      return
     }
   }
 

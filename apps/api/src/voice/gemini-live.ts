@@ -284,8 +284,6 @@ export async function createGeminiLiveSession(
   // Farewell / silence-fallback state
   let turnTextAccum = ''
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let lastAudioTime = Date.now()
   let firstInboundLogged = false
   let hungUp = false
   let greetingDone = false
@@ -487,10 +485,9 @@ export async function createGeminiLiveSession(
   return {
     send(audioChunk: Buffer): void {
       if (hungUp) return
-      lastAudioTime = Date.now()
       if (!firstInboundLogged) {
         firstInboundLogged = true
-        console.info('[gemini-live] first inbound audio — lastAudioTime reset')
+        console.info('[gemini-live] first inbound audio')
       }
       if (greetingDone && silenceTimer) {
         clearTimeout(silenceTimer)

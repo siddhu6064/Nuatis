@@ -29,6 +29,8 @@ export async function proxy(request: NextRequest) {
         })
           .setProtectedHeader({ alg: 'HS256' })
           .setIssuedAt()
+          .setIssuer('nuatis-web')
+          .setAudience('nuatis-api')
           .setExpirationTime('60s')
           .sign(secretBytes)
 

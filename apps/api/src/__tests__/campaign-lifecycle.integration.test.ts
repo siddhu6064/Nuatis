@@ -4,6 +4,7 @@ import {
   createMockSupabase,
   type MockStore,
 } from '../routes/__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from '../routes/__test-support__/tenant-fixture.js'
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
@@ -112,9 +113,7 @@ beforeAll(() => {
   store.tables['smart_lists'] = [
     { id: 'sl-1', tenant_id: 'tenant-1', name: 'Test Segment', filters: {} },
   ]
-  store.tables['tenants'] = [
-    { id: 'tenant-1', name: 'Test Biz', brand_voice: null, modules: {}, vertical: null },
-  ]
+  seedEntitledTenant(store, 'tenant-1')
 
   jest.spyOn(console, 'info').mockImplementation(() => {})
   jest.spyOn(console, 'warn').mockImplementation(() => {})

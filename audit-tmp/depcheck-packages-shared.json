@@ -1,0 +1,25 @@
+{
+  "dependencies": [],
+  "devDependencies": [],
+  "missing": {
+    "@supabase/supabase-js": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/supabase/seeds/service_packages_seed.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/src/seed/inventory.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/src/seed/staff.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/dist/seed/inventory.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/dist/seed/staff.js"
+    ]
+  },
+  "using": {
+    "typescript": ["/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/package.json"],
+    "@supabase/supabase-js": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/supabase/seeds/service_packages_seed.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/src/seed/inventory.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/src/seed/staff.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/dist/seed/inventory.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/packages/shared/dist/seed/staff.js"
+    ]
+  },
+  "invalidFiles": {},
+  "invalidDirs": {}
+}

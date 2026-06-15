@@ -7,6 +7,7 @@ import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logBulkAction } from '../middleware/audit-logger.js'
+import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
 
@@ -58,7 +59,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
   // ── Text search (q or search) ──
   const rawQ = req.query['search'] ?? req.query['q']
-  const q = typeof rawQ === 'string' ? rawQ.trim() : null
+  const q = typeof rawQ === 'string' ? sanitizeSearchTerm(rawQ) : null
   if (q && q.length > 0) {
     const pattern = `%${q}%`
     query = query.or(`full_name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
@@ -80,6 +81,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       .from('pipeline_stages')
       .select('name')
       .eq('pipeline_id', pipelineId)
+      .eq('tenant_id', authed.tenantId)
     const stageNames = (stageData || []).map((s) => s.name)
     if (stageNames.length > 0) {
       query = query.in('pipeline_stage', stageNames)

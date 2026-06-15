@@ -11,7 +11,7 @@ function getSupabase() {
 }
 
 // GET /api/announcements — public, no auth
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+router.get('/', async (_req: Request, res: Response): Promise<void> => {
   const supabase = getSupabase()
   const now = new Date().toISOString()
   const { data, error } = await supabase

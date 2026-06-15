@@ -53,6 +53,7 @@ router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): 
       .from('pipeline_stages')
       .select('id')
       .eq('pipeline_id', pipelineId)
+      .eq('tenant_id', authed.tenantId)
     const pipelineStageIds = (stageData || []).map((s) => s.id)
     if (pipelineStageIds.length > 0) {
       query = query.in('pipeline_stage_id', pipelineStageIds)

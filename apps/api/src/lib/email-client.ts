@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
 import { shouldSuppressEmail } from './email-risk.js'
 
-export interface EmailAttachment {
+interface EmailAttachment {
   filename: string
   content: Buffer
 }

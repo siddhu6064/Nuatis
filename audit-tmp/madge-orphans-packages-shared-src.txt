@@ -1,0 +1,5 @@
+- Finding files
+Processed 7 files (1.5s) 
+
+index.ts
+

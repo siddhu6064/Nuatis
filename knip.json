@@ -1,0 +1,53 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [
+    "supabase/migrations/**",
+    "audit-tmp/**",
+    "**/dist/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**"
+  ],
+  "workspaces": {
+    "apps/api": {
+      "entry": ["src/index.ts", "src/workers/**/*.ts", "src/scripts/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "apps/web": {
+      "entry": [
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/app/**/route.ts",
+        "src/app/**/loading.tsx",
+        "src/app/**/error.tsx",
+        "src/app/**/not-found.tsx",
+        "src/app/**/template.tsx",
+        "src/app/**/default.tsx",
+        "src/proxy.ts",
+        "next.config.ts",
+        "src/middleware.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/shared": {
+      "entry": ["index.ts", "src/index.ts"],
+      "project": ["**/*.ts"]
+    },
+    "apps/mobile": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "App.{ts,tsx,js}",
+        "index.{ts,tsx,js}",
+        "babel.config.js",
+        "app.json",
+        "eas.json"
+      ],
+      "project": [
+        "app/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "hooks/**/*.{ts,tsx}"
+      ]
+    }
+  }
+}

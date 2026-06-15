@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { giftCardBalanceLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
@@ -113,28 +114,39 @@ router.post('/redeem', requireAuth, async (req: Request, res: Response): Promise
   res.json({ success: true, new_balance_cents })
 })
 
-// GET /api/gift-cards/:code/balance — PUBLIC
-router.get('/:code/balance', async (req: Request, res: Response): Promise<void> => {
-  const code = req.params['code']
-  if (!code) {
-    res.status(400).json({ error: 'code param required' })
-    return
+// GET /api/gift-cards/:code/balance — authed, tenant-scoped
+router.get(
+  '/:code/balance',
+  requireAuth,
+  giftCardBalanceLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const code = req.params['code']
+    if (!code) {
+      res.status(400).json({ error: 'code param required' })
+      return
+    }
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('gift_cards')
+      .select('balance_cents, status, expires_at')
+      .eq('code', code.toUpperCase())
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+    if (!data) {
+      res.status(404).json({ error: 'Gift card not found' })
+      return
+    }
+    res.json({
+      balance_cents: data.balance_cents,
+      status: data.status,
+      expires_at: data.expires_at,
+    })
   }
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('gift_cards')
-    .select('balance_cents, status, expires_at')
-    .eq('code', code.toUpperCase())
-    .maybeSingle()
-  if (error) {
-    res.status(500).json({ error: error.message })
-    return
-  }
-  if (!data) {
-    res.status(404).json({ error: 'Gift card not found' })
-    return
-  }
-  res.json({ balance_cents: data.balance_cents, status: data.status, expires_at: data.expires_at })
-})
+)
 
 export default router

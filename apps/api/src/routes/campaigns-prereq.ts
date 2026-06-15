@@ -11,7 +11,7 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-export interface PrereqCheck {
+interface PrereqCheck {
   key: string
   label: string
   status: 'pass' | 'fail' | 'warning'

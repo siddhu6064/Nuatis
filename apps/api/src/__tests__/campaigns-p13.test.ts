@@ -5,6 +5,7 @@ import {
   type MockStore,
   type Row,
 } from '../routes/__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from '../routes/__test-support__/tenant-fixture.js'
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
@@ -110,10 +111,8 @@ beforeEach(() => {
   store.tables['campaign_sends'] = []
   store.tables['contacts'] = []
   store.tables['smart_lists'] = []
-  // modules: {} means no module is explicitly disabled → requireModule passes
-  store.tables['tenants'] = [
-    { id: 'tenant-1', name: 'Test Biz', brand_voice: null, modules: {}, vertical: null },
-  ]
+  // Entitled suite/scale tenant; individual tests override modules to test denial.
+  seedEntitledTenant(store, 'tenant-1')
   mockQueueAdd.mockClear()
 })
 

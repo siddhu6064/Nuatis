@@ -38,7 +38,7 @@ function getTenant(tenants: TenantInfo | TenantInfo[] | null): TenantInfo | null
 
 const result = NextAuth({
   trustHost: true,
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: 60 * 60, updateAge: 5 * 60 },
   providers: [
     Credentials({
       name: 'credentials',
@@ -97,6 +97,16 @@ const result = NextAuth({
         // because authorize() already fetched it; storing it avoids a per-request
         // DB lookup in the API auth middleware.
         token.appUserId = u.appUserId as string
+        // 12h absolute session cap — stamped once at sign-in only, so refresh
+        // (every updateAge) does not reset it.
+        token.absoluteExpiry = Date.now() + 12 * 60 * 60 * 1000
+      }
+
+      // Enforce the 12h hard cap on every invocation (incl. refresh). Also
+      // rejects pre-existing tokens minted under the old 30-day default, which
+      // lack absoluteExpiry. Returning null invalidates the session (Auth.js v5).
+      if (!token.absoluteExpiry || Date.now() > (token.absoluteExpiry as number)) {
+        return null
       }
 
       // Re-read vertical + modules from DB on every token rotation so demo
@@ -133,6 +143,8 @@ const result = NextAuth({
           })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
+            .setIssuer('nuatis-web')
+            .setAudience('nuatis-api')
             .setExpirationTime('60s')
             .sign(secretBytes)
         }

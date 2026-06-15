@@ -16,6 +16,7 @@
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { sendSms } from '../lib/sms.js'
 import { sendEmail } from '../lib/email-client.js'
 import { shouldSuppressEmail } from '../lib/email-risk.js'
@@ -172,24 +173,17 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   // ── STEP 4: Resolve contacts ──────────────────────────────────────────────────
 
   // Fetch tenant name + primary Telnyx number (once, before loop)
-  const [{ data: tenantRow }, { data: telnyxNumRow }] = await Promise.all([
+  const [{ data: tenantRow }, tenantPhoneNumber] = await Promise.all([
     supabase
       .from('tenants')
       .select('name')
       .eq('id', tenantId)
       .maybeSingle<{ name: string | null }>(),
-    supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle<{ phone_number: string | null }>(),
+    getTenantPhoneNumber(tenantId),
   ])
 
   const businessName = tenantRow?.name ?? 'Us'
-  const smsFromNumber = telnyxNumRow?.phone_number ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
+  const smsFromNumber = tenantPhoneNumber ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
 
   // Query contacts — simple fallback: all active contacts for tenant.
   // Smart-list filter execution is deferred to a future iteration.

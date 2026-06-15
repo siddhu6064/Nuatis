@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express'
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { logActivity } from '../lib/activity.js'
 import { notifyOwner } from '../lib/notifications.js'
@@ -43,8 +44,8 @@ router.post('/init', sessionInitLimiter, async (req: Request, res: Response): Pr
 
   const { data: session, error: sessionError } = await supabase
     .from('chat_sessions')
-    .insert({ tenant_id: tenantId, status: 'active' })
-    .select('id')
+    .insert({ tenant_id: tenantId, status: 'active', share_token: randomUUID() })
+    .select('id, share_token')
     .single()
 
   if (sessionError || !session) {
@@ -53,7 +54,8 @@ router.post('/init', sessionInitLimiter, async (req: Request, res: Response): Pr
   }
 
   res.status(201).json({
-    sessionId: session.id,
+    // Public identifier is the unguessable share_token, never the raw PK.
+    sessionId: session.share_token,
     greeting:
       (tenant.chat_widget_greeting as string | null) ?? 'Hi there! How can we help you today?',
     businessName: tenant.business_name,
@@ -84,11 +86,11 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
 
   const supabase = getSupabase()
 
-  // Validate session
+  // Validate session — `sessionId` from the client is the public share_token.
   const { data: session, error: sessionError } = await supabase
     .from('chat_sessions')
     .select('id, tenant_id, status, contact_id')
-    .eq('id', sessionId)
+    .eq('share_token', sessionId)
     .maybeSingle()
 
   if (sessionError || !session) {
@@ -102,12 +104,14 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
   }
 
   const tenantId: string = session.tenant_id as string
+  // Internal DB primary key, resolved from the token — used for all writes/joins.
+  const sessionDbId: string = session.id as string
 
   // Insert message
   const { data: message, error: messageError } = await supabase
     .from('chat_messages')
     .insert({
-      session_id: sessionId,
+      session_id: sessionDbId,
       tenant_id: tenantId,
       sender_type: 'visitor',
       body: messageBody,
@@ -127,17 +131,17 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
       last_message_at: new Date().toISOString(),
       // unread_count handled below via RPC
     })
-    .eq('id', sessionId)
+    .eq('id', sessionDbId)
 
   // Increment unread_count separately
   try {
-    await supabase.rpc('increment_chat_unread', { p_session_id: sessionId })
+    await supabase.rpc('increment_chat_unread', { p_session_id: sessionDbId })
   } catch {
     // Fallback if RPC not available — best effort
     void supabase
       .from('chat_sessions')
       .update({ last_message_at: new Date().toISOString() })
-      .eq('id', sessionId)
+      .eq('id', sessionDbId)
   }
 
   // Handle visitor info / contact find-or-create
@@ -152,7 +156,7 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
     if (name) sessionUpdates['visitor_name'] = name
     if (email) sessionUpdates['visitor_email'] = email
     if (phone) sessionUpdates['visitor_phone'] = phone
-    await supabase.from('chat_sessions').update(sessionUpdates).eq('id', sessionId)
+    await supabase.from('chat_sessions').update(sessionUpdates).eq('id', sessionDbId)
 
     // Find or create contact (match email first, then phone)
     if (!contactId && (email || phone)) {
@@ -180,7 +184,7 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
 
       if (foundId) {
         contactId = foundId
-        await supabase.from('chat_sessions').update({ contact_id: contactId }).eq('id', sessionId)
+        await supabase.from('chat_sessions').update({ contact_id: contactId }).eq('id', sessionDbId)
       } else {
         // Create new contact
         const { data: newContact } = await supabase
@@ -197,7 +201,10 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
 
         if (newContact) {
           contactId = newContact.id as string
-          await supabase.from('chat_sessions').update({ contact_id: contactId }).eq('id', sessionId)
+          await supabase
+            .from('chat_sessions')
+            .update({ contact_id: contactId })
+            .eq('id', sessionDbId)
 
           // Auto-enrich new contact
           try {
@@ -240,7 +247,7 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
       contactId,
       type: 'system',
       body: `Chat message: ${messageBody.slice(0, 100)}`,
-      metadata: { session_id: sessionId, message_id: message.id },
+      metadata: { session_id: sessionDbId, message_id: message.id },
       actorType: 'system',
     })
   }
@@ -255,11 +262,11 @@ router.get('/messages/:sessionId', async (req: Request, res: Response): Promise<
 
   const supabase = getSupabase()
 
-  // Verify session exists
+  // Verify session exists — `sessionId` from the client is the public share_token.
   const { data: session } = await supabase
     .from('chat_sessions')
     .select('id')
-    .eq('id', sessionId)
+    .eq('share_token', sessionId)
     .maybeSingle()
 
   if (!session) {
@@ -270,7 +277,7 @@ router.get('/messages/:sessionId', async (req: Request, res: Response): Promise<
   let query = supabase
     .from('chat_messages')
     .select('id, session_id, sender_type, body, created_at')
-    .eq('session_id', sessionId)
+    .eq('session_id', session.id)
     .order('created_at', { ascending: true })
 
   if (after) {
@@ -298,10 +305,11 @@ router.post('/end', async (req: Request, res: Response): Promise<void> => {
 
   const supabase = getSupabase()
 
+  // `sessionId` from the client is the public share_token.
   const { data: session } = await supabase
     .from('chat_sessions')
     .select('id')
-    .eq('id', sessionId)
+    .eq('share_token', sessionId)
     .maybeSingle()
 
   if (!session) {
@@ -312,7 +320,7 @@ router.post('/end', async (req: Request, res: Response): Promise<void> => {
   const { error } = await supabase
     .from('chat_sessions')
     .update({ status: 'closed', ended_at: new Date().toISOString() })
-    .eq('id', sessionId)
+    .eq('id', session.id)
 
   if (error) {
     res.status(500).json({ error: error.message })

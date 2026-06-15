@@ -1,0 +1,248 @@
+apps/api/src/index.ts:639 - default
+packages/shared/dist/index.d.ts:4 - buildTriggerUrl
+packages/shared/dist/index.d.ts:1 - VerticalType
+packages/shared/dist/index.d.ts:2 - SubscriptionPlan
+packages/shared/dist/index.d.ts:3 - SubscriptionStatus
+packages/shared/dist/index.d.ts:4 - UserRole
+packages/shared/dist/index.d.ts:5 - ContactSource
+packages/shared/dist/index.d.ts:6 - AppointmentStatus
+packages/shared/dist/index.d.ts:7 - CallDirection
+packages/shared/dist/index.d.ts:8 - CallStatus
+packages/shared/dist/index.d.ts:9 - AutomationType
+packages/shared/dist/index.d.ts:10 - Tenant
+packages/shared/dist/index.d.ts:27 - Location
+packages/shared/dist/index.d.ts:44 - User
+packages/shared/dist/index.d.ts:56 - DentalVerticalData
+packages/shared/dist/index.d.ts:73 - ContractorVerticalData
+packages/shared/dist/index.d.ts:89 - SalonVerticalData
+packages/shared/dist/index.d.ts:107 - LawFirmVerticalData
+packages/shared/dist/index.d.ts:125 - RestaurantVerticalData
+packages/shared/dist/index.d.ts:140 - VerticalData
+packages/shared/dist/index.d.ts:141 - Contact
+packages/shared/dist/index.d.ts:160 - Appointment
+packages/shared/dist/index.d.ts:182 - Call
+packages/shared/dist/index.d.ts:204 - CallTranscript
+packages/shared/dist/index.d.ts:214 - PipelineStage
+packages/shared/dist/index.d.ts:224 - PipelineEntry
+packages/shared/dist/index.d.ts:237 - AutomationRule
+packages/shared/dist/index.d.ts:247 - SmsMessage
+packages/shared/dist/index.d.ts:261 - Conversation
+packages/shared/dist/index.d.ts:275 - ConversationMessage
+packages/shared/dist/index.d.ts:300 - ApiSuccess
+packages/shared/dist/index.d.ts:304 - ApiError
+packages/shared/dist/index.d.ts:309 - ApiResponse
+packages/shared/dist/index.d.ts:310 - PaginatedResponse
+packages/shared/dist/index.d.ts:317 - DayHours
+packages/shared/dist/index.d.ts:322 - LocationBusinessHours
+packages/shared/dist/index.d.ts:331 - ServiceEntry
+packages/shared/dist/index.d.ts:337 - StaffEntry
+packages/shared/dist/index.d.ts:341 - FaqEntry
+packages/shared/dist/index.d.ts:352 - MayaKbFileStatus
+packages/shared/dist/index.d.ts:353 - MayaKbFile
+packages/shared/dist/index.d.ts:366 - GbpConnection
+packages/shared/dist/index.d.ts:379 - ReviewStatus
+packages/shared/dist/index.d.ts:380 - Review
+packages/shared/dist/index.d.ts:394 - ReputationStats
+packages/shared/dist/index.d.ts:416 - TriggerLinkAction
+packages/shared/dist/index.d.ts:417 - TriggerLink
+packages/shared/dist/index.d.ts:428 - TriggerLinkEvent
+packages/shared/dist/index.d.ts:438 - Snippet
+packages/shared/dist/index.d.ts:448 - ReviewRequestStatus
+packages/shared/dist/index.d.ts:449 - ReviewRequestChannel
+packages/shared/dist/index.d.ts:450 - ReviewRequest
+packages/shared/dist/index.d.ts:466 - ReviewRequestStats
+packages/shared/dist/index.d.ts:494 - FailedJob
+packages/shared/dist/index.d.ts:536 - ConversationAnalytics
+packages/shared/dist/index.d.ts:551 - SmsDeliveryAlert
+packages/shared/dist/index.d.ts:555 - SmsDeliveryError
+packages/shared/dist/index.d.ts:560 - SmsHealthStats
+packages/shared/dist/index.d.ts:577 - EmailEvent
+packages/shared/dist/index.d.ts:588 - EmailHealthAlert
+packages/shared/dist/index.d.ts:592 - EmailHealthStats
+packages/shared/dist/index.d.ts:647 - SquareConnection
+packages/shared/dist/index.d.ts:657 - SquarePayment
+packages/shared/dist/index.d.ts:664 - Quote
+packages/shared/dist/index.d.ts:701 - QuotePayment
+packages/shared/dist/index.d.ts:713 - InvoiceLineItem
+packages/shared/dist/index.d.ts:723 - Invoice
+packages/shared/dist/index.d.ts:751 - ClientSubscription
+packages/shared/dist/index.d.ts:776 - CampaignPrereqCheck
+packages/shared/dist/index.d.ts:783 - CampaignPrereqResult
+packages/shared/dist/index.d.ts:787 - CampaignStatus
+packages/shared/dist/index.d.ts:788 - CampaignType
+packages/shared/dist/index.d.ts:809 - CampaignRecipient
+packages/shared/dist/index.d.ts:845 - WebchatSessionStatus
+packages/shared/dist/index.d.ts:846 - WebchatMessageRole
+packages/shared/dist/index.d.ts:847 - WebchatSession
+packages/shared/dist/index.d.ts:861 - WebchatMessage
+packages/shared/dist/index.d.ts:868 - WebchatConfig
+packages/shared/dist/index.d.ts:874 - OutboundCallTriggerType
+packages/shared/dist/index.d.ts:875 - OutboundCallStatus
+packages/shared/dist/index.d.ts:876 - OutboundCallJob
+packages/shared/dist/index.d.ts:895 - PortalAccess
+packages/shared/dist/index.d.ts:906 - PortalSettings
+packages/shared/dist/index.d.ts:912 - PortalAppointment
+packages/shared/dist/index.d.ts:919 - PortalQuote
+packages/shared/dist/index.d.ts:928 - PortalInvoice
+packages/shared/dist/index.d.ts:937 - PortalData
+packages/shared/dist/index.d.ts:951 - PortalVerifyResult
+packages/shared/dist/index.d.ts:959 - VideoCollectorStatus
+packages/shared/dist/index.d.ts:960 - VideoTestimonialStatus
+packages/shared/dist/index.d.ts:961 - VideoSentiment
+packages/shared/dist/index.d.ts:962 - VideoCollector
+packages/shared/dist/index.d.ts:974 - VideoTestimonial
+packages/shared/dist/index.d.ts:992 - MayaKbUrlStatus
+packages/shared/dist/index.d.ts:993 - MayaKbUrl
+packages/shared/dist/index.d.ts:1005 - TelnyxNumberDepartment
+packages/shared/dist/index.d.ts:1006 - TelnyxNumberStatus
+packages/shared/dist/index.d.ts:1007 - TelnyxNumber
+packages/shared/dist/index.d.ts:1024 - CustomAutomationStatus
+packages/shared/dist/index.d.ts:1035 - CustomAutomation
+packages/shared/dist/index.d.ts:1051 - ResourceType
+packages/shared/dist/index.d.ts:1052 - ResourceStatus
+packages/shared/dist/index.d.ts:1053 - ResourceBookingStatus
+packages/shared/dist/index.d.ts:1054 - BookableResource
+packages/shared/dist/index.d.ts:1067 - ResourceBooking
+packages/shared/dist/index.d.ts:1 - FieldType
+packages/shared/dist/index.d.ts:2 - VerticalField
+packages/shared/dist/index.d.ts:18 - BusinessHours
+packages/shared/dist/index.d.ts:29 - VerticalConfig
+packages/shared/dist/index.d.ts:1 - formatDate
+packages/shared/dist/index.d.ts:2 - formatTime
+packages/shared/dist/index.d.ts:3 - formatBytes
+apps/api/src/config/stripe-plans.ts:69 - PlanDef
+apps/api/src/config/stripe-plans.ts:110 - BASE_SUITE (used in module)
+apps/api/src/config/stripe-plans.ts:121 - TIER_GATED (used in module)
+apps/api/src/lib/auth.ts:150 - requireModule
+apps/api/src/lib/booking-availability.ts:19 - TimeSlot (used in module)
+apps/api/src/lib/booking-availability.ts:24 - CalendarCredentials (used in module)
+apps/api/src/lib/calendar-provider.ts:108 - checkCalendarAvailability
+apps/api/src/lib/calendar-provider.ts:141 - createCalendarAppointment
+apps/api/src/lib/calendar-provider.ts:11 - CalendarCredentials (used in module)
+apps/api/src/lib/contact-enrichment.ts:105 - enrichByPhone (used in module)
+apps/api/src/lib/contact-enrichment.ts:133 - enrichByEmail (used in module)
+apps/api/src/lib/email-client.ts:4 - EmailAttachment (used in module)
+apps/api/src/lib/email-client.ts:9 - EmailParams (used in module)
+apps/api/src/lib/email-client.ts:23 - TemplatedEmailParams (used in module)
+apps/api/src/lib/email-oauth.ts:85 - refreshGmailToken (used in module)
+apps/api/src/lib/email-oauth.ts:130 - refreshOutlookToken (used in module)
+apps/api/src/lib/email-oauth.ts:6 - EmailAccount (used in module)
+apps/api/src/lib/email-oauth.ts:14 - ValidToken (used in module)
+apps/api/src/lib/email-risk.ts:103 - getRiskLabel
+apps/api/src/lib/email-templates.ts:14 - resolveMergeTags (used in module)
+apps/api/src/lib/email-templates.ts:54 - AppointmentConfirmationEmailParams (used in module)
+apps/api/src/lib/email-templates.ts:63 - ConfirmationEmail (used in module)
+apps/api/src/lib/expo-push.ts:23 - sendExpoPush
+apps/api/src/lib/gbp-sync.ts:28 - starRatingToInt (used in module)
+apps/api/src/lib/gbp-sync.ts:39 - buildAiReplyPrompt (used in module)
+apps/api/src/lib/gbp-sync.ts:162 - generateAiReply (used in module)
+apps/api/src/lib/import-processor.ts:17 - ImportResult (used in module)
+apps/api/src/lib/outbound-caller.ts:12 - OutboundCallParams (used in module)
+apps/api/src/lib/outbound-caller.ts:21 - OutboundCallResult (used in module)
+apps/api/src/lib/outlook-calendar.ts:102 - refreshOutlookCalendarToken (used in module)
+apps/api/src/lib/receipt-email.ts:3 - ReceiptLineItem (used in module)
+apps/api/src/lib/receipt-email.ts:10 - ReceiptQuote (used in module)
+apps/api/src/lib/receipt-email.ts:21 - ReceiptContact (used in module)
+apps/api/src/lib/report-engine.ts:7 - ReportFilter (used in module)
+apps/api/src/lib/report-engine.ts:13 - ReportConfig (used in module)
+apps/api/src/lib/report-engine.ts:24 - ReportResult (used in module)
+apps/api/src/lib/sms-templates.ts:17 - ConfirmationSmsParams (used in module)
+apps/api/src/lib/square-client.ts:153 - getSquarePayment
+apps/api/src/lib/telnyx-tenant-lookup.ts:10 - TenantPhoneResult (used in module)
+apps/api/src/middleware/audit-logger.ts:4 - AuditEvent (used in module)
+apps/api/src/routes/campaigns-prereq.ts:27 - getPrereqChecks (used in module)
+apps/api/src/routes/campaigns-prereq.ts:14 - PrereqCheck (used in module)
+apps/api/src/routes/campaigns-prereq.ts:22 - PrereqResult (used in module)
+apps/api/src/routes/digest.ts:27 - verifyDigestToken (used in module)
+apps/api/src/routes/inventory-logic.ts:26 - validateInventoryCreate
+apps/api/src/routes/inventory-logic.ts:73 - applyQuantityAdjustment
+apps/api/src/routes/inventory-logic.ts:6 - VALID_UNITS (used in module)
+apps/api/src/routes/inventory-logic.ts:7 - Unit (used in module)
+apps/api/src/routes/inventory-logic.ts:9 - InventoryCreateValidation (used in module)
+apps/api/src/routes/inventory-logic.ts:21 - InventoryValidationError (used in module)
+apps/api/src/routes/inventory-logic.ts:64 - AdjustResult (used in module)
+apps/api/src/routes/invoices.ts:24 - calcInvoiceTotals (used in module)
+apps/api/src/routes/invoices.ts:673 - processRecordPayment
+apps/api/src/routes/invoices.ts:735 - processVoidInvoice
+apps/api/src/routes/square.ts:158 - getSquareConnectionStatus (used in module)
+apps/api/src/routes/staff-logic.ts:21 - detectShiftConflict
+apps/api/src/routes/staff-logic.ts:50 - validateShiftBody
+apps/api/src/routes/staff-logic.ts:96 - validateStaffCreateBody
+apps/api/src/routes/staff-logic.ts:6 - DATE_RE (used in module)
+apps/api/src/routes/staff-logic.ts:7 - TIME_RE (used in module)
+apps/api/src/routes/staff-logic.ts:9 - ShiftWindow (used in module)
+apps/api/src/routes/staff-logic.ts:37 - ShiftValidation (used in module)
+apps/api/src/routes/staff-logic.ts:45 - ShiftValidationError (used in module)
+apps/api/src/routes/staff-logic.ts:85 - StaffBodyValidation (used in module)
+apps/api/src/routes/staff-logic.ts:91 - StaffBodyError (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:63 - resolveInvoiceSubscriptionId (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:70 - customerIdOf (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:75 - unixToIso (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:85 - identifyPlanAndOverageItem (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:36 - StripeSubPayload (used in module)
+apps/api/src/routes/stripe-billing-webhooks.ts:51 - StripeInvoicePayload (used in module)
+apps/api/src/routes/subscriptions.ts:319 - calcMonthlyEquivalent
+apps/api/src/routes/subscriptions.ts:333 - processPauseSubscription
+apps/api/src/routes/subscriptions.ts:374 - getSubscriptionsForTenant
+apps/api/src/scripts/seed-services.ts:191 - VERTICAL_SERVICES (used in module)
+apps/api/src/services/embeddings.ts:45 - generateEmbedding (used in module)
+apps/api/src/services/embeddings.ts:6 - KnowledgeEntry (used in module)
+apps/api/src/services/embeddings.ts:14 - KnowledgeRecord (used in module)
+apps/api/src/services/google.ts:3 - getOAuthClient (used in module)
+apps/api/src/services/scheduling.ts:18 - getAvailableSlots
+apps/api/src/services/scheduling.ts:3 - TimeSlot (used in module)
+apps/api/src/services/scheduling.ts:8 - CreateEventParams (used in module)
+apps/api/src/voice/call-logger.ts:3 - CallLogEntry (used in module)
+apps/api/src/voice/call-session-logger.ts:118 - calcOverageMinutes (used in module)
+apps/api/src/voice/call-session-logger.ts:7 - VoiceSessionParams (used in module)
+apps/api/src/voice/gemini-live.ts:91 - containsFarewell (used in module)
+apps/api/src/voice/gemini-live.ts:123 - GeminiLiveSession (used in module)
+apps/api/src/voice/maya-circuit-breaker.ts:182 - _setMayaCircuitBreaker
+apps/api/src/voice/maya-circuit-breaker.ts:14 - BreakerState (used in module)
+apps/api/src/voice/maya-circuit-breaker.ts:22 - BreakerSnapshot (used in module)
+apps/api/src/voice/maya-circuit-breaker.ts:30 - TOOL_TIMEOUT_MS (used in module)
+apps/api/src/voice/maya-circuit-breaker.ts:57 - MayaCircuitBreaker (used in module)
+apps/api/src/voice/maya-latency-tracker.ts:26 - TurnLatency (used in module)
+apps/api/src/voice/post-call.ts:422 - generateAutoQuote (used in module)
+apps/api/src/voice/post-call.ts:26 - CallSessionBooking (used in module)
+apps/api/src/voice/post-call.ts:40 - PostCallParams (used in module)
+apps/api/src/voice/pre-call-lookup.ts:27 - enrichCallerInfo (used in module)
+apps/api/src/voice/pre-call-lookup.ts:48 - maskPhone (used in module)
+apps/api/src/voice/tenant-helpers.ts:10 - getTenantBusinessName
+apps/api/src/workers/appointment-reminder-worker.ts:25 - scan (used in module)
+apps/api/src/workers/campaign-send-worker.ts:44 - processCampaignSend (used in module)
+apps/api/src/workers/campaign-send-worker.ts:16 - CampaignSendJobData (used in module)
+apps/api/src/workers/campaign-sender.ts:25 - CampaignSenderJobData (used in module)
+apps/api/src/workers/custom-automation-worker.ts:350 - scan (used in module)
+apps/api/src/workers/data-retention-worker.ts:37 - scan (used in module)
+apps/api/src/workers/export-worker.ts:143 - processExport (used in module)
+apps/api/src/workers/follow-up-cadence-worker.ts:26 - scan (used in module)
+apps/api/src/workers/follow-up-missed-scanner.ts:26 - scan (used in module)
+apps/api/src/workers/invoice-overdue-scanner.ts:15 - scan (used in module)
+apps/api/src/workers/lead-score-worker.ts:29 - processCompute (used in module)
+apps/api/src/workers/lead-score-worker.ts:117 - processDecay (used in module)
+apps/api/src/workers/lead-stalled-scanner.ts:18 - scan (used in module)
+apps/api/src/workers/low-stock-scanner.ts:25 - scan (used in module)
+apps/api/src/workers/maya-memory-extractor.ts:14 - MayaMemoryJobData (used in module)
+apps/api/src/workers/no-show-scanner.ts:21 - scan (used in module)
+apps/api/src/workers/outbound-call-worker.ts:37 - processOutboundCall (used in module)
+apps/api/src/workers/outbound-call-worker.ts:7 - OutboundCallJobData (used in module)
+apps/api/src/workers/quote-expiry-worker.ts:15 - scan (used in module)
+apps/api/src/workers/quote-followup-worker.ts:35 - processFollowup (used in module)
+apps/api/src/workers/review-request-worker.ts:26 - processReviewRequest (used in module)
+apps/api/src/workers/scheduled-report-scanner.ts:49 - scanScheduledReports (used in module)
+apps/api/src/workers/scheduled-report-worker.ts:345 - processScheduledReport (used in module)
+apps/api/src/workers/task-reminder-worker.ts:12 - getTaskReminderQueue (used in module)
+apps/api/src/workers/task-reminder-worker.ts:34 - processReminder (used in module)
+apps/api/src/workers/task-reminder-worker.ts:26 - TaskReminderJob (used in module)
+apps/api/src/routes/__test-support__/jwt.ts:24 - mintTestToken
+apps/api/src/routes/__test-support__/jwt.ts:14 - TEST_JWT_ISSUER (used in module)
+apps/api/src/routes/__test-support__/jwt.ts:15 - TEST_JWT_AUDIENCE (used in module)
+apps/api/src/routes/__test-support__/jwt.ts:17 - MintTestTokenOptions (used in module)
+apps/api/src/routes/__test-support__/supabase-mock.ts:38 - createStore
+apps/api/src/routes/__test-support__/supabase-mock.ts:451 - createMockSupabase
+apps/api/src/routes/__test-support__/supabase-mock.ts:25 - StorageMock (used in module)
+apps/api/src/routes/__test-support__/tenant-fixture.ts:15 - entitledTenantRow (used in module)
+apps/api/src/routes/__test-support__/tenant-fixture.ts:30 - seedEntitledTenant
+apps/api/src/services/campaigns/ai-copy-generator.ts:21 - GenerateParams (used in module)
+apps/api/src/services/campaigns/ai-copy-generator.ts:30 - CampaignMessageDraft (used in module)

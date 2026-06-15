@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import {
   createStore,
   createMockSupabase,
@@ -21,12 +21,10 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(role: string = 'owner'): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role, vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role, vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 const [{ default: express }, { default: request }, { default: settingsModulesRouter }] =
@@ -62,8 +60,19 @@ describe('GET /api/settings/modules', () => {
   })
 })
 
+function seedTenant(plan: string | null, status: string | null, id: string = TENANT_ID) {
+  ;(store.tables['tenants'] as Row[]).push({
+    id,
+    modules: { maya: true, crm: true, cpq: false },
+    ...(plan !== null ? { subscription_plan: plan } : {}),
+    ...(status !== null ? { subscription_status: status } : {}),
+  })
+}
+
 describe('PUT /api/settings/modules', () => {
-  it('enables a module and returns updated modules', async () => {
+  it('enables a module within the tenant plan and returns updated modules', async () => {
+    store.tables['tenants'] = []
+    seedTenant('scale', 'active')
     const token = await makeToken('owner')
     const res = await request(makeApp())
       .put('/api/settings/modules')
@@ -143,22 +152,127 @@ describe('PUT /api/settings/modules — plan gate', () => {
     expect(res.body.module).toBe('cpq')
   })
 
-  it('allows module enable during trial regardless of plan', async () => {
-    store.tables['tenants'] = [
-      {
-        id: TENANT_ID,
-        modules: { maya: true, crm: true, cpq: false },
-        subscription_plan: 'core',
-        subscription_status: 'trialing',
-      },
-    ]
+  it('gates trial tenants by their plan — Core trialing cannot enable above-plan modules', async () => {
+    for (const moduleName of ['cpq', 'campaigns', 'automation', 'insights']) {
+      store.tables['tenants'] = []
+      seedTenant('core', 'trialing')
+      const token = await makeToken('owner')
+      const res = await request(makeApp())
+        .put('/api/settings/modules')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ module: moduleName, enabled: true })
+
+      expect(res.status).toBe(402)
+      const row = (store.tables['tenants'] as Row[]).find((r) => r['id'] === TENANT_ID)
+      expect((row?.['modules'] as Record<string, boolean>)[moduleName]).not.toBe(true)
+    }
+  })
+
+  it('returns 402 when Core active tenant tries to enable campaigns', async () => {
+    store.tables['tenants'] = []
+    seedTenant('core', 'active')
+    const token = await makeToken('owner')
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'campaigns', enabled: true })
+
+    expect(res.status).toBe(402)
+    expect(res.body.required_plan).toBe('pro')
+    expect(res.body.upgrade_url).toBe('/pricing')
+  })
+
+  it('allows Core tenants (trialing or active) to enable base-suite modules', async () => {
+    for (const status of ['trialing', 'active']) {
+      for (const moduleName of ['pipeline', 'crm', 'maya']) {
+        store.tables['tenants'] = []
+        seedTenant('core', status)
+        const token = await makeToken('owner')
+        const res = await request(makeApp())
+          .put('/api/settings/modules')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ module: moduleName, enabled: true })
+
+        expect(res.status).toBe(200)
+        expect(res.body.modules[moduleName]).toBe(true)
+      }
+    }
+  })
+
+  it('allows Pro tenant to enable campaigns', async () => {
+    store.tables['tenants'] = []
+    seedTenant('pro', 'active')
+    const token = await makeToken('owner')
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'campaigns', enabled: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.modules.campaigns).toBe(true)
+  })
+
+  it('never gates disabling — Core tenant can disable an above-plan module', async () => {
+    store.tables['tenants'] = []
+    seedTenant('core', 'active')
+    const token = await makeToken('owner')
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'cpq', enabled: false })
+
+    expect(res.status).toBe(200)
+    expect(res.body.modules.cpq).toBe(false)
+  })
+
+  it('fails closed with 503 when the tenant/plan lookup errors — no write performed', async () => {
+    store.tables['tenants'] = []
+    seedTenant('scale', 'active')
+    store.tableErrors = { tenants: { message: 'db unavailable' } }
     const token = await makeToken('owner')
     const res = await request(makeApp())
       .put('/api/settings/modules')
       .set('Authorization', `Bearer ${token}`)
       .send({ module: 'cpq', enabled: true })
 
+    expect(res.status).toBe(503)
+    const row = (store.tables['tenants'] as Row[]).find((r) => r['id'] === TENANT_ID)
+    expect((row?.['modules'] as Record<string, boolean>)['cpq']).toBe(false)
+  })
+
+  it('null plan fails closed: base module 200, above-base module 402', async () => {
+    store.tables['tenants'] = []
+    seedTenant(null, null)
+    const token = await makeToken('owner')
+
+    const base = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'crm', enabled: true })
+    expect(base.status).toBe(200)
+
+    const aboveBase = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'campaigns', enabled: true })
+    expect(aboveBase.status).toBe(402)
+    expect(aboveBase.body.required_plan).toBe('pro')
+  })
+
+  it('writes scope to the authed tenant only — other tenants untouched', async () => {
+    const OTHER_ID = 'bbbbbbbb-0000-0000-0000-00000sm00002'
+    store.tables['tenants'] = []
+    seedTenant('scale', 'active')
+    seedTenant('scale', 'active', OTHER_ID)
+    const token = await makeToken('owner')
+
+    const res = await request(makeApp())
+      .put('/api/settings/modules')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ module: 'cpq', enabled: true })
     expect(res.status).toBe(200)
-    expect(res.body.modules.cpq).toBe(true)
+
+    const other = (store.tables['tenants'] as Row[]).find((r) => r['id'] === OTHER_ID)
+    expect((other?.['modules'] as Record<string, boolean>)['cpq']).toBe(false)
   })
 })

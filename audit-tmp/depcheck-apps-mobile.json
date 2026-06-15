@@ -1,0 +1,150 @@
+{
+  "dependencies": ["react-native-gesture-handler"],
+  "devDependencies": ["typescript"],
+  "missing": {},
+  "using": {
+    "expo": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/package.json",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/tsconfig.json",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/api.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/auth-context.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/offline-cache.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/push.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "expo-router": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "expo-constants": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/api.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "expo-linking": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "expo-status-bar": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "react-native-safe-area-context": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/index.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/inventory.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/notifications.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/pipeline.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/staff.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "react-native-screens": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/babel.config.js",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/_layout.tsx"
+    ],
+    "react": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/package.json",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/auth-context.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/push.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/index.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/inventory.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/notifications.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/pipeline.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/staff.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/login.tsx"
+    ],
+    "expo-secure-store": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/api.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/auth-context.tsx"
+    ],
+    "@types/react": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/auth-context.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/index.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/inventory.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/notifications.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/pipeline.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/staff.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/login.tsx"
+    ],
+    "expo-sqlite": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/offline-cache.ts"
+    ],
+    "expo-notifications": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/push.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx"
+    ],
+    "react-native": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/lib/push.ts",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/_layout.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/index.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/inventory.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/notifications.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/pipeline.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/staff.tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/contacts/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments/[id].tsx",
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(auth)/login.tsx"
+    ],
+    "react-native-calendars": [
+      "/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/app/(tabs)/appointments.tsx"
+    ]
+  },
+  "invalidFiles": {},
+  "invalidDirs": {}
+}

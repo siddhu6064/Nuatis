@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { SignJWT } from 'jose'
+import { mintTestToken } from './__test-support__/jwt.js'
 import { randomUUID } from 'node:crypto'
 import {
   createStore,
@@ -7,6 +7,7 @@ import {
   type MockStore,
   type Row,
 } from './__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from './__test-support__/tenant-fixture.js'
 
 let store: MockStore = createStore()
 
@@ -34,12 +35,10 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
-  const secretBytes = new TextEncoder().encode(SECRET)
-  return new SignJWT({ sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secretBytes)
+  return mintTestToken(
+    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { secret: SECRET }
+  )
 }
 
 const [{ default: express }, { default: request }, { default: contactsRouter }] = await Promise.all(
@@ -74,6 +73,7 @@ function seedContact(partial: Partial<Row> = {}): string {
 
 beforeEach(() => {
   store = createStore()
+  seedEntitledTenant(store, TENANT_ID)
   store.tables['contacts'] = []
   store.tables['pipeline_stages'] = []
   store.tables['activity_log'] = []
@@ -336,5 +336,53 @@ describe('GET /api/contacts/:id', () => {
     expect(res.status).toBe(200)
     expect(res.body.id).toBe(id)
     expect(res.body.full_name).toBe('Single Target')
+  })
+})
+
+// ── ENUM-1: pipeline_stages tenant scope on ?pipeline_id= ─────────────────────
+describe('ENUM-1 — pipeline_id filter is tenant-scoped', () => {
+  const B_TENANT = 'bbbbbbbb-0000-0000-0000-0000000ct00b1'
+  const A_PIPELINE = 'pipe-a-ct'
+  const B_PIPELINE = 'pipe-b-ct'
+
+  it("a foreign tenant's pipeline_id resolves to zero stages and does NOT filter A's contacts", async () => {
+    ;(store.tables['pipeline_stages'] as Row[]).push(
+      { id: 'st-a', tenant_id: TENANT_ID, pipeline_id: A_PIPELINE, name: 'AWon' },
+      { id: 'st-b', tenant_id: B_TENANT, pipeline_id: B_PIPELINE, name: 'BWon' }
+    )
+    seedContact({ full_name: 'C1', pipeline_stage: 'AWon' })
+    seedContact({ full_name: 'C2', pipeline_stage: 'AWon' })
+    seedContact({ full_name: 'C3', pipeline_stage: 'AOther' })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get(`/api/contacts?pipeline_id=${B_PIPELINE}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    // B's pipeline yields no stages for A → no pipeline_stage filter → all 3 returned.
+    // If the lookup were not tenant-scoped it would find 'BWon' and filter to 0.
+    expect((res.body.contacts as Array<unknown>).length).toBe(3)
+  })
+
+  it("POSITIVE CONTROL: A's own pipeline_id filters A's contacts by its stages", async () => {
+    ;(store.tables['pipeline_stages'] as Row[]).push({
+      id: 'st-a',
+      tenant_id: TENANT_ID,
+      pipeline_id: A_PIPELINE,
+      name: 'AWon',
+    })
+    const won1 = seedContact({ full_name: 'C1', pipeline_stage: 'AWon' })
+    const won2 = seedContact({ full_name: 'C2', pipeline_stage: 'AWon' })
+    seedContact({ full_name: 'C3', pipeline_stage: 'AOther' })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get(`/api/contacts?pipeline_id=${A_PIPELINE}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const idsOut = (res.body.contacts as Array<{ id: string }>).map((c) => c.id).sort()
+    expect(idsOut).toEqual([won1, won2].sort())
   })
 })

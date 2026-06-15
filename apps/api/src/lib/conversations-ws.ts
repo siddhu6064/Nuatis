@@ -39,7 +39,13 @@ export function initConversationsWs(): WebSocketServer {
           return
         }
         const secretBytes = new TextEncoder().encode(secret)
-        const { payload } = await jwtVerify(msg.token, secretBytes, { algorithms: ['HS256'] })
+        // Same iss/aud binding as requireAuth (lib/auth.ts) — only tokens
+        // minted for this API are accepted.
+        const { payload } = await jwtVerify(msg.token, secretBytes, {
+          algorithms: ['HS256'],
+          issuer: ['nuatis-web', 'nuatis-mobile'],
+          audience: 'nuatis-api',
+        })
 
         const tokenTenantId = (payload['tenantId'] ?? payload['org_id']) as string | undefined
         if (!tokenTenantId || tokenTenantId !== msg.tenantId) {

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
 
@@ -33,7 +34,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.get('/search', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
-  const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : ''
+  const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   let query = supabase
     .from('snippets')

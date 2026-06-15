@@ -1,4 +1,4 @@
-export interface DayAvailability {
+interface DayAvailability {
   enabled: boolean
   start?: string
   end?: string

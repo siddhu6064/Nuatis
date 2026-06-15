@@ -5,6 +5,7 @@ import {
   type MockStore,
   type Row,
 } from '../routes/__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from '../routes/__test-support__/tenant-fixture.js'
 
 // ── Env vars ──────────────────────────────────────────────────────────────────
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
@@ -105,9 +106,7 @@ beforeEach(() => {
   store = createStore()
   store.tables['campaigns'] = []
   store.tables['campaign_recipients'] = []
-  store.tables['tenants'] = [
-    { id: 'tenant-1', name: 'Test Biz', brand_voice: null, modules: {}, vertical: null },
-  ]
+  seedEntitledTenant(store, 'tenant-1')
   store.tables['smart_lists'] = [
     { id: 'sl-1', tenant_id: 'tenant-1', name: 'All Contacts', filters: {} },
   ]
@@ -216,7 +215,7 @@ describe('processCampaignSend — suppression', () => {
       },
     ]
 
-    store.tables['tenants'] = [{ id: tenantId, name: 'Test Biz', brand_voice: null }]
+    seedEntitledTenant(store, tenantId)
 
     store.tables['contacts'] = [
       {

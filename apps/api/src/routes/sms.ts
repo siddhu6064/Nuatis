@@ -1,8 +1,10 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sendSms } from '../lib/sms.js'
 import { logActivity } from '../lib/activity.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
@@ -62,6 +64,7 @@ router.get(
 router.post(
   '/contacts/:contactId/sms',
   requireAuth,
+  smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getSupabase()
@@ -94,21 +97,14 @@ router.post(
     }
 
     // Get tenant's Telnyx number (from telnyx_numbers table)
-    const { data: telnyxNum } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', authed.tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const fromNumber = await getTenantPhoneNumber(authed.tenantId)
 
-    if (!telnyxNum?.phone_number) {
+    if (!fromNumber) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
       return
     }
 
-    const result = await sendSms(telnyxNum.phone_number, contact.phone, message, {
+    const result = await sendSms(fromNumber, contact.phone, message, {
       tenantId: authed.tenantId,
       contactId,
     })

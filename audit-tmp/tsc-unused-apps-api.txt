@@ -1,0 +1,2 @@
+apps/api/src/routes/announcements.ts(14,24): error TS6133: 'req' is declared but its value is never read.
+apps/api/src/voice/gemini-live.ts(288,7): error TS6133: 'lastAudioTime' is declared but its value is never read.

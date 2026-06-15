@@ -1,6 +1,6 @@
 import { sendEmail } from './email-client.js'
 
-export interface ReceiptLineItem {
+interface ReceiptLineItem {
   description: string
   quantity: number
   unit_price: number

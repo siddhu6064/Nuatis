@@ -4,6 +4,7 @@ import {
   createMockSupabase,
   type MockStore,
 } from '../routes/__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from '../routes/__test-support__/tenant-fixture.js'
 
 // ── Env vars ──────────────────────────────────────────────────────────────────
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
@@ -59,6 +60,7 @@ function makeApp() {
 
 beforeEach(() => {
   store = createStore()
+  seedEntitledTenant(store, 'test-tenant-id')
   store.tables['audit_log'] = []
 
   mockQueue.getJobCounts.mockReset()

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
+import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
 
@@ -33,7 +34,7 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
 
   const countOnly = req.query['count'] === 'true'
   const lowStock = req.query['low_stock'] === 'true'
-  const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : ''
+  const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   // Count-only path (used by sidebar low-stock badge polling)
   if (countOnly) {

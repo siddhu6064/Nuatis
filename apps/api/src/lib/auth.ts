@@ -70,7 +70,14 @@ async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>
   const secret = process.env['AUTH_SECRET']
   if (!secret) throw new Error('AUTH_SECRET not set')
   const secretBytes = new TextEncoder().encode(secret)
-  const { payload } = await jwtVerify(token, secretBytes, { algorithms: ['HS256'] })
+  // iss/aud binding: only tokens minted by our web proxy or the mobile login
+  // endpoint for this API are accepted, even if another system shares the
+  // secret. (RS256 key split is a deferred follow-up.)
+  const { payload } = await jwtVerify(token, secretBytes, {
+    algorithms: ['HS256'],
+    issuer: ['nuatis-web', 'nuatis-mobile'],
+    audience: 'nuatis-api',
+  })
   return payload as Record<string, unknown>
 }
 
@@ -109,12 +116,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Fast path: appUserId was embedded at login time (tokens issued after the
     // authjs.ts change carry this claim). Fall back to DB lookup for older tokens.
     authedReq.appUserId = claimedAppUserId ?? (sub ? await resolveAppUserId(sub, tenantId) : null)
-    // TEMP DIAGNOSTIC — remove after appUserId debug
-    console.info('[DIAG appUserId] auth', {
-      claim: claimedAppUserId,
-      sub: sub || null,
-      final: authedReq.appUserId,
-    })
     authedReq.role = (payload['role'] as string) ?? 'staff'
     authedReq.vertical = (payload['vertical'] as string) ?? ''
     authedReq.authProvider = 'authjs'
@@ -153,7 +154,9 @@ export function requireModule(moduleName: string) {
     const supabaseUrl = process.env['SUPABASE_URL']
     const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
     if (!supabaseUrl || !supabaseKey) {
-      next() // fail open if env not configured
+      // Fail closed — without the module check we cannot confirm entitlement
+      // (mirrors require-plan.ts).
+      res.status(503).json({ error: 'Module check unavailable' })
       return
     }
     const { createClient } = await import('@supabase/supabase-js')

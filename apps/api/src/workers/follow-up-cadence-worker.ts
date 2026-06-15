@@ -8,6 +8,7 @@ import { sendTemplatedEmail } from '../lib/email-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { logActivity } from '../lib/activity.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const QUEUE_NAME = 'follow-up-cadence'
 const MAX_LOOKBACK_DAYS = 14
@@ -97,16 +98,7 @@ export async function scan(): Promise<void> {
         if (recentAppt) continue
 
         // Get tenant's Telnyx number for SMS
-        const { data: telnyxNumRow } = await supabase
-          .from('telnyx_numbers')
-          .select('phone_number')
-          .eq('tenant_id', contact.tenant_id)
-          .eq('status', 'active')
-          .order('is_primary', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const telnyxNumber = telnyxNumRow?.phone_number ?? ''
+        const telnyxNumber = (await getTenantPhoneNumber(contact.tenant_id)) ?? ''
         const contactName = contact.full_name || 'there'
         const vars: Record<string, string> = {
           name: contactName,

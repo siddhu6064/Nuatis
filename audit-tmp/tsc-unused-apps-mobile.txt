@@ -1,0 +1,20 @@
+apps/mobile/app/(tabs)/contacts.tsx(41,35): error TS2345: Argument of type 'Contact[]' is not assignable to parameter of type '{ id: string; full_name: string; email?: string | undefined; phone?: string | undefined; lifecycle_stage?: string | undefined; lead_score?: number | undefined; lead_grade?: string | undefined; }[]'.
+  Type 'Contact' is not assignable to type '{ id: string; full_name: string; email?: string | undefined; phone?: string | undefined; lifecycle_stage?: string | undefined; lead_score?: number | undefined; lead_grade?: string | undefined; }'.
+    Types of property 'email' are incompatible.
+      Type 'string | null' is not assignable to type 'string | undefined'.
+        Type 'null' is not assignable to type 'string | undefined'.
+apps/mobile/app/(tabs)/staff.tsx(148,48): error TS2352: Conversion of type 'SectionListData<StaffMember | Shift, DefaultSectionT>' to type '{ title: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'title' is missing in type 'SectionBase<StaffMember | Shift, DefaultSectionT> & DefaultSectionT' but required in type '{ title: string; }'.
+apps/mobile/app/(tabs)/staff.tsx(151,25): error TS2352: Conversion of type 'SectionListData<StaffMember | Shift, DefaultSectionT>' to type '{ kind: "shift" | "staff"; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'kind' is missing in type 'SectionBase<StaffMember | Shift, DefaultSectionT> & DefaultSectionT' but required in type '{ kind: "shift" | "staff"; }'.
+apps/mobile/lib/offline-cache.ts(7,24): error TS2551: Property 'openDatabaseAsync' does not exist on type 'typeof import("/Users/sidyennamaneni/Documents/Nuatis/nuatis/apps/mobile/node_modules/expo-sqlite/build/index")'. Did you mean 'openDatabase'?
+apps/mobile/lib/offline-cache.ts(8,11): error TS18047: '_db' is possibly 'null'.
+apps/mobile/lib/offline-cache.ts(8,15): error TS2554: Expected 2 arguments, but got 1.
+apps/mobile/lib/offline-cache.ts(35,3): error TS2322: Type 'SQLiteDatabase | null' is not assignable to type 'SQLiteDatabase'.
+  Type 'null' is not assignable to type 'SQLiteDatabase'.
+apps/mobile/lib/offline-cache.ts(51,12): error TS2554: Expected 2 arguments, but got 1.
+apps/mobile/lib/offline-cache.ts(53,14): error TS2339: Property 'runAsync' does not exist on type 'SQLiteDatabase'.
+apps/mobile/lib/offline-cache.ts(81,13): error TS2339: Property 'getAllAsync' does not exist on type 'SQLiteDatabase'.
+apps/mobile/lib/offline-cache.ts(105,12): error TS2554: Expected 2 arguments, but got 1.
+apps/mobile/lib/offline-cache.ts(107,14): error TS2339: Property 'runAsync' does not exist on type 'SQLiteDatabase'.
+apps/mobile/lib/offline-cache.ts(135,13): error TS2339: Property 'getAllAsync' does not exist on type 'SQLiteDatabase'.

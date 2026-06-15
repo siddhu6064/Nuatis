@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { resolveResetRedirectUrl } from '@/lib/auth/reset-redirect'
 
 export async function POST(request: Request) {
+  // Resolve OUTSIDE the swallow-all block: a misconfigured base URL must
+  // surface as an error, not silently email a broken localhost reset link.
+  let redirectTo: string
+  try {
+    redirectTo = resolveResetRedirectUrl()
+  } catch (err) {
+    console.error('[forgot-password] reset redirect misconfigured:', err)
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
+
   try {
     const { email } = (await request.json()) as { email?: string }
     if (!email || typeof email !== 'string') {
@@ -9,11 +20,8 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${appUrl}/reset-password`,
-    })
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo })
   } catch {
     // swallow — never leak account existence or internal errors
   }

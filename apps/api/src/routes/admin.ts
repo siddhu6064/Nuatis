@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
+import { timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const router = Router()
@@ -11,7 +12,13 @@ function requireAdminKey(req: Request, res: Response, next: NextFunction): void 
     return
   }
   const provided = req.headers['x-admin-key']
-  if (provided !== key) {
+  if (typeof provided !== 'string') {
+    res.status(401).json({ error: 'Invalid admin key' })
+    return
+  }
+  const a = Buffer.from(key)
+  const b = Buffer.from(provided)
+  if (a.byteLength !== b.byteLength || !timingSafeEqual(a, b)) {
     res.status(401).json({ error: 'Invalid admin key' })
     return
   }

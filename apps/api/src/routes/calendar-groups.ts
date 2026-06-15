@@ -187,6 +187,20 @@ router.post('/:id/members', requireAuth, async (req: Request, res: Response): Pr
     return
   }
 
+  // Validate the location belongs to the authed tenant before inserting it
+  // into the group — otherwise a foreign location UUID could be referenced.
+  const { data: location } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('id', locationId)
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+
+  if (!location) {
+    res.status(404).json({ error: 'Location not found' })
+    return
+  }
+
   const { data: existing } = await supabase
     .from('calendar_group_members')
     .select('position')
@@ -240,7 +254,22 @@ router.put(
       return
     }
 
-    const updates = (b['order'] as string[]).map((locationId, index) => ({
+    // Validate every location_id in the payload belongs to the authed tenant
+    // before upserting — otherwise a foreign location UUID could be injected
+    // via the reorder payload. Do not reveal which id was foreign.
+    const payloadIds = b['order'] as string[]
+    const { data: ownedLocations } = await supabase
+      .from('locations')
+      .select('id')
+      .in('id', payloadIds)
+      .eq('tenant_id', authed.tenantId)
+
+    if ((ownedLocations?.length ?? 0) !== payloadIds.length) {
+      res.status(404).json({ error: 'Location not found' })
+      return
+    }
+
+    const updates = payloadIds.map((locationId, index) => ({
       group_id: req.params['id'],
       location_id: locationId,
       position: index,
@@ -330,6 +359,7 @@ router.post('/:id/assign', requireAuth, async (req: Request, res: Response): Pro
     const { data: appts } = await supabase
       .from('appointments')
       .select('location_id')
+      .eq('tenant_id', authed.tenantId)
       .in('location_id', locationIds)
       .gte('start_time', now.toISOString())
       .lte('start_time', weekOut.toISOString())

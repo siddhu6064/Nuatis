@@ -79,11 +79,48 @@ export default router
 
 // ── Router 2: Inbound email webhook (PUBLIC — no auth) ───────────────────────
 
+// Inbound-parse providers (SendGrid Inbound Parse et al.) do not sign their
+// POSTs, so the route is gated on a shared secret instead: INBOUND_WEBHOOK_SECRET
+// must appear in the configured destination URL (?secret=...) or in an
+// x-inbound-secret header. Fail-closed when the env is unset, mirroring
+// email-webhooks.ts.
+function verifyInboundSecret(req: Request): boolean {
+  const secret = process.env['INBOUND_WEBHOOK_SECRET']
+  if (!secret) {
+    console.error('[email-inbound webhook] INBOUND_WEBHOOK_SECRET not configured — rejecting')
+    return false
+  }
+
+  const fromQuery = typeof req.query['secret'] === 'string' ? req.query['secret'] : undefined
+  const fromHeader =
+    typeof req.headers['x-inbound-secret'] === 'string'
+      ? req.headers['x-inbound-secret']
+      : undefined
+  const provided = fromQuery ?? fromHeader
+  if (!provided) return false
+
+  const a = Buffer.from(secret)
+  const b = Buffer.from(provided)
+  if (a.byteLength !== b.byteLength) return false
+  return crypto.timingSafeEqual(a, b)
+}
+
 export const emailInboundWebhookRouter = Router()
 
 // POST / — receive inbound email from mail provider (SendGrid / Mailgun / Postmark)
 emailInboundWebhookRouter.post('/', async (req: Request, res: Response): Promise<void> => {
-  // Always return 200 to prevent mail provider retries
+  // Fail-closed: refuse to process anything if the shared secret is unset
+  // (defense-in-depth even though verifyInboundSecret also rejects in that case)
+  if (!process.env['INBOUND_WEBHOOK_SECRET']) {
+    res.sendStatus(500)
+    return
+  }
+  if (!verifyInboundSecret(req)) {
+    res.sendStatus(401)
+    return
+  }
+
+  // Verified from here on — always return 200 to prevent mail provider retries
   try {
     const body = req.body as Record<string, unknown>
 

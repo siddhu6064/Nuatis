@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 
-export interface ColumnDef {
+interface ColumnDef {
   key: string
   label: string
 }

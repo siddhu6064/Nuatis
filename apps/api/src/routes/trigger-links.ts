@@ -1,10 +1,27 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
-import { generateTriggerSlug } from '../lib/slugify.js'
+import { generateTriggerToken } from '../lib/slugify.js'
+import { triggerLinkLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 const publicRouter = Router()
+
+// Actions that mutate state on click (flip appointment/deal status, fire a
+// webhook with side effects). These default to single-use + 30-day expiry so a
+// forwarded link can't replay the action. mark_contacted only refreshes an
+// engagement timestamp and stays multi-use like pure tracking clicks.
+const STATE_MUTATING_ACTIONS = new Set([
+  'confirm_appointment',
+  'cancel_appointment',
+  'mark_won',
+  'mark_lost',
+  'custom_webhook',
+])
+
+const DEFAULT_EXPIRY_DAYS = 30
+
+const GONE_HTML = '<html><body><p>This link has expired or has already been used.</p></body></html>'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -21,7 +38,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('trigger_links')
-    .select('id, name, slug, action, click_count, created_at')
+    .select('id, name, slug, action, click_count, expires_at, max_uses, use_count, created_at')
     .eq('tenant_id', authed.tenantId)
     .order('created_at', { ascending: false })
   if (error) {
@@ -66,15 +83,46 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
   let slug: string
   try {
-    slug = await generateTriggerSlug()
+    slug = await generateTriggerToken()
   } catch {
     res.status(500).json({ error: 'Could not generate unique slug' })
     return
   }
 
+  const isMutating = STATE_MUTATING_ACTIONS.has(action)
+
+  let maxUses: number | null = isMutating ? 1 : null
+  if (b['max_uses'] === null) {
+    maxUses = null
+  } else if (
+    typeof b['max_uses'] === 'number' &&
+    Number.isInteger(b['max_uses']) &&
+    b['max_uses'] > 0
+  ) {
+    maxUses = b['max_uses']
+  }
+
+  let expiresAt: string | null = isMutating
+    ? new Date(Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    : null
+  if (b['expires_at'] === null) {
+    expiresAt = null
+  } else if (typeof b['expires_at'] === 'string' && !Number.isNaN(Date.parse(b['expires_at']))) {
+    expiresAt = new Date(b['expires_at']).toISOString()
+  }
+
   const { data, error } = await supabase
     .from('trigger_links')
-    .insert({ tenant_id: authed.tenantId, name, slug, action, action_config: actionConfig })
+    .insert({
+      tenant_id: authed.tenantId,
+      name,
+      slug,
+      action,
+      action_config: actionConfig,
+      max_uses: maxUses,
+      expires_at: expiresAt,
+      use_count: 0,
+    })
     .select()
     .single()
   if (error) {
@@ -155,130 +203,188 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
   res.status(204).send()
 })
 
-// ── PUBLIC: GET /t/:slug ──────────────────────────────────────────────────────
-publicRouter.get('/:slug', async (req: Request, res: Response): Promise<void> => {
-  const { slug } = req.params as { slug: string }
-  const supabase = getSupabase()
-
-  const { data: link } = await supabase
-    .from('trigger_links')
-    .select('*')
-    .eq('slug', slug)
-    .maybeSingle()
-
-  if (!link) {
-    res.status(404).send('<html><body><p>This link is no longer active.</p></body></html>')
-    return
-  }
-
-  const contactId = typeof req.query['cid'] === 'string' ? req.query['cid'] : null
-  const ip =
-    req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ??
-    req.socket.remoteAddress ??
-    null
-  const userAgent = req.headers['user-agent'] ?? null
-
-  // Insert event
-  await supabase.from('trigger_link_events').insert({
-    trigger_link_id: link.id,
-    tenant_id: link.tenant_id,
-    contact_id: contactId,
-    ip_address: ip,
-    user_agent: userAgent,
-  })
-
-  // Increment click_count (RPC with direct-update fallback)
+// Atomically claim one use of the link. Returns false when the link is
+// consumed (max_uses reached). The DB function does `use_count = use_count + 1`
+// server-side so concurrent clicks can never double-claim a single-use link;
+// the catch branch is an optimistic compare-and-swap fallback for environments
+// without the RPC (the in-memory test mock).
+async function claimTriggerLinkUse(
+  supabase: ReturnType<typeof getSupabase>,
+  link: Record<string, unknown>
+): Promise<boolean> {
   try {
-    await supabase.rpc('increment_trigger_link_click', { link_id: link.id })
+    const { data, error } = await supabase.rpc('claim_trigger_link_use', {
+      p_link_id: link['id'],
+    })
+    if (error) throw new Error(error.message)
+    return Array.isArray(data) ? data.length > 0 : Boolean(data)
   } catch {
-    await supabase
+    const current = (link['use_count'] as number | null) ?? 0
+    const maxUses = link['max_uses'] as number | null
+    if (maxUses == null) {
+      await supabase
+        .from('trigger_links')
+        .update({ use_count: current + 1 })
+        .eq('id', link['id'])
+      return true
+    }
+    if (current >= maxUses) return false
+    const { data } = await supabase
       .from('trigger_links')
-      .update({ click_count: (link.click_count as number) + 1 })
-      .eq('id', link.id)
+      .update({ use_count: current + 1 })
+      .eq('id', link['id'])
+      .eq('use_count', current)
+      .select('id')
+    return Array.isArray(data) && data.length > 0
   }
+}
 
-  // Execute action
-  const config = (link.action_config ?? {}) as Record<string, unknown>
-  const action: string = link.action
+// ── PUBLIC: GET /t/:slug ──────────────────────────────────────────────────────
+publicRouter.get(
+  '/:slug',
+  triggerLinkLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const { slug } = req.params as { slug: string }
+    const supabase = getSupabase()
 
-  if (action === 'confirm_appointment') {
-    const apptId = config['appointment_id'] as string | undefined
-    if (apptId) {
-      await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', apptId)
-    } else if (contactId) {
-      await supabase
-        .from('appointments')
-        .update({ status: 'confirmed' })
-        .eq('contact_id', contactId)
-        .eq('tenant_id', link.tenant_id)
-        .in('status', ['pending', 'scheduled'])
-        .order('start_time', { ascending: true })
-        .limit(1)
+    const { data: link } = await supabase
+      .from('trigger_links')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    if (!link) {
+      res.status(404).send('<html><body><p>This link is no longer active.</p></body></html>')
+      return
     }
-  } else if (action === 'cancel_appointment') {
-    const apptId = config['appointment_id'] as string | undefined
-    if (apptId) {
-      await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', apptId)
+
+    // The holder already has the token, so a distinct "expired/used" response is
+    // not an existence oracle.
+    const expiresAt = link.expires_at as string | null
+    if (expiresAt && Date.parse(expiresAt) < Date.now()) {
+      res.status(410).send(GONE_HTML)
+      return
     }
-  } else if (action === 'mark_contacted') {
-    if (contactId) {
-      await supabase
-        .from('contacts')
-        .update({ last_contacted_at: new Date().toISOString() })
-        .eq('id', contactId)
-        .eq('tenant_id', link.tenant_id)
+
+    if (!(await claimTriggerLinkUse(supabase, link as Record<string, unknown>))) {
+      res.status(410).send(GONE_HTML)
+      return
     }
-  } else if (action === 'mark_won') {
-    if (contactId) {
-      const { data: deals } = await supabase
-        .from('deals')
-        .select('id')
-        .eq('contact_id', contactId)
-        .eq('tenant_id', link.tenant_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (deals?.[0]) {
-        await supabase.from('deals').update({ status: 'won' }).eq('id', deals[0].id)
-      }
-    }
-  } else if (action === 'mark_lost') {
-    if (contactId) {
-      const { data: deals } = await supabase
-        .from('deals')
-        .select('id')
-        .eq('contact_id', contactId)
-        .eq('tenant_id', link.tenant_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (deals?.[0]) {
-        await supabase.from('deals').update({ status: 'lost' }).eq('id', deals[0].id)
-      }
-    }
-  } else if (action === 'custom_webhook') {
-    const webhookUrl = config['webhook_url'] as string | undefined
-    if (webhookUrl) {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trigger_link_id: link.id,
-          contact_id: contactId,
-          clicked_at: new Date().toISOString(),
-          metadata: {},
-        }),
-      }).catch(() => {
-        /* fire-and-forget */
+
+    const contactId = typeof req.query['cid'] === 'string' ? req.query['cid'] : null
+    const ip =
+      req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ??
+      req.socket.remoteAddress ??
+      null
+    const userAgent = req.headers['user-agent'] ?? null
+
+    // Insert event
+    await supabase.from('trigger_link_events').insert({
+      trigger_link_id: link.id,
+      tenant_id: link.tenant_id,
+      contact_id: contactId,
+      ip_address: ip,
+      user_agent: userAgent,
+    })
+
+    // Increment click_count (RPC with direct-update fallback). supabase-js rpc()
+    // reports a missing function via the error field rather than throwing, so
+    // check both.
+    try {
+      const { error: clickError } = await supabase.rpc('increment_trigger_link_click', {
+        link_id: link.id,
       })
+      if (clickError) throw new Error(clickError.message)
+    } catch {
+      await supabase
+        .from('trigger_links')
+        .update({ click_count: (link.click_count as number) + 1 })
+        .eq('id', link.id)
+    }
+
+    // Execute action
+    const config = (link.action_config ?? {}) as Record<string, unknown>
+    const action: string = link.action
+
+    if (action === 'confirm_appointment') {
+      const apptId = config['appointment_id'] as string | undefined
+      if (apptId) {
+        await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', apptId)
+      } else if (contactId) {
+        await supabase
+          .from('appointments')
+          .update({ status: 'confirmed' })
+          .eq('contact_id', contactId)
+          .eq('tenant_id', link.tenant_id)
+          .in('status', ['pending', 'scheduled'])
+          .order('start_time', { ascending: true })
+          .limit(1)
+      }
+    } else if (action === 'cancel_appointment') {
+      const apptId = config['appointment_id'] as string | undefined
+      if (apptId) {
+        await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', apptId)
+      }
+    } else if (action === 'mark_contacted') {
+      if (contactId) {
+        await supabase
+          .from('contacts')
+          .update({ last_contacted_at: new Date().toISOString() })
+          .eq('id', contactId)
+          .eq('tenant_id', link.tenant_id)
+      }
+    } else if (action === 'mark_won') {
+      if (contactId) {
+        const { data: deals } = await supabase
+          .from('deals')
+          .select('id')
+          .eq('contact_id', contactId)
+          .eq('tenant_id', link.tenant_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (deals?.[0]) {
+          await supabase.from('deals').update({ status: 'won' }).eq('id', deals[0].id)
+        }
+      }
+    } else if (action === 'mark_lost') {
+      if (contactId) {
+        const { data: deals } = await supabase
+          .from('deals')
+          .select('id')
+          .eq('contact_id', contactId)
+          .eq('tenant_id', link.tenant_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (deals?.[0]) {
+          await supabase.from('deals').update({ status: 'lost' }).eq('id', deals[0].id)
+        }
+      }
+    } else if (action === 'custom_webhook') {
+      const webhookUrl = config['webhook_url'] as string | undefined
+      if (webhookUrl) {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trigger_link_id: link.id,
+            contact_id: contactId,
+            clicked_at: new Date().toISOString(),
+            metadata: {},
+          }),
+        }).catch(() => {
+          /* fire-and-forget */
+        })
+      }
+    }
+
+    const redirectUrl = config['redirect_url'] as string | undefined
+    if (redirectUrl) {
+      res.redirect(302, redirectUrl)
+    } else {
+      res.send("<html><body><p>Got it — you're all set.</p></body></html>")
     }
   }
-
-  const redirectUrl = config['redirect_url'] as string | undefined
-  if (redirectUrl) {
-    res.redirect(302, redirectUrl)
-  } else {
-    res.send("<html><body><p>Got it — you're all set.</p></body></html>")
-  }
-})
+)
 
 export default router
 export { publicRouter as triggerLinkPublicRouter }
