@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from 'express'
+import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUrl, exchangeCodeForTokens } from '../services/google.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import redis from '../lib/redis.js'
 
 const router = Router()
 
@@ -13,20 +15,34 @@ function getSupabase() {
 }
 
 // GET /api/auth/google — redirect business owner to Google consent screen
-router.get('/', requireAuth, (req: Request, res: Response): void => {
+router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const url = getAuthUrl(authed.tenantId)
+  // CSRF/tenant-injection guard: issue a single-use nonce bound to the
+  // authenticated tenant and pass it as `state`. The callback resolves the
+  // tenant from Redis, never from the attacker-controllable `state` value.
+  const nonce = randomBytes(32).toString('hex')
+  await redis.set(`oauth:google:${nonce}`, authed.tenantId, 'EX', 600)
+  const url = getAuthUrl(nonce)
   res.redirect(url)
 })
 
 // GET /api/auth/google/callback — Google redirects here after consent
 router.get('/callback', async (req: Request, res: Response): Promise<void> => {
-  const { code, state: tenantId } = req.query as { code: string; state: string }
+  const { code, state } = req.query as { code?: string; state?: string }
 
-  if (!code || !tenantId) {
+  if (!code || !state) {
     res.status(400).json({ error: 'Missing code or state' })
     return
   }
+
+  // Resolve the tenant from the single-use nonce — never trust `state` directly.
+  const nonceKey = `oauth:google:${state}`
+  const tenantId = await redis.get(nonceKey)
+  if (!tenantId) {
+    res.status(400).json({ error: 'Invalid or expired OAuth state' })
+    return
+  }
+  await redis.del(nonceKey)
 
   try {
     const tokens = await exchangeCodeForTokens(code)

@@ -10,12 +10,59 @@
  */
 import { Router } from 'express'
 import { createProxyMiddleware } from 'http-proxy-middleware'
+import { jwtVerify } from 'jose'
 import type { ClientRequest, IncomingMessage } from 'node:http'
 import type { Socket } from 'node:net'
 import type { ProxyServerOptions } from 'httpxy'
 import { requireAuth } from '../lib/auth.js'
 
 const GEMINI_TARGET = 'wss://generativelanguage.googleapis.com'
+
+/**
+ * VOICE-02: authenticate a `/api/voice/live` WebSocket upgrade. Express
+ * middleware (incl. requireAuth) never runs for upgrades, so the upgrade handler
+ * in index.ts calls this directly before proxying to Gemini. Accepts the API JWT
+ * from a `token` query param, an `Authorization: Bearer` header, or a
+ * `Sec-WebSocket-Protocol: token.<jwt>` subprotocol (browsers can't set headers
+ * on WS upgrades). Same iss/aud binding as requireAuth — only this API's tokens.
+ */
+export async function verifyVoiceLiveUpgrade(req: IncomingMessage): Promise<boolean> {
+  const secret = process.env['AUTH_SECRET']
+  if (!secret) {
+    console.warn('[voice/live] AUTH_SECRET not set — rejecting upgrade')
+    return false
+  }
+
+  let token: string | undefined
+  const fromQuery = new URL(req.url ?? '', 'http://x').searchParams.get('token')
+  const authHeader = req.headers['authorization']
+  if (fromQuery) {
+    token = fromQuery
+  } else if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice('Bearer '.length)
+  } else {
+    const proto = req.headers['sec-websocket-protocol']
+    const protoStr = Array.isArray(proto) ? proto.join(',') : proto
+    token = protoStr
+      ?.split(',')
+      .map((p) => p.trim())
+      .find((p) => p.startsWith('token.'))
+      ?.slice('token.'.length)
+  }
+
+  if (!token) return false
+
+  try {
+    await jwtVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ['HS256'],
+      issuer: ['nuatis-web', 'nuatis-mobile'],
+      audience: 'nuatis-api',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
 const GEMINI_WS_PATH =
   '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
 

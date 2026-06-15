@@ -8,6 +8,9 @@ import {
 // ── Env ───────────────────────────────────────────────────────────────────────
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
+// square.ts now imports lib/redis (OAuth nonce store); lazyConnect means no real
+// connection, but redis.ts requires REDIS_URL to be set at import time.
+process.env['REDIS_URL'] = 'redis://localhost:6379'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 let store: MockStore = createStore()

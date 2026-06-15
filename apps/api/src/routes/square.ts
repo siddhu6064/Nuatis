@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express'
+import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import redis from '../lib/redis.js'
 
 const router = Router()
 
@@ -24,16 +26,21 @@ function getSupabase() {
 }
 
 // ── GET /connect — return Square OAuth URL ────────────────────────────────────
-router.get('/connect', requireAuth, (req: Request, res: Response): void => {
+router.get('/connect', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
 
   const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/square/callback`
 
+  // Single-use nonce bound to the authenticated tenant; callback resolves the
+  // tenant from Redis rather than trusting `state`.
+  const nonce = randomBytes(32).toString('hex')
+  await redis.set(`oauth:square:${nonce}`, authed.tenantId, 'EX', 600)
+
   const params = new URLSearchParams({
     client_id: SQUARE_APP_ID,
     scope: 'PAYMENTS_WRITE+ORDERS_READ+MERCHANT_PROFILE_READ',
-    state: authed.tenantId,
+    state: nonce,
     redirect_uri: redirectUri,
   })
 
@@ -57,7 +64,14 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const tenantId = state
+  // Resolve the tenant from the single-use nonce — never trust `state` directly.
+  const nonceKey = `oauth:square:${state}`
+  const tenantId = await redis.get(nonceKey)
+  if (!tenantId) {
+    res.redirect(`${webUrl}/settings/payments?square=error`)
+    return
+  }
+  await redis.del(nonceKey)
 
   try {
     const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 
 type PanelState = 'idle' | 'connecting' | 'active' | 'error'
 
@@ -49,6 +50,7 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 }
 
 export default function TestMayaPanel() {
+  const { data: session } = useSession()
   const [state, setState] = useState<PanelState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<Turn[]>([])
@@ -316,7 +318,15 @@ export default function TestMayaPanel() {
     )
 
     // Open WebSocket via server-side proxy — key injected by the API server.
-    const ws = new WebSocket(`${API_BASE}/api/voice/live`)
+    // The upgrade is JWT-gated (VOICE-02); pass the session access token as a
+    // query param since browsers can't set headers on WS upgrades.
+    const accessToken = (session as { accessToken?: string } | null)?.accessToken
+    if (!accessToken) {
+      setError('Not authenticated — please reload and sign in again.')
+      setState('error')
+      return
+    }
+    const ws = new WebSocket(`${API_BASE}/api/voice/live?token=${encodeURIComponent(accessToken)}`)
     wsRef.current = ws
     startTimeRef.current = Date.now()
 

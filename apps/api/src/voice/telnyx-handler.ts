@@ -670,18 +670,13 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
           tenantId = process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown'
         }
 
-        // X-Tenant-Id header (outbound only) takes precedence over DB lookup.
-        if (headerCallType === 'outbound') {
-          if (headerTenantId) {
-            tenantId = headerTenantId
-            console.info(
-              `[telnyx-handler] outbound call — tenant_id from X-Tenant-Id header: ${tenantId}`
-            )
-          } else {
-            console.warn(
-              '[telnyx-handler] outbound call detected but X-Tenant-Id missing from custom_headers'
-            )
-          }
+        // VOICE-01: the X-Tenant-Id custom header is client-controllable and must
+        // never override server-side tenant resolution. Tenant is resolved above
+        // from the phone-number lookup and (for outbound) the call registry below.
+        if (headerTenantId) {
+          console.warn(
+            '[telnyx-handler] ignoring client-supplied X-Tenant-Id header — tenant resolved server-side'
+          )
         }
 
         console.info(

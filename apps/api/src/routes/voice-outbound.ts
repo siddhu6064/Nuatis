@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { prewarmGemini, rekeyPrewarmedSession } from '../voice/telnyx-handler.js'
+import { buildSignedStreamUrl } from '../lib/stream-token.js'
 
 const router = Router()
 
@@ -152,6 +153,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         )
       } else {
         try {
+          // Bind the stream_url to this tenant + call so the /voice/stream upgrade
+          // can authenticate the outbound Telnyx connection (VOICE-01).
+          const meta = outboundWebhookMeta.get(callControlId)
+          const signedStreamUrl = buildSignedStreamUrl(
+            streamUrl,
+            meta?.tenantId ?? 'unknown',
+            callControlId
+          )
           const streamRes = await fetch(
             `https://api.telnyx.com/v2/calls/${encodeURIComponent(callControlId)}/actions/streaming_start`,
             {
@@ -161,7 +170,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                stream_url: streamUrl,
+                stream_url: signedStreamUrl,
                 stream_track: 'both_tracks',
                 stream_type: 'websocket_v2',
                 enable_dialogflow: false,

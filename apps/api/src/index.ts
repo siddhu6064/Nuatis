@@ -68,7 +68,11 @@ import smartListsRouter from './routes/smart-lists.js'
 import followUpTemplatesRouter from './routes/follow-up-templates.js'
 import mobileAuthRouter from './routes/mobile-auth.js'
 import voiceTestRouter from './routes/voice-test.js'
-import voiceLiveProxyRouter, { voiceLiveProxy } from './routes/voice-live-proxy.js'
+import voiceLiveProxyRouter, {
+  voiceLiveProxy,
+  verifyVoiceLiveUpgrade,
+} from './routes/voice-live-proxy.js'
+import { verifyStreamToken, buildSignedStreamUrl } from './lib/stream-token.js'
 import scheduledReportsRouter from './routes/scheduled-reports.js'
 import paymentLinksRouter from './routes/payment-links.js'
 import paymentsRouter from './routes/payments.js'
@@ -387,11 +391,18 @@ app.post('/voice/inbound', async (req, res) => {
             console.warn('[voice/recording] record_start failed:', err)
           })
 
+        // Bind the stream_url to this tenant + call so the /voice/stream upgrade
+        // can authenticate the inbound Telnyx connection (VOICE-01).
+        const signedStreamUrl = buildSignedStreamUrl(
+          streamUrl,
+          resolvedTenantId ?? 'unknown',
+          callControlId
+        )
         const streamRes = await fetch(`${base}/streaming_start`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            stream_url: streamUrl,
+            stream_url: signedStreamUrl,
             stream_track: 'both_tracks',
             codec: 'PCMU',
             stream_bidirectional_mode: 'rtp',
@@ -589,6 +600,17 @@ server.on('upgrade', (req, socket, head) => {
   const pathname = req.url ? new URL(req.url, 'http://x').pathname : ''
 
   if (pathname === '/voice/stream') {
+    // VOICE-01: the upgrade is public, so authenticate it with the HMAC stream
+    // token we embedded in the stream_url handed to Telnyx at streaming_start.
+    const params = new URL(req.url ?? '', 'http://x').searchParams
+    if (
+      !verifyStreamToken(params.get('st') ?? '', params.get('t') ?? '', params.get('cci') ?? '')
+    ) {
+      console.warn('[voice/stream] upgrade rejected — invalid or missing stream token')
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+      socket.destroy()
+      return
+    }
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req)
     })
@@ -597,9 +619,19 @@ server.on('upgrade', (req, socket, head) => {
       conversationsWss.emit('connection', ws, req)
     })
   } else if (pathname.startsWith('/api/voice/live')) {
-    // Node types the upgrade socket as Duplex; http-proxy-middleware expects
-    // net.Socket.  In practice upgrade sockets are always net.Socket instances.
-    voiceLiveProxy.upgrade(req, socket as import('net').Socket, head)
+    // VOICE-02: the HTTP path is gated by requireAuth, but the WS upgrade
+    // bypasses Express — verify the caller's JWT here before proxying to Gemini.
+    void verifyVoiceLiveUpgrade(req).then((ok) => {
+      if (!ok) {
+        console.warn('[voice/live] upgrade rejected — invalid or missing token')
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+        socket.destroy()
+        return
+      }
+      // Node types the upgrade socket as Duplex; http-proxy-middleware expects
+      // net.Socket.  In practice upgrade sockets are always net.Socket instances.
+      voiceLiveProxy.upgrade(req, socket as import('net').Socket, head)
+    })
   } else {
     // Unknown path — reject cleanly rather than leaving the socket dangling.
     socket.destroy()

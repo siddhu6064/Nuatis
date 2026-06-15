@@ -11,6 +11,7 @@ import {
 } from '../lib/email-send.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
+import redis from '../lib/redis.js'
 
 const router = Router()
 
@@ -72,7 +73,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 })
 
 // ── GET /gmail/auth-url — generate Gmail OAuth consent URL ───────────────────
-router.get('/gmail/auth-url', requireAuth, (req: Request, res: Response): void => {
+router.get('/gmail/auth-url', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
 
   const clientId = process.env['GOOGLE_EMAIL_CLIENT_ID']
@@ -84,11 +85,16 @@ router.get('/gmail/auth-url', requireAuth, (req: Request, res: Response): void =
   const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/gmail/callback`
 
-  const state = Buffer.from(JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }))
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+  // Single-use nonce bound to tenant + user; callback resolves both from Redis
+  // rather than trusting the `state` value.
+  const nonce = crypto.randomBytes(32).toString('hex')
+  await redis.set(
+    `oauth:gmail:${nonce}`,
+    JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }),
+    'EX',
+    600
+  )
+  const state = nonce
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -123,11 +129,16 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
   let tenantId: string
   let userId: string
 
+  // Resolve tenant + user from the single-use nonce — never trust `state` directly.
+  const nonceKey = `oauth:gmail:${state}`
+  const stored = await redis.get(nonceKey)
+  if (!stored) {
+    res.redirect(`${webUrl}/settings/integrations?email=error&reason=invalid_state`)
+    return
+  }
+  await redis.del(nonceKey)
   try {
-    const decoded = Buffer.from(state.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
-      'utf-8'
-    )
-    const parsed = JSON.parse(decoded) as { tenantId: string; userId: string }
+    const parsed = JSON.parse(stored) as { tenantId: string; userId: string }
     tenantId = parsed.tenantId
     userId = parsed.userId
   } catch {
@@ -222,7 +233,7 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
 })
 
 // ── GET /outlook/auth-url — generate Outlook OAuth consent URL ───────────────
-router.get('/outlook/auth-url', requireAuth, (req: Request, res: Response): void => {
+router.get('/outlook/auth-url', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
 
   const clientId = process.env['OUTLOOK_CLIENT_ID']
@@ -234,11 +245,16 @@ router.get('/outlook/auth-url', requireAuth, (req: Request, res: Response): void
   const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/outlook/callback`
 
-  const state = Buffer.from(JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }))
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+  // Single-use nonce bound to tenant + user; callback resolves both from Redis
+  // rather than trusting the `state` value.
+  const nonce = crypto.randomBytes(32).toString('hex')
+  await redis.set(
+    `oauth:outlook:${nonce}`,
+    JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }),
+    'EX',
+    600
+  )
+  const state = nonce
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -268,11 +284,16 @@ router.get('/outlook/callback', async (req: Request, res: Response): Promise<voi
   let tenantId: string
   let userId: string
 
+  // Resolve tenant + user from the single-use nonce — never trust `state` directly.
+  const nonceKey = `oauth:outlook:${state}`
+  const stored = await redis.get(nonceKey)
+  if (!stored) {
+    res.redirect(`${webUrl}/settings/integrations?email=error&reason=invalid_state`)
+    return
+  }
+  await redis.del(nonceKey)
   try {
-    const decoded = Buffer.from(state.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
-      'utf-8'
-    )
-    const parsed = JSON.parse(decoded) as { tenantId: string; userId: string }
+    const parsed = JSON.parse(stored) as { tenantId: string; userId: string }
     tenantId = parsed.tenantId
     userId = parsed.userId
   } catch {

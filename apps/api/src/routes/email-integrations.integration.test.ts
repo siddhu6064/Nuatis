@@ -8,6 +8,10 @@ import {
   type Row,
 } from './__test-support__/supabase-mock.js'
 
+// email-integrations.ts now imports lib/redis (OAuth nonce store); lazyConnect
+// means no real connection, but redis.ts requires REDIS_URL set at import time.
+process.env['REDIS_URL'] = 'redis://localhost:6379'
+
 let store: MockStore = createStore()
 
 const sendViaGmail = jest.fn(async () => undefined)
