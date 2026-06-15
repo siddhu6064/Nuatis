@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { VerticalSelector } from '@/components/crm'
 
 type Step = 1 | 2 | 3
@@ -122,13 +123,8 @@ function SignUpForm() {
     <div className="min-h-screen flex items-center justify-center bg-bg px-4">
       <div className="w-full max-w-lg bg-white rounded-xl border border-border-brand p-8 shadow-sm">
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">N</span>
-          </div>
-          <span className="font-display font-bold text-[22px] tracking-tight text-ink">
-            Nu<span className="text-teal-brand">atis</span>
-          </span>
+        <div className="flex items-center mb-6">
+          <Image src="/nuatis-lockup-teal.png" width={160} height={50} alt="Nuatis" priority />
         </div>
 
         {/* Step indicator */}

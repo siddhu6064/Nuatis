@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -183,13 +184,8 @@ function SignInForm() {
     <div className="min-h-screen bg-bg flex flex-col items-center px-4 justify-center sm:justify-start sm:pt-20">
       <div className="w-full max-w-sm">
         {/* Brand */}
-        <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center">
-            <span className="text-white font-bold text-base">N</span>
-          </div>
-          <span className="font-display font-bold text-[22px] tracking-tight text-ink">
-            Nu<span className="text-teal-brand">atis</span>
-          </span>
+        <div className="flex items-center justify-center mb-8">
+          <Image src="/nuatis-lockup-teal.png" width={160} height={50} alt="Nuatis" priority />
         </div>
 
         {/* Demo Card */}
