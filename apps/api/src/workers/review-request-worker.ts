@@ -1,5 +1,6 @@
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 import { sendSms } from '../lib/sms.js'
@@ -105,9 +106,10 @@ export async function processReviewRequest(data: ReviewRequestJobData): Promise<
   const template = (tenant.review_message_template as string | null) ?? defaultTemplate
   const businessName = (tenant.name as string | null) ?? ''
 
-  const nameParts = (contact.full_name ?? '').split(' ')
-  const firstName = nameParts[0] ?? 'there'
-  const lastName = nameParts.slice(1).join(' ')
+  // Preserve prior behavior: empty/missing full_name yielded '' here (the old
+  // `?? 'there'` was unreachable — split always returns at least one element).
+  const firstName = getFirstName(contact.full_name, '')
+  const lastName = (contact.full_name ?? '').split(' ').slice(1).join(' ')
 
   const resolvedMessage = template
     .replace(/\{\{first_name\}\}/g, firstName)

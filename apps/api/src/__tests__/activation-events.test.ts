@@ -99,6 +99,8 @@ jest.unstable_mockModule('@nuatis/shared', () => ({
   VERTICAL_SLUGS: ['hvac'],
   seedInventory: jest.fn(async () => undefined),
   seedStaff: jest.fn(async () => undefined),
+  getFirstName: (fullName: string | null | undefined, fallback = 'there') =>
+    fullName?.trim() ? fullName.trim().split(' ')[0] : fallback,
 }))
 
 // ── Dynamic imports (after mocks) ─────────────────────────────────────────────

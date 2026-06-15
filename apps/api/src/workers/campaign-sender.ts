@@ -15,6 +15,7 @@
 
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { sendSms } from '../lib/sms.js'
@@ -62,11 +63,6 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
-}
-
-function getFirstName(fullName: string | null | undefined): string {
-  if (!fullName || fullName.trim() === '') return 'there'
-  return fullName.trim().split(' ')[0] ?? 'there'
 }
 
 function personalise(text: string, firstName: string, businessName: string): string {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { getFirstName } from '@nuatis/shared'
 
 interface CollectorInfo {
   id: string
@@ -339,7 +340,7 @@ export default function CollectPageClient({ slug }: { slug: string }) {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              Thank you{submitterName ? `, ${submitterName.split(' ')[0]}` : ''}!
+              Thank you{submitterName ? `, ${getFirstName(submitterName)}` : ''}!
             </h2>
             <p className="text-gray-400">Your review has been submitted.</p>
           </div>

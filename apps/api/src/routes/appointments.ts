@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
+import { getFirstName } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import {
   createEvent,
@@ -414,7 +415,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   // Fire-and-forget confirmation SMS — never blocks the response or throws
   void (async () => {
     try {
-      const firstName = (contact?.full_name as string | undefined)?.split(' ')[0] ?? null
+      // Empty/missing name → '' (≡ null downstream: buildConfirmationSms trims to null)
+      const firstName = getFirstName(contact?.full_name as string | undefined, '')
 
       const [contactPhone, locationSms, tenantSms] = await Promise.all([
         supabase

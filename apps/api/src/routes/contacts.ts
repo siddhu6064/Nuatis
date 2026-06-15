@@ -1,5 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
@@ -1018,7 +1019,7 @@ router.post('/bulk-sms', requireAuth, async (req: Request, res: Response): Promi
   void (async () => {
     for (const c of contacts ?? []) {
       if (!c.phone || c.sms_opt_in === false) continue
-      const firstName = (c.full_name ?? '').split(' ')[0] ?? ''
+      const firstName = getFirstName(c.full_name, '')
       const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
       try {
         await fetch('https://api.telnyx.com/v2/messages', {
@@ -1196,7 +1197,7 @@ router.post('/bulk/sms', requireAuth, async (req: Request, res: Response): Promi
       continue
     }
 
-    const firstName = (c.full_name ?? '').split(' ')[0] ?? ''
+    const firstName = getFirstName(c.full_name, '')
     const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
 
     try {

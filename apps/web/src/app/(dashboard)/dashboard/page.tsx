@@ -1,3 +1,4 @@
+import { getFirstName } from '@nuatis/shared'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
         .lt('start_time', tomorrow.toISOString()),
     ])
 
-  const userName = session?.user?.name?.split(' ')[0] ?? 'there'
+  const userName = getFirstName(session?.user?.name)
 
   const stats = [
     {

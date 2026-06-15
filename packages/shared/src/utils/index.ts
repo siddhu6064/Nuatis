@@ -23,3 +23,17 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+
+/**
+ * Extracts the first name from a full_name string.
+ * Trims input, then splits on the first space; returns the whole (trimmed)
+ * string when no space is present. Returns the fallback when fullName is
+ * null, undefined, empty, or whitespace-only.
+ *
+ * @param fullName - The full name string (from contacts.full_name column)
+ * @param fallback - Returned when fullName is falsy/blank. Defaults to 'there'.
+ */
+export function getFirstName(fullName: string | null | undefined, fallback = 'there'): string {
+  if (!fullName?.trim()) return fallback
+  return fullName.trim().split(' ')[0] ?? fallback
+}

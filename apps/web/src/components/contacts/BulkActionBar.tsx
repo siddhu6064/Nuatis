@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getFirstName } from '@nuatis/shared'
 import type { FilterState } from './ContactFilters'
 
 interface Contact {
@@ -208,7 +209,7 @@ export default function BulkActionBar({
   const optOutCount = selectedContacts.filter((c) => c.sms_opt_in === false).length
   const smsBlockedCount = selectedContacts.filter((c) => !c.phone || c.sms_opt_in === false).length
   const firstContact = selectedContacts[0]
-  const firstName = firstContact?.full_name?.split(' ')[0] ?? 'John'
+  const firstName = getFirstName(firstContact?.full_name, 'John')
 
   return (
     <>

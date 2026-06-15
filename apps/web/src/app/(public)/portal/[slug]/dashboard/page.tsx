@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import { getFirstName } from '@nuatis/shared'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ function PortalDashboardContent() {
             <h1 className="text-base font-bold text-gray-900">{businessName}</h1>
             <p className="text-xs text-gray-500">Client Portal</p>
           </div>
-          {contactName && <p className="text-sm text-gray-600">Hi, {contactName.split(' ')[0]}</p>}
+          {contactName && <p className="text-sm text-gray-600">Hi, {getFirstName(contactName)}</p>}
         </div>
       </header>
 
