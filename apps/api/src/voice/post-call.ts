@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { normalizePhone } from '../lib/phone.js'
+import { maskPhone } from './pre-call-lookup.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
@@ -75,7 +76,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
   const escalationReason = booking?.escalationReason ?? null
 
   console.info(
-    `[post-call] handling: tenant=${tenantId} caller=${callerId} duration=${duration}s booked=${bookedAppointment} escalated=${escalated}`
+    `[post-call] handling: tenant=${tenantId} caller=${maskPhone(callerId)} duration=${duration}s booked=${bookedAppointment} escalated=${escalated}`
   )
 
   // ── Feature 1: Contact auto-upsert (Suite only) ─────────────────────────
@@ -116,7 +117,9 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
           .from('contacts')
           .update({ last_contacted: new Date().toISOString() })
           .eq('id', contactId)
-        console.info(`[post-call] contact found and updated: id=${contactId} phone=${callerId}`)
+        console.info(
+          `[post-call] contact found and updated: id=${contactId} phone=${maskPhone(callerId)}`
+        )
       } else {
         // Create minimal contact
         const { data: newContact, error } = await supabase
@@ -136,7 +139,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
         } else {
           contactId = newContact.id
           console.info(
-            `[post-call] contact created: id=${contactId} phone=${callerId} tenant=${tenantId}`
+            `[post-call] contact created: id=${contactId} phone=${maskPhone(callerId)} tenant=${tenantId}`
           )
           void dispatchWebhook(tenantId, 'contact.created', {
             contact_id: contactId,
@@ -221,7 +224,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
         if (success) {
           console.info(
-            `[post-call] SMS confirmation sent to=${callerId} appointment=${appointmentId ?? 'none'}`
+            `[post-call] SMS confirmation sent to=${maskPhone(callerId)} appointment=${appointmentId ?? 'none'}`
           )
         } else {
           console.warn('[post-call] SMS confirmation send failed')

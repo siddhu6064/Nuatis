@@ -14,29 +14,40 @@ export default async function DashboardPage() {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  const [{ count: totalContacts }, { count: openPipeline }, { count: appointmentsToday }] =
-    await Promise.all([
-      supabase
-        .from('contacts')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('is_archived', false),
+  const [
+    { count: totalContacts },
+    { count: openPipeline },
+    { count: appointmentsToday },
+    { count: callsHandled },
+  ] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('is_archived', false),
 
-      supabase
-        .from('contacts')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .not('pipeline_stage', 'is', null)
-        .neq('pipeline_stage', 'closed')
-        .neq('pipeline_stage', 'lost'),
+    supabase
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .not('pipeline_stage', 'is', null)
+      .neq('pipeline_stage', 'closed')
+      .neq('pipeline_stage', 'lost'),
 
-      supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .gte('start_time', today.toISOString())
-        .lt('start_time', tomorrow.toISOString()),
-    ])
+    supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .gte('start_time', today.toISOString())
+      .lt('start_time', tomorrow.toISOString()),
+
+    supabase
+      .from('calls')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .gte('started_at', today.toISOString())
+      .lt('started_at', tomorrow.toISOString()),
+  ])
 
   const userName = getFirstName(session?.user?.name)
 
@@ -62,7 +73,13 @@ export default async function DashboardPage() {
       color: 'amber',
       href: '/appointments',
     },
-    { label: 'Calls Handled', value: '0', icon: '◉', color: 'purple', href: '/calls' },
+    {
+      label: 'Calls Handled',
+      value: String(callsHandled ?? 0),
+      icon: '◉',
+      color: 'purple',
+      href: '/calls',
+    },
   ]
 
   return <DashboardClient stats={stats} userName={userName} />

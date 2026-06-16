@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { getExportQueue } from '../workers/export-worker.js'
 
 const router = Router()
@@ -24,84 +24,91 @@ function getSupabase() {
 }
 
 // ── POST /api/data-export — start export ─────────────────────────────────────
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const b = req.body as Record<string, unknown>
-  const requestedTables = Array.isArray(b['tables']) ? (b['tables'] as unknown[]) : DEFAULT_TABLES
+    const b = req.body as Record<string, unknown>
+    const requestedTables = Array.isArray(b['tables']) ? (b['tables'] as unknown[]) : DEFAULT_TABLES
 
-  // Validate all requested tables
-  const invalidTables = requestedTables.filter((t) => typeof t !== 'string' || !VALID_TABLES.has(t))
-  if (invalidTables.length > 0) {
-    res.status(400).json({
-      error: `Invalid tables: ${invalidTables.join(', ')}. Valid tables: ${[...VALID_TABLES].join(', ')}`,
-    })
-    return
-  }
+    // Validate all requested tables
+    const invalidTables = requestedTables.filter(
+      (t) => typeof t !== 'string' || !VALID_TABLES.has(t)
+    )
+    if (invalidTables.length > 0) {
+      res.status(400).json({
+        error: `Invalid tables: ${invalidTables.join(', ')}. Valid tables: ${[...VALID_TABLES].join(', ')}`,
+      })
+      return
+    }
 
-  const tables = requestedTables as string[]
+    const tables = requestedTables as string[]
 
-  // Rate limit: check for pending/processing export for this tenant
-  const { data: existing, error: checkErr } = await supabase
-    .from('export_jobs')
-    .select('id, status')
-    .eq('tenant_id', authed.tenantId)
-    .in('status', ['pending', 'processing'])
-    .limit(1)
+    // Rate limit: check for pending/processing export for this tenant
+    const { data: existing, error: checkErr } = await supabase
+      .from('export_jobs')
+      .select('id, status')
+      .eq('tenant_id', authed.tenantId)
+      .in('status', ['pending', 'processing'])
+      .limit(1)
 
-  if (checkErr) {
-    res.status(500).json({ error: checkErr.message })
-    return
-  }
+    if (checkErr) {
+      res.status(500).json({ error: checkErr.message })
+      return
+    }
 
-  if (existing && existing.length > 0) {
-    res.status(429).json({
-      error: 'An export is already in progress. Please wait for it to complete.',
-      exportJobId: existing[0]!.id,
-    })
-    return
-  }
+    if (existing && existing.length > 0) {
+      res.status(429).json({
+        error: 'An export is already in progress. Please wait for it to complete.',
+        exportJobId: existing[0]!.id,
+      })
+      return
+    }
 
-  // Insert export_jobs row
-  const { data: job, error: insertErr } = await supabase
-    .from('export_jobs')
-    .insert({
-      tenant_id: authed.tenantId,
-      requested_by: authed.userId,
-      status: 'pending',
-      tables_included: tables,
-    })
-    .select('id')
-    .single()
+    // Insert export_jobs row
+    const { data: job, error: insertErr } = await supabase
+      .from('export_jobs')
+      .insert({
+        tenant_id: authed.tenantId,
+        requested_by: authed.userId,
+        status: 'pending',
+        tables_included: tables,
+      })
+      .select('id')
+      .single()
 
-  if (insertErr || !job) {
-    res.status(500).json({ error: insertErr?.message ?? 'Failed to create export job' })
-    return
-  }
+    if (insertErr || !job) {
+      res.status(500).json({ error: insertErr?.message ?? 'Failed to create export job' })
+      return
+    }
 
-  // Enqueue BullMQ job
-  try {
-    const queue = getExportQueue()
-    await queue.add('data-export', {
-      tenantId: authed.tenantId,
+    // Enqueue BullMQ job
+    try {
+      const queue = getExportQueue()
+      await queue.add('data-export', {
+        tenantId: authed.tenantId,
+        exportJobId: job.id,
+        requestedBy: authed.userId,
+        tables,
+      })
+    } catch (err) {
+      console.error('[data-export] failed to enqueue job:', err)
+      await supabase.from('export_jobs').update({ status: 'failed' }).eq('id', job.id)
+      res.status(500).json({ error: 'Failed to enqueue export job' })
+      return
+    }
+
+    res.status(201).json({
       exportJobId: job.id,
-      requestedBy: authed.userId,
-      tables,
+      status: 'pending',
+      message: 'Export started',
     })
-  } catch (err) {
-    console.error('[data-export] failed to enqueue job:', err)
-    await supabase.from('export_jobs').update({ status: 'failed' }).eq('id', job.id)
-    res.status(500).json({ error: 'Failed to enqueue export job' })
-    return
   }
-
-  res.status(201).json({
-    exportJobId: job.id,
-    status: 'pending',
-    message: 'Export started',
-  })
-})
+)
 
 // ── GET /api/data-export — list exports ──────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -124,39 +131,44 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 })
 
 // ── GET /api/data-export/:id/download — redirect to signed URL ───────────────
-router.get('/:id/download', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.get(
+  '/:id/download',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: job, error } = await supabase
-    .from('export_jobs')
-    .select('id, status, download_url, expires_at')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    const { data: job, error } = await supabase
+      .from('export_jobs')
+      .select('id, status, download_url, expires_at')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (error || !job) {
-    res.status(404).json({ error: 'Export job not found' })
-    return
+    if (error || !job) {
+      res.status(404).json({ error: 'Export job not found' })
+      return
+    }
+
+    if (job.status !== 'completed') {
+      res.status(404).json({ error: 'Export is not ready yet', status: job.status })
+      return
+    }
+
+    // Check expiry
+    if (job.expires_at && new Date(job.expires_at) < new Date()) {
+      res.status(410).json({ error: 'Export link has expired' })
+      return
+    }
+
+    if (!job.download_url) {
+      res.status(404).json({ error: 'Download URL not available' })
+      return
+    }
+
+    res.redirect(302, job.download_url)
   }
-
-  if (job.status !== 'completed') {
-    res.status(404).json({ error: 'Export is not ready yet', status: job.status })
-    return
-  }
-
-  // Check expiry
-  if (job.expires_at && new Date(job.expires_at) < new Date()) {
-    res.status(410).json({ error: 'Export link has expired' })
-    return
-  }
-
-  if (!job.download_url) {
-    res.status(404).json({ error: 'Download URL not available' })
-    return
-  }
-
-  res.redirect(302, job.download_url)
-})
+)
 
 export default router

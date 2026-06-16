@@ -184,7 +184,7 @@ router.post('/block', requireAuth, async (req: Request, res: Response): Promise<
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -196,11 +196,6 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
 
-  await supabase.rpc('set_config', {
-    setting: 'app.current_tenant_id',
-    value: authed.tenantId,
-  })
-
   const { data, error } = await supabase
     .from('appointments')
     .select(
@@ -210,7 +205,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     .order('start_time', { ascending: true })
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -355,7 +350,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       event_type: 'booking.failed',
       payload_json: { severity: 'high', reason: error.message, booking_id: contact_id },
     })
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -540,7 +535,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -702,7 +697,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
     .eq('tenant_id', authed.tenantId)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 

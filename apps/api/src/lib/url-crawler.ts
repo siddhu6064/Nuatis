@@ -1,3 +1,5 @@
+import dns from 'node:dns'
+import net from 'node:net'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenAI } from '@google/genai'
 import { load } from 'cheerio'
@@ -8,6 +10,81 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
+}
+
+// ── SSRF guard (SSRF-01) ────────────────────────────────────────────────────
+const MAX_REDIRECTS = 3
+const MAX_BODY_BYTES = 2 * 1024 * 1024 // 2MB
+
+// Private / loopback / link-local / reserved ranges that must never be reached.
+const PRIVATE_BLOCKLIST = (() => {
+  const bl = new net.BlockList()
+  // IPv4
+  bl.addSubnet('0.0.0.0', 8, 'ipv4')
+  bl.addSubnet('10.0.0.0', 8, 'ipv4')
+  bl.addSubnet('100.64.0.0', 10, 'ipv4') // CGNAT
+  bl.addSubnet('127.0.0.0', 8, 'ipv4')
+  bl.addSubnet('169.254.0.0', 16, 'ipv4') // link-local / cloud metadata
+  bl.addSubnet('172.16.0.0', 12, 'ipv4')
+  bl.addSubnet('192.168.0.0', 16, 'ipv4')
+  bl.addSubnet('198.18.0.0', 15, 'ipv4') // benchmarking
+  bl.addSubnet('198.51.100.0', 24, 'ipv4') // TEST-NET-2
+  bl.addSubnet('203.0.113.0', 24, 'ipv4') // TEST-NET-3
+  bl.addSubnet('240.0.0.0', 4, 'ipv4') // reserved (covers 255.255.255.255)
+  // IPv6
+  bl.addAddress('::1', 'ipv6')
+  bl.addSubnet('fc00::', 7, 'ipv6') // ULA
+  bl.addSubnet('fe80::', 10, 'ipv6') // link-local
+  bl.addSubnet('::ffff:0:0', 96, 'ipv6') // IPv4-mapped
+  return bl
+})()
+
+/**
+ * Reject any URL that is not a publicly-routable http/https endpoint. Blocks
+ * raw IP literals (decimal/octal/hex/IPv6), resolves the hostname via DNS, and
+ * rejects if ANY resolved A/AAAA record falls in a private/loopback/link-local
+ * range. Must be called on the initial URL, robots.txt, and every redirect hop.
+ */
+async function assertPublicUrl(urlStr: string): Promise<void> {
+  let parsed: URL
+  try {
+    parsed = new URL(urlStr)
+  } catch {
+    throw new Error('Invalid URL')
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('URL must use http or https protocol')
+  }
+  const hostname = parsed.hostname
+  if (hostname === 'localhost') {
+    throw new Error('Crawling local addresses is not allowed')
+  }
+  // Reject bare IP literals (the original URL string) — incl. IPv6 in brackets.
+  const ipKind = net.isIP(hostname)
+  if (ipKind !== 0) {
+    throw new Error('Crawling raw IP addresses is not allowed')
+  }
+  // Reject decimal/octal/hex-encoded IPs that net.isIP does not recognize but
+  // the resolver/fetch would still interpret (e.g. http://2130706433/).
+  if (/^(0x[0-9a-f]+|\d+|0\d+(\.\d+)*|\d+\.\d+\.\d+\.\d+)$/i.test(hostname)) {
+    throw new Error('Crawling numeric/encoded IP addresses is not allowed')
+  }
+
+  let records: Array<{ address: string; family: number }>
+  try {
+    records = await dns.promises.lookup(hostname, { all: true })
+  } catch {
+    throw new Error('DNS resolution failed')
+  }
+  if (records.length === 0) {
+    throw new Error('No DNS records for host')
+  }
+  for (const rec of records) {
+    const family = rec.family === 6 ? 'ipv6' : 'ipv4'
+    if (PRIVATE_BLOCKLIST.check(rec.address, family)) {
+      throw new Error('Host resolves to a private/loopback/link-local address')
+    }
+  }
 }
 
 export async function crawlUrl(params: {
@@ -33,26 +110,14 @@ export async function crawlUrl(params: {
     }
     normalizedUrl = normalizedUrl.replace(/\/$/, '')
 
-    // Step 3: Validate URL
+    // Step 3: Validate URL (SSRF-01 — DNS-resolving private-range guard)
+    await assertPublicUrl(normalizedUrl)
     const parsed = new URL(normalizedUrl)
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      throw new Error('URL must use http or https protocol')
-    }
-    const hostname = parsed.hostname
-    if (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      /^\d+\.\d+\.\d+\.\d+$/.test(hostname) // IP address check
-    ) {
-      throw new Error('Crawling local or IP addresses is not allowed')
-    }
 
     // Step 3b: Check robots.txt
     try {
       const robotsUrl = `${parsed.protocol}//${parsed.hostname}/robots.txt`
-      const robotsRes = await fetchWithTimeout(robotsUrl, 5000)
+      const robotsRes = await safeFetch(robotsUrl, 5000)
       if (robotsRes.ok) {
         const robotsTxt = await robotsRes.text()
         if (isDisallowAll(robotsTxt)) {
@@ -179,20 +244,65 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
       headers: {
         'User-Agent': 'NuatisBot/1.0 (AI Assistant Knowledge Base Builder)',
       },
-      redirect: 'follow',
+      // SSRF-01: never auto-follow — each hop is re-validated by assertPublicUrl.
+      redirect: 'manual',
     })
   } finally {
     clearTimeout(timer)
   }
 }
 
+/**
+ * Fetch with per-hop SSRF validation. Validates the URL (and every redirect
+ * Location) against assertPublicUrl, following at most MAX_REDIRECTS hops.
+ */
+async function safeFetch(url: string, timeoutMs: number): Promise<Response> {
+  let current = url
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    await assertPublicUrl(current)
+    const res = await fetchWithTimeout(current, timeoutMs)
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location')
+      if (!location) return res
+      if (hop === MAX_REDIRECTS) throw new Error('Too many redirects')
+      current = new URL(location, current).toString()
+      continue
+    }
+    return res
+  }
+  throw new Error('Too many redirects')
+}
+
+/** Read a response body, aborting if it exceeds MAX_BODY_BYTES. */
+async function readCappedText(res: Response): Promise<string | null> {
+  const declared = Number(res.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null
+  if (!res.body) return res.text()
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) {
+      total += value.byteLength
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel()
+        return null
+      }
+      chunks.push(value)
+    }
+  }
+  return Buffer.concat(chunks).toString('utf-8')
+}
+
 async function fetchPage(url: string): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(url, 10000)
+    const res = await safeFetch(url, 10000)
     if (!res.ok) return null
     const contentType = res.headers.get('content-type') ?? ''
     if (!contentType.includes('text/html')) return null
-    return res.text()
+    return await readCappedText(res)
   } catch {
     return null
   }

@@ -73,6 +73,41 @@ export interface CallerFacts {
   [key: string]: unknown
 }
 
+// ── Sanitization (PROMPT-01) ────────────────────────────────────────────────
+
+// Strip instruction-injection phrasing and structural characters from caller
+// memory before it is stored and later injected into Maya's system prompt.
+const INJECTION_PATTERN =
+  /(ignore|disregard|forget|override|pretend|you are|your (real |true |actual )?instructions|system prompt|[<>{}\\])/gi
+
+/** Sanitize a free-text memory string: strip injection phrasing, collapse
+ *  whitespace, and truncate to `maxLen` characters. */
+export function sanitizeMemoryText(text: string, maxLen: number): string {
+  return text
+    .replace(INJECTION_PATTERN, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+}
+
+/** Sanitize every string (and string-array) value in a facts object. Scalars
+ *  are capped at 200 chars; structure and non-string values are preserved. */
+export function sanitizeFacts(facts: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(facts)) {
+    if (typeof value === 'string') {
+      out[key] = sanitizeMemoryText(value, 200)
+    } else if (Array.isArray(value)) {
+      out[key] = value.map((item) =>
+        typeof item === 'string' ? sanitizeMemoryText(item, 200) : item
+      )
+    } else {
+      out[key] = value
+    }
+  }
+  return out
+}
+
 // ── Merge logic ─────────────────────────────────────────────────────────────
 
 const ARRAY_FIELDS = new Set(['pending_needs', 'preferences', 'topics'])

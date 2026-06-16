@@ -306,6 +306,7 @@ describe('PUT /api/contacts/:id — assignment change', () => {
     const id = seedContact({ assigned_to_user_id: null })
     ;(store.tables['users'] = store.tables['users'] ?? []).push({
       id: 'user-new-assignee',
+      tenant_id: TENANT_ID,
       full_name: 'New Assignee',
     })
     const token = await makeToken()

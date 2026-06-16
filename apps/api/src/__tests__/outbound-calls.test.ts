@@ -35,6 +35,7 @@ jest.unstable_mockModule('../lib/auth.js', () => ({
     next()
   },
   requireModule: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }))
 
 // ── BullMQ mock ───────────────────────────────────────────────────────────────

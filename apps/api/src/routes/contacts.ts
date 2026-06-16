@@ -192,7 +192,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const { data, error, count } = await query
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -323,7 +323,7 @@ router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<
   const { data, error } = await stagesQuery
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -344,7 +344,8 @@ async function findDuplicates(
     const digits = phone.replace(/\D/g, '').slice(-10)
     if (digits.length >= 7) conditions.push(`phone.ilike.%${digits}%`)
   }
-  if (email) conditions.push(`email.ilike.${email.toLowerCase().trim()}`)
+  // SQLI-01: sanitize before interpolating into the PostgREST .or() DSL string.
+  if (email) conditions.push(`email.ilike.${sanitizeSearchTerm(email.toLowerCase().trim())}`)
   if (conditions.length === 0) return []
 
   let query = supabase
@@ -399,7 +400,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -501,6 +502,32 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (b['company_id'] === null) updates['company_id'] = null
   if (typeof b['sms_opt_in'] === 'boolean') updates['sms_opt_in'] = b['sms_opt_in']
 
+  // FK-01: body-supplied foreign keys must belong to the caller's tenant.
+  if (typeof updates['assigned_to_user_id'] === 'string') {
+    const { data: userCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', updates['assigned_to_user_id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (!userCheck) {
+      res.status(400).json({ error: 'Invalid assigned_to_user_id' })
+      return
+    }
+  }
+  if (typeof updates['company_id'] === 'string') {
+    const { data: companyCheck } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('id', updates['company_id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (!companyCheck) {
+      res.status(400).json({ error: 'Invalid company_id' })
+      return
+    }
+  }
+
   const { data: updated, error } = await supabase
     .from('contacts')
     .update(updates)
@@ -510,7 +537,7 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -931,7 +958,7 @@ router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Pr
     .in('id', contactIds)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1405,7 +1432,7 @@ router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response):
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1467,7 +1494,7 @@ router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response)
     .in('id', contactIds)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1533,7 +1560,7 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
     .in('id', contactIds)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 

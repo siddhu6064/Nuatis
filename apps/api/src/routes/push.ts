@@ -37,7 +37,9 @@ router.post('/subscribe', requireAuth, async (req: Request, res: Response): Prom
         p256dh: sub.keys.p256dh,
         auth: sub.keys.auth,
       },
-      { onConflict: 'endpoint' }
+      // MASS-01: scope conflict resolution to the tenant so a tenant cannot
+      // overwrite another tenant's subscription row (see migration 0132).
+      { onConflict: 'tenant_id,endpoint' }
     )
 
     console.info(`[push] subscription saved for tenant=${authed.tenantId}`)

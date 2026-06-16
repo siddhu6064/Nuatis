@@ -2,10 +2,13 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenAI } from '@google/genai'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { maskPhone } from '../voice/pre-call-lookup.js'
 import {
   EXTRACT_FACTS_PROMPT,
   SUMMARISE_PROMPT,
   mergeFacts,
+  sanitizeFacts,
+  sanitizeMemoryText,
   type CallerFacts,
 } from '../services/maya/memory-prompts.js'
 
@@ -39,7 +42,7 @@ function getSupabase() {
 async function processMemory(data: MayaMemoryJobData): Promise<void> {
   const { tenantId, sessionId, phone } = data
   console.info(
-    `[maya-memory-extractor] job start: session=${sessionId} tenant=${tenantId} phone=${phone}`
+    `[maya-memory-extractor] job start: session=${sessionId} tenant=${tenantId} phone=${maskPhone(phone)}`
   )
 
   // ── Step 1: Fetch voice session transcript ─────────────────────────────────
@@ -132,7 +135,10 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   // ── Step 5: Merge facts ───────────────────────────────────────────────────
 
-  const mergedFacts = mergeFacts(existingRow?.facts ?? null, extractedFacts)
+  // PROMPT-01: sanitize merged facts + summary before they are stored and
+  // later injected into Maya's system prompt.
+  const mergedFacts = sanitizeFacts(mergeFacts(existingRow?.facts ?? null, extractedFacts))
+  const sanitizedSummary = summary ? sanitizeMemoryText(summary, 500) : ''
 
   // ── Step 6: Best-effort contact_id lookup ─────────────────────────────────
 
@@ -162,7 +168,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
     tenant_id: tenantId,
     phone,
     facts: mergedFacts,
-    summary: summary || null,
+    summary: sanitizedSummary || null,
     call_count: (existingRow?.call_count ?? 0) + 1,
     last_call_at: now,
     updated_at: now,
@@ -178,14 +184,14 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   if (upsertError) {
     console.error(
-      `[maya-memory-extractor] upsert failed: session=${sessionId} phone=${phone}`,
+      `[maya-memory-extractor] upsert failed: session=${sessionId} phone=${maskPhone(phone)}`,
       upsertError.message
     )
     return
   }
 
   console.info(
-    `[maya-memory-extractor] upsert complete: session=${sessionId} phone=${phone} calls=${(existingRow?.call_count ?? 0) + 1}`
+    `[maya-memory-extractor] upsert complete: session=${sessionId} phone=${maskPhone(phone)} calls=${(existingRow?.call_count ?? 0) + 1}`
   )
 }
 

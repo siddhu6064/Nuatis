@@ -181,7 +181,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const { data, error, count } = await query
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1037,7 +1037,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
   const { data, error, count } = await query
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1123,7 +1123,7 @@ router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): 
 
   const { data, error, count } = await query
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -1159,7 +1159,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
     .eq('tenant_id', authed.tenantId)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 

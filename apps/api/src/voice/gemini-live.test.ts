@@ -121,9 +121,9 @@ describe('createGeminiLiveSession — memory block injection', () => {
     expect(session).toBeDefined()
     const prompt = capturedPrompt()
     expect(prompt).toContain('Returning caller John')
-    expect(prompt).toContain('CALLER CONTEXT')
+    expect(prompt).toContain('CALLER_CONTEXT_')
     // Memory block must appear before the core prompt body
-    const memoryIdx = prompt.indexOf('CALLER CONTEXT')
+    const memoryIdx = prompt.indexOf('CALLER_CONTEXT_')
     const coreIdx = prompt.indexOf('You are Maya')
     expect(memoryIdx).toBeLessThan(coreIdx)
   })
@@ -148,7 +148,7 @@ describe('createGeminiLiveSession — memory block injection', () => {
 
     expect(session).toBeDefined()
     const prompt = capturedPrompt()
-    expect(prompt).not.toContain('CALLER CONTEXT')
+    expect(prompt).not.toContain('CALLER_CONTEXT_')
     expect(prompt.length).toBeGreaterThan(0)
   })
 
@@ -178,6 +178,6 @@ describe('createGeminiLiveSession — memory block injection', () => {
     const session = await sessionPromise
 
     expect(session).toBeDefined()
-    expect(capturedPrompt()).not.toContain('CALLER CONTEXT')
+    expect(capturedPrompt()).not.toContain('CALLER_CONTEXT_')
   })
 })

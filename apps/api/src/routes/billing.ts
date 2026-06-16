@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
 import rateLimit from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { PLANS, PLAN_KEYS, type PlanKey } from '../config/stripe-plans.js'
 
 const router = Router()
@@ -99,6 +99,7 @@ router.get('/subscription', requireAuth, async (req: Request, res: Response): Pr
 router.post(
   '/checkout',
   requireAuth,
+  requireRole('owner', 'admin'),
   checkoutLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
@@ -207,39 +208,44 @@ router.post(
 
 // ── POST /api/billing/portal ──────────────────────────────────────────────────
 // Returns a Stripe Customer Portal URL for the tenant.
-router.post('/portal', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const stripe = getStripe()
-  if (!stripe) {
-    res.status(503).json({ error: 'Stripe not configured' })
-    return
+router.post(
+  '/portal',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const stripe = getStripe()
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe not configured' })
+      return
+    }
+
+    const supabase = getSupabase()
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('stripe_customer_id')
+      .eq('id', authed.tenantId)
+      .single<{ stripe_customer_id: string | null }>()
+
+    if (!tenant?.stripe_customer_id) {
+      res.status(400).json({ error: 'No Stripe customer found for this tenant' })
+      return
+    }
+
+    try {
+      const webUrl = process.env['WEB_URL'] ?? 'https://app.nuatis.com'
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: tenant.stripe_customer_id,
+        return_url: `${webUrl}/settings/billing`,
+      })
+
+      res.json({ url: portalSession.url })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      console.error('[billing] portal error:', message)
+      res.status(502).json({ error: message })
+    }
   }
-
-  const supabase = getSupabase()
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('stripe_customer_id')
-    .eq('id', authed.tenantId)
-    .single<{ stripe_customer_id: string | null }>()
-
-  if (!tenant?.stripe_customer_id) {
-    res.status(400).json({ error: 'No Stripe customer found for this tenant' })
-    return
-  }
-
-  try {
-    const webUrl = process.env['WEB_URL'] ?? 'https://app.nuatis.com'
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: tenant.stripe_customer_id,
-      return_url: `${webUrl}/settings/billing`,
-    })
-
-    res.json({ url: portalSession.url })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    console.error('[billing] portal error:', message)
-    res.status(502).json({ error: message })
-  }
-})
+)
 
 export default router

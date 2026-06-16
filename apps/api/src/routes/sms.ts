@@ -44,7 +44,7 @@ router.get(
       .order('created_at', { ascending: true })
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 

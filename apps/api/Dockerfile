@@ -45,12 +45,15 @@ COPY apps/api/package.json apps/api/
 RUN npm ci --workspace=apps/api --workspace=packages/shared --include-workspace-root --omit=dev
 
 # Copy compiled shared JS from builder (shared "main" → dist/index.js)
-COPY --from=builder /app/packages/shared/dist/ packages/shared/dist/
+COPY --from=builder --chown=node:node /app/packages/shared/dist/ packages/shared/dist/
 
 # Copy compiled API JS from builder
-COPY --from=builder /app/apps/api/dist/ apps/api/dist/
+COPY --from=builder --chown=node:node /app/apps/api/dist/ apps/api/dist/
 
 EXPOSE 3001
+
+# DOCKER-01: drop root — run as the built-in non-root `node` user.
+USER node
 
 # No request timeout — WebSocket voice calls can last several minutes
 CMD ["node", "apps/api/dist/index.js"]

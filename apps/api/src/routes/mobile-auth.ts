@@ -73,7 +73,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       .setIssuedAt()
       .setIssuer('nuatis-mobile')
       .setAudience('nuatis-api')
-      .setExpirationTime('30d')
+      .setExpirationTime('7d')
       .sign(secretKey)
 
     res.json({

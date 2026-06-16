@@ -36,9 +36,25 @@ function getTenant(tenants: TenantInfo | TenantInfo[] | null): TenantInfo | null
   return Array.isArray(tenants) ? (tenants[0] ?? null) : tenants
 }
 
+// CSRF-01: pin the session cookie attributes explicitly so SameSite can't
+// silently regress. `secure` stays adaptive — forcing it on would break local
+// http dev login. (Matches Auth.js defaults, made explicit.)
+const useSecureCookies = process.env.NODE_ENV === 'production'
+
 const result = NextAuth({
   trustHost: true,
   session: { strategy: 'jwt', maxAge: 60 * 60, updateAge: 5 * 60 },
+  cookies: {
+    sessionToken: {
+      name: `${useSecureCookies ? '__Secure-' : ''}authjs.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+      },
+    },
+  },
   providers: [
     Credentials({
       name: 'credentials',

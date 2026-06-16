@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { logActivity } from './activity.js'
 import { capture } from './posthog.js'
+import { sanitizeSearchTerm } from './sanitize-search.js'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -111,7 +112,8 @@ export async function processImportRows(
           const phoneDigits = phone.replace(/\D/g, '')
           conditions.push(`phone.ilike.%${phoneDigits.slice(-10)}%`)
         }
-        if (email) conditions.push(`email.ilike.${email}`)
+        // SQLI-01: sanitize before interpolating into the PostgREST .or() DSL.
+        if (email) conditions.push(`email.ilike.${sanitizeSearchTerm(email)}`)
 
         const { data: dupes } = await supabase
           .from('contacts')

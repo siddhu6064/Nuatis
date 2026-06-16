@@ -1279,7 +1279,7 @@ router.get('/inventory', requireAuth, async (req: Request, res: Response): Promi
       .is('deleted_at', null)
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 

@@ -85,6 +85,32 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   const assignedToUserId =
     typeof b['assigned_to_user_id'] === 'string' ? b['assigned_to_user_id'] || null : null
 
+  // FK-01: body-supplied foreign keys must belong to the caller's tenant.
+  if (contactId) {
+    const { data: contactCheck } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', contactId)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (!contactCheck) {
+      res.status(400).json({ error: 'Invalid contact_id' })
+      return
+    }
+  }
+  if (assignedToUserId) {
+    const { data: userCheck } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', assignedToUserId)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (!userCheck) {
+      res.status(400).json({ error: 'Invalid assigned_to_user_id' })
+      return
+    }
+  }
+
   const insertPayload = {
     tenant_id: authed.tenantId,
     contact_id: contactId,

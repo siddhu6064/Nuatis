@@ -11,6 +11,18 @@ export async function proxy(request: NextRequest) {
   // Proxy /api/* (except /api/auth/*) to Express backend
   // Create a signed HS256 JWT from the Auth.js session for Express requireAuth
   if (pathname.startsWith('/api') && !pathname.startsWith('/api/auth')) {
+    // CSRF-01: for state-mutating methods, reject cross-origin requests. The
+    // browser always sends Origin on these; a same-origin call matches the app's
+    // own origin. Absent Origin (server-side / same-origin navigation) is allowed.
+    const origin = request.headers.get('origin')
+    if (
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
+      origin &&
+      origin !== request.nextUrl.origin
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const url = new URL(pathname + request.nextUrl.search, API_BACKEND)
     const headers = new Headers(request.headers)
 

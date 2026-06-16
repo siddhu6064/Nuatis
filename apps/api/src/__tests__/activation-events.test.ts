@@ -47,6 +47,7 @@ jest.unstable_mockModule('../lib/auth.js', () => ({
     Object.assign(req, AUTHED)
     next()
   },
+  requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }))
 
 // ── Rate-limit middleware → passthrough ───────────────────────────────────────

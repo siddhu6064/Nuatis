@@ -38,7 +38,8 @@ router.post('/register', requireAuth, async (req: Request, res: Response): Promi
         is_active: true,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'expo_token' }
+      // MASS-01: scope conflict resolution to the tenant (see migration 0132).
+      { onConflict: 'tenant_id,expo_token' }
     )
 
     if (error) {

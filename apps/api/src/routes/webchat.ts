@@ -95,9 +95,8 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { token } = req.params
-      const { content, role: bodyRole } = req.body as {
+      const { content } = req.body as {
         content?: string
-        role?: 'user' | 'agent'
       }
 
       if (!content) {
@@ -105,7 +104,9 @@ router.post(
         return
       }
 
-      const role = bodyRole ?? 'user'
+      // MASS-03: this is a public (unauthenticated) endpoint — the message role
+      // must never come from the request body, or a visitor could post as staff.
+      const role = 'user'
       const supabase = getSupabase()
 
       // Lookup session

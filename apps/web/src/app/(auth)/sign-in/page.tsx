@@ -78,7 +78,8 @@ function DemoCard({ onLoginAsDemo }: { onLoginAsDemo: () => void }) {
       </span>
       <h2 className="mt-1 text-base font-semibold text-ink">Try Nuatis free</h2>
       <p className="mt-0.5 text-xs text-ink4 leading-relaxed">
-        Explore the full product with our demo account — no signup needed.
+        Explore the full product with our demo account — no signup needed. Demo environment —
+        synthetic data only.
       </p>
 
       <div className="mt-3 space-y-2">
@@ -126,10 +127,18 @@ export default function SignInPage() {
   )
 }
 
+// REDIRECT-01: allow only same-origin relative paths (reject `//host`, `/\host`,
+// and absolute URLs like `https://evil.com`).
+function isSafeRedirect(url: string): boolean {
+  return url === '/' || /^\/[^/\\]/.test(url)
+}
+
 function SignInForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const callbackUrl = params.get('callbackUrl') ?? '/dashboard'
+  // REDIRECT-01: only allow same-origin relative paths to prevent open redirect.
+  const rawCallbackUrl = params.get('callbackUrl') ?? '/dashboard'
+  const callbackUrl = isSafeRedirect(rawCallbackUrl) ? rawCallbackUrl : '/dashboard'
   const reset = params.get('reset') === '1'
   const passwordUpdated = params.get('passwordUpdated') === '1'
 

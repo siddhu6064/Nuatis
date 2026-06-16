@@ -144,7 +144,7 @@ router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Pr
 
   const { data, error, count } = await query
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -457,7 +457,7 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
     .single()
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
   res.json(data)
@@ -480,7 +480,7 @@ router.delete(
       .eq('status', 'draft')
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
     res.json({ deleted: true })
@@ -1607,7 +1607,7 @@ router.get(
       .order('recorded_at', { ascending: true })
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 

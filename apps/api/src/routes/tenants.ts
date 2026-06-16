@@ -9,7 +9,7 @@ import {
 } from '@nuatis/shared'
 import { z } from 'zod'
 import { seedSampleData } from '../lib/seed-sample-data.js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { authLimiter } from '../middleware/rate-limit.js'
 import { capture } from '../lib/posthog.js'
 
@@ -303,44 +303,49 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
 })
 
 // ── PATCH /api/tenants/me ─────────────────────────────────────
-router.patch('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const b = req.body as Record<string, unknown>
-  const updates: Record<string, unknown> = {}
+router.patch(
+  '/me',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const b = req.body as Record<string, unknown>
+    const updates: Record<string, unknown> = {}
 
-  if (typeof b['tax_rate'] === 'number') {
-    if (b['tax_rate'] < 0 || b['tax_rate'] > 100) {
-      res.status(400).json({ error: 'tax_rate must be between 0 and 100' })
+    if (typeof b['tax_rate'] === 'number') {
+      if (b['tax_rate'] < 0 || b['tax_rate'] > 100) {
+        res.status(400).json({ error: 'tax_rate must be between 0 and 100' })
+        return
+      }
+      updates['tax_rate'] = Number(b['tax_rate'].toFixed(2))
+    }
+
+    if (typeof b['tax_label'] === 'string') {
+      updates['tax_label'] = b['tax_label'].trim() || 'Tax'
+    }
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: 'No valid fields provided' })
       return
     }
-    updates['tax_rate'] = Number(b['tax_rate'].toFixed(2))
+
+    const { error } = await supabase.from('tenants').update(updates).eq('id', authed.tenantId)
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    const { data } = await supabase
+      .from('tenants')
+      .select('tax_rate, tax_label')
+      .eq('id', authed.tenantId)
+      .single()
+
+    res.json({
+      tax_rate: Number(data?.tax_rate ?? 0),
+      tax_label: (data?.tax_label as string) ?? 'Tax',
+    })
   }
-
-  if (typeof b['tax_label'] === 'string') {
-    updates['tax_label'] = b['tax_label'].trim() || 'Tax'
-  }
-
-  if (Object.keys(updates).length === 0) {
-    res.status(400).json({ error: 'No valid fields provided' })
-    return
-  }
-
-  const { error } = await supabase.from('tenants').update(updates).eq('id', authed.tenantId)
-  if (error) {
-    res.status(500).json({ error: error.message })
-    return
-  }
-
-  const { data } = await supabase
-    .from('tenants')
-    .select('tax_rate, tax_label')
-    .eq('id', authed.tenantId)
-    .single()
-
-  res.json({
-    tax_rate: Number(data?.tax_rate ?? 0),
-    tax_label: (data?.tax_label as string) ?? 'Tax',
-  })
-})
+)
 
 export default router

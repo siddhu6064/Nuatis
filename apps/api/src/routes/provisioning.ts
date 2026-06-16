@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { phoneProvisionLimiter } from '../middleware/rate-limit.js'
 import { capture } from '../lib/posthog.js'
 // config/urls.js available for future phone configuration
@@ -19,6 +19,7 @@ router.post(
   '/provision-phone',
   phoneProvisionLimiter,
   requireAuth,
+  requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const areaCode = typeof req.body?.area_code === 'string' ? req.body.area_code : '512'

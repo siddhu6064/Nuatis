@@ -177,7 +177,7 @@ router.get('/assignees', requireAuth, async (req: Request, res: Response): Promi
     .order('full_name', { ascending: true })
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Database operation failed' })
     return
   }
 
@@ -398,7 +398,7 @@ router.post(
     )
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 
@@ -450,7 +450,7 @@ router.post(
     )
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 
@@ -635,7 +635,7 @@ router.post(
     )
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 
@@ -673,7 +673,7 @@ router.post(
       .select('id')
 
     if (error) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: 'Database operation failed' })
       return
     }
 

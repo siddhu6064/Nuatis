@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { Queue } from 'bullmq'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { smsSendLimiter } from '../middleware/rate-limit.js'
 
@@ -29,6 +29,7 @@ router.post(
   '/',
   smsSendLimiter,
   requireAuth,
+  requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const { contact_id, call_context } = req.body as {

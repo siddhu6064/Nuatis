@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import {
   getOrCreateStripeCustomer,
   createStripeSubscription,
@@ -72,246 +72,266 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 })
 
 // ── POST /api/subscriptions ───────────────────────────────────────────────────
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
+router.post(
+  '/',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
 
-  if (!process.env['STRIPE_SECRET_KEY']) {
-    res.status(503).json({ error: 'Stripe not configured' })
-    return
-  }
+    if (!process.env['STRIPE_SECRET_KEY']) {
+      res.status(503).json({ error: 'Stripe not configured' })
+      return
+    }
 
-  const supabase = getSupabase()
-  const b = req.body as Record<string, unknown>
+    const supabase = getSupabase()
+    const b = req.body as Record<string, unknown>
 
-  // Validate required fields
-  if (!b['contact_id'] || typeof b['contact_id'] !== 'string') {
-    res.status(400).json({ error: 'contact_id is required' })
-    return
-  }
-  if (!b['name'] || typeof b['name'] !== 'string') {
-    res.status(400).json({ error: 'name is required' })
-    return
-  }
-  const amount =
-    typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount'] ?? ''))
-  if (isNaN(amount) || amount <= 0) {
-    res.status(400).json({ error: 'amount must be a positive number' })
-    return
-  }
-  const interval = typeof b['interval'] === 'string' ? b['interval'] : ''
-  if (!VALID_INTERVALS.includes(interval)) {
-    res.status(400).json({ error: `interval must be one of: ${VALID_INTERVALS.join(', ')}` })
-    return
-  }
+    // Validate required fields
+    if (!b['contact_id'] || typeof b['contact_id'] !== 'string') {
+      res.status(400).json({ error: 'contact_id is required' })
+      return
+    }
+    if (!b['name'] || typeof b['name'] !== 'string') {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+    const amount =
+      typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount'] ?? ''))
+    if (isNaN(amount) || amount <= 0) {
+      res.status(400).json({ error: 'amount must be a positive number' })
+      return
+    }
+    const interval = typeof b['interval'] === 'string' ? b['interval'] : ''
+    if (!VALID_INTERVALS.includes(interval)) {
+      res.status(400).json({ error: `interval must be one of: ${VALID_INTERVALS.join(', ')}` })
+      return
+    }
 
-  const contactId = b['contact_id'] as string
-  const name = b['name'] as string
-  const description = typeof b['description'] === 'string' ? b['description'] : undefined
-  const currency = typeof b['currency'] === 'string' ? b['currency'] : 'usd'
+    const contactId = b['contact_id'] as string
+    const name = b['name'] as string
+    const description = typeof b['description'] === 'string' ? b['description'] : undefined
+    const currency = typeof b['currency'] === 'string' ? b['currency'] : 'usd'
 
-  // 1. Fetch contact for this tenant
-  const { data: contact, error: contactErr } = await supabase
-    .from('contacts')
-    .select('email, full_name')
-    .eq('id', contactId)
-    .eq('tenant_id', authed.tenantId)
-    .single()
+    // 1. Fetch contact for this tenant
+    const { data: contact, error: contactErr } = await supabase
+      .from('contacts')
+      .select('email, full_name')
+      .eq('id', contactId)
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-  if (contactErr || !contact) {
-    res.status(404).json({ error: 'Contact not found' })
-    return
-  }
+    if (contactErr || !contact) {
+      res.status(404).json({ error: 'Contact not found' })
+      return
+    }
 
-  try {
-    // 2. Get or create Stripe customer
-    const customerId = await getOrCreateStripeCustomer({
-      tenantId: authed.tenantId,
-      contactId,
-      email: contact.email as string,
-      name: (contact.full_name as string) ?? name,
-    })
+    try {
+      // 2. Get or create Stripe customer
+      const customerId = await getOrCreateStripeCustomer({
+        tenantId: authed.tenantId,
+        contactId,
+        email: contact.email as string,
+        name: (contact.full_name as string) ?? name,
+      })
 
-    // 3. Create Stripe subscription
-    const result = await createStripeSubscription({
-      tenantId: authed.tenantId,
-      contactId,
-      customerId,
-      amount,
-      currency,
-      interval,
-      name,
-      description,
-    })
-
-    // 4. Insert into client_subscriptions
-    const { data: subscription, error: insertErr } = await supabase
-      .from('client_subscriptions')
-      .insert({
-        tenant_id: authed.tenantId,
-        contact_id: contactId,
-        name,
-        description: description ?? null,
+      // 3. Create Stripe subscription
+      const result = await createStripeSubscription({
+        tenantId: authed.tenantId,
+        contactId,
+        customerId,
         amount,
         currency,
         interval,
-        interval_count: 1,
-        status: result.status,
-        stripe_subscription_id: result.subscriptionId,
-        stripe_customer_id: customerId,
-        stripe_price_id: result.priceId,
+        name,
+        description,
       })
-      .select('*, contacts(full_name)')
-      .single()
 
-    if (insertErr || !subscription) {
-      res.status(500).json({ error: insertErr?.message ?? 'Failed to create subscription' })
-      return
+      // 4. Insert into client_subscriptions
+      const { data: subscription, error: insertErr } = await supabase
+        .from('client_subscriptions')
+        .insert({
+          tenant_id: authed.tenantId,
+          contact_id: contactId,
+          name,
+          description: description ?? null,
+          amount,
+          currency,
+          interval,
+          interval_count: 1,
+          status: result.status,
+          stripe_subscription_id: result.subscriptionId,
+          stripe_customer_id: customerId,
+          stripe_price_id: result.priceId,
+        })
+        .select('*, contacts(full_name)')
+        .single()
+
+      if (insertErr || !subscription) {
+        res.status(500).json({ error: insertErr?.message ?? 'Failed to create subscription' })
+        return
+      }
+
+      res.status(201).json({ subscription, client_secret: result.clientSecret })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      res.status(502).json({ error: message })
     }
-
-    res.status(201).json({ subscription, client_secret: result.clientSecret })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    res.status(502).json({ error: message })
   }
-})
+)
 
 // ── POST /api/subscriptions/:id/cancel ───────────────────────────────────────
-router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
-  const b = req.body as Record<string, unknown>
+router.post(
+  '/:id/cancel',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const b = req.body as Record<string, unknown>
 
-  const immediately = Boolean(b['immediately'])
+    const immediately = Boolean(b['immediately'])
 
-  const { data: subscription, error: fetchErr } = await supabase
-    .from('client_subscriptions')
-    .select('id, stripe_subscription_id, status, current_period_end')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
-
-  if (fetchErr || !subscription) {
-    res.status(404).json({ error: 'Subscription not found' })
-    return
-  }
-
-  try {
-    await cancelStripeSubscription(subscription.stripe_subscription_id as string, immediately)
-
-    const cancelledAt = new Date().toISOString()
-    const updateFields: Record<string, unknown> = {
-      cancelled_at: cancelledAt,
-      updated_at: cancelledAt,
-    }
-
-    if (immediately) {
-      updateFields['status'] = 'cancelled'
-    } else {
-      // Stripe will cancel at period end — store the period-end as cancel_at
-      updateFields['cancel_at'] = subscription.current_period_end ?? null
-      // Status stays active until the webhook fires customer.subscription.deleted
-    }
-
-    const { error: updateErr } = await supabase
+    const { data: subscription, error: fetchErr } = await supabase
       .from('client_subscriptions')
-      .update(updateFields)
-      .eq('id', subscription.id)
+      .select('id, stripe_subscription_id, status, current_period_end')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-    if (updateErr) {
-      res.status(500).json({ error: updateErr.message })
+    if (fetchErr || !subscription) {
+      res.status(404).json({ error: 'Subscription not found' })
       return
     }
 
-    res.json({ cancelled_at: cancelledAt })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    res.status(502).json({ error: message })
+    try {
+      await cancelStripeSubscription(subscription.stripe_subscription_id as string, immediately)
+
+      const cancelledAt = new Date().toISOString()
+      const updateFields: Record<string, unknown> = {
+        cancelled_at: cancelledAt,
+        updated_at: cancelledAt,
+      }
+
+      if (immediately) {
+        updateFields['status'] = 'cancelled'
+      } else {
+        // Stripe will cancel at period end — store the period-end as cancel_at
+        updateFields['cancel_at'] = subscription.current_period_end ?? null
+        // Status stays active until the webhook fires customer.subscription.deleted
+      }
+
+      const { error: updateErr } = await supabase
+        .from('client_subscriptions')
+        .update(updateFields)
+        .eq('id', subscription.id)
+
+      if (updateErr) {
+        res.status(500).json({ error: updateErr.message })
+        return
+      }
+
+      res.json({ cancelled_at: cancelledAt })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      res.status(502).json({ error: message })
+    }
   }
-})
+)
 
 // ── POST /api/subscriptions/:id/pause ────────────────────────────────────────
-router.post('/:id/pause', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/pause',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: subscription, error: fetchErr } = await supabase
-    .from('client_subscriptions')
-    .select('id, stripe_subscription_id, status')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
-
-  if (fetchErr || !subscription) {
-    res.status(404).json({ error: 'Subscription not found' })
-    return
-  }
-
-  if (subscription.status !== 'active') {
-    res.status(400).json({ error: 'Only active subscriptions can be paused' })
-    return
-  }
-
-  try {
-    await pauseStripeSubscription(subscription.stripe_subscription_id as string)
-
-    const { error: updateErr } = await supabase
+    const { data: subscription, error: fetchErr } = await supabase
       .from('client_subscriptions')
-      .update({ status: 'paused', updated_at: new Date().toISOString() })
-      .eq('id', subscription.id)
+      .select('id, stripe_subscription_id, status')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-    if (updateErr) {
-      res.status(500).json({ error: updateErr.message })
+    if (fetchErr || !subscription) {
+      res.status(404).json({ error: 'Subscription not found' })
       return
     }
 
-    res.json({ status: 'paused' })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    res.status(502).json({ error: message })
+    if (subscription.status !== 'active') {
+      res.status(400).json({ error: 'Only active subscriptions can be paused' })
+      return
+    }
+
+    try {
+      await pauseStripeSubscription(subscription.stripe_subscription_id as string)
+
+      const { error: updateErr } = await supabase
+        .from('client_subscriptions')
+        .update({ status: 'paused', updated_at: new Date().toISOString() })
+        .eq('id', subscription.id)
+
+      if (updateErr) {
+        res.status(500).json({ error: updateErr.message })
+        return
+      }
+
+      res.json({ status: 'paused' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      res.status(502).json({ error: message })
+    }
   }
-})
+)
 
 // ── POST /api/subscriptions/:id/resume ───────────────────────────────────────
-router.post('/:id/resume', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+router.post(
+  '/:id/resume',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
 
-  const { data: subscription, error: fetchErr } = await supabase
-    .from('client_subscriptions')
-    .select('id, stripe_subscription_id, status')
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .single()
-
-  if (fetchErr || !subscription) {
-    res.status(404).json({ error: 'Subscription not found' })
-    return
-  }
-
-  if (subscription.status !== 'paused') {
-    res.status(400).json({ error: 'Only paused subscriptions can be resumed' })
-    return
-  }
-
-  try {
-    await resumeStripeSubscription(subscription.stripe_subscription_id as string)
-
-    const { error: updateErr } = await supabase
+    const { data: subscription, error: fetchErr } = await supabase
       .from('client_subscriptions')
-      .update({ status: 'active', updated_at: new Date().toISOString() })
-      .eq('id', subscription.id)
+      .select('id, stripe_subscription_id, status')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
 
-    if (updateErr) {
-      res.status(500).json({ error: updateErr.message })
+    if (fetchErr || !subscription) {
+      res.status(404).json({ error: 'Subscription not found' })
       return
     }
 
-    res.json({ status: 'active' })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    res.status(502).json({ error: message })
+    if (subscription.status !== 'paused') {
+      res.status(400).json({ error: 'Only paused subscriptions can be resumed' })
+      return
+    }
+
+    try {
+      await resumeStripeSubscription(subscription.stripe_subscription_id as string)
+
+      const { error: updateErr } = await supabase
+        .from('client_subscriptions')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', subscription.id)
+
+      if (updateErr) {
+        res.status(500).json({ error: updateErr.message })
+        return
+      }
+
+      res.json({ status: 'active' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      res.status(502).json({ error: message })
+    }
   }
-})
+)
 
 export default router
 

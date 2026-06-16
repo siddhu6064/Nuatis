@@ -147,6 +147,25 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
+/**
+ * Role gate. Must run AFTER requireAuth (which populates `req.role`, defaulting
+ * to 'staff'). Returns 403 unless the caller's role is in `roles`.
+ */
+export function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const authed = req as AuthenticatedRequest
+    if (!authed.role) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+    if (!roles.includes(authed.role)) {
+      res.status(403).json({ error: 'Insufficient permissions' })
+      return
+    }
+    next()
+  }
+}
+
 export function requireModule(moduleName: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const authed = req as AuthenticatedRequest

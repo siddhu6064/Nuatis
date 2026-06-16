@@ -2,7 +2,7 @@ import { createServer } from 'http'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import express from 'express'
+import express, { type Request, type Response, type NextFunction } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import 'dotenv/config'
@@ -582,6 +582,17 @@ app.use('/webhooks/telnyx/sms', smsWebhooksRouter)
 // Sentry error handler — must be after all routes
 Sentry.setupExpressErrorHandler(app)
 
+// ERR-01: terminal error handler — never leak stack traces or internal messages,
+// regardless of NODE_ENV. Must be the last middleware registered.
+app.use((err: Error, _req: Request, res: Response, next: NextFunction): void => {
+  console.error('[unhandled]', err.message, err.stack)
+  if (res.headersSent) {
+    next(err)
+    return
+  }
+  res.status(500).json({ error: 'An unexpected error occurred' })
+})
+
 const server = createServer(app)
 
 // Both WebSocket servers use noServer:true so the ws library never subscribes
@@ -645,6 +656,14 @@ server.listen(PORT, () => {
   console.info(`Nuatis API running on http://localhost:${PORT}`)
   console.info(`Voice WebSocket listening at ws://localhost:${PORT}/voice/stream`)
   console.info(`Conversations WebSocket listening at ws://localhost:${PORT}/ws/conversations`)
+
+  // Webhook signature + rate-limit middleware bypass when NODE_ENV==='test'.
+  // Warn loudly if a deployed environment is neither production nor test.
+  if (process.env['NODE_ENV'] !== 'production' && process.env['NODE_ENV'] !== 'test') {
+    console.warn(
+      '[startup] NODE_ENV is not "production" — webhook/rate-limit test bypasses may be active'
+    )
+  }
 
   // Start BullMQ scanners (best-effort — don't block server start)
   startWorkers().catch((err) => console.error('[workers] failed to start:', err))

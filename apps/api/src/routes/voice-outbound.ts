@@ -139,8 +139,22 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     const supabase = getSupabase()
 
+    // MASS-02: resolve the job's own tenant so every status update below is
+    // tenant-scoped. The route is already Telnyx-signature-verified (mounted in
+    // index.ts), so this is defense-in-depth against a wrong-tenant write.
+    const { data: jobTenantRow } = await supabase
+      .from('outbound_call_jobs')
+      .select('tenant_id')
+      .eq('id', jobId)
+      .maybeSingle()
+    const jobTenantId = (jobTenantRow as { tenant_id: string } | null)?.tenant_id ?? null
+
     if (event === 'call.answered') {
-      await supabase.from('outbound_call_jobs').update({ status: 'connected' }).eq('id', jobId)
+      await supabase
+        .from('outbound_call_jobs')
+        .update({ status: 'connected' })
+        .eq('id', jobId)
+        .eq('tenant_id', jobTenantId)
       console.info(`[voice-outbound] call.answered job=${jobId}`)
 
       // Start media streaming now that the contact has answered.
@@ -216,6 +230,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           .from('outbound_call_jobs')
           .update({ status: 'completed', completed_at: new Date().toISOString(), attempts })
           .eq('id', jobId)
+          .eq('tenant_id', jobTenantId)
         console.info(`[voice-outbound] call completed job=${jobId}`)
       } else {
         // No answer
@@ -225,6 +240,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             .from('outbound_call_jobs')
             .update({ status: 'pending', attempts })
             .eq('id', jobId)
+            .eq('tenant_id', jobTenantId)
           const queue = new Queue('outbound-calls', {
             connection: createBullMQConnection(),
             skipVersionCheck: true,
@@ -244,6 +260,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               attempts,
             })
             .eq('id', jobId)
+            .eq('tenant_id', jobTenantId)
           console.info(`[voice-outbound] no_answer — max attempts reached job=${jobId}`)
         }
       }
@@ -262,6 +279,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             notes: 'Left voicemail',
           })
           .eq('id', jobId)
+          .eq('tenant_id', jobTenantId)
         console.info(`[voice-outbound] voicemail detected — marked completed job=${jobId}`)
       }
       return

@@ -165,22 +165,35 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           .maybeSingle()
 
         if (subscription && inv.amount_paid > 0) {
-          const invoiceNumber = await generateInvoiceNumber(subscription.tenant_id as string)
+          // DUP-01: skip if this Stripe invoice was already recorded (a replay
+          // inside Stripe's timestamp tolerance window would otherwise duplicate).
+          const { data: existingInvoice } = await supabase
+            .from('invoices')
+            .select('id')
+            .eq('stripe_invoice_id', inv.id)
+            .maybeSingle()
 
-          await supabase.from('invoices').insert({
-            tenant_id: subscription.tenant_id,
-            contact_id: subscription.contact_id,
-            invoice_number: invoiceNumber,
-            status: 'received',
-            issue_date: new Date().toISOString().split('T')[0],
-            subtotal: inv.amount_paid / 100,
-            tax_rate: 0,
-            tax_amount: 0,
-            total: inv.amount_paid / 100,
-            amount_paid: inv.amount_paid / 100,
-            paid_at: new Date().toISOString(),
-            notes: `Auto-generated from subscription: ${subscription.name as string}`,
-          })
+          if (existingInvoice) {
+            console.info(`[stripe-webhook] invoice already processed: ${inv.id}`)
+          } else {
+            const invoiceNumber = await generateInvoiceNumber(subscription.tenant_id as string)
+
+            await supabase.from('invoices').insert({
+              tenant_id: subscription.tenant_id,
+              contact_id: subscription.contact_id,
+              invoice_number: invoiceNumber,
+              stripe_invoice_id: inv.id,
+              status: 'received',
+              issue_date: new Date().toISOString().split('T')[0],
+              subtotal: inv.amount_paid / 100,
+              tax_rate: 0,
+              tax_amount: 0,
+              total: inv.amount_paid / 100,
+              amount_paid: inv.amount_paid / 100,
+              paid_at: new Date().toISOString(),
+              notes: `Auto-generated from subscription: ${subscription.name as string}`,
+            })
+          }
         }
         break
       }
