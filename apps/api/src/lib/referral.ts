@@ -34,7 +34,7 @@ export async function generateReferralCode(
       status: 'active',
       clicks: 0,
       signups: 0,
-      commission_rate: 10.0,
+      commission_rate: 20.0,
     })
 
     if (!error) return candidate

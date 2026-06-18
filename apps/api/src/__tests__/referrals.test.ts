@@ -67,7 +67,7 @@ describe('generateReferralCode — code format', () => {
     // Should be stored in the mock
     const rows = store.tables['referral_codes'] as Row[]
     expect(rows.length).toBe(1)
-    expect(rows[0]?.['commission_rate']).toBe(10)
+    expect(rows[0]?.['commission_rate']).toBe(20)
   })
 })
 
