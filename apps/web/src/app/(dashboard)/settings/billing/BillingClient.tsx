@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? ''
@@ -29,10 +29,9 @@ const STATUS_STYLE: Record<Status, { bg: string; fg: string; label: string }> = 
   unpaid: { bg: '#fef3c7', fg: '#92400e', label: 'Unpaid' },
 }
 
-function daysUntil(iso: string | null): number | null {
+function daysUntil(iso: string | null, now: number): number | null {
   if (!iso) return null
   const target = new Date(iso).getTime()
-  const now = Date.now()
   return Math.max(0, Math.ceil((target - now) / 86_400_000))
 }
 
@@ -48,6 +47,11 @@ function formatDate(iso: string | null): string {
 export default function BillingClient(props: Props) {
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalError, setPortalError] = useState<string | null>(null)
+  const [now, setNow] = useState<number | null>(null)
+
+  useEffect(() => {
+    setNow(Date.now())
+  }, [])
 
   async function openPortal() {
     setPortalError(null)
@@ -71,7 +75,11 @@ export default function BillingClient(props: Props) {
   }
 
   const statusStyle = STATUS_STYLE[props.status]
-  const trialDaysLeft = props.status === 'trialing' ? daysUntil(props.trialEndsAt) : null
+  // `now` is null during SSR and the first client render, populated after mount.
+  // Keeps the trial-days display out of the SSR markup, avoiding hydration
+  // mismatch (#418) from server-now vs client-now.
+  const trialDaysLeft =
+    props.status === 'trialing' && now !== null ? daysUntil(props.trialEndsAt, now) : null
 
   // Maya minutes display state
   const isUnlimited = props.mayaMinutesLimit === null

@@ -44,6 +44,11 @@ export default function BookingSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [slugError, setSlugError] = useState<string | null>(null)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
 
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -131,7 +136,7 @@ export default function BookingSettingsPage() {
     )
   }
 
-  const bookingUrl = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/book/${settings.slug}`
+  const bookingUrl = `${origin}/book/${settings.slug}`
 
   const inputCls =
     'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'

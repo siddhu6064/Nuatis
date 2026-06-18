@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 
 interface VoiceSession {
@@ -152,8 +152,16 @@ interface Props {
 
 export default function CallLogView({ calls, total, hasFilters }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [mounted, setMounted] = useState(false)
 
-  const buckets = useMemo(() => bucketAndGroup(calls), [calls])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // `bucketAndGroup` reads `new Date()` for week/month boundaries. Gate on
+  // `mounted` so SSR and the first client render match (empty) — boundaries are
+  // computed only after mount, avoiding hydration mismatch (#418).
+  const buckets = useMemo(() => (mounted ? bucketAndGroup(calls) : []), [calls, mounted])
 
   function toggleGroup(key: string) {
     setExpanded((prev) => {
