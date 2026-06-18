@@ -9,7 +9,7 @@ interface EmailTemplate {
 
 interface EmailAccount {
   id: string
-  email: string
+  email_address: string
   provider: string
   is_default: boolean
 }
@@ -196,7 +196,7 @@ export default function EmailComposeModal({
                 >
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.email}
+                      {a.email_address}
                       {a.is_default ? ' (default)' : ''}
                     </option>
                   ))}

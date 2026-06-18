@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 interface EmailAccount {
   id: string
   provider: 'gmail' | 'outlook'
-  email: string
+  email_address: string
   is_default: boolean
 }
 
@@ -65,8 +65,8 @@ function IntegrationsContent() {
     try {
       const res = await fetch(`/api/email-integrations`)
       if (res.ok) {
-        const data: EmailAccount[] = await res.json()
-        setAccounts(data)
+        const data: { accounts: EmailAccount[] } = await res.json()
+        setAccounts(data.accounts ?? [])
       }
     } catch {
       // silently fail on load
@@ -222,7 +222,9 @@ function IntegrationsContent() {
                       {account.provider === 'gmail' ? <GmailIcon /> : <OutlookIcon />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink truncate">{account.email}</p>
+                      <p className="text-sm font-medium text-ink truncate">
+                        {account.email_address}
+                      </p>
                       <p className="text-xs text-ink4">{providerLabel(account.provider)}</p>
                     </div>
                     {account.is_default && (
@@ -232,7 +234,7 @@ function IntegrationsContent() {
                     )}
                   </div>
                   <button
-                    onClick={() => disconnectAccount(account.id, account.email)}
+                    onClick={() => disconnectAccount(account.id, account.email_address)}
                     disabled={disconnecting === account.id}
                     className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
