@@ -71,7 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'Appointments',
         icon: '◷',
         suiteOnly: true,
-        requireModule: 'appointments',
+        requireModule: 'scheduling',
       },
       { href: '/settings/booking', label: 'Online Booking', icon: '📅', suiteOnly: true },
       { href: '/settings/intake-forms', label: 'Intake Forms', icon: '📋', suiteOnly: true },

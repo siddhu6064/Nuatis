@@ -9,15 +9,20 @@ export default async function ModulesPage() {
   const vertical = session?.user?.vertical ?? 'sales_crm'
 
   const supabase = createAdminClient()
-  const { data } = await supabase.from('tenants').select('modules').eq('id', tenantId).single()
+  const { data } = await supabase
+    .from('tenants')
+    .select('modules, subscription_plan')
+    .eq('id', tenantId)
+    .single()
 
   const modules = (data?.modules as Record<string, boolean>) ?? {}
+  const plan = (data?.subscription_plan as string | null) ?? null
 
   return (
     <div className="px-8 py-8 max-w-2xl">
       <h1 className="text-xl font-bold text-ink mb-1">Modules</h1>
       <p className="text-sm text-ink3 mb-6">Choose which features are visible in your workspace</p>
-      <ModuleSettings initialModules={modules} isOwner={isOwner} vertical={vertical} />
+      <ModuleSettings initialModules={modules} isOwner={isOwner} vertical={vertical} plan={plan} />
     </div>
   )
 }

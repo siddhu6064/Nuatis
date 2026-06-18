@@ -2,21 +2,11 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { PLANS, PLAN_KEYS, BASE_SUITE, type PlanKey } from '../config/stripe-plans.js'
+import { VALID_MODULE_IDS } from '../config/module-registry.js'
 
 const router = Router()
 
-const VALID_MODULES = [
-  'maya',
-  'crm',
-  'appointments',
-  'pipeline',
-  'automation',
-  'cpq',
-  'insights',
-  'companies',
-  'deals',
-  'campaigns',
-]
+const VALID_MODULES = VALID_MODULE_IDS
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

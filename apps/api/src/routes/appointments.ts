@@ -24,7 +24,7 @@ const router = Router()
 // Appointments module gate
 async function requireAppointments(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authed = req as AuthenticatedRequest
-  const enabled = await isModuleEnabled(authed.tenantId, 'appointments')
+  const enabled = await isModuleEnabled(authed.tenantId, 'scheduling')
   if (!enabled) {
     res.status(403).json({
       error:

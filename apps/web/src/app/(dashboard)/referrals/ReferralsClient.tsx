@@ -34,6 +34,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function ReferralsClient() {
   const [clicks, setClicks] = useState<number>(0)
+  const [commissionRate, setCommissionRate] = useState<number>(20)
   const [signups, setSignups] = useState<number>(0)
   const [referralUrl, setReferralUrl] = useState<string>('')
   const [estimatedMrr, setEstimatedMrr] = useState<number>(0)
@@ -55,6 +56,9 @@ export default function ReferralsClient() {
           const codeData = await codeRes.json()
           setClicks(codeData.clicks ?? 0)
           setReferralUrl(codeData.referral_url ?? '')
+          setCommissionRate(
+            codeData.commission_rate != null ? Number(codeData.commission_rate) : 20
+          )
         }
 
         if (signupsRes.ok) {
@@ -92,14 +96,18 @@ export default function ReferralsClient() {
     }
   }
 
+  const ratePct = Math.round(commissionRate)
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Hero banner */}
       <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-6 mb-6">
-        <h1 className="text-2xl font-bold text-amber-900 mb-2">Earn 10% recurring commission</h1>
+        <h1 className="text-2xl font-bold text-amber-900 mb-2">
+          Earn {ratePct}% recurring commission
+        </h1>
         <p className="text-amber-800">
-          Refer a business to Nuatis and earn 10% of their monthly subscription — every month they
-          stay active.
+          Refer a business to Nuatis and earn {ratePct}% of their monthly subscription — every month
+          they stay active.
         </p>
       </div>
 
@@ -214,7 +222,7 @@ export default function ReferralsClient() {
           {[
             'Share your unique referral link with fellow business owners',
             'They sign up for Nuatis using your link',
-            'Earn 10% of their monthly subscription — for life',
+            `Earn ${ratePct}% of their monthly subscription — for life`,
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-4">
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center">
