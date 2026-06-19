@@ -486,6 +486,8 @@ function StepYourInfo({
                 First Name <span className="text-red-400">*</span>
               </label>
               <input
+                id="firstName"
+                name="firstName"
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -499,6 +501,8 @@ function StepYourInfo({
                 Last Name <span className="text-red-400">*</span>
               </label>
               <input
+                id="lastName"
+                name="lastName"
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -514,6 +518,8 @@ function StepYourInfo({
               Email <span className="text-red-400">*</span>
             </label>
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -528,6 +534,8 @@ function StepYourInfo({
               Phone <span className="text-red-400">*</span>
             </label>
             <input
+              id="phone"
+              name="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -540,6 +548,8 @@ function StepYourInfo({
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1">Notes (optional)</label>
             <textarea
+              id="notes"
+              name="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
@@ -562,6 +572,8 @@ function StepYourInfo({
 
                 {field.type === 'textarea' ? (
                   <textarea
+                    id={field.id}
+                    name={field.id}
                     rows={3}
                     required={field.required}
                     value={String(intakeData[field.id] ?? '')}
@@ -570,6 +582,8 @@ function StepYourInfo({
                   />
                 ) : field.type === 'select' ? (
                   <select
+                    id={field.id}
+                    name={field.id}
                     required={field.required}
                     value={String(intakeData[field.id] ?? '')}
                     onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
@@ -585,6 +599,8 @@ function StepYourInfo({
                 ) : field.type === 'checkbox' ? (
                   <div className="flex items-center gap-2">
                     <input
+                      id={field.id}
+                      name={field.id}
                       type="checkbox"
                       checked={Boolean(intakeData[field.id])}
                       onChange={(e) =>
@@ -596,6 +612,8 @@ function StepYourInfo({
                   </div>
                 ) : (
                   <input
+                    id={field.id}
+                    name={field.id}
                     type={field.type}
                     required={field.required}
                     value={String(intakeData[field.id] ?? '')}

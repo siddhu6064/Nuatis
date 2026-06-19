@@ -284,6 +284,8 @@ export default function CollectPageClient({ slug }: { slug: string }) {
               className="space-y-3 mb-6"
             >
               <input
+                id="name"
+                name="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -292,6 +294,8 @@ export default function CollectPageClient({ slug }: { slug: string }) {
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
               <input
+                id="email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

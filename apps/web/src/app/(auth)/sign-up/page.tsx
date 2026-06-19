@@ -182,6 +182,8 @@ function SignUpForm() {
               <div>
                 <label className="block text-sm font-medium text-ink2 mb-1">Business name</label>
                 <input
+                  id="business_name"
+                  name="business_name"
                   type="text"
                   value={form.business_name}
                   onChange={(e) => set('business_name', e.target.value)}
@@ -252,6 +254,8 @@ function SignUpForm() {
               <div>
                 <label className="block text-sm font-medium text-ink2 mb-1">Your full name</label>
                 <input
+                  id="name"
+                  name="name"
                   type="text"
                   value={form.owner_name}
                   onChange={(e) => set('owner_name', e.target.value)}
@@ -263,6 +267,8 @@ function SignUpForm() {
               <div>
                 <label className="block text-sm font-medium text-ink2 mb-1">Email address</label>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   value={form.owner_email}
                   onChange={(e) => set('owner_email', e.target.value)}
@@ -273,6 +279,8 @@ function SignUpForm() {
               <div>
                 <label className="block text-sm font-medium text-ink2 mb-1">Password</label>
                 <input
+                  id="password"
+                  name="password"
                   type="password"
                   value={form.owner_password}
                   onChange={(e) => set('owner_password', e.target.value)}

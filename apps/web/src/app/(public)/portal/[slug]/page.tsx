@@ -138,6 +138,8 @@ function PortalLandingContent() {
                 }}
               >
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

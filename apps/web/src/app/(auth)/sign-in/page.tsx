@@ -220,6 +220,8 @@ function SignInForm() {
             <div>
               <label className="block text-xs font-medium text-ink3 mb-1.5">Email</label>
               <input
+                id="email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -241,6 +243,8 @@ function SignInForm() {
                 </a>
               </div>
               <input
+                id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
