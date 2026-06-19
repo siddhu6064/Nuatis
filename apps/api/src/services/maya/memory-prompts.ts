@@ -19,6 +19,7 @@ Return ONLY a valid JSON object with exactly this shape — no commentary, no ma
   "preferred_name": "nickname or preferred name if mentioned, or null",
   "last_appointment_type": "type of appointment or service discussed, or null",
   "last_appointment_date": "date mentioned in YYYY-MM-DD format, or null",
+  "last_provider": "name of the provider, doctor, or staff member the caller saw or mentions, or null if not stated",
   "pending_needs": ["things the caller wanted but did not complete, e.g. 'reschedule crown'"],
   "preferences": ["time or staff preferences, e.g. 'morning slots', 'Dr. Martinez'"],
   "sentiment": "one of: positive | neutral | negative | frustrated",
@@ -29,7 +30,7 @@ Return ONLY a valid JSON object with exactly this shape — no commentary, no ma
 Rules:
 - Return ONLY valid JSON — no markdown fences, no explanation text, no trailing comments
 - Only include facts explicitly stated or clearly implied by the transcript
-- Scalar fields (name, preferred_name, last_appointment_type, last_appointment_date): use null if unknown
+- Scalar fields (name, preferred_name, last_provider, last_appointment_type, last_appointment_date, language): use null if unknown
 - Array fields (pending_needs, preferences, topics): use [] if none found
 - Keep every array item concise — 5 words maximum per item, no duplicates
 - sentiment must be exactly one of: positive, neutral, negative, frustrated
@@ -49,6 +50,7 @@ summary suitable for briefing a receptionist before they answer the phone.
 
 The summary should feel natural and helpful — mention the caller's name if known, their most recent
 topic or appointment type, and any pending needs or preferences worth knowing.
+If last_provider is set, mention who they saw last (e.g. "They last saw Dr. Lee.").
 
 Example outputs:
 - "Returning caller John, last called about a crown consultation in April. Prefers morning slots with Dr. Martinez and wants to reschedule."
@@ -65,6 +67,7 @@ export interface CallerFacts {
   preferred_name?: string | null
   last_appointment_type?: string | null
   last_appointment_date?: string | null
+  last_provider?: string | null
   pending_needs?: string[]
   preferences?: string[]
   sentiment?: 'positive' | 'neutral' | 'negative' | 'frustrated'
@@ -116,6 +119,7 @@ const SCALAR_FIELDS = new Set([
   'preferred_name',
   'last_appointment_type',
   'last_appointment_date',
+  'last_provider',
   'language',
 ])
 
