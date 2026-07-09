@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sendSms } from '../lib/sms.js'
+import { grantTcpaOptIn } from '../lib/tcpa.js'
 import { logActivity } from '../lib/activity.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
@@ -82,7 +83,7 @@ router.post(
 
     const { data: contact } = await supabase
       .from('contacts')
-      .select('id, phone, full_name')
+      .select('id, phone, full_name, sms_opt_in')
       .eq('id', contactId)
       .eq('tenant_id', authed.tenantId)
       .single()
@@ -94,6 +95,19 @@ router.post(
     if (!contact.phone) {
       res.status(400).json({ error: 'Contact has no phone number' })
       return
+    }
+
+    // Check SMS opt-in: explicit opt-out blocks. Null/undefined is treated as
+    // agent-initiated consent — the agent's deliberate action to send creates
+    // an established business relationship under TCPA. Grant opt-in here so
+    // sendSms's internal TCPA check passes and so future automated replies
+    // (Maya, campaigns) can also reach this contact.
+    if (contact.sms_opt_in === false) {
+      res.status(403).json({ error: 'Contact has opted out of SMS' })
+      return
+    }
+    if (contact.sms_opt_in !== true) {
+      await grantTcpaOptIn(contactId as string, authed.tenantId, authed.appUserId ?? null)
     }
 
     // Get tenant's Telnyx number (from telnyx_numbers table)

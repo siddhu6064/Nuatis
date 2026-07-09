@@ -70,6 +70,11 @@ export type PlanDef = (typeof PLANS)[PlanKey]
 
 export const PLAN_KEYS: PlanKey[] = ['core', 'pro', 'scale']
 
+// The full suite module set (scale's module list). upgrade-to-suite writes an
+// explicit boolean for every one of these keys so downstream gates never have
+// to resolve an absent key.
+export const SUITE_MODULE_KEYS: readonly string[] = PLANS.scale.modules
+
 /**
  * Reverse-lookup a plan key from any of its Stripe price IDs (monthly,
  * annual, or overage). Used by the webhook handler to identify which

@@ -309,7 +309,11 @@ publicRouter.get(
     if (action === 'confirm_appointment') {
       const apptId = config['appointment_id'] as string | undefined
       if (apptId) {
-        await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', apptId)
+        await supabase
+          .from('appointments')
+          .update({ status: 'confirmed' })
+          .eq('id', apptId)
+          .eq('tenant_id', link.tenant_id)
       } else if (contactId) {
         await supabase
           .from('appointments')
@@ -323,7 +327,11 @@ publicRouter.get(
     } else if (action === 'cancel_appointment') {
       const apptId = config['appointment_id'] as string | undefined
       if (apptId) {
-        await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', apptId)
+        await supabase
+          .from('appointments')
+          .update({ status: 'cancelled' })
+          .eq('id', apptId)
+          .eq('tenant_id', link.tenant_id)
       }
     } else if (action === 'mark_contacted') {
       if (contactId) {

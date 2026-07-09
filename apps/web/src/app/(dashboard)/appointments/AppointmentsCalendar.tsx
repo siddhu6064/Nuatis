@@ -99,6 +99,9 @@ const localizer = dateFnsLocalizer({
   locales: { 'en-US': enUS },
 })
 
+// Initial scroll position for week/day time grids — open at 8 AM, not midnight
+const SCROLL_TO_TIME = new Date(1970, 0, 1, 8, 0, 0)
+
 // ── Supabase browser client ───────────────────────────────────────────────────
 
 function getSupabase() {
@@ -400,7 +403,7 @@ export default function AppointmentsCalendar({
       </div>
 
       <div
-        className={`rbc-wrapper bg-white rounded-xl border border-border-brand overflow-hidden${
+        className={`rbc-wrapper relative bg-white rounded-xl border border-border-brand overflow-hidden${
           loading ? ' opacity-60 pointer-events-none' : ''
         }`}
       >
@@ -417,8 +420,14 @@ export default function AppointmentsCalendar({
           selectable
           eventPropGetter={eventPropGetter}
           style={{ height: 680 }}
+          scrollToTime={SCROLL_TO_TIME}
           popup
         />
+        {view === Views.WEEK && !loading && events.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <p className="text-sm text-ink4">Click any time slot to add an appointment</p>
+          </div>
+        )}
       </div>
 
       {selectedAppt && (

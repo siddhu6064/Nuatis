@@ -15,10 +15,15 @@ export async function proxy(request: NextRequest) {
     // browser always sends Origin on these; a same-origin call matches the app's
     // own origin. Absent Origin (server-side / same-origin navigation) is allowed.
     const origin = request.headers.get('origin')
+    // Behind the prod reverse proxy, request.nextUrl.origin reflects the internal
+    // host, not the public domain — compare against the forwarded public origin.
+    const fwdHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+    const fwdProto = request.headers.get('x-forwarded-proto') ?? 'https'
+    const expectedOrigin = fwdHost ? `${fwdProto}://${fwdHost}` : request.nextUrl.origin
     if (
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
       origin &&
-      origin !== request.nextUrl.origin
+      origin !== expectedOrigin
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

@@ -89,6 +89,7 @@ export async function createSquarePayment(params: {
   sourceId: string
   note?: string
   referenceId?: string
+  idempotencyKey?: string
 }): Promise<{ paymentId: string; status: string; receiptUrl: string | null }> {
   const supabase = getSupabase()
 
@@ -112,7 +113,7 @@ export async function createSquarePayment(params: {
       'Square-Version': '2024-01-18',
     },
     body: JSON.stringify({
-      idempotency_key: randomUUID(),
+      idempotency_key: params.idempotencyKey ?? randomUUID(),
       amount_money: {
         amount: params.amountCents,
         currency: params.currency,

@@ -59,7 +59,6 @@ const NAV_GROUPS: NavGroup[] = [
         suiteOnly: true,
         requireModule: 'companies',
       },
-      { href: '/settings/lead-scoring', label: 'Lead Scoring', icon: '📊', suiteOnly: true },
     ],
   },
   {
@@ -212,6 +211,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/qr-codes', label: 'QR Codes', icon: '▦', suiteOnly: true },
       { href: '/settings/gift-cards', label: 'Gift Cards', icon: '🎁', suiteOnly: true },
       { href: '/settings/media-library', label: 'Media Library', icon: '🖼', suiteOnly: true },
+      { href: '/settings/lead-scoring', label: 'Lead Scoring', icon: '📊', suiteOnly: true },
     ],
   },
 ]

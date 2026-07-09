@@ -588,8 +588,9 @@ router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<voi
 // workspace owners to prevent cross-tenant business-intelligence disclosure.
 router.get('/plg', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  if (authed.role !== 'owner') {
-    res.status(403).json({ error: 'Owner role required' })
+  const platformTenantId = process.env['PLATFORM_TENANT_ID']
+  if (!platformTenantId || authed.tenantId !== platformTenantId || authed.role !== 'owner') {
+    res.status(403).json({ error: 'Forbidden' })
     return
   }
   const supabase = getSupabase()
@@ -853,7 +854,11 @@ router.get(
           .eq('id', pipelineId)
           .eq('tenant_id', authed.tenantId)
           .maybeSingle()
-        pipelineName = pipeline?.name ?? ''
+        if (!pipeline) {
+          res.status(404).json({ error: 'Pipeline not found' })
+          return
+        }
+        pipelineName = pipeline.name
       }
 
       // 2. Get all stages for the pipeline ordered by position
@@ -1031,6 +1036,17 @@ router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response):
         return
       }
       pipelineId = defaultPipeline.id
+    } else {
+      const { data: ownedPipeline } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('id', pipelineId)
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle()
+      if (!ownedPipeline) {
+        res.status(404).json({ error: 'Pipeline not found' })
+        return
+      }
     }
 
     // Get stages ordered by position

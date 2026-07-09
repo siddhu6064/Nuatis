@@ -114,8 +114,25 @@ describe('POST /api/provisioning/upgrade-to-suite', () => {
     expect(res.status).toBe(403)
   })
 
-  it('upgrades to suite and writes complete modules object including companies + deals — fix verified', async () => {
+  it('returns 402 when the tenant has no active subscription — fail closed', async () => {
     store.tables['tenants']!.push({ id: TENANT_ID, product: 'maya_only', modules: { maya: true } })
+    const token = await makeToken('owner')
+
+    const res = await request(makeApp())
+      .post('/api/provisioning/upgrade-to-suite')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(402)
+  })
+
+  it('upgrades to suite and writes an explicit boolean for every suite module key', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      product: 'maya_only',
+      modules: { maya: true },
+      subscription_plan: 'scale',
+      subscription_status: 'active',
+    })
     const token = await makeToken('owner')
 
     const res = await request(makeApp())
@@ -128,10 +145,52 @@ describe('POST /api/provisioning/upgrade-to-suite', () => {
 
     const row = (store.tables['tenants'] as Row[]).find((r) => r['id'] === TENANT_ID)
     const modules = row?.['modules'] as Record<string, boolean>
-    expect(modules.companies).toBe(true)
-    expect(modules.deals).toBe(true)
-    expect(modules.appointments).toBe(true)
-    expect(modules.pipeline).toBe(true)
-    expect(modules.automation).toBe(true)
+    // Scale entitles all nine suite keys — every one written as an explicit true.
+    for (const key of [
+      'maya',
+      'crm',
+      'scheduling',
+      'appointments',
+      'pipeline',
+      'automation',
+      'insights',
+      'campaigns',
+      'cpq',
+    ]) {
+      expect(modules[key]).toBe(true)
+    }
+    // companies/deals are no longer written — they stay entitled via BASE_SUITE.
+    expect('companies' in modules).toBe(false)
+    expect('deals' in modules).toBe(false)
+  })
+
+  it('writes explicit false for tier-gated modules the plan does not entitle', async () => {
+    store.tables['tenants']!.push({
+      id: TENANT_ID,
+      product: 'maya_only',
+      modules: { maya: true },
+      subscription_plan: 'core',
+      subscription_status: 'trialing',
+    })
+    const token = await makeToken('owner')
+
+    const res = await request(makeApp())
+      .post('/api/provisioning/upgrade-to-suite')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+
+    const row = (store.tables['tenants'] as Row[]).find((r) => r['id'] === TENANT_ID)
+    const modules = row?.['modules'] as Record<string, boolean>
+    expect(modules['maya']).toBe(true)
+    expect(modules['crm']).toBe(true)
+    expect(modules['scheduling']).toBe(true)
+    expect(modules['appointments']).toBe(true)
+    expect(modules['pipeline']).toBe(true)
+    // Core does not entitle these — explicit false, never an absent key.
+    expect(modules['automation']).toBe(false)
+    expect(modules['insights']).toBe(false)
+    expect(modules['campaigns']).toBe(false)
+    expect(modules['cpq']).toBe(false)
   })
 })

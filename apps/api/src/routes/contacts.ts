@@ -8,6 +8,7 @@ import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logBulkAction } from '../middleware/audit-logger.js'
+import { smsSendLimiter, smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
@@ -978,96 +979,104 @@ router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Pr
 })
 
 // ── POST /api/contacts/bulk-sms ──────────────────────────────────────────────
-router.post('/bulk-sms', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
-  const { contactIds, message } = req.body as { contactIds: string[]; message: string }
+router.post(
+  '/bulk-sms',
+  requireAuth,
+  smsSendLimiter,
+  smsSendTenantLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const { contactIds, message } = req.body as { contactIds: string[]; message: string }
 
-  if (!Array.isArray(contactIds) || contactIds.length === 0) {
-    res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
-    return
-  }
-  if (contactIds.length > 500) {
-    res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
-    return
-  }
-  if (!message || !message.trim()) {
-    res.status(400).json({ error: 'message is required' })
-    return
-  }
-  if (message.length > 160) {
-    res.status(400).json({ error: 'message must be 160 chars or less' })
-    return
-  }
-
-  const check = await validateBulkIds(supabase, authed.tenantId, contactIds)
-  if (!check.valid) {
-    res.status(400).json({ error: check.error })
-    return
-  }
-
-  const { data: telnyxNum } = await supabase
-    .from('telnyx_numbers')
-    .select('phone_number')
-    .eq('tenant_id', authed.tenantId)
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const apiKey = process.env['TELNYX_API_KEY']
-  if (!telnyxNum?.phone_number || !apiKey) {
-    res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
-    return
-  }
-
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('id, full_name, phone, sms_opt_in')
-    .eq('tenant_id', authed.tenantId)
-    .in('id', contactIds)
-
-  const queued = (contacts ?? []).filter((c) => c.phone && c.sms_opt_in !== false).length
-
-  void logBulkAction({
-    tenantId: authed.tenantId,
-    userId: authed.userId,
-    action: 'bulk_sms',
-    resourceType: 'contact',
-    contactCount: contactIds.length,
-    successCount: queued,
-    failCount: contactIds.length - queued,
-    details: `Message: "${message.slice(0, 60)}"`,
-  })
-
-  // Fire-and-forget — respond immediately
-  res.json({ queued })
-
-  void (async () => {
-    for (const c of contacts ?? []) {
-      if (!c.phone || c.sms_opt_in === false) continue
-      const firstName = getFirstName(c.full_name, '')
-      const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
-      try {
-        await fetch('https://api.telnyx.com/v2/messages', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: telnyxNum.phone_number, to: c.phone, text: substituted }),
-        })
-        void logActivity({
-          tenantId: authed.tenantId,
-          contactId: c.id,
-          type: 'sms',
-          body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
-          actorType: 'user',
-          actorId: authed.userId,
-        })
-      } catch (err) {
-        console.error(`[bulk-sms] failed for contact ${c.id}:`, err)
-      }
+    if (!Array.isArray(contactIds) || contactIds.length === 0) {
+      res.status(400).json({ error: 'contactIds is required and must be a non-empty array' })
+      return
     }
-  })()
-})
+    if (contactIds.length > 500) {
+      res.status(400).json({ error: 'Maximum 500 contacts per bulk operation' })
+      return
+    }
+    if (!message || !message.trim()) {
+      res.status(400).json({ error: 'message is required' })
+      return
+    }
+    if (message.length > 160) {
+      res.status(400).json({ error: 'message must be 160 chars or less' })
+      return
+    }
+
+    const check = await validateBulkIds(supabase, authed.tenantId, contactIds)
+    if (!check.valid) {
+      res.status(400).json({ error: check.error })
+      return
+    }
+
+    const { data: telnyxNum } = await supabase
+      .from('telnyx_numbers')
+      .select('phone_number')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const apiKey = process.env['TELNYX_API_KEY']
+    if (!telnyxNum?.phone_number || !apiKey) {
+      res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
+      return
+    }
+
+    const { data: contacts } = await supabase
+      .from('contacts')
+      .select('id, full_name, phone, sms_opt_in')
+      .eq('tenant_id', authed.tenantId)
+      .in('id', contactIds)
+
+    // Bulk send requires prior express written consent — only an explicit
+    // opt-in counts. Never auto-grant here.
+    const queued = (contacts ?? []).filter((c) => c.phone && c.sms_opt_in === true).length
+
+    void logBulkAction({
+      tenantId: authed.tenantId,
+      userId: authed.userId,
+      action: 'bulk_sms',
+      resourceType: 'contact',
+      contactCount: contactIds.length,
+      successCount: queued,
+      failCount: contactIds.length - queued,
+      details: `Message: "${message.slice(0, 60)}"`,
+    })
+
+    // Fire-and-forget — respond immediately
+    res.json({ queued })
+
+    void (async () => {
+      for (const c of contacts ?? []) {
+        if (!c.phone || c.sms_opt_in !== true) continue
+        const firstName = getFirstName(c.full_name, '')
+        const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
+        try {
+          await fetch('https://api.telnyx.com/v2/messages', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: telnyxNum.phone_number, to: c.phone, text: substituted }),
+          })
+          void logActivity({
+            tenantId: authed.tenantId,
+            contactId: c.id,
+            type: 'sms',
+            body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
+            actorType: 'user',
+            actorId: authed.userId,
+          })
+        } catch (err) {
+          console.error(`[bulk-sms] failed for contact ${c.id}:`, err)
+        }
+      }
+    })()
+  }
+)
 
 // ── POST /api/contacts/bulk/stage ────────────────────────────────────────────
 router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -1174,92 +1183,104 @@ router.post('/bulk/tag', requireAuth, async (req: Request, res: Response): Promi
 })
 
 // ── POST /api/contacts/bulk/sms ──────────────────────────────────────────────
-router.post('/bulk/sms', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
-  const { contact_ids, message } = req.body as { contact_ids: string[]; message: string }
+router.post(
+  '/bulk/sms',
+  requireAuth,
+  smsSendLimiter,
+  smsSendTenantLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getSupabase()
+    const { contact_ids, message } = req.body as { contact_ids: string[]; message: string }
 
-  const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
-  if (!check.valid) {
-    res.status(400).json({ error: check.error })
-    return
-  }
-
-  if (!message || message.length === 0) {
-    res.status(400).json({ error: 'message is required' })
-    return
-  }
-  if (message.length > 320) {
-    res.status(400).json({ error: 'message must be 320 chars or less' })
-    return
-  }
-
-  const { data: telnyxNum } = await supabase
-    .from('telnyx_numbers')
-    .select('phone_number')
-    .eq('tenant_id', authed.tenantId)
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const apiKey = process.env['TELNYX_API_KEY']
-  if (!telnyxNum?.phone_number || !apiKey) {
-    res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
-    return
-  }
-
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('id, full_name, phone')
-    .eq('tenant_id', authed.tenantId)
-    .in('id', contact_ids)
-
-  let sent = 0
-  const skippedReasons: Array<{ contact_id: string; reason: string }> = []
-
-  for (const c of contacts ?? []) {
-    if (!c.phone) {
-      skippedReasons.push({ contact_id: c.id, reason: 'No phone number' })
-      continue
+    const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
+    if (!check.valid) {
+      res.status(400).json({ error: check.error })
+      return
     }
 
-    const firstName = getFirstName(c.full_name, '')
-    const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
-
-    try {
-      await fetch('https://api.telnyx.com/v2/messages', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: telnyxNum.phone_number,
-          to: c.phone,
-          text: substituted,
-        }),
-      })
-      sent++
-
-      void logActivity({
-        tenantId: authed.tenantId,
-        contactId: c.id,
-        type: 'sms',
-        body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
-        actorType: 'user',
-        actorId: authed.userId,
-      })
-
-      // Rate limit: 50ms between sends
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    } catch (err) {
-      skippedReasons.push({
-        contact_id: c.id,
-        reason: err instanceof Error ? err.message : 'Send failed',
-      })
+    if (!message || message.length === 0) {
+      res.status(400).json({ error: 'message is required' })
+      return
     }
-  }
+    if (message.length > 320) {
+      res.status(400).json({ error: 'message must be 320 chars or less' })
+      return
+    }
 
-  res.json({ sent, skipped: skippedReasons.length, skipped_reasons: skippedReasons })
-})
+    const { data: telnyxNum } = await supabase
+      .from('telnyx_numbers')
+      .select('phone_number')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const apiKey = process.env['TELNYX_API_KEY']
+    if (!telnyxNum?.phone_number || !apiKey) {
+      res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
+      return
+    }
+
+    const { data: contacts } = await supabase
+      .from('contacts')
+      .select('id, full_name, phone, sms_opt_in')
+      .eq('tenant_id', authed.tenantId)
+      .in('id', contact_ids)
+
+    let sent = 0
+    const skippedReasons: Array<{ contact_id: string; reason: string }> = []
+
+    for (const c of contacts ?? []) {
+      if (!c.phone) {
+        skippedReasons.push({ contact_id: c.id, reason: 'No phone number' })
+        continue
+      }
+      // Bulk send requires prior express written consent — only an explicit
+      // opt-in counts. Never auto-grant here.
+      if (c.sms_opt_in !== true) {
+        skippedReasons.push({ contact_id: c.id, reason: 'Contact has not opted in to SMS' })
+        continue
+      }
+
+      const firstName = getFirstName(c.full_name, '')
+      const substituted = message.replace(/\{\{first_name\}\}/g, firstName)
+
+      try {
+        await fetch('https://api.telnyx.com/v2/messages', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: telnyxNum.phone_number,
+            to: c.phone,
+            text: substituted,
+          }),
+        })
+        sent++
+
+        void logActivity({
+          tenantId: authed.tenantId,
+          contactId: c.id,
+          type: 'sms',
+          body: `Bulk SMS sent: "${substituted.slice(0, 60)}${substituted.length > 60 ? '...' : ''}"`,
+          actorType: 'user',
+          actorId: authed.userId,
+        })
+
+        // Rate limit: 50ms between sends
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      } catch (err) {
+        skippedReasons.push({
+          contact_id: c.id,
+          reason: err instanceof Error ? err.message : 'Send failed',
+        })
+      }
+    }
+
+    res.json({ sent, skipped: skippedReasons.length, skipped_reasons: skippedReasons })
+  }
+)
 
 // ── POST /api/contacts/bulk/archive ──────────────────────────────────────────
 router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): Promise<void> => {

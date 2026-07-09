@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { logAuditEvent } from '../middleware/audit-logger.js'
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']
@@ -34,7 +35,11 @@ export async function checkTcpaOptIn(contactId: string, tenantId: string): Promi
   }
 }
 
-export async function grantTcpaOptIn(contactId: string, tenantId: string): Promise<void> {
+export async function grantTcpaOptIn(
+  contactId: string,
+  tenantId: string,
+  appUserId?: string | null
+): Promise<void> {
   try {
     const supabase = getSupabase()
     const { error } = await supabase
@@ -47,6 +52,23 @@ export async function grantTcpaOptIn(contactId: string, tenantId: string): Promi
       console.error(`[tcpa] grantTcpaOptIn update error contactId=${contactId}:`, error)
     } else {
       console.info(`[tcpa] SMS opt-in granted contactId=${contactId}`)
+      // Consent-grant audit trail. logAuditEvent swallows its own errors and
+      // the outer catch backstops it — a logging failure never blocks the send.
+      try {
+        await logAuditEvent({
+          tenantId,
+          userId: appUserId ?? undefined,
+          action: 'sms_opt_in_granted',
+          resourceType: 'contact',
+          resourceId: contactId,
+          details: {
+            rationale:
+              'agent-initiated consent — deliberate SMS send to a contact with no explicit opt-out establishes a business relationship under TCPA',
+          },
+        })
+      } catch (auditErr) {
+        console.warn(`[tcpa] opt-in audit log failed contactId=${contactId}:`, auditErr)
+      }
     }
   } catch (err) {
     console.error(`[tcpa] grantTcpaOptIn unexpected error contactId=${contactId}:`, err)

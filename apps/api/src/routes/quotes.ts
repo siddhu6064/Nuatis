@@ -15,6 +15,7 @@ import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
 import { createSquarePayment } from '../lib/square-client.js'
+import { publicPaymentLimiter } from '../middleware/rate-limit.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -979,80 +980,128 @@ router.get('/view/:token/pdf', async (req: Request, res: Response): Promise<void
 })
 
 // ── PUBLIC: POST /api/quotes/view/:token/pay-square ─────────────────────────
-router.post('/view/:token/pay-square', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
-  const { sourceId, amountCents } = req.body as { sourceId?: unknown; amountCents?: unknown }
+router.post(
+  '/view/:token/pay-square',
+  publicPaymentLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const supabase = getSupabase()
+    const { sourceId, paymentType } = req.body as { sourceId?: unknown; paymentType?: unknown }
 
-  if (typeof sourceId !== 'string' || !sourceId) {
-    res.status(400).json({ error: 'sourceId is required' })
-    return
-  }
-  if (typeof amountCents !== 'number' || amountCents <= 0) {
-    res.status(400).json({ error: 'amountCents must be a positive number' })
-    return
-  }
+    if (typeof sourceId !== 'string' || !sourceId) {
+      res.status(400).json({ error: 'sourceId is required' })
+      return
+    }
+    if (paymentType !== 'deposit' && paymentType !== 'full') {
+      res.status(400).json({ error: "paymentType must be 'deposit' or 'full'" })
+      return
+    }
 
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('id, tenant_id, quote_number, status, total')
-    .eq('share_token', req.params['token'])
-    .single()
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, tenant_id, quote_number, status, total, deposit_amount')
+      .eq('share_token', req.params['token'])
+      .single()
 
-  if (!quote) {
-    res.status(404).json({ error: 'Quote not found' })
-    return
-  }
-  if (quote.status !== 'accepted') {
-    res.status(400).json({ error: 'Payment only allowed for accepted quotes' })
-    return
-  }
+    if (!quote) {
+      res.status(404).json({ error: 'Quote not found' })
+      return
+    }
+    if (quote.status !== 'accepted') {
+      res.status(400).json({ error: 'Payment only allowed for accepted quotes' })
+      return
+    }
 
-  let squarePaymentId: string | null = null
-  let receiptUrl: string | null = null
+    // Amount is derived server-side from the client's INTENT (deposit | full),
+    // never from a client-supplied amount. All math is in integer cents to avoid
+    // numeric→float drift.
+    const { data: priorPayments } = await supabase
+      .from('quote_payments')
+      .select('amount')
+      .eq('quote_id', quote.id)
+      .eq('tenant_id', quote.tenant_id)
 
-  try {
-    const squareResult = await createSquarePayment({
-      tenantId: quote.tenant_id,
-      amountCents,
-      currency: 'USD',
-      sourceId,
-      referenceId: String(quote.id),
+    const totalCents = Math.round(Number(quote.total) * 100)
+    const depositCents = Math.round(Number(quote.deposit_amount ?? 0) * 100)
+    const paidCents = (priorPayments ?? []).reduce(
+      (s, p) => s + Math.round(Number(p.amount) * 100),
+      0
+    )
+
+    // Guard the total before using it — Math.round(NaN) is NaN and NaN <= 0 is
+    // false, so a bad total would otherwise sail through into Square.
+    if (!Number.isFinite(totalCents) || totalCents <= 0) {
+      console.error('[pay-square] quote has invalid total', { quoteId: quote.id })
+      res.status(500).json({ error: 'Quote total is invalid' })
+      return
+    }
+
+    let amountCents: number
+    if (paymentType === 'deposit') {
+      if (depositCents <= 0 || paidCents !== 0) {
+        res.status(400).json({ error: 'Deposit is not available for this quote' })
+        return
+      }
+      amountCents = depositCents
+    } else {
+      amountCents = totalCents - paidCents
+    }
+
+    if (amountCents <= 0) {
+      res.status(400).json({ error: 'Quote is already paid in full' })
+      return
+    }
+
+    let squarePaymentId: string | null = null
+    let receiptUrl: string | null = null
+
+    try {
+      const squareResult = await createSquarePayment({
+        tenantId: quote.tenant_id,
+        amountCents,
+        currency: 'USD',
+        sourceId,
+        referenceId: String(quote.id),
+        idempotencyKey: `${quote.id}:${paymentType}:${amountCents}:${sourceId}`,
+      })
+      squarePaymentId = squareResult.paymentId
+      receiptUrl = squareResult.receiptUrl
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Square payment failed' })
+      return
+    }
+
+    const amountDollars = Number((amountCents / 100).toFixed(2))
+    const { error: payErr } = await supabase.from('quote_payments').insert({
+      quote_id: quote.id,
+      tenant_id: quote.tenant_id,
+      amount: amountDollars,
+      method: 'square',
+      provider: 'square',
+      square_payment_id: squarePaymentId,
+      recorded_by: null,
     })
-    squarePaymentId = squareResult.paymentId
-    receiptUrl = squareResult.receiptUrl
-  } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Square payment failed' })
-    return
+
+    if (payErr) {
+      console.error('[quotes] pay-square: failed to record payment:', payErr)
+    }
+
+    // Update payment_status
+    const { data: allPayments } = await supabase
+      .from('quote_payments')
+      .select('amount')
+      .eq('quote_id', quote.id)
+
+    const paidTotalCents = (allPayments ?? []).reduce(
+      (s, p) => s + Math.round(Number(p.amount) * 100),
+      0
+    )
+    const newPaymentStatus =
+      paidTotalCents >= totalCents ? 'paid' : paidTotalCents > 0 ? 'partial' : 'unpaid'
+    await supabase.from('quotes').update({ payment_status: newPaymentStatus }).eq('id', quote.id)
+
+    res.json({ success: true, receipt_url: receiptUrl })
   }
-
-  const amountDollars = Number((amountCents / 100).toFixed(2))
-  const { error: payErr } = await supabase.from('quote_payments').insert({
-    quote_id: quote.id,
-    tenant_id: quote.tenant_id,
-    amount: amountDollars,
-    method: 'square',
-    provider: 'square',
-    square_payment_id: squarePaymentId,
-    recorded_by: null,
-  })
-
-  if (payErr) {
-    console.error('[quotes] pay-square: failed to record payment:', payErr)
-  }
-
-  // Update payment_status
-  const { data: allPayments } = await supabase
-    .from('quote_payments')
-    .select('amount')
-    .eq('quote_id', quote.id)
-
-  const totalPaid = (allPayments ?? []).reduce((s, p) => s + Number(p.amount), 0)
-  const quoteTotal = Number(quote.total)
-  const newPaymentStatus = totalPaid >= quoteTotal ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid'
-  await supabase.from('quotes').update({ payment_status: newPaymentStatus }).eq('id', quote.id)
-
-  res.json({ success: true, receipt_url: receiptUrl })
-})
+)
 
 // ── PUBLIC: POST /api/quotes/view/:token/accept ──────────────────────────────
 router.post('/view/:token/accept', async (req: Request, res: Response): Promise<void> => {

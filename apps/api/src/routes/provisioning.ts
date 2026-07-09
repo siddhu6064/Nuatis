@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { phoneProvisionLimiter } from '../middleware/rate-limit.js'
 import { capture } from '../lib/posthog.js'
+import { PLANS, PLAN_KEYS, SUITE_MODULE_KEYS, type PlanKey } from '../config/stripe-plans.js'
 // config/urls.js available for future phone configuration
 
 const router = Router()
@@ -211,24 +212,31 @@ router.post(
 
     try {
       const supabase = getSupabase()
-      await supabase
+      const { data: tenant } = await supabase
         .from('tenants')
-        .update({
-          product: 'suite',
-          modules: {
-            maya: true,
-            crm: true,
-            revenue_ops: true,
-            cpq: true,
-            insights: true,
-            appointments: true,
-            pipeline: true,
-            automation: true,
-            companies: true,
-            deals: true,
-          },
-        })
+        .select('subscription_plan, subscription_status')
         .eq('id', authed.tenantId)
+        .single()
+
+      const plan = (tenant?.subscription_plan as string | null) ?? null
+      const status = (tenant?.subscription_status as string | null) ?? null
+      if (
+        !plan ||
+        !PLAN_KEYS.includes(plan as PlanKey) ||
+        !status ||
+        !['trialing', 'active'].includes(status)
+      ) {
+        res.status(402).json({ error: 'An active subscription is required to upgrade to suite' })
+        return
+      }
+
+      // Explicit boolean for every suite key — never a partial object, so
+      // downstream gates never resolve an absent key.
+      const planModules = PLANS[plan as PlanKey].modules as readonly string[]
+      const modules: Record<string, boolean> = {}
+      for (const key of SUITE_MODULE_KEYS) modules[key] = planModules.includes(key)
+
+      await supabase.from('tenants').update({ product: 'suite', modules }).eq('id', authed.tenantId)
 
       console.info(`[provisioning] tenant upgraded to suite: ${authed.tenantId}`)
       res.json({ upgraded: true, product: 'suite' })

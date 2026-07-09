@@ -96,3 +96,12 @@ export const phoneProvisionLimiter = rateLimit({
   legacyHeaders: false,
   skip: isTestEnv,
 })
+
+export const publicPaymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many payment attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+})

@@ -78,6 +78,33 @@ export function unixToIso(seconds: number | null | undefined): string | null {
 }
 
 /**
+ * The subscription_status enum carries legacy labels ('cancelled',
+ * 'incomplete') that must never be written, and Stripe emits statuses the
+ * enum lacks ('incomplete_expired' — writing it raw throws). Every Stripe
+ * status passes this allow-list map before a write; unknown statuses
+ * degrade to 'past_due'.
+ *
+ * Deviations from the approved spec, kept because both fail closed under
+ * requirePlan: incomplete → 'past_due' (spec said 'unpaid'), and
+ * cancelled → 'canceled' added defensively for the two-L spelling.
+ */
+const STRIPE_STATUS_MAP: Record<string, string> = {
+  trialing: 'trialing',
+  active: 'active',
+  past_due: 'past_due',
+  unpaid: 'unpaid',
+  paused: 'paused',
+  canceled: 'canceled',
+  cancelled: 'canceled',
+  incomplete: 'past_due',
+  incomplete_expired: 'canceled',
+}
+
+export function mapStripeStatus(status: string): string {
+  return STRIPE_STATUS_MAP[status] ?? 'past_due'
+}
+
+/**
  * Identify the plan + the metered overage subscription_item from a
  * subscription payload. Stripe stores the line items under `items.data`;
  * the metered one has `recurring.usage_type === 'metered'`.
@@ -160,7 +187,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         }
         const plan = PLANS[planKey]
 
-        const status = sub.status === 'trialing' ? 'trialing' : 'active'
+        const status = mapStripeStatus(sub.status)
 
         const update: Record<string, unknown> = {
           stripe_customer_id: customerId,
@@ -220,7 +247,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           break
         }
         const plan = PLANS[planKey]
-        const status = sub.status === 'trialing' ? 'trialing' : sub.status
+        const status = mapStripeStatus(sub.status)
 
         const { error } = await supabase
           .from('tenants')
