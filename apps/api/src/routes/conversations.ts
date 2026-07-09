@@ -381,11 +381,6 @@ router.post(
 
     const now = new Date().toISOString()
 
-    // TEMP DIAGNOSTIC — remove after appUserId debug
-    console.info('[DIAG appUserId] resolve-handler', {
-      authedAppUserId: authed.appUserId,
-    })
-
     const { error } = await supabase.from('conversation_status').upsert(
       {
         tenant_id: tenantId,

@@ -120,7 +120,6 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     priority,
     created_by_user_id: authed.userId || null,
   }
-  console.error('[tasks] insert payload:', JSON.stringify(insertPayload))
 
   const { data: task, error } = await supabase.from('tasks').insert(insertPayload).select().single()
 

@@ -10,6 +10,7 @@ import {
   checkOutlookAvailability,
 } from '../lib/outlook-calendar.js'
 import { callSessionState } from './post-call.js'
+import { maskPhone } from './pre-call-lookup.js'
 import { getMayaCircuitBreaker } from './maya-circuit-breaker.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
@@ -342,7 +343,7 @@ const handlers: Record<string, ToolHandler> = {
       const digitsOnly = phone.replace(/\+/, '')
 
       console.info(
-        `[tool-handlers] lookup_contact query: phone=${phone} tenant=${context.tenantId}`
+        `[tool-handlers] lookup_contact query: phone=${maskPhone(phone)} tenant=${context.tenantId}`
       )
 
       try {
@@ -1051,7 +1052,9 @@ const handlers: Record<string, ToolHandler> = {
           })
         }
 
-        console.info(`[tool-handlers] escalate_to_human: call transferred to ${escalationPhone}`)
+        console.info(
+          `[tool-handlers] escalate_to_human: call transferred to ${maskPhone(escalationPhone)}`
+        )
 
         // 4. Track escalation in session state for post-call automation
         const existing = callSessionState.get(ccId)
@@ -1341,8 +1344,11 @@ export async function executeToolCall(
     console.error(`[tool-handlers] unknown tool: ${name}`)
     return { error: `Unknown tool: ${name}` }
   }
+  // Never serialize the result — lookup_contact and friends return caller PII.
+  // Per-tool logs already carry the operational specifics.
+  const started = Date.now()
   const result = await handler(args, context)
-  console.info(`[tool-handlers] ${name} result: ${JSON.stringify(result)}`)
+  console.info(`[tool-handlers] ${name} completed in ${Date.now() - started}ms`)
 
   // Track tool call in session state for voice_sessions persistence
   if (context.callControlId) {

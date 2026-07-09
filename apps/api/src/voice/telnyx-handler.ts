@@ -633,9 +633,6 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
       if (event.event === 'start') {
         startEventReceived = true
         clearTimeout(startEventTimeout)
-        // Log raw start payload to diagnose outbound tenant resolution and
-        // confirm whether custom_headers are present in the WebSocket stream.
-        console.info('[telnyx-handler] raw start event:', JSON.stringify(event.start))
 
         streamId = event.stream_id ?? null
         const toNumber = event.start.to

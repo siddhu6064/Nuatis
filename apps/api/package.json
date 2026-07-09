@@ -10,7 +10,7 @@
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests --forceExit",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --passWithNoTests --forceExit",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts --max-warnings 0"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",

@@ -131,6 +131,7 @@ import {
   lookupTenant,
   setWssRef,
 } from './voice/telnyx-handler.js'
+import { maskPhone } from './voice/pre-call-lookup.js'
 
 // Initialize Sentry before Express
 initSentry()
@@ -309,7 +310,11 @@ app.get('/', (_req, res) => {
 
 app.post('/voice/inbound', async (req, res) => {
   const event = req.body?.data?.event_type ?? req.body?.event_type ?? 'unknown'
-  console.info(`[voice/inbound] event: ${event}`, JSON.stringify(req.body?.data ?? req.body))
+  // Never log the raw webhook body — it carries the caller's unmasked number.
+  const inboundPayload = (req.body?.data?.payload ?? {}) as Record<string, unknown>
+  console.info(
+    `[voice/inbound] event: ${event} call_control_id=${String(inboundPayload['call_control_id'] ?? '')} from=${maskPhone(String(inboundPayload['from'] ?? ''))} to=${maskPhone(String(inboundPayload['to'] ?? ''))}`
+  )
 
   if (event === 'call.initiated') {
     const callControlId: string = req.body?.data?.payload?.call_control_id ?? ''
@@ -414,7 +419,6 @@ app.post('/voice/inbound', async (req, res) => {
         if (streamRes.ok) {
           try {
             const streamBody = await streamRes.json()
-            console.info('[debug] streaming_start response body:', JSON.stringify(streamBody))
             const streamId = (streamBody as { data?: { stream_id?: string } })?.data?.stream_id
             if (streamId) {
               rekeyPrewarmedSession(callControlId, streamId)
