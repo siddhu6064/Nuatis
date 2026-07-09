@@ -10,6 +10,7 @@ import {
 import { z } from 'zod'
 import { seedSampleData } from '../lib/seed-sample-data.js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
+import { PLANS, SUITE_MODULE_KEYS } from '../config/stripe-plans.js'
 import { authLimiter } from '../middleware/rate-limit.js'
 import { capture } from '../lib/posthog.js'
 
@@ -88,7 +89,17 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
   // 4. Load vertical config
   const vertical = getVertical(vertical_slug)
 
-  // 5. Create tenant row
+  // 5. Create tenant row — unpaid pre-checkout state. Every module key gets
+  // an explicit boolean (never a partial object) so requirePlan's override
+  // path resolves the same answer as defaultEntitlement would.
+  // checkout.session.completed overwrites all billing fields with real
+  // Stripe values once the tenant pays.
+  const coreModules = new Set<string>(PLANS.core.modules)
+  const signupModules = Object.fromEntries(
+    SUITE_MODULE_KEYS.map((m) => [m, product === 'maya_only' ? m === 'maya' : coreModules.has(m)])
+  )
+  const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .insert({
@@ -96,29 +107,12 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
       slug: uniqueSlug,
       vertical: vertical_slug,
       timezone,
-      subscription_status: 'active',
+      subscription_status: 'trialing',
       subscription_plan: 'core',
       product,
-      modules:
-        product === 'maya_only'
-          ? {
-              maya: true,
-              crm: false,
-              appointments: false,
-              pipeline: false,
-              automation: false,
-              cpq: false,
-              insights: false,
-            }
-          : {
-              maya: true,
-              crm: true,
-              appointments: true,
-              pipeline: true,
-              automation: true,
-              cpq: false,
-              insights: true,
-            },
+      modules: signupModules,
+      trial_ends_at: trialEndsAt,
+      maya_minutes_limit: PLANS.core.mayaMinutes,
     })
     .select('id')
     .single()
