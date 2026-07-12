@@ -66,7 +66,7 @@ async function resolveAppUserId(sub: string, tenantId: string): Promise<string |
   return appUserId
 }
 
-async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>> {
+export async function verifyAuthjsToken(token: string): Promise<Record<string, unknown>> {
   const secret = process.env['AUTH_SECRET']
   if (!secret) throw new Error('AUTH_SECRET not set')
   const secretBytes = new TextEncoder().encode(secret)

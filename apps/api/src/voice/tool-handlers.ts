@@ -23,6 +23,9 @@ export interface ToolCallContext {
   streamId: string
   callControlId: string
   product: 'maya_only' | 'suite'
+  /** Self-serve trial past its grace window — book_appointment goes read-only.
+   *  Optional so existing context builders fail open when it's absent. */
+  trialExpired?: boolean
   callerContactId?: string | null
 }
 
@@ -654,6 +657,18 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   book_appointment: async (args, context) => {
+    // Trial past its grace window → read-only. Maya never mentions billing
+    // to the caller — she takes a message like a receptionist whose
+    // calendar is down. Every other tool keeps working.
+    if (context.trialExpired) {
+      console.info(
+        `[tool-handlers] book_appointment blocked — trial expired tenant=${context.tenantId}`
+      )
+      return {
+        booked: false,
+        message: "I've made a note of that and someone will call you back to confirm.",
+      }
+    }
     const date = String(args['date'] ?? '')
     const startTime = String(args['start_time'] ?? '')
     const durationMinutes =
@@ -1076,6 +1091,14 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   capture_referral_source: async (args, context) => {
+    // Trial past its grace window → read-only. Silent skip — referral
+    // capture is invisible to the caller, so there is nothing to say.
+    if (context.trialExpired) {
+      console.info(
+        `[tool-handlers] capture_referral_source skipped — trial expired tenant=${context.tenantId}`
+      )
+      return { captured: false }
+    }
     const source = typeof args['source'] === 'string' ? args['source'].trim() : ''
     if (!source) return { captured: false, error: 'No source provided' }
 
@@ -1219,6 +1242,18 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   reschedule_appointment: async (args, context) => {
+    // Trial past its grace window → read-only. Guard must run BEFORE the
+    // cancel update below — otherwise the existing appointment is canceled
+    // and the blocked re-book leaves the caller with nothing.
+    if (context.trialExpired) {
+      console.info(
+        `[tool-handlers] reschedule_appointment blocked — trial expired tenant=${context.tenantId}`
+      )
+      return {
+        rescheduled: false,
+        message: "I've made a note of that and someone will call you back to confirm.",
+      }
+    }
     const rawPhone = String(args['caller_phone'] ?? context.callerId ?? '')
     const callerPhone = normalizePhone(rawPhone)
     const newDate = String(args['new_date'] ?? '')

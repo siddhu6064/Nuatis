@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
 import { sendEmail } from '../lib/email-client.js'
 import { PLANS, planKeyFromPriceId, modulesForPlan, type PlanKey } from '../config/stripe-plans.js'
+import { invalidateTrialCache } from '../lib/trial-cache.js'
 
 const router = Router()
 
@@ -223,6 +224,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           null
 
         if (resolvedTenantId) {
+          // Tenant just paid — drop the cached trial flag so the read-only
+          // gate lifts immediately instead of waiting out the 60s TTL.
+          invalidateTrialCache(resolvedTenantId)
           await logAuditEvent({
             tenantId: resolvedTenantId,
             action: 'subscription.created',

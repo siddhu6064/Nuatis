@@ -12,6 +12,7 @@ import { lookupCaller, buildSystemPromptSuffix, type CallerContext } from './pre
 import { Sentry } from '../lib/sentry.js'
 import type { BusinessProfile } from '@nuatis/shared'
 import { getTenantByPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
+import { isTrialExpired } from '../lib/trial-status.js'
 
 // ── Hangup data registry ─────────────────────────────────────────────────────
 // Populated by the call.hangup webhook, consumed by handleCallEnd.
@@ -267,13 +268,19 @@ function buildAfterHoursSystemPrefix(msg: string): string {
  * timeout guards against slow Supabase responses delaying call pickup —
  * the caller hears the fallback greeting rather than dead air.
  */
-export async function getTenantConfig(
-  tenantId: string
-): Promise<{ businessName: string; vertical: string; product: 'maya_only' | 'suite' }> {
+export async function getTenantConfig(tenantId: string): Promise<{
+  businessName: string
+  vertical: string
+  product: 'maya_only' | 'suite'
+  trialExpired: boolean
+}> {
+  // Fail open on trialExpired: a timeout or DB blip must never make Maya
+  // refuse a call over billing — worse than a few extra days of free access.
   const FALLBACK = {
     businessName: 'the business',
     vertical: 'sales_crm',
     product: 'suite' as const,
+    trialExpired: false,
   }
   try {
     const url = process.env['SUPABASE_URL']
@@ -281,7 +288,12 @@ export async function getTenantConfig(
     if (!url || !key) return FALLBACK
 
     const supabase = createClient(url, key)
-    type Result = { businessName: string; vertical: string; product: 'maya_only' | 'suite' }
+    type Result = {
+      businessName: string
+      vertical: string
+      product: 'maya_only' | 'suite'
+      trialExpired: boolean
+    }
     let timedOut = false
     const timeout = new Promise<Result>((resolve) =>
       setTimeout(() => {
@@ -297,16 +309,26 @@ export async function getTenantConfig(
       try {
         const { data, error } = await supabase
           .from('tenants')
-          .select('name, vertical, product')
+          .select('name, vertical, product, stripe_subscription_id, trial_ends_at')
           .eq('id', tenantId)
           .single()
         if (timedOut) return FALLBACK
         if (error || !data) return FALLBACK
-        const d = data as { name?: string; vertical?: string; product?: string }
+        const d = data as {
+          name?: string
+          vertical?: string
+          product?: string
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+        }
         return {
           businessName: d.name || FALLBACK.businessName,
           vertical: d.vertical || FALLBACK.vertical,
           product: (d.product === 'maya_only' ? 'maya_only' : 'suite') as 'maya_only' | 'suite',
+          trialExpired: isTrialExpired({
+            stripe_subscription_id: d.stripe_subscription_id ?? null,
+            trial_ends_at: d.trial_ends_at ?? null,
+          }),
         }
       } catch {
         return FALLBACK
@@ -352,6 +374,7 @@ interface PrewarmedEntry {
   vertical: string
   businessName: string
   product: 'maya_only' | 'suite'
+  trialExpired: boolean
   callControlId: string
   cleanupTimer: ReturnType<typeof setTimeout>
   callerContext?: CallerContext
@@ -445,7 +468,7 @@ export async function prewarmGemini(
       ? lookupCaller(tenantId, fromNumber)
       : Promise.resolve({ matched: false })
 
-  const { businessName, vertical, product } = await getTenantConfig(tenantId)
+  const { businessName, vertical, product, trialExpired } = await getTenantConfig(tenantId)
   const safeName = businessName || 'the business'
   const safeVertical = vertical || 'sales_crm'
 
@@ -483,6 +506,7 @@ export async function prewarmGemini(
     safeName,
     callControlId,
     product,
+    trialExpired,
     fullContextSuffix,
     callerContext.contactId ?? null,
     afterHoursPrefix,
@@ -522,6 +546,7 @@ export async function prewarmGemini(
       vertical: safeVertical,
       businessName: safeName,
       product,
+      trialExpired,
       callControlId,
       cleanupTimer,
       callerContext,
@@ -583,6 +608,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
     let sessionVertical: string | null = null
     let sessionBusinessName: string | null = null
     let sessionProduct: 'maya_only' | 'suite' = 'suite'
+    // Fail open — a reconnect must never flip a paying tenant to read-only.
+    let sessionTrialExpired = false
     let preCallContactId: string | null = null
     let preCallContextSuffix = ''
     let callDepartment = 'general'
@@ -781,6 +808,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 businessName,
                 callControlId ?? undefined,
                 undefined,
+                sessionTrialExpired,
                 preCallContextSuffix,
                 preCallContactId
               )
@@ -861,6 +889,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               matched: waited.callerContext?.matched ?? false,
               suffixChars: preCallContextSuffix.length,
             })
+            sessionTrialExpired = waited.trialExpired
             wireSession(waited.session, waited.vertical, waited.businessName, waited.product)
           } else {
             console.info('[telnyx-handler] pre-warm wait timeout — creating fresh')
@@ -873,7 +902,9 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               const fallbackLookup: Promise<CallerContext> = callerId
                 ? lookupCaller(resolvedTenantId, callerId)
                 : Promise.resolve({ matched: false })
-              const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
+              const { businessName, vertical, trialExpired } =
+                await getTenantConfig(resolvedTenantId)
+              sessionTrialExpired = trialExpired
               const safeName = businessName || 'the business'
               const safeVertical = vertical || 'sales_crm'
               const fallbackCtx = await fallbackLookup
@@ -895,6 +926,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
                 safeName,
                 callControlId ?? undefined,
                 undefined,
+                trialExpired,
                 outboundSuffix ?? preCallContextSuffix,
                 outboundMeta?.contactId ?? preCallContactId
               )
@@ -930,7 +962,8 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
             const fallbackLookup: Promise<CallerContext> = callerId
               ? lookupCaller(resolvedTenantId, callerId)
               : Promise.resolve({ matched: false })
-            const { businessName, vertical } = await getTenantConfig(resolvedTenantId)
+            const { businessName, vertical, trialExpired } = await getTenantConfig(resolvedTenantId)
+            sessionTrialExpired = trialExpired
             const safeName = businessName || 'the business'
             const safeVertical = vertical || 'sales_crm'
             const fallbackCtx = await fallbackLookup
@@ -952,6 +985,7 @@ export function registerVoiceWebSocket(wss: WebSocketServer): void {
               safeName,
               callControlId ?? undefined,
               undefined,
+              trialExpired,
               outboundSuffix ?? preCallContextSuffix,
               outboundMeta?.contactId ?? preCallContactId
             )

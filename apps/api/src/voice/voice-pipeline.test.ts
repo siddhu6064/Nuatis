@@ -123,6 +123,7 @@ describe('Tenant Config Resolution', () => {
       businessName: 'Acme Dental',
       vertical: 'dental',
       product: 'suite',
+      trialExpired: false,
     })
   })
 
@@ -138,6 +139,7 @@ describe('Tenant Config Resolution', () => {
       businessName: 'the business',
       vertical: 'sales_crm',
       product: 'suite',
+      trialExpired: false,
     })
   })
 })

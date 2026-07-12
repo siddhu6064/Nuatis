@@ -139,6 +139,7 @@ export async function createGeminiLiveSession(
   businessName?: string,
   callControlId?: string,
   product?: 'maya_only' | 'suite',
+  trialExpired?: boolean,
   promptSuffix?: string,
   callerContactId?: string | null,
   afterHoursPrefix?: string,
@@ -321,6 +322,7 @@ export async function createGeminiLiveSession(
     streamId: '',
     callControlId: callControlId ?? '',
     product: product ?? 'suite',
+    trialExpired: trialExpired ?? false,
     callerContactId: callerContactId ?? null,
   }
 

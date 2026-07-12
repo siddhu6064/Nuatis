@@ -118,6 +118,7 @@ import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import { verifyTelnyxWebhook } from './middleware/verify-telnyx-webhook.js'
 import { generalLimiter, authLimiter } from './middleware/rate-limit.js'
+import { enforceTrial } from './middleware/enforce-trial.js'
 import healthRouter from './routes/health.js'
 import adminRouter from './routes/admin.js'
 import { createClient } from '@supabase/supabase-js'
@@ -186,6 +187,10 @@ app.use('/admin', adminRouter)
 // Global baseline rate limit — applies after health/admin so probes never get
 // throttled. Per-IP, 100 req/min. Skipped in NODE_ENV=test.
 app.use(generalLimiter)
+
+// Self-serve trial enforcement (read-only after grace). Fails open on any
+// token or DB problem — requireAuth inside each router stays authoritative.
+app.use('/api', enforceTrial)
 
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
@@ -311,9 +316,13 @@ app.get('/', (_req, res) => {
 app.post('/voice/inbound', async (req, res) => {
   const event = req.body?.data?.event_type ?? req.body?.event_type ?? 'unknown'
   // Never log the raw webhook body — it carries the caller's unmasked number.
-  const inboundPayload = (req.body?.data?.payload ?? {}) as Record<string, unknown>
+  // `to` is the tenant's own Telnyx DID, not caller PII — keep it readable.
+  const inboundPayload = (req.body?.data?.payload ?? req.body?.payload ?? {}) as Record<
+    string,
+    unknown
+  >
   console.info(
-    `[voice/inbound] event: ${event} call_control_id=${String(inboundPayload['call_control_id'] ?? '')} from=${maskPhone(String(inboundPayload['from'] ?? ''))} to=${maskPhone(String(inboundPayload['to'] ?? ''))}`
+    `[voice/inbound] event: ${event} call_control_id=${String(inboundPayload['call_control_id'] ?? '')} from=${maskPhone(String(inboundPayload['from'] ?? ''))} to=${String(inboundPayload['to'] ?? '')}`
   )
 
   if (event === 'call.initiated') {
