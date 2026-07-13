@@ -507,7 +507,12 @@ router.post(
       return
     }
     if (contact.sms_opt_in !== true) {
-      await grantTcpaOptIn(contactId as string, tenantId as string, authed.appUserId ?? null)
+      await grantTcpaOptIn(
+        contactId as string,
+        tenantId as string,
+        authed.appUserId ?? null,
+        authed.userId
+      )
     }
 
     // Get our phone number (from telnyx_numbers table)

@@ -17,9 +17,21 @@
  */
 import type { Request, Response, NextFunction } from 'express'
 import { verifyAuthjsToken } from '../lib/auth.js'
-import { getTrialExpired, getCachedTrialEndsAt } from '../lib/trial-cache.js'
+import {
+  getTrialExpired,
+  getCachedTrialEndsAt,
+  getCachedReadOnlyReason,
+} from '../lib/trial-cache.js'
+import type { ReadOnlyReason } from '../lib/trial-status.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+const ERROR_BY_REASON: Record<ReadOnlyReason, string> = {
+  trial_expired: 'Trial ended',
+  subscription_canceled: 'Subscription canceled',
+  subscription_unpaid: 'Subscription unpaid',
+  subscription_paused: 'Subscription paused',
+}
 
 // Paths are relative to the /api mount — Express strips the mount prefix,
 // so req.path here is e.g. '/billing/checkout', not '/api/billing/checkout'.
@@ -74,8 +86,10 @@ export async function enforceTrial(req: Request, res: Response, next: NextFuncti
     return
   }
 
+  const reason = getCachedReadOnlyReason(tenantId) ?? 'trial_expired'
   res.status(402).json({
-    error: 'Trial ended',
+    error: ERROR_BY_REASON[reason],
+    reason,
     trial_ended_at: getCachedTrialEndsAt(tenantId),
     upgrade_url: '/pricing',
     read_only: true,

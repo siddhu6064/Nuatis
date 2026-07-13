@@ -12,10 +12,11 @@
  * doesn't pin the tenant open for the full TTL.
  */
 import { createClient } from '@supabase/supabase-js'
-import { isTrialExpired } from './trial-status.js'
+import { readOnlyReason, type ReadOnlyReason } from './trial-status.js'
 
 interface TrialCacheEntry {
   expired: boolean
+  reason: ReadOnlyReason | null
   trialEndsAt: string | null
   cachedAt: number
 }
@@ -23,6 +24,7 @@ interface TrialCacheEntry {
 interface TenantTrialRow {
   stripe_subscription_id: string | null
   trial_ends_at: string | null
+  subscription_status: string | null
 }
 
 const TTL_MS = 60 * 1000
@@ -37,6 +39,11 @@ export function invalidateTrialCache(tenantId: string): void {
 /** trial_ends_at from the cache entry, for the 402 response body. */
 export function getCachedTrialEndsAt(tenantId: string): string | null {
   return cache.get(tenantId)?.trialEndsAt ?? null
+}
+
+/** Why the tenant is read-only (trial vs canceled vs unpaid vs paused), for the 402 body. */
+export function getCachedReadOnlyReason(tenantId: string): ReadOnlyReason | null {
+  return cache.get(tenantId)?.reason ?? null
 }
 
 export async function getTrialExpired(tenantId: string): Promise<boolean> {
@@ -64,7 +71,7 @@ export async function getTrialExpired(tenantId: string): Promise<boolean> {
   const lookup: Promise<TenantTrialRow | null> = Promise.resolve(
     supabase
       .from('tenants')
-      .select('stripe_subscription_id, trial_ends_at')
+      .select('stripe_subscription_id, trial_ends_at, subscription_status')
       .eq('id', tenantId)
       .maybeSingle<TenantTrialRow>()
   ).then(
@@ -87,7 +94,8 @@ export async function getTrialExpired(tenantId: string): Promise<boolean> {
 
   if (!row) return false
 
-  const expired = isTrialExpired(row)
-  cache.set(tenantId, { expired, trialEndsAt: row.trial_ends_at, cachedAt: Date.now() })
+  const reason = readOnlyReason(row)
+  const expired = reason !== null
+  cache.set(tenantId, { expired, reason, trialEndsAt: row.trial_ends_at, cachedAt: Date.now() })
   return expired
 }

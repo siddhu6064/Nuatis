@@ -69,6 +69,7 @@ function makeEmptySupabase(): any {
     from: () => chain,
     select: () => chain,
     eq: () => chain,
+    or: () => chain,
     order: () => chain,
     limit: () => chain,
     single: () => Promise.resolve({ data: null, error: null }),
@@ -77,6 +78,31 @@ function makeEmptySupabase(): any {
     update: () => chain,
   }
   return chain
+}
+
+/**
+ * Table-aware mock: .from(table) resolves to the row seeded for that table
+ * (null otherwise). Unlike the scripted mock this is order-independent, so it
+ * works for the WS start path where getTenantConfig, getLocationConfig, and
+ * lookupCaller race concurrently.
+ */
+function makeTableSupabase(rows: Record<string, unknown>): any {
+  return {
+    from: (table: string) => {
+      const chain: any = {
+        select: () => chain,
+        eq: () => chain,
+        or: () => chain,
+        order: () => chain,
+        limit: () => chain,
+        insert: () => chain,
+        update: () => chain,
+        single: () => Promise.resolve({ data: rows[table] ?? null, error: null }),
+        maybeSingle: () => Promise.resolve({ data: rows[table] ?? null, error: null }),
+      }
+      return chain
+    },
+  }
 }
 
 /**
@@ -103,6 +129,7 @@ function makeScriptedSupabase(queue: Array<{ data: unknown; error: unknown }>): 
       eqCalls.push({ col, val })
       return chain
     },
+    or: () => chain,
     order: () => chain,
     limit: () => chain,
     single: () => Promise.resolve(queue.shift() ?? { data: null, error: null }),
@@ -256,6 +283,18 @@ describe('WebSocket /voice/stream — session initialisation', () => {
   }
 
   it('4. start event with stream_id opens a Gemini session (one createGeminiLiveSession call)', async () => {
+    // Seed a caller contact so lookupCaller genuinely matches — this test
+    // previously passed on a silent lookupCaller throw (mock chain lacked .or)
+    ;(globalThis as any).__supabaseClient = makeTableSupabase({
+      contacts: {
+        id: 'contact-precall-1',
+        full_name: 'Jane Doe',
+        last_contacted: '2026-07-01T00:00:00.000Z',
+        vertical_data: {},
+        lifecycle_stage: 'customer',
+      },
+    })
+
     const { wss, emitConnection } = makeFakeWss()
     registerVoiceWebSocket(wss)
 
@@ -272,14 +311,29 @@ describe('WebSocket /voice/stream — session initialisation', () => {
     // Await the async start-handler chain (prewarm miss path → fresh session)
     await new Promise((resolve) => setTimeout(resolve, 1100))
 
-    const calls = (globalThis as any).__geminiCreateCalls
+    const calls = (globalThis as any).__geminiCreateCalls as unknown[][]
     expect(calls.length).toBeGreaterThanOrEqual(1)
-    // createGeminiLiveSession(tenantId, vertical, businessName, callControlId, product?, promptSuffix?)
-    expect(calls[0][0]).toBe('tenant-abc')
+    // createGeminiLiveSession(tenantId, vertical, businessName, callControlId,
+    //   product, trialExpired, promptSuffix, callerContactId, ...)
+    // Under full-suite load, test 1's fire-and-forget prewarm session can land
+    // its createGeminiLiveSession call during this test — match by contact id
+    // instead of position. Real caller matching must reach the session: the
+    // contact id in callerContactId (arg 7) and matched context in the prompt
+    // suffix (arg 6). This still fails if caller matching breaks — no call
+    // will carry the seeded contact.
+    const matchedCall = calls.find((c) => c[0] === 'tenant-abc' && c[7] === 'contact-precall-1')
+    expect(matchedCall).toBeDefined()
+    expect(String(matchedCall![6])).toContain('CALLER CONTEXT')
+    expect(String(matchedCall![6])).toContain('Jane Doe')
   })
 
   it('5. unknown `to` in start event still opens a session via dev-tenant fallback', async () => {
     process.env['VOICE_DEV_TENANT_ID'] = 'dev-fallback-tenant'
+    // No TELNYX_API_KEY → enrichCallerInfo returns immediately on the
+    // no-match path instead of racing lookupCaller's 800ms timeout (which
+    // would push session creation past this test's 1100ms sleep).
+    // beforeEach restores the key for later tests.
+    delete process.env['TELNYX_API_KEY']
     const { wss, emitConnection } = makeFakeWss()
     registerVoiceWebSocket(wss)
 

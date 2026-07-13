@@ -35,6 +35,8 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Format ('+1 512 ***-1234') is intentionally distinct from the canonical
+// pre-call-lookup maskPhone ('****1234') — settings UI display choice. Do not consolidate.
 function maskPhone(phone: string): string {
   const usMatch = phone.match(/^(\+1)(\d{3})(\d{3})(\d{4})$/)
   if (usMatch) return `${usMatch[1]} ${usMatch[2]} ***-${usMatch[4]}`

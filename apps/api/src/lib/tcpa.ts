@@ -38,7 +38,10 @@ export async function checkTcpaOptIn(contactId: string, tenantId: string): Promi
 export async function grantTcpaOptIn(
   contactId: string,
   tenantId: string,
-  appUserId?: string | null
+  appUserId?: string | null,
+  /** NextAuth token subject — keeps the granter identifiable when the
+   *  appUserId claim is missing (stale pre-claim sessions). */
+  actorSub?: string | null
 ): Promise<void> {
   try {
     const supabase = getSupabase()
@@ -55,15 +58,20 @@ export async function grantTcpaOptIn(
       // Consent-grant audit trail. logAuditEvent swallows its own errors and
       // the outer catch backstops it — a logging failure never blocks the send.
       try {
+        // user_id is never null — 'unresolved' keeps the column greppable in a
+        // "who granted consent" query; details carry the token subject so the
+        // granter stays identifiable even without the domain id.
         await logAuditEvent({
           tenantId,
-          userId: appUserId ?? undefined,
+          userId: appUserId ?? 'unresolved',
           action: 'sms_opt_in_granted',
           resourceType: 'contact',
           resourceId: contactId,
           details: {
             rationale:
               'agent-initiated consent — deliberate SMS send to a contact with no explicit opt-out establishes a business relationship under TCPA',
+            actor_appuserid: appUserId ?? null,
+            actor_sub: actorSub ?? null,
           },
         })
       } catch (auditErr) {

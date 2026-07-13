@@ -309,7 +309,9 @@ export async function getTenantConfig(tenantId: string): Promise<{
       try {
         const { data, error } = await supabase
           .from('tenants')
-          .select('name, vertical, product, stripe_subscription_id, trial_ends_at')
+          .select(
+            'name, vertical, product, stripe_subscription_id, trial_ends_at, subscription_status'
+          )
           .eq('id', tenantId)
           .single()
         if (timedOut) return FALLBACK
@@ -320,6 +322,7 @@ export async function getTenantConfig(tenantId: string): Promise<{
           product?: string
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
+          subscription_status?: string | null
         }
         return {
           businessName: d.name || FALLBACK.businessName,
@@ -328,6 +331,7 @@ export async function getTenantConfig(tenantId: string): Promise<{
           trialExpired: isTrialExpired({
             stripe_subscription_id: d.stripe_subscription_id ?? null,
             trial_ends_at: d.trial_ends_at ?? null,
+            subscription_status: d.subscription_status ?? null,
           }),
         }
       } catch {

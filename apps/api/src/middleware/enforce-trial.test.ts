@@ -20,6 +20,7 @@ const getTrialExpiredMock = jest.fn<(tenantId: string) => Promise<boolean>>()
 jest.unstable_mockModule('../lib/trial-cache.js', () => ({
   getTrialExpired: getTrialExpiredMock,
   getCachedTrialEndsAt: () => TRIAL_ENDED_AT,
+  getCachedReadOnlyReason: () => 'trial_expired',
   invalidateTrialCache: () => undefined,
 }))
 
@@ -59,6 +60,7 @@ describe('enforceTrial', () => {
     expect(res.status).toBe(402)
     expect(res.body).toEqual({
       error: 'Trial ended',
+      reason: 'trial_expired',
       trial_ended_at: TRIAL_ENDED_AT,
       upgrade_url: '/pricing',
       read_only: true,

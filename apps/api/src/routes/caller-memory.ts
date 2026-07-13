@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
+import { maskPhone } from '../voice/pre-call-lookup.js'
 
 const router = Router()
 
@@ -10,28 +11,6 @@ function getSupabase() {
   const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
   if (!url || !key) throw new Error('Supabase env vars not set')
   return createClient(url, key)
-}
-
-/**
- * Mask phone to: +1 512 ***-1234
- * Keep country code + area code (first 2 digit groups), mask middle 3 + last 4.
- * For E.164 +15125551234 → "+1 512 ***-1234"
- * Falls back gracefully for non-US or unexpected formats.
- */
-function maskPhone(phone: string): string {
-  // US/CA: +1AAANNNXXXX (11 digits total)
-  const usMatch = phone.match(/^(\+1)(\d{3})(\d{3})(\d{4})$/)
-  if (usMatch) {
-    return `${usMatch[1]} ${usMatch[2]} ***-${usMatch[4]}`
-  }
-  // Generic: keep +CC + next 3, mask rest, show last 4
-  const genericMatch = phone.match(/^(\+\d{1,3})(\d{1,4})(\d+)(\d{4})$/)
-  if (genericMatch) {
-    return `${genericMatch[1]} ${genericMatch[2]} ***-${genericMatch[4]}`
-  }
-  // Fallback: show only last 4
-  const last4 = phone.slice(-4)
-  return `***-${last4}`
 }
 
 // ── GET /api/caller-memory ────────────────────────────────────────────────────

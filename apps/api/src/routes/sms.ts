@@ -107,7 +107,12 @@ router.post(
       return
     }
     if (contact.sms_opt_in !== true) {
-      await grantTcpaOptIn(contactId as string, authed.tenantId, authed.appUserId ?? null)
+      await grantTcpaOptIn(
+        contactId as string,
+        authed.tenantId,
+        authed.appUserId ?? null,
+        authed.userId
+      )
     }
 
     // Get tenant's Telnyx number (from telnyx_numbers table)
