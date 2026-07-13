@@ -6,6 +6,8 @@ import { sendPushNotification } from '../lib/push-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
+import { sendSms } from '../lib/sms.js'
+import { maskPhone } from '../voice/pre-call-lookup.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
@@ -130,17 +132,17 @@ export async function scan(): Promise<void> {
           if (toPhone && fromNumber) {
             const smsText = `We missed you today! Would you like to rebook? Reply YES or call us at ${fromNumber}.`
 
-            const res = await fetch('https://api.telnyx.com/v2/messages', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ from: fromNumber, to: toPhone, text: smsText }),
+            // sendSms runs the TCPA opt-in check internally; success=false covers
+            // both suppression and send failure (sendSms logs the reason itself)
+            const { success } = await sendSms(fromNumber, toPhone, smsText, {
+              contactId: appt.contact_id,
+              tenantId: appt.tenant_id,
             })
 
-            if (res.ok) {
-              console.info(`[no-show-scanner] rebook SMS sent to=${toPhone} appointment=${appt.id}`)
+            if (success) {
+              console.info(
+                `[no-show-scanner] rebook SMS sent to=${maskPhone(toPhone)} appointment=${appt.id}`
+              )
               void logActivity({
                 tenantId: appt.tenant_id,
                 contactId: appt.contact_id ?? undefined,
@@ -149,9 +151,6 @@ export async function scan(): Promise<void> {
                 metadata: { appointment_id: appt.id, automated: true, trigger: 'no_show' },
                 actorType: 'ai',
               })
-            } else {
-              const body = await res.text()
-              console.error(`[no-show-scanner] rebook SMS failed (${res.status}): ${body}`)
             }
           }
         } catch (smsErr) {

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendSms } from '../lib/sms.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
+import { maskPhone } from '../voice/pre-call-lookup.js'
 
 const QUEUE_NAME = 'appointment-reminder'
 
@@ -75,7 +76,7 @@ export async function scan(): Promise<void> {
       const time = formatTime(appt.start_time)
 
       console.info(
-        `[appointment-reminder] sending 24h reminder: appointment=${appt.id} contact=${contact.phone} at=${appt.start_time}`
+        `[appointment-reminder] sending 24h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`
       )
 
       const text = `Reminder: You have an appointment '${appt.title}' tomorrow at ${time}. Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
@@ -103,7 +104,7 @@ export async function scan(): Promise<void> {
       const time = formatTime(appt.start_time)
 
       console.info(
-        `[appointment-reminder] sending 1h reminder: appointment=${appt.id} contact=${contact.phone} at=${appt.start_time}`
+        `[appointment-reminder] sending 1h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`
       )
 
       const text = `Your appointment '${appt.title}' is in 1 hour at ${time}. See you soon! Reply CANCEL to cancel or STOP to opt out. - ${businessName}`

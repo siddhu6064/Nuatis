@@ -4,6 +4,8 @@ import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { API_BASE_URL } from '../config/urls.js'
 import { isScannerPaused } from '../lib/scanner-pause.js'
+import { sendSms } from '../lib/sms.js'
+import { maskPhone } from '../voice/pre-call-lookup.js'
 
 const QUEUE_NAME = 'quote-followup'
 
@@ -49,7 +51,13 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
   }
 
   // Check 2: is the quote still in a sendable state?
-  const { data: quote } = await supabase.from('quotes').select('status').eq('id', quoteId).single()
+  // contact_id fetched here so sendSms can run its TCPA opt-in check —
+  // the job payload predates the check and carries only the phone.
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('status, contact_id')
+    .eq('id', quoteId)
+    .single()
 
   if (!quote) {
     console.info(`[quote-followup] skipped — quote not found`)
@@ -77,25 +85,23 @@ export async function processFollowup(data: FollowupJobData): Promise<void> {
 
   const shareUrl = `${API_BASE_URL}/quotes/view/${shareToken}`
 
-  const response = await fetch('https://api.telnyx.com/v2/messages', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: fromNumber,
-      to: contactPhone,
-      text: `Hi ${contactName}, just following up — your quote ${quoteNumber} from ${businessName} is ready for review: ${shareUrl}`,
-    }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text()
-    console.error('[quote-followup] Telnyx error:', response.status, body)
-    throw new Error(`Telnyx SMS failed: ${response.status}`)
-  }
-
-  console.info(
-    `[quote-followup] sent 48h follow-up SMS for quote=${quoteNumber} to=${contactPhone}`
+  // sendSms runs the TCPA opt-in check internally; success=false covers both
+  // suppression and send failure (sendSms logs the reason itself)
+  const { success } = await sendSms(
+    fromNumber,
+    contactPhone,
+    `Hi ${contactName}, just following up — your quote ${quoteNumber} from ${businessName} is ready for review: ${shareUrl}`,
+    {
+      contactId: (quote.contact_id as string | null) ?? undefined,
+      tenantId,
+    }
   )
+
+  if (success) {
+    console.info(
+      `[quote-followup] sent 48h follow-up SMS for quote=${quoteNumber} to=${maskPhone(contactPhone)}`
+    )
+  }
 }
 
 export function createQuoteFollowupWorker(): { queue: Queue; worker: Worker } {

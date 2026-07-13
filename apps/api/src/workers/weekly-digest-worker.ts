@@ -15,6 +15,12 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+/** First char + domain only — owner emails must not land in logs verbatim. */
+function maskEmail(email: string): string {
+  const at = email.indexOf('@')
+  return at > 0 ? `${email[0]}***@${email.slice(at + 1)}` : '***'
+}
+
 async function processWeeklyDigest(): Promise<void> {
   console.info('[weekly-digest] starting weekly digest scan...')
 
@@ -92,7 +98,7 @@ async function processWeeklyDigest(): Promise<void> {
         emailOk = await sendEmail({ to: ownerEmail, subject, html, tenantId: tenant.id })
       } catch (sendErr) {
         console.warn(
-          `[weekly-digest] sendEmail threw for tenant=${tenant.id} email=${ownerEmail}:`,
+          `[weekly-digest] sendEmail threw for tenant=${tenant.id} email=${maskEmail(ownerEmail)}:`,
           sendErr,
           '— continuing'
         )
@@ -103,7 +109,7 @@ async function processWeeklyDigest(): Promise<void> {
       // g. On sendEmail failure: log warn + continue
       if (!emailOk) {
         console.warn(
-          `[weekly-digest] sendEmail returned false for tenant=${tenant.id} email=${ownerEmail} — continuing`
+          `[weekly-digest] sendEmail returned false for tenant=${tenant.id} email=${maskEmail(ownerEmail)} — continuing`
         )
         failed++
         continue
@@ -122,7 +128,7 @@ async function processWeeklyDigest(): Promise<void> {
       }
 
       // i. Log success
-      console.info(`[weekly-digest] sent to tenantId=${tenant.id} email=${ownerEmail}`)
+      console.info(`[weekly-digest] sent to tenantId=${tenant.id} email=${maskEmail(ownerEmail)}`)
       sent++
     } catch (tenantErr) {
       console.error(`[weekly-digest] unexpected error for tenant=${tenant.id}:`, tenantErr)
