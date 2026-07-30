@@ -22,7 +22,6 @@ import { createScheduledReportWorker } from './scheduled-report-worker.js'
 import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
-import { createCampaignSendWorker } from './campaign-send-worker.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
@@ -220,12 +219,7 @@ export async function startWorkers(): Promise<void> {
   managed.push({ name: 'invoice-overdue-scanner', ...invoiceOverdueScanner })
   console.info('[workers] invoice-overdue-scanner started, cron 0 9 * * *')
 
-  // 22. Campaign send worker — one-off jobs triggered by route
-  const campaignSendWorker = createCampaignSendWorker()
-  managed.push({ name: 'campaign-send', ...campaignSendWorker })
-  console.info('[workers] campaign-send worker started')
-
-  // 23. Outbound call worker — one-off jobs triggered by route or auto-triggers
+  // 22. Outbound call worker — one-off jobs triggered by route or auto-triggers
   const outboundCallWorker = createOutboundCallWorker()
   managed.push({ name: 'outbound-call', ...outboundCallWorker })
   console.info('[workers] outbound-call worker started')

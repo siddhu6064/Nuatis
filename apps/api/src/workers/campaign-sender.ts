@@ -1,14 +1,11 @@
 /**
  * campaign-sender.ts — P13 AI Campaigns BullMQ worker
  *
- * Listens on queue: 'campaign-send' (shared with legacy campaign-send-worker.ts).
- * IMPORTANT: Mutual-exclusion contract with the legacy worker:
- *   - This worker (P13) processes jobs where campaign.channels is a non-empty
- *     array. If channels is null/empty, it returns early (legacy campaign).
- *   - Legacy worker (campaign-send-worker.ts) does the inverse: returns early
- *     when channels is non-empty.
- * BullMQ load-balances jobs between both workers on the shared queue, so the
- * guards must stay symmetric to avoid corruption.
+ * Sole consumer of queue: 'campaign-send'. (The legacy email-blast worker that
+ * used to share this queue was removed; it silently completed every real job
+ * because campaigns.channels is NOT NULL DEFAULT '{sms}', so its guard never
+ * matched.) The channels guard below is retained defensively — a null/empty
+ * channels row should never exist, but if one appears we skip rather than send.
  *
  * Concurrency: 1 — campaigns are large batch jobs, not high-frequency micro-jobs.
  */
@@ -146,6 +143,22 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
     )
   }
 
+  // ── STEP 2b: Fail closed on segment-scoped campaigns ──────────────────────────
+  // Smart-list / segment filter execution is NOT implemented (see the contact
+  // query in STEP 4 below). Until it ships, a segment_id-scoped campaign would
+  // silently fan out to ALL active contacts, ignoring the segment the recipient
+  // count was snapshotted from at schedule time. Refuse rather than mis-send.
+  if (campaign.segment_id != null) {
+    await supabase
+      .from('campaigns')
+      .update({ status: 'paused', updated_at: new Date().toISOString() })
+      .eq('id', campaignId)
+      .eq('tenant_id', tenantId)
+    throw new Error(
+      `[campaign-sender] Campaign ${campaignId} is segment-scoped (segment_id=${campaign.segment_id}) — segment-scoped sends are not yet supported; paused without sending`
+    )
+  }
+
   // Index messages by channel for fast lookup
   const messageByChannel = new Map<string, MessageRow>()
   for (const msg of messageRows) {
@@ -181,8 +194,11 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   const businessName = tenantRow?.name ?? 'Us'
   const smsFromNumber = tenantPhoneNumber ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
 
-  // Query contacts — simple fallback: all active contacts for tenant.
-  // Smart-list filter execution is deferred to a future iteration.
+  // Query contacts — DEFERRED WORK: smart-list / segment filter execution is not
+  // implemented (separate ticket). This is an intentional fallback, NOT the final
+  // behaviour: it returns all active contacts for the tenant. Segment-scoped
+  // campaigns are rejected above (STEP 2b) so this fallback only ever runs for
+  // segment_id === null campaigns.
   const { data: contactsData, error: contactsErr } = await supabase
     .from('contacts')
     .select('id, full_name, phone, email, sms_opt_in, email_status, email_risk_score')
@@ -194,6 +210,21 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   }
 
   const contacts = (contactsData ?? []) as ContactRow[]
+
+  // Fail closed if the schedule-time recipient snapshot disagrees with what we
+  // actually resolved — prevents sending to a different audience than the UI
+  // showed. (segment_id is null here, so contact_count is expected null or exact.)
+  if (campaign.contact_count != null && campaign.contact_count !== contacts.length) {
+    await supabase
+      .from('campaigns')
+      .update({ status: 'paused', updated_at: new Date().toISOString() })
+      .eq('id', campaignId)
+      .eq('tenant_id', tenantId)
+    throw new Error(
+      `[campaign-sender] Campaign ${campaignId} recipient count mismatch: snapshot=${campaign.contact_count} resolved=${contacts.length} — paused without sending`
+    )
+  }
+
   console.info(
     `[campaign-sender] campaign ${campaignId}: ${contacts.length} contacts × ${campaign.channels.length} channels`
   )
