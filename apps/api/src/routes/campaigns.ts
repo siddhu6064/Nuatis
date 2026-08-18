@@ -71,6 +71,107 @@ function getCampaignQueue(): Queue {
   return _campaignQueue
 }
 
+// ── Shared scheduler: one path for /schedule and /send-now ────────────────────
+// Loads + validates the campaign, enforces the approval gate, marks it
+// 'scheduled', and enqueues the P13 'send' job. Returns a discriminated result
+// the routes map to HTTP — expected validation failures do NOT throw.
+type ScheduleResult =
+  | { kind: 'ok'; campaign: Campaign }
+  | { kind: 'not_found' }
+  | { kind: 'invalid_status'; status: string }
+  | { kind: 'unapproved' }
+  | { kind: 'error'; message: string }
+
+async function scheduleCampaignSend(
+  campaignId: string,
+  tenantId: string,
+  sendAt: Date | null
+): Promise<ScheduleResult> {
+  const supabase = getSupabase()
+
+  const { data: campaign, error: campErr } = await supabase
+    .from('campaigns')
+    .select('id, status, segment_id')
+    .eq('id', campaignId)
+    .eq('tenant_id', tenantId)
+    .single<{ id: string; status: string; segment_id: string | null }>()
+
+  if (campErr || !campaign) return { kind: 'not_found' }
+
+  // Idempotency: only a draft can be scheduled. A second click on an already
+  // scheduled/running/complete campaign must not double-enqueue.
+  if (campaign.status !== 'draft') {
+    return { kind: 'invalid_status', status: campaign.status }
+  }
+
+  // Approval gate — every campaign_messages row must be approved.
+  const { data: messages } = await supabase
+    .from('campaign_messages')
+    .select('channel, approved')
+    .eq('campaign_id', campaignId)
+
+  const unapproved = ((messages ?? []) as { channel: string; approved: boolean }[]).filter(
+    (m) => !m.approved
+  )
+  if (unapproved.length > 0) return { kind: 'unapproved' }
+
+  // Snapshot contact_count from the segment when set (display only). The worker
+  // fails closed on segment-scoped sends until smart-list execution ships.
+  let contactCount: number | null = null
+  if (campaign.segment_id) {
+    const desc = await resolveSegmentDescription(campaign.segment_id, tenantId)
+    contactCount = parseContactCount(desc)
+  }
+
+  const scheduleAt = sendAt ?? new Date()
+  const { data: updated, error: updateErr } = await supabase
+    .from('campaigns')
+    .update({
+      status: 'scheduled',
+      schedule_at: scheduleAt.toISOString(),
+      contact_count: contactCount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', campaignId)
+    .eq('tenant_id', tenantId)
+    .select('*')
+    .single<Campaign>()
+
+  if (updateErr || !updated) {
+    return { kind: 'error', message: updateErr?.message ?? 'Failed to schedule campaign' }
+  }
+
+  // Enqueue the P13 'send' job. Non-fatal on failure — campaign is scheduled in DB.
+  try {
+    const delay = sendAt ? Math.max(0, sendAt.getTime() - Date.now()) : 0
+    await getCampaignQueue().add('send', { campaignId, tenantId }, { delay })
+  } catch (err) {
+    console.error('[campaigns/schedule] BullMQ enqueue error:', err)
+  }
+
+  return { kind: 'ok', campaign: updated }
+}
+
+function respondSchedule(res: Response, result: ScheduleResult): void {
+  switch (result.kind) {
+    case 'ok':
+      res.json({ campaign: result.campaign })
+      return
+    case 'not_found':
+      res.status(404).json({ error: 'Campaign not found' })
+      return
+    case 'invalid_status':
+      res.status(400).json({ error: `Cannot schedule a campaign with status '${result.status}'` })
+      return
+    case 'unapproved':
+      res.status(400).json({ error: 'Approve all messages before scheduling' })
+      return
+    case 'error':
+      res.status(500).json({ error: result.message })
+      return
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 const router = Router()
@@ -658,180 +759,19 @@ router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Pr
 // ── POST /api/campaigns/:id/schedule ─────────────────────────────────────────
 router.post('/:id/schedule', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
-  const id = req.params['id']
-
+  const id = req.params['id'] as string
   const body = req.body as Record<string, unknown>
 
-  // ── P13 schedule path: expects schedule_at ─────────────────────────────────
+  // P13 schedule requires a valid future ISO timestamp.
   const scheduleAt = body['schedule_at'] as string | undefined
-
-  // ── Legacy schedule path: expects scheduled_at ─────────────────────────────
-  const scheduledAt = body['scheduled_at'] as string | undefined
-
-  // P13 path
-  if (scheduleAt !== undefined) {
-    const scheduleDate = new Date(scheduleAt)
-    if (isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now()) {
-      res.status(400).json({ error: 'schedule_at must be a valid future ISO timestamp' })
-      return
-    }
-
-    const { data: campaign, error: campErr } = await supabase
-      .from('campaigns')
-      .select('id, status, channels, segment_id')
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .single<{
-        id: string
-        status: string
-        channels: string[] | null
-        segment_id: string | null
-      }>()
-
-    if (campErr || !campaign) {
-      res.status(404).json({ error: 'Campaign not found' })
-      return
-    }
-
-    if (!['draft', 'scheduled'].includes(campaign.status)) {
-      res.status(400).json({
-        error: `Cannot schedule a campaign with status '${campaign.status}'`,
-      })
-      return
-    }
-
-    // All messages must be approved
-    const { data: messages } = await supabase
-      .from('campaign_messages')
-      .select('channel, approved')
-      .eq('campaign_id', id)
-
-    type MsgRow = { channel: string; approved: boolean }
-    const unapproved = ((messages ?? []) as MsgRow[]).filter((m) => !m.approved)
-    if (unapproved.length > 0) {
-      res.status(400).json({ error: 'Approve all messages before scheduling' })
-      return
-    }
-
-    // Snapshot contact_count
-    let contactCount: number | null = null
-    if (campaign.segment_id) {
-      const desc = await resolveSegmentDescription(campaign.segment_id, authed.tenantId)
-      contactCount = parseContactCount(desc)
-    }
-
-    const { data: updated, error: updateErr } = await supabase
-      .from('campaigns')
-      .update({
-        status: 'scheduled',
-        schedule_at: scheduleDate.toISOString(),
-        contact_count: contactCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('tenant_id', authed.tenantId)
-      .select('*')
-      .single<Campaign>()
-
-    if (updateErr || !updated) {
-      res.status(500).json({ error: updateErr?.message ?? 'Failed to schedule campaign' })
-      return
-    }
-
-    try {
-      const delay = Math.max(0, scheduleDate.getTime() - Date.now())
-      await getCampaignQueue().add('send', { campaignId: id, tenantId: authed.tenantId }, { delay })
-    } catch (err) {
-      console.error('[campaigns/schedule] BullMQ enqueue error:', err)
-      // Non-fatal — campaign is marked scheduled in DB
-    }
-
-    res.json({ campaign: updated })
+  const scheduleDate = new Date(scheduleAt ?? '')
+  if (isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now()) {
+    res.status(400).json({ error: 'schedule_at must be a valid future ISO timestamp' })
     return
   }
 
-  // ── Legacy path: expects scheduled_at + validates smart_list_id/subject/body ─
-  if (!scheduledAt) {
-    res.status(400).json({ error: 'scheduled_at is required' })
-    return
-  }
-
-  const scheduledDate = new Date(scheduledAt)
-  if (isNaN(scheduledDate.getTime())) {
-    res.status(400).json({ error: 'scheduled_at must be a valid ISO date string' })
-    return
-  }
-
-  const minScheduleTime = Date.now() + 5 * 60 * 1000
-  if (scheduledDate.getTime() <= minScheduleTime) {
-    res.status(400).json({ error: 'scheduled_at must be at least 5 minutes in the future' })
-    return
-  }
-
-  const { data: campaignLegacy, error: fetchErr } = await supabase
-    .from('campaigns')
-    .select('*')
-    .eq('id', id)
-    .eq('tenant_id', authed.tenantId)
-    .single<Campaign>()
-
-  if (fetchErr || !campaignLegacy) {
-    res.status(404).json({ error: 'Campaign not found' })
-    return
-  }
-
-  if (campaignLegacy.status !== 'draft' && campaignLegacy.status !== 'scheduled') {
-    res.status(400).json({
-      error: 'Only draft or scheduled campaigns can be (re)scheduled',
-    })
-    return
-  }
-
-  if (!campaignLegacy.subject) {
-    res.status(400).json({ error: 'Campaign must have a subject before scheduling' })
-    return
-  }
-  if (!campaignLegacy.body_html) {
-    res.status(400).json({ error: 'Campaign must have email body before scheduling' })
-    return
-  }
-  if (!campaignLegacy.smart_list_id) {
-    res.status(400).json({
-      error: 'Campaign must have a recipient list before scheduling',
-    })
-    return
-  }
-
-  const { data: updatedLegacy, error: updateErr } = await supabase
-    .from('campaigns')
-    .update({
-      status: 'scheduled',
-      scheduled_at: scheduledDate.toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('tenant_id', authed.tenantId)
-    .select('*')
-    .single<Campaign>()
-
-  if (updateErr || !updatedLegacy) {
-    res.status(500).json({ error: updateErr?.message ?? 'Failed to schedule campaign' })
-    return
-  }
-
-  try {
-    const delay = scheduledDate.getTime() - Date.now()
-    await getCampaignQueue().add(
-      'campaign-send',
-      { campaignId: campaignLegacy.id, tenantId: authed.tenantId },
-      { delay }
-    )
-  } catch (err) {
-    console.error('[campaigns/schedule] BullMQ enqueue error:', err)
-  }
-
-  res.json({ campaign: updatedLegacy })
+  const result = await scheduleCampaignSend(id, authed.tenantId, scheduleDate)
+  respondSchedule(res, result)
 })
 
 // ── POST /api/campaigns/:id/cancel ────────────────────────────────────────────
@@ -885,60 +825,40 @@ router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Pro
   res.json({ campaign: updated })
 })
 
-// ── POST /api/campaigns/:id/send-now — legacy, kept for compat ────────────────
+// ── POST /api/campaigns/:id/send-now ──────────────────────────────────────────
+// Repointed onto the P13 path: shares scheduleCampaignSend (approval gate +
+// status='scheduled' + enqueue 'send' with no delay) so campaign-sender.ts
+// accepts it. Success shape is { campaign } as before; note the returned status
+// is now 'scheduled' (was 'sending' under the deleted legacy worker path).
 router.post('/:id/send-now', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getSupabase()
+  const id = req.params['id'] as string
 
+  // Fail closed on segment-scoped sends at the edge — do not enqueue a job the
+  // worker would only pause. Segment/smart-list execution is a separate ticket.
   const { data: campaign, error: fetchErr } = await supabase
     .from('campaigns')
-    .select('*')
-    .eq('id', req.params['id'])
+    .select('id, segment_id')
+    .eq('id', id)
     .eq('tenant_id', authed.tenantId)
-    .single<Campaign>()
+    .single<{ id: string; segment_id: string | null }>()
 
   if (fetchErr || !campaign) {
     res.status(404).json({ error: 'Campaign not found' })
     return
   }
 
-  if (!campaign.subject) {
-    res.status(400).json({ error: 'Campaign must have a subject before sending' })
-    return
-  }
-  if (!campaign.body_html) {
-    res.status(400).json({ error: 'Campaign must have email body before sending' })
-    return
-  }
-  if (!campaign.smart_list_id) {
-    res.status(400).json({ error: 'Campaign must have a recipient list before sending' })
+  if (campaign.segment_id != null) {
+    res.status(400).json({
+      error:
+        'Segment-scoped sends are not yet supported — remove the segment or send to all contacts',
+    })
     return
   }
 
-  const { data: updated, error: updateErr } = await supabase
-    .from('campaigns')
-    .update({ status: 'sending', updated_at: new Date().toISOString() })
-    .eq('id', req.params['id'])
-    .eq('tenant_id', authed.tenantId)
-    .select('*')
-    .single<Campaign>()
-
-  if (updateErr || !updated) {
-    res.status(500).json({ error: updateErr?.message ?? 'Failed to update campaign status' })
-    return
-  }
-
-  try {
-    await getCampaignQueue().add(
-      'campaign-send',
-      { campaignId: campaign.id, tenantId: authed.tenantId },
-      { delay: 0 }
-    )
-  } catch (err) {
-    console.error('[campaigns/send-now] BullMQ enqueue error:', err)
-  }
-
-  res.json({ campaign: updated })
+  const result = await scheduleCampaignSend(id, authed.tenantId, null)
+  respondSchedule(res, result)
 })
 
 // ── GET /api/campaigns/:id/stats — legacy, kept for compat ───────────────────

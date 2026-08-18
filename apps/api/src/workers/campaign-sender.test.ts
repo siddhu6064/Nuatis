@@ -252,4 +252,54 @@ describe('campaign-sender worker — P13', () => {
     const camp = camps.find((c) => c['id'] === CAMPAIGN_ID)
     expect(camp?.['status']).toBe('complete')
   })
+
+  // ── Test 6: Segment-scoped campaign → paused, throws, zero sends ────────────
+  it('pauses and throws without sending when segment_id is set', async () => {
+    store.tables['campaigns'] = [{ ...makeScheduledCampaign(['sms']), segment_id: 'seg-1' }]
+    store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
+    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+
+    await expect(runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })).rejects.toThrow(
+      /segment-scoped/i
+    )
+
+    expect(mockSendSms).not.toHaveBeenCalled()
+    expect((store.tables['campaign_sends'] as Row[]).length).toBe(0)
+
+    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === CAMPAIGN_ID)
+    expect(camp?.['status']).toBe('paused')
+  })
+
+  // ── Test 7: null segment + contact_count matches → sends normally ───────────
+  it('sends normally when segment_id is null and contact_count matches the resolved count', async () => {
+    store.tables['campaigns'] = [{ ...makeScheduledCampaign(['sms']), contact_count: 1 }]
+    store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
+    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+
+    await expect(runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })).resolves.not.toThrow()
+
+    expect(mockSendSms).toHaveBeenCalledTimes(1)
+    const sends = store.tables['campaign_sends'] as Row[]
+    expect(sends.filter((s) => s['status'] === 'sent').length).toBe(1)
+
+    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === CAMPAIGN_ID)
+    expect(camp?.['status']).toBe('complete')
+  })
+
+  // ── Test 8: null segment + contact_count mismatch → paused, throws, zero sends
+  it('pauses and throws without sending when contact_count disagrees with resolved count', async () => {
+    store.tables['campaigns'] = [{ ...makeScheduledCampaign(['sms']), contact_count: 5 }]
+    store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
+    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+
+    await expect(runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })).rejects.toThrow(
+      /mismatch/i
+    )
+
+    expect(mockSendSms).not.toHaveBeenCalled()
+    expect((store.tables['campaign_sends'] as Row[]).length).toBe(0)
+
+    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === CAMPAIGN_ID)
+    expect(camp?.['status']).toBe('paused')
+  })
 })

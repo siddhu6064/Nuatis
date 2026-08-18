@@ -92,8 +92,6 @@ jest.unstable_mockModule('resend', () => ({
 const [{ default: express }, { default: request }, { default: campaignsRouter }] =
   await Promise.all([import('express'), import('supertest'), import('../routes/campaigns.js')])
 
-const { processCampaignSend } = await import('../workers/campaign-send-worker.js')
-
 function makeApp() {
   const app = express()
   app.use(express.json())
@@ -133,122 +131,160 @@ describe('POST /api/campaigns', () => {
   })
 })
 
-// ── Test 2: POST /api/campaigns/:id/schedule returns 400 if no smart_list_id ──
-describe('POST /api/campaigns/:id/schedule — no smart_list_id', () => {
-  it('returns 400 when campaign has no smart_list_id', async () => {
-    // Create a draft campaign without smart_list_id
-    const createRes = await request(makeApp())
-      .post('/api/campaigns')
-      .send({ name: 'No List Campaign', type: 'email' })
-      .set('Content-Type', 'application/json')
+// ── Helpers for the P13 /send-now + /schedule suite ──────────────────────────
+// Seed a draft campaign + one campaign_messages row directly in the store.
+function seedCampaign(
+  id: string,
+  opts: { status?: string; approved?: boolean; segment_id?: string | null } = {}
+): void {
+  ;(store.tables['campaigns'] as Row[]).push({
+    id,
+    tenant_id: 'tenant-1',
+    status: opts.status ?? 'draft',
+    channels: ['sms'],
+    segment_id: opts.segment_id ?? null,
+    contact_count: null,
+  })
+  store.tables['campaign_messages'] = (store.tables['campaign_messages'] as Row[]) ?? []
+  ;(store.tables['campaign_messages'] as Row[]).push({
+    id: `${id}-msg`,
+    campaign_id: id,
+    channel: 'sms',
+    subject: null,
+    body: 'Hi {first_name}',
+    approved: opts.approved ?? true,
+  })
+}
 
-    expect(createRes.status).toBeLessThan(300)
-    const campaignId = (createRes.body.campaign as { id: string }).id
-
-    // Manually set subject and body_html so those checks pass, but leave smart_list_id unset
-    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === campaignId)
-    if (camp) {
-      camp['subject'] = 'Test Subject'
-      camp['body_html'] = '<p>Test</p>'
-    }
-
-    const scheduledAt = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min from now
+// ── Test 2: /send-now on an approved draft → 200, scheduled, one 'send' job ────
+describe('POST /api/campaigns/:id/send-now — approved draft', () => {
+  it('schedules and enqueues exactly one send job with delay 0', async () => {
+    seedCampaign('camp-sn-ok', { status: 'draft', approved: true })
 
     const res = await request(makeApp())
-      .post(`/api/campaigns/${campaignId}/schedule`)
-      .send({ scheduled_at: scheduledAt })
+      .post('/api/campaigns/camp-sn-ok/send-now')
+      .send({})
       .set('Content-Type', 'application/json')
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    const campaign = res.body.campaign as { status: string }
+    expect(campaign.status).toBe('scheduled')
+
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1)
+    const call = mockQueueAdd.mock.calls[0] as unknown as [
+      string,
+      { campaignId: string; tenantId: string },
+      { delay: number },
+    ]
+    expect(call[0]).toBe('send')
+    expect(call[1]).toEqual({ campaignId: 'camp-sn-ok', tenantId: 'tenant-1' })
+    expect(call[2].delay).toBe(0)
   })
 })
 
-// ── Test 3: POST /api/campaigns/:id/schedule returns 400 if scheduled_at is past
-describe('POST /api/campaigns/:id/schedule — past date', () => {
-  it('returns 400 when scheduled_at is in the past', async () => {
-    // Create campaign with smart_list_id, subject, body_html
-    const createRes = await request(makeApp())
-      .post('/api/campaigns')
-      .send({
-        name: 'Past Schedule Campaign',
-        type: 'email',
-        smart_list_id: 'sl-1',
-        subject: 'Subject',
-      })
-      .set('Content-Type', 'application/json')
-
-    expect(createRes.status).toBeLessThan(300)
-    const campaignId = (createRes.body.campaign as { id: string }).id
-
-    // Set body_html directly in store
-    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === campaignId)
-    if (camp) {
-      camp['body_html'] = '<p>Body</p>'
-    }
-
-    // 1 hour in the past
-    const scheduledAt = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+// ── Test 3: /send-now with an unapproved message → rejected, no job ───────────
+describe('POST /api/campaigns/:id/send-now — unapproved message', () => {
+  it('returns 400 and enqueues nothing', async () => {
+    seedCampaign('camp-sn-unapproved', { status: 'draft', approved: false })
 
     const res = await request(makeApp())
-      .post(`/api/campaigns/${campaignId}/schedule`)
-      .send({ scheduled_at: scheduledAt })
+      .post('/api/campaigns/camp-sn-unapproved/send-now')
+      .send({})
       .set('Content-Type', 'application/json')
 
     expect(res.status).toBe(400)
+    expect((res.body as { error: string }).error).toMatch(/Approve/i)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
   })
 })
 
-// ── Test 4: Worker skips suppressed contacts ──────────────────────────────────
-describe('processCampaignSend — suppression', () => {
-  it('skips suppressed contacts (hard_bounce) and only inserts non-suppressed recipients', async () => {
-    const campaignId = 'camp-worker-1'
-    const tenantId = 'tenant-1'
+// ── Test 4: /send-now on an already-scheduled/complete campaign → rejected ────
+describe('POST /api/campaigns/:id/send-now — non-draft status', () => {
+  it('returns 400 for a scheduled campaign and enqueues nothing', async () => {
+    seedCampaign('camp-sn-sched', { status: 'scheduled', approved: true })
 
-    store.tables['campaigns'] = [
-      {
-        id: campaignId,
-        tenant_id: tenantId,
-        status: 'scheduled',
-        subject: 'Hello',
-        body_html: '<p>Hi {{contact_name}}</p>',
-        smart_list_id: 'sl-1',
-      },
-    ]
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sn-sched/send-now')
+      .send({})
+      .set('Content-Type', 'application/json')
 
-    seedEntitledTenant(store, tenantId)
+    expect(res.status).toBe(400)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
+  })
 
-    store.tables['contacts'] = [
-      {
-        id: 'contact-good',
-        tenant_id: tenantId,
-        full_name: 'Good Person',
-        email: 'good@example.com',
-        email_status: null,
-        email_risk_score: 0,
-        is_archived: false,
-      },
-      {
-        id: 'contact-bad',
-        tenant_id: tenantId,
-        full_name: 'Bad Person',
-        email: 'bad@example.com',
-        email_status: 'hard_bounce',
-        email_risk_score: 100,
-        is_archived: false,
-      },
-    ]
+  it('returns 400 for a complete campaign and enqueues nothing', async () => {
+    seedCampaign('camp-sn-complete', { status: 'complete', approved: true })
 
-    store.tables['campaign_recipients'] = []
-    store.tables['smart_lists'] = [{ id: 'sl-1', tenant_id: tenantId, name: 'All', filters: {} }]
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sn-complete/send-now')
+      .send({})
+      .set('Content-Type', 'application/json')
 
-    await processCampaignSend({ campaignId, tenantId })
+    expect(res.status).toBe(400)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
+  })
+})
 
-    // Only the good contact should be in campaign_recipients
-    const recipients = store.tables['campaign_recipients'] as Row[]
-    const contactIds = recipients.map((r) => r['contact_id'])
-    expect(contactIds).toContain('contact-good')
-    expect(contactIds).not.toContain('contact-bad')
-    expect(recipients.length).toBeLessThan(2)
+// ── Test 4b: /send-now on a segment-scoped campaign → rejected at the route ───
+describe('POST /api/campaigns/:id/send-now — segment guard', () => {
+  it('returns 400 without touching the queue when segment_id is set', async () => {
+    seedCampaign('camp-sn-seg', { status: 'draft', approved: true, segment_id: 'seg-1' })
+
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sn-seg/send-now')
+      .send({})
+      .set('Content-Type', 'application/json')
+
+    expect(res.status).toBe(400)
+    expect((res.body as { error: string }).error).toMatch(/segment/i)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
+  })
+})
+
+// ── Test 5: /schedule still enforces the approval gate + honours schedule_at ──
+describe('POST /api/campaigns/:id/schedule — approval gate + future schedule_at', () => {
+  it('returns 400 when a message is unapproved and enqueues nothing', async () => {
+    seedCampaign('camp-sch-unapproved', { status: 'draft', approved: false })
+    const futureAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sch-unapproved/schedule')
+      .send({ schedule_at: futureAt })
+      .set('Content-Type', 'application/json')
+
+    expect(res.status).toBe(400)
+    expect((res.body as { error: string }).error).toMatch(/Approve/i)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
+  })
+
+  it('schedules an approved draft at a future schedule_at and enqueues one send job', async () => {
+    seedCampaign('camp-sch-ok', { status: 'draft', approved: true })
+    const futureAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sch-ok/schedule')
+      .send({ schedule_at: futureAt })
+      .set('Content-Type', 'application/json')
+
+    expect(res.status).toBe(200)
+    expect((res.body.campaign as { status: string }).status).toBe('scheduled')
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1)
+    const call = mockQueueAdd.mock.calls[0] as unknown as [string, unknown, { delay: number }]
+    expect(call[0]).toBe('send')
+    expect(call[2].delay).toBeGreaterThan(0)
+  })
+
+  it('returns 400 for a past schedule_at and enqueues nothing', async () => {
+    seedCampaign('camp-sch-past', { status: 'draft', approved: true })
+    const pastAt = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sch-past/schedule')
+      .send({ schedule_at: pastAt })
+      .set('Content-Type', 'application/json')
+
+    expect(res.status).toBe(400)
+    expect(mockQueueAdd).not.toHaveBeenCalled()
   })
 })
 
