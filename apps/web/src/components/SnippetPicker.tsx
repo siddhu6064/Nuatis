@@ -18,7 +18,9 @@ interface Props {
   maxLength?: number
   contactName?: string
   className?: string
-  textareaRef?: React.RefObject<HTMLTextAreaElement>
+  // React 19 types: useRef<T>(null) yields RefObject<T | null>, so the prop has
+  // to admit null to accept a ref created that way.
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
 function substituteVars(body: string, contactName?: string): string {
