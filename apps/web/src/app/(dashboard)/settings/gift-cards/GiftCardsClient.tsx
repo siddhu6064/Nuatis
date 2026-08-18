@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -108,9 +111,17 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
   }
 
   if (result) {
+    // No header/close-X in the original design here — only "Done" closed it,
+    // and the backdrop was inert (no onClick). MUI's Dialog always wires
+    // Escape/backdrop to onClose, so both now behave like "Done" (call
+    // onSuccess then onClose) rather than leave the parent's list stale.
+    const finish = () => {
+      onSuccess()
+      onClose()
+    }
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4 p-6 text-center">
+      <Modal onClose={finish} maxWidth="xs">
+        <div className="text-center">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mx-auto mb-4">
             <svg
               className="w-6 h-6 text-green-600"
@@ -129,85 +140,57 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
               {formatDollars(result.new_balance_cents)}
             </span>
           </p>
-          <button
-            onClick={() => {
-              onSuccess()
-              onClose()
-            }}
-            className="mt-5 w-full rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-          >
+          <Button onClick={finish} variant="contained" fullWidth sx={{ mt: 2.5 }}>
             Done
-          </button>
+          </Button>
         </div>
-      </div>
+      </Modal>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-brand">
-          <h2 className="text-sm font-semibold text-ink">Redeem Gift Card</h2>
-          <button onClick={onClose} className="text-ink4 hover:text-ink">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="px-5 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1">Gift Card Code</label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. GC-ABCD1234"
-              className="w-full rounded-lg border border-border-brand bg-white px-3 py-2 text-sm font-mono text-ink placeholder-ink4 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1">
-              Redemption Amount ($)
-            </label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={amountDollars}
-              onChange={(e) => setAmountDollars(e.target.value)}
-              placeholder="0.00"
-              className="w-full rounded-lg border border-border-brand bg-white px-3 py-2 text-sm text-ink placeholder-ink4 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-          {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-brand">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border-brand px-3 py-2 text-sm font-medium text-ink3 hover:text-ink"
-          >
+    <Modal
+      onClose={onClose}
+      title="Redeem Gift Card"
+      maxWidth="xs"
+      footer={
+        <>
+          <Button onClick={onClose} variant="outlined" color="inherit">
             Cancel
-          </button>
-          <button
-            onClick={() => void handleRedeem()}
-            disabled={loading}
-            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-          >
+          </Button>
+          <Button onClick={() => void handleRedeem()} variant="contained" disabled={loading}>
             {loading ? 'Redeeming…' : 'Redeem'}
-          </button>
-        </div>
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <TextField
+          label="Gift Card Code"
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="e.g. GC-ABCD1234"
+          fullWidth
+          size="small"
+          slotProps={{ htmlInput: { className: 'font-mono' } }}
+        />
+        <TextField
+          label="Redemption Amount ($)"
+          type="number"
+          value={amountDollars}
+          onChange={(e) => setAmountDollars(e.target.value)}
+          placeholder="0.00"
+          fullWidth
+          size="small"
+          slotProps={{ htmlInput: { min: '0.01', step: '0.01' } }}
+        />
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 
