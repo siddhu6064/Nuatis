@@ -25,17 +25,28 @@ function getSupabase() {
 // ── GET / — list connected email accounts ────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
+
+  // user_email_accounts.user_id FKs public.users(id) — that is appUserId, not the
+  // Auth.js `sub` on authed.userId. Passing `sub` (empty for sessions without a
+  // resolved domain user) made Postgres reject it as a malformed uuid → 500.
+  if (!authed.appUserId) {
+    res.json({ accounts: [] })
+    return
+  }
+
   const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('user_email_accounts')
     .select('id, provider, email_address, is_default, created_at')
     .eq('tenant_id', authed.tenantId)
-    .eq('user_id', authed.userId)
+    .eq('user_id', authed.appUserId)
     .order('created_at', { ascending: true })
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    // ERR-01: never surface raw DB messages to the client.
+    console.error('[email-integrations] list failed:', error.message)
+    res.status(500).json({ error: 'Failed to load email accounts' })
     return
   }
 
@@ -46,6 +57,12 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
+
+  if (!authed.appUserId) {
+    res.status(404).json({ error: 'Email account not found' })
+    return
+  }
+
   const supabase = getSupabase()
 
   // Verify the account belongs to the current user before deleting
@@ -54,7 +71,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
     .select('id')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
-    .eq('user_id', authed.userId)
+    .eq('user_id', authed.appUserId)
     .single()
 
   if (fetchError || !existing) {
@@ -65,7 +82,8 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
   const { error } = await supabase.from('user_email_accounts').delete().eq('id', id)
 
   if (error) {
-    res.status(500).json({ error: error.message })
+    console.error('[email-integrations] delete failed:', error.message)
+    res.status(500).json({ error: 'Failed to disconnect email account' })
     return
   }
 
@@ -82,6 +100,14 @@ router.get('/gmail/auth-url', requireAuth, async (req: Request, res: Response): 
     return
   }
 
+  // The callback writes user_email_accounts.user_id, which FKs public.users(id).
+  // Without a resolved appUserId the row would violate that FK, so refuse up front
+  // rather than failing mid-OAuth after the user has granted consent.
+  if (!authed.appUserId) {
+    res.status(409).json({ error: 'No user record resolved for this session' })
+    return
+  }
+
   const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/gmail/callback`
 
@@ -90,7 +116,7 @@ router.get('/gmail/auth-url', requireAuth, async (req: Request, res: Response): 
   const nonce = crypto.randomBytes(32).toString('hex')
   await redis.set(
     `oauth:gmail:${nonce}`,
-    JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }),
+    JSON.stringify({ tenantId: authed.tenantId, userId: authed.appUserId }),
     'EX',
     600
   )
@@ -242,6 +268,12 @@ router.get('/outlook/auth-url', requireAuth, async (req: Request, res: Response)
     return
   }
 
+  // See the Gmail handler: the callback row FKs public.users(id).
+  if (!authed.appUserId) {
+    res.status(409).json({ error: 'No user record resolved for this session' })
+    return
+  }
+
   const apiUrl = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
   const redirectUri = `${apiUrl}/api/email-integrations/outlook/callback`
 
@@ -250,7 +282,7 @@ router.get('/outlook/auth-url', requireAuth, async (req: Request, res: Response)
   const nonce = crypto.randomBytes(32).toString('hex')
   await redis.set(
     `oauth:outlook:${nonce}`,
-    JSON.stringify({ tenantId: authed.tenantId, userId: authed.userId }),
+    JSON.stringify({ tenantId: authed.tenantId, userId: authed.appUserId }),
     'EX',
     600
   )
@@ -433,13 +465,18 @@ router.post('/send/:contactId', requireAuth, async (req: Request, res: Response)
     return
   }
 
+  if (!authed.appUserId) {
+    res.status(404).json({ error: 'Email account not found' })
+    return
+  }
+
   // Validate email account belongs to the current user
   const { data: emailAccount, error: accountError } = await supabase
     .from('user_email_accounts')
     .select('id, provider, email_address')
     .eq('id', emailAccountId)
     .eq('tenant_id', authed.tenantId)
-    .eq('user_id', authed.userId)
+    .eq('user_id', authed.appUserId)
     .single()
 
   if (accountError || !emailAccount) {

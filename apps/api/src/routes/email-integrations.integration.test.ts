@@ -44,8 +44,9 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
+  // user_email_accounts.user_id FKs public.users(id) — the appUserId claim, not `sub`.
   return mintTestToken(
-    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
+    { sub: USER_ID, appUserId: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'dental' },
     { secret: SECRET }
   )
 }
