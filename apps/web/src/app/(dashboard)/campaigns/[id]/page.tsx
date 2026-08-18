@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -103,30 +105,23 @@ function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl border border-border-brand w-full max-w-md mx-4 p-6 space-y-4">
-        <h3 className="text-base font-bold text-ink">{title}</h3>
-        <p className="text-sm text-ink2 whitespace-pre-line">{body}</p>
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors"
-          >
+    <Modal
+      onClose={onCancel}
+      title={title}
+      maxWidth="xs"
+      footer={
+        <>
+          <Button onClick={onCancel} variant="outlined" color="inherit">
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors text-white ${
-              destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-teal-600 hover:bg-teal-700'
-            }`}
-          >
+          </Button>
+          <Button onClick={onConfirm} variant="contained" color={destructive ? 'error' : 'primary'}>
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink2 whitespace-pre-line">{body}</p>
+    </Modal>
   )
 }
 
