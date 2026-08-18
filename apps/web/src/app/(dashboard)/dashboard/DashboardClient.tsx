@@ -13,6 +13,7 @@ import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
 import LeadSourceReport from '@/components/dashboard/LeadSourceReport'
 import RecentActivity from '@/components/dashboard/RecentActivity'
 import GbpInsightsWidget from './GbpInsightsWidget'
+import { StatCard } from './StatCard'
 
 // ── Widget IDs ─────────────────────────────────────────────────────────────────
 
@@ -57,13 +58,6 @@ function saveOrder(order: WidgetId[]) {
 }
 
 // ── Static constants ──────────────────────────────────────────────────────────
-
-const COLOR: Record<string, string> = {
-  teal: 'bg-teal-50 text-teal-600',
-  blue: 'bg-blue-50 text-blue-600',
-  amber: 'bg-amber-50 text-amber-600',
-  purple: 'bg-purple-50 text-purple-600',
-}
 
 const ACTIONS = [
   { label: 'Add Contact', icon: '+', href: '/contacts/new' },
@@ -131,31 +125,9 @@ export default function DashboardClient({ stats, userName }: Props) {
       case 'stat-cards':
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map(({ label, value, icon, color, href }) => {
-              const cardClass = `bg-white rounded-xl border border-border-brand p-5${href ? ' hover:shadow-md hover:border-teal-300 transition-all cursor-pointer' : ''}`
-              const inner = (
-                <>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-medium text-ink3">{label}</p>
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${COLOR[color]}`}
-                    >
-                      {icon}
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-ink">{value}</p>
-                </>
-              )
-              return href ? (
-                <Link key={label} href={href} className={`block ${cardClass}`}>
-                  {inner}
-                </Link>
-              ) : (
-                <div key={label} className={cardClass}>
-                  {inner}
-                </div>
-              )
-            })}
+            {stats.map((stat) => (
+              <StatCard key={stat.label} {...stat} />
+            ))}
           </div>
         )
       case 'pipeline-funnel':
