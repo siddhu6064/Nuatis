@@ -1,6 +1,6 @@
 # MUI v9 migration plan
 
-Branch: `chore/mui-v9-migration`. Status as of this document: **Phase 1 (foundation) and Phase 2 (pilot) complete and verified.** Phases 3+ are scoped but not started — see "Remaining work" below.
+Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-3 complete and verified** (foundation, pilot, shared design tokens). Phase 4+ is scoped but not started — see "Remaining work" below.
 
 ## Context
 
@@ -54,6 +54,21 @@ This is Tailwind v3's own documented compatibility pattern for native CSS cascad
 
 **Action item for anyone touching `globals.css` or adding another CSS-in-JS library later: do not remove this layer declaration**, and if a new "layered" library is added, its layer name needs a slot in that same top-of-file `@layer` statement or this bug reappears silently — it will not throw, lint, or fail a build. It only shows up as component internals quietly reverting to Tailwind's defaults.
 
+### Second instance, found in Phase 3: it's not just Tailwind's generated CSS
+
+The fix above only wraps `@tailwind base/components/utilities` — Tailwind's _generated_ output. `globals.css` also has hand-written CSS below that block: `:root` custom properties, `html`/`body` defaults, and a `h1, h2, h3, h4, h5, h6 { font-family: 'DM Serif Display' }` rule. That hand-written CSS is just as unlayered as preflight was, and has the identical bug.
+
+This wasn't caught by inspection — it surfaced as a real regression while doing the Phase 3 token refactor. The pilot's stat-card value (`Typography variant="h5"`, which renders a real `<h5>` tag) is styled `font-weight: 700` via the theme, same as before. After the tokens refactor its **font-family** silently flipped from `DM Sans` to `DM Serif Display` — not because the refactor touched anything font-related, but because a computed-style diff caught it, and a stylesheet-rule audit traced it to that one hand-written `h1..h6` rule in `globals.css`, still unlayered, still winning over MUI by the same cascade mechanism as before.
+
+**Fixed two ways, not one:**
+
+1. Moved `:root`, `html`/`body`, and the `h1-h6` rule inside the same `tailwind-base` layer as `@tailwind base`, so any future MUI `Typography` using a real heading tag correctly inherits from the theme instead of this rule.
+2. Fixed the pilot itself: `StatCard`'s value now renders `component="p"` instead of the default `h5` tag mapping. Independent of the CSS bug — a stat number isn't a document heading, and the _original_ pre-migration Tailwind version used a plain `<p>`, sans-serif. `variant="h5"` (for the type-scale styling) plus `component="p"` (for the actual tag) gets both the right look and the right semantics, and sidesteps this whole class of collision for this component regardless of what `globals.css` does.
+
+**Verified both changes don't regress the non-MUI part of the app:** plain `<h1>`/`<h2>` tags on `/sign-in` (a page with zero MUI components) still resolve `DM Serif Display`, unchanged — moving these rules into a layer doesn't affect elements that have no competing layered rule.
+
+**Generalized action item:** any _new_ base-level rule added to `globals.css` — not just Tailwind's own output — needs to go inside the `tailwind-base` layer block, not beside it, or it silently outranks every MUI component again. This is a standing risk for the rest of the migration: any global selector broad enough to also match an MUI-rendered element (tag selectors like `button`, `input`, `a`, `h1-h6`; the universal selector; anything targeting a shared class name) is a candidate for this bug if it's ever added outside the layer.
+
 ## What's installed (Phase 1)
 
 ```
@@ -67,16 +82,19 @@ This is Tailwind v3's own documented compatibility pattern for native CSS cascad
 
 Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI itself deduped under `@mui/material`. `npm audit` after install shows 0 new vulnerabilities attributable to MUI/Emotion/the Next.js integration package — all pre-existing findings trace to `next-auth`, `next`, `sentry`/`opentelemetry`, `multer`, `sharp`, `undici`.
 
-## Files added/changed (Phase 1 + 2)
+## Files added/changed (Phase 1-3)
 
-| File                                                         | Purpose                                                                                                                                                                                                              |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/theme/muiTheme.ts`                             | `createTheme()` mapping Tailwind's palette/typography/shape tokens (from `tailwind.config.js`) into MUI's theme shape. Values are duplicated, not shared from one source yet — see "Follow-up: shared tokens" below. |
-| `apps/web/src/theme/ThemeRegistry.tsx`                       | Client component: `AppRouterCacheProvider` (with `enableCssLayer: true`) + `ThemeProvider`. No `CssBaseline` — Tailwind's preflight already normalizes the document; two resets would fight over box-sizing/margin.  |
-| `apps/web/src/app/layout.tsx`                                | Wraps `children` in `ThemeRegistry`.                                                                                                                                                                                 |
-| `apps/web/src/app/globals.css`                               | The layer-order fix above.                                                                                                                                                                                           |
-| `apps/web/src/app/(dashboard)/dashboard/StatCard.tsx`        | Pilot component — MUI `Card`/`CardActionArea`/`Typography` replacing the hand-rolled Tailwind stat tile.                                                                                                             |
-| `apps/web/src/app/(dashboard)/dashboard/DashboardClient.tsx` | Stat-card grid now renders `<StatCard>`; removed the now-dead `COLOR` map it replaced.                                                                                                                               |
+| File                                                         | Purpose                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/theme/tokens.js`                               | Phase 3. Single source of truth for color/font values — plain CJS, `require()`-able from `tailwind.config.js`, typed via JSDoc for the TS side.                                                                     |
+| `apps/web/src/theme/muiTheme.ts`                             | `createTheme()` reading from `tokens.js` (was hand-duplicated literals through Phase 2 — fixed in Phase 3).                                                                                                         |
+| `apps/web/tailwind.config.js`                                | Now reads from the same `tokens.js`. Verified byte-identical output before/after via a direct `require()` diff.                                                                                                     |
+| `eslint.config.js`                                           | `no-require-imports` off for `tailwind.config.js` (CJS config loader, not TS-transpiled); a `module`-global override for `tokens.js` itself.                                                                        |
+| `apps/web/src/theme/ThemeRegistry.tsx`                       | Client component: `AppRouterCacheProvider` (with `enableCssLayer: true`) + `ThemeProvider`. No `CssBaseline` — Tailwind's preflight already normalizes the document; two resets would fight over box-sizing/margin. |
+| `apps/web/src/app/layout.tsx`                                | Wraps `children` in `ThemeRegistry`.                                                                                                                                                                                |
+| `apps/web/src/app/globals.css`                               | The layer-order fix. As of Phase 3, covers not just `@tailwind base` but every hand-written document-base rule in this file (`:root` vars, `html`/`body`, the `h1-h6` font rule) — see "second instance" below.     |
+| `apps/web/src/app/(dashboard)/dashboard/StatCard.tsx`        | Pilot component — MUI `Card`/`CardActionArea`/`Typography` replacing the hand-rolled Tailwind stat tile. Value renders `component="p"`, not the default `h5` tag — see below.                                       |
+| `apps/web/src/app/(dashboard)/dashboard/DashboardClient.tsx` | Stat-card grid now renders `<StatCard>`; removed the now-dead `COLOR` map it replaced.                                                                                                                              |
 
 CSP: no change needed. `style-src 'self' 'unsafe-inline'` (`apps/web/next.config.ts`) already covers Emotion's injected `<style>` tags.
 
@@ -100,13 +118,12 @@ Same data contract as before (`label`, `value`, `icon`, `color`, `href`) — thi
 
 No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
 
-This is a multi-week effort across 206 components; it was not attempted in one pass. Suggested phasing:
+This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) is done — see above. Suggested phasing from here:
 
-1. **Shared design tokens** — extract `tailwind.config.js`'s color/font values and `apps/web/src/theme/muiTheme.ts`'s duplicated literals into one source both import, so they can't drift. Skipped in Phase 1 as scope creep; worth doing before Phase 3 component conversions multiply the duplication.
-2. **Primitives first** — Button, TextField/Input, Modal/Dialog, Select, Menu are used everywhere and have the highest leverage: converting them once fixes consistency across every page that uses them, without a page-by-page rewrite.
-3. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
-4. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
-5. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass).
+1. **Primitives first** — Button, TextField/Input, Modal/Dialog, Select, Menu are used everywhere and have the highest leverage: converting them once fixes consistency across every page that uses them, without a page-by-page rewrite. Given the Phase 3 findings, audit each primitive's default rendered tag against `globals.css`'s base rules before converting — anything rendering `button`, `a`, `input`, or `h1-h6` is a candidate for the same collision the stat card hit.
+2. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
+3. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
+4. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass).
 
 ## Rollback
 
