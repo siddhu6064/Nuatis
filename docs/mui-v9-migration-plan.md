@@ -18,7 +18,7 @@ MUI's registry skips v8 — it goes v7 → v9, realigned with MUI X's version nu
 - `components`/`componentsProps` → `slots`/`slotProps` across 40+ components.
 - `GridLegacy` removed — use `Grid`.
 - Icon exports ending "Outline" renamed to "Outlined".
-- Browser support floor raised to Chrome 117+, Firefox 121+, Safari 17+, Edge 121. **Open question, not answered here:** does Nuatis have any user base on older browsers? If yes, this floor needs sign-off before wider rollout.
+- Browser support floor raised to Chrome 117+, Firefox 121+, Safari 17+, Edge 121. **Resolved:** no production user base yet (pre-launch, still in development) — this floor is a non-issue, no sign-off needed.
 
 ## The coexistence mechanism, and the bug it has if you stop half-way
 
@@ -97,6 +97,8 @@ Same data contract as before (`label`, `value`, `icon`, `color`, `href`) — thi
 - 5-page sweep of MUI-free routes after the CSS change: 0 regressions
 
 ## Remaining work (not started)
+
+No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
 
 This is a multi-week effort across 206 components; it was not attempted in one pass. Suggested phasing:
 
