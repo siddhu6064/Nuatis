@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -532,32 +534,43 @@ function CalendarSettingsContent() {
 
       {/* Switch Provider Confirmation Dialog */}
       {switchConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl mx-4">
-            <h3 className="text-base font-semibold text-ink mb-2">Switch Calendar Provider?</h3>
-            <p className="text-sm text-ink3 mb-5">
-              This will disconnect{' '}
-              <strong>
-                {status?.provider ? providerLabel(status.provider) : 'your current calendar'}
-              </strong>{' '}
-              and connect <strong>{providerLabel(switchConfirm)}</strong>. Continue?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setSwitchConfirm(null)}
-                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
-              >
+        <Modal
+          onClose={() => setSwitchConfirm(null)}
+          title="Switch Calendar Provider?"
+          maxWidth="xs"
+          footer={
+            <>
+              <Button onClick={() => setSwitchConfirm(null)} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={confirmSwitch}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
+              </Button>
+              {/*
+                confirmSwitch() ends in a real window.location.href redirect to
+                Google/Microsoft OAuth consent — deliberately not exercised
+                during verification (docs/mui-v9-migration-plan.md phase 8),
+                same treatment as the SMS/email sends held back in earlier
+                phases. Cancel/Escape are verified for real; this isn't.
+
+                variant="contained" with no color prop renders the theme's
+                default primary (teal), not this page's own bg-blue-600 —
+                a deliberate simplification: converted modal buttons use the
+                app-wide primary color rather than reproducing every page's
+                local accent, since the point of one shared theme is not
+                having per-page custom colors bleed into a shared component.
+              */}
+              <Button onClick={confirmSwitch} variant="contained">
                 Continue
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink3">
+            This will disconnect{' '}
+            <strong>
+              {status?.provider ? providerLabel(status.provider) : 'your current calendar'}
+            </strong>{' '}
+            and connect <strong>{providerLabel(switchConfirm)}</strong>. Continue?
+          </p>
+        </Modal>
       )}
 
       {/* Toast */}
