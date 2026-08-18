@@ -1,6 +1,6 @@
 # MUI v9 migration plan
 
-Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-4 complete and verified** (foundation, pilot, shared design tokens, first shared primitive). Phase 5+ is scoped but not started — see "Remaining work" below.
+Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-5 complete and verified** (foundation, pilot, shared design tokens, first shared primitive, primitive rollout started). Phase 6+ is scoped but not started — see "Remaining work" below.
 
 ## Context
 
@@ -82,7 +82,7 @@ This wasn't caught by inspection — it surfaced as a real regression while doin
 
 Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI itself deduped under `@mui/material`. `npm audit` after install shows 0 new vulnerabilities attributable to MUI/Emotion/the Next.js integration package — all pre-existing findings trace to `next-auth`, `next`, `sentry`/`opentelemetry`, `multer`, `sharp`, `undici`.
 
-## Files added/changed (Phase 1-4)
+## Files added/changed (Phase 1-5)
 
 | File                                                                   | Purpose                                                                                                                                                                                                             |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -97,6 +97,8 @@ Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI its
 | `apps/web/src/app/(dashboard)/dashboard/DashboardClient.tsx`           | Stat-card grid now renders `<StatCard>`; removed the now-dead `COLOR` map it replaced.                                                                                                                              |
 | `apps/web/src/components/ui/Modal.tsx`                                 | Phase 4. First shared primitive — wraps MUI `Dialog`, matches the app's existing modal convention.                                                                                                                  |
 | `apps/web/src/app/(dashboard)/settings/gift-cards/GiftCardsClient.tsx` | Phase 4 pilot — `RedeemModal` converted to the new `Modal` primitive.                                                                                                                                               |
+| `apps/web/src/app/(dashboard)/settings/lead-scoring/page.tsx`          | Phase 5 — `AddRuleModal` converted; `<form onSubmit>` pattern, `<select>` → MUI `TextField select`.                                                                                                                 |
+| `apps/web/src/app/(dashboard)/subscriptions/page.tsx`                  | Phase 5 — `CancelModal` converted; raw radios → `RadioGroup`/`Radio`, one-off `bg-red-600` → `color="error"`.                                                                                                       |
 
 CSP: no change needed. `style-src 'self' 'unsafe-inline'` (`apps/web/next.config.ts`) already covers Emotion's injected `<style>` tags.
 
@@ -132,18 +134,38 @@ This codebase had **no shared UI primitives before phase 4** — every button, m
 
 **Verified against the real backend**, not render-without-error: issued a real gift card through the existing (untouched) `IssueForm`, opened the converted dialog, confirmed `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` (none present before), confirmed focus starts inside the dialog, confirmed Escape closes it, redeemed $10 of $50 end-to-end (table updated to $40), tested the over-limit path (real 400 from the API, inline error banner, dialog stays open, form retains its values), confirmed Cancel closes cleanly. Swept 6 other pages (MUI and non-MUI) afterward: 0 new JS/API errors. Full check suite: typecheck 0, lint 0, web tests 15/15, build clean.
 
+## Phase 5: rolling the primitive out
+
+**Triage before converting anything.** Re-ran the `fixed inset-0` search (~30 files). Not all of them are `Modal` candidates: the mobile sidebar backdrop, a dropdown-popover backdrop, and three slide-over panels (Inventory/Staff/Shift — these say "Drawer" in their own filenames) use the same overlay CSS shape but are a different UI pattern than a centered dialog. Filtering by the `items-center justify-center` signature that actually distinguishes a centered dialog from those narrowed it to 17 real candidates. Forcing a slide-over into `Dialog` would have been the wrong primitive — noted as its own future item (MUI `Drawer`), not lumped in here.
+
+**Picked two that stress different integration patterns than the Phase 4 pilot**, deliberately — the goal was proving the primitive generalizes, not padding the conversion count:
+
+- **`lead-scoring` `AddRuleModal`** — a `<form onSubmit>` with the submit button _inside_ the form, and no footer divider in the original design. This is the case that would have broken if `Modal`'s `footer` prop were used here: `DialogActions` is a DOM _sibling_ of `DialogContent`, not nested inside it, so a submit button placed there sits outside any `<form>` wrapping the content — native submit-on-Enter would silently stop working. Solved by not using `footer` at all for this one; Cancel/Add Rule stay as plain children inside the form, exactly matching the original's no-divider look for free. Also converts a `<select>` to MUI `TextField` in `select` mode with `MenuItem`s.
+- **`subscriptions` `CancelModal`** — raw radio-button pairs convert to `RadioGroup`/`FormControlLabel`/`Radio`. The original's one-off `bg-red-600` danger button becomes `Button color="error"`, which resolves through the theme to `#ef4444` — a small, deliberate visual choice (app-wide semantic red instead of a page-local hex), called out here rather than left as a silent diff.
+
+**A real tooling gotcha, worth keeping in mind for future verification:** a synthetic `.click()` does not open an MUI `Select` — same limitation already hit with `react-big-calendar`'s toolbar during the React 19 upgrade. Verification needs a real browser click (`computer` tool coordinates or equivalent) for that specific interaction. Separately, filling form fields by querying "the first input with no explicit `type`" grabbed MUI Select's _hidden_ form-value input instead of the visible Label field — MUI Select renders both; query by placeholder/label text, not input position.
+
+**Verified against the real backend, not render-without-error, for both:**
+
+- lead-scoring: opened the Select with a real click, confirmed all 4 categories listed, picked "Behavior", submitted, got a real `201` from `POST /api/lead-scoring/rules`, confirmed the new rule landed under the right category tab (`Behavior (1)`).
+- subscriptions: created a real subscription through the page's own _unconverted_ New Subscription flow first (incidentally confirming that flow — sharing the same file — still works untouched), opened Cancel, confirmed `role="radiogroup"` and the error button's computed color (`rgb(239, 68, 68)` = `#ef4444`, exactly the theme value), selected "Cancel immediately" with a real click, submitted, got a real `200` from `POST /api/subscriptions/:id/cancel`, confirmed the row shows `Cancelled`.
+- Escape-to-close confirmed on both. Full check suite: typecheck 0, lint 0, web tests 15/15, build clean.
+
+**Explicitly deferred, not converted this pass:** `quotes/payment-links`' modal has a live SMS-send action — same category of outward-facing side effect flagged during the original full-app audit as needing explicit go-ahead before firing for real. Left for a pass where that's been discussed, rather than risk it during routine verification.
+
 ## Remaining work (not started)
 
 No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
 
-This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) and Phase 4 (first primitive, `Modal`) are done — see above. Suggested phasing from here:
+This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) and Phase 4 (first primitive, `Modal`) are done — see above. Phase 5 converted 2 of the 17 real dialog candidates (`RedeemModal` from Phase 4 makes 3 of 18 total, counting the one file — `EmailComposeModal.tsx` — not yet looked at closely). Suggested phasing from here:
 
-1. **More primitives, same audit-first approach as Phase 4** — `TextField`/form-field wrapper (used everywhere, but plain MUI `TextField` may already be enough without a wrapper, unlike `Modal` which needed one to match the app's visual convention), `Select`, `Menu`. Before building each: find the real call-site count in this codebase (not an assumed one), sample a few for existing a11y/behavior gaps, and check the MUI component's default rendered tag against `globals.css`'s base rules — anything defaulting to `button`/`a`/`input`/`h1-h6` needs the same computed-style verification `DialogTitle` got in Phase 4.
-2. **Convert the other ~29 hand-rolled modals** to the now-existing `Modal` primitive — each one is a small, bounded, individually-verifiable change following the Phase 4 pilot's pattern (real backend interaction, not just render-without-error).
-3. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
-4. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
-5. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass).
+1. **Continue the `Modal` rollout** — 14 real dialog candidates remain (17 found in Phase 5's triage, minus the 2 converted there and the 1 from Phase 4's pilot which was in the same original list before triage). `quotes/payment-links` is explicitly held back — has a live SMS-send action, needs an explicit go-ahead before exercising for real, unlike the others which only hit this app's own API. Each conversion should keep following the Phase 4/5 pattern: real backend verification, not render-without-error.
+2. **More primitives, same audit-first approach as Phase 4** — `TextField`/form-field wrapper (used everywhere, but plain MUI `TextField` may already be enough without a wrapper, unlike `Modal` which needed one to match the app's visual convention), `Select`, `Menu`. Before building each: find the real call-site count in this codebase (not an assumed one), sample a few for existing a11y/behavior gaps, and check the MUI component's default rendered tag against `globals.css`'s base rules — anything defaulting to `button`/`a`/`input`/`h1-h6` needs the same computed-style verification `DialogTitle` got in Phase 4.
+3. **`Drawer` for the slide-over panels** — Phase 5's triage found 4 files (`InventorySlideOver`, `StaffSlideOver`, `ShiftSlideOver`, `AppointmentDrawer`) using the same `fixed inset-0`-adjacent overlay CSS as the modals but sliding in from an edge, not centered. That's MUI `Drawer`'s use case, not `Dialog`'s — a separate primitive, not a variant of `Modal`.
+4. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
+5. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
+6. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass, and lead-scoring's recharts `BarChart` coexisting with the converted `AddRuleModal` on the same page, per Phase 5).
 
 ## Rollback
 
-Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and `StatCard.tsx`/`GiftCardsClient.tsx`'s `RedeemModal` are single components with the same props contract as what they replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, revert `GiftCardsClient.tsx`/delete `Modal.tsx`, revert `tailwind.config.js`/`muiTheme.ts`/`eslint.config.js`/delete `tokens.js`, uninstall the four packages.
+Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and every converted modal (`StatCard.tsx`, `GiftCardsClient.tsx`'s `RedeemModal`, `lead-scoring`'s `AddRuleModal`, `subscriptions`' `CancelModal`) is a single component with the same props contract as what it replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, revert `GiftCardsClient.tsx`/`lead-scoring/page.tsx`/`subscriptions/page.tsx`/delete `Modal.tsx`, revert `tailwind.config.js`/`muiTheme.ts`/`eslint.config.js`/delete `tokens.js`, uninstall the four packages.
