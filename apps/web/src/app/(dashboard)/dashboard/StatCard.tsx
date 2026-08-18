@@ -58,7 +58,14 @@ export function StatCard({ label, value, icon, color, href }: StatCardProps) {
           {icon}
         </Box>
       </Box>
-      <Typography variant="h5" color="text.primary" sx={{ fontWeight: 700 }}>
+      {/*
+        component="p": a stat value isn't a document heading, and the
+        default h5 tag collides with the app's global `h1..h6 { font-family:
+        DM Serif Display }` rule (apps/web/src/app/globals.css) — the
+        original Tailwind version of this card used a plain <p>, sans-serif.
+        See docs/mui-v9-migration-plan.md phase 3.
+      */}
+      <Typography variant="h5" component="p" color="text.primary" sx={{ fontWeight: 700 }}>
         {value}
       </Typography>
     </CardContent>

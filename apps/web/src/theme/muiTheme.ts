@@ -1,11 +1,16 @@
 import { createTheme } from '@mui/material/styles'
+import tokens from './tokens.js'
+
+/** Tailwind's fontFamily arrays -> MUI's CSS font-family string, quoting names with spaces. */
+function fontStack(stack: string[]): string {
+  return stack.map((name) => (name.includes(' ') ? `"${name}"` : name)).join(', ')
+}
 
 /**
- * MUI theme mapped onto the existing Tailwind design tokens
- * (apps/web/tailwind.config.js). Values are duplicated rather than
- * shared from a single source for now — see docs/mui-v9-migration-plan.md
- * phase 1 for why, and the follow-up to extract a shared tokens module.
- * If you change a color/font here, change tailwind.config.js too.
+ * MUI theme mapped onto the existing Tailwind design tokens. Both this
+ * file and tailwind.config.js read from theme/tokens.js — see
+ * docs/mui-v9-migration-plan.md phase 3. Change a color/font in
+ * tokens.js, not here or in tailwind.config.js.
  */
 export const muiTheme = createTheme({
   cssVariables: {
@@ -16,34 +21,34 @@ export const muiTheme = createTheme({
   palette: {
     mode: 'light',
     background: {
-      default: '#f9f8f5', // bg
-      paper: '#ffffff',
+      default: tokens.colors.bg,
+      paper: '#ffffff', // no Tailwind equivalent — plain white MUI surface
     },
     text: {
-      primary: '#1a1814', // ink
-      secondary: '#7a7468', // ink3
-      disabled: '#a8a29a', // ink4
+      primary: tokens.colors.ink,
+      secondary: tokens.colors.ink3,
+      disabled: tokens.colors.ink4,
     },
     primary: {
-      main: '#0d9488', // teal / accent
-      light: '#99f6e4', // teal.mid
-      dark: '#0f766e', // teal.dark
+      main: tokens.colors.accent,
+      light: tokens.colors.teal.mid,
+      dark: tokens.colors.teal.dark,
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#d97706', // amber-brand
+      main: tokens.colors.amberBrand,
       contrastText: '#ffffff',
     },
-    divider: '#dedad2', // border
+    divider: tokens.colors.border,
     error: {
-      main: '#ef4444', // cpq module color, reused as the closest existing red
+      main: tokens.colors.cpq, // reused as the closest existing red
     },
   },
   typography: {
-    fontFamily: '"DM Sans", system-ui, -apple-system, sans-serif',
-    h1: { fontFamily: '"DM Serif Display", Georgia, serif' },
-    h2: { fontFamily: '"DM Serif Display", Georgia, serif' },
-    h3: { fontFamily: '"DM Serif Display", Georgia, serif' },
+    fontFamily: fontStack(tokens.fontFamily.sans),
+    h1: { fontFamily: fontStack(tokens.fontFamily.display) },
+    h2: { fontFamily: fontStack(tokens.fontFamily.display) },
+    h3: { fontFamily: fontStack(tokens.fontFamily.display) },
     button: { textTransform: 'none' }, // Tailwind buttons in this app are not uppercased
   },
   shape: {
@@ -58,7 +63,7 @@ export const muiTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          border: '1px solid #dedad2',
+          border: `1px solid ${tokens.colors.border}`,
           backgroundImage: 'none', // disable MUI's default elevation overlay gradient
         },
       },

@@ -12,52 +12,61 @@
  * fixes the ordering: tailwind-base < mui < tailwind-utilities, so preflight
  * loses to MUI, and MUI loses to Tailwind utility classes (the desired
  * direction — a `className="text-2xl"` on an MUI component should still win).
+ *
+ * `tailwind-base` holds not just `@tailwind base` but every document-wide
+ * base rule below (:root vars, html/body, the h1-h6 font rule) — anything
+ * written as plain unlayered CSS here has the exact same "always beats MUI"
+ * problem as Tailwind's own preflight. This was caught empirically: the
+ * `h1..h6 { font-family: DM Serif Display }` rule below silently overrode
+ * an MUI Typography variant="h5" (a real <h5> tag) that should have
+ * inherited the theme's DM Sans default, until it moved into this layer.
  */
 @layer tailwind-base, mui, tailwind-utilities;
 
 @layer tailwind-base {
   @tailwind base;
+
+  :root {
+    --bg: #f9f8f5;
+    --bg2: #f2f0eb;
+    --bg3: #e8e5de;
+    --ink: #1a1814;
+    --ink2: #3d3a34;
+    --ink3: #7a7468;
+    --ink4: #a8a29a;
+    --accent: #0d9488;
+    --teal: #0d9488;
+    --teal-light: #ccfbf1;
+    --teal-mid: #99f6e4;
+    --teal-dark: #0f766e;
+    --amber: #d97706;
+    --border: #dedad2;
+    --dark-bg: #12110e;
+    --dark-alt: #1a1714;
+  }
+
+  html,
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family:
+      'DM Sans',
+      system-ui,
+      -apple-system,
+      sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'DM Serif Display', Georgia, serif;
+  }
 }
+
 @tailwind components;
 @layer tailwind-utilities {
   @tailwind utilities;
-}
-
-:root {
-  --bg: #f9f8f5;
-  --bg2: #f2f0eb;
-  --bg3: #e8e5de;
-  --ink: #1a1814;
-  --ink2: #3d3a34;
-  --ink3: #7a7468;
-  --ink4: #a8a29a;
-  --accent: #0d9488;
-  --teal: #0d9488;
-  --teal-light: #ccfbf1;
-  --teal-mid: #99f6e4;
-  --teal-dark: #0f766e;
-  --amber: #d97706;
-  --border: #dedad2;
-  --dark-bg: #12110e;
-  --dark-alt: #1a1714;
-}
-
-html,
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family:
-    'DM Sans',
-    system-ui,
-    -apple-system,
-    sans-serif;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: 'DM Serif Display', Georgia, serif;
 }

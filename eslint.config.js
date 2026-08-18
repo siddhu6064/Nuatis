@@ -32,6 +32,21 @@ export default tseslint.config(
         require: 'readonly',
       },
     },
+    rules: {
+      // Tailwind v3's config loader is plain CJS (require()), not run through
+      // a TS/ESM transpiler — see apps/web/src/theme/tokens.js.
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    // Shared design tokens: plain CJS so tailwind.config.js above can
+    // require() it without a build step. See its own file header.
+    files: ['**/theme/tokens.js'],
+    languageOptions: {
+      globals: {
+        module: 'writable',
+      },
+    },
   },
   {
     // API webchat widget — browser-only vanilla JS
