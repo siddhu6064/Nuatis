@@ -1,6 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import TextField from '@mui/material/TextField'
+import InputAdornment from '@mui/material/InputAdornment'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 interface Payment {
   id: string
@@ -193,95 +197,93 @@ export default function QuotePayments({
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-sm font-semibold text-ink mb-4">Record Payment</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-ink3 block mb-1">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3 text-sm">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-ink3 block mb-2">Method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['cash', 'check', 'stripe', 'other'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMethod(m)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
-                        method === m
-                          ? 'border-teal-500 bg-teal-50 text-teal-700 font-medium'
-                          : 'border-border-brand text-ink3 hover:bg-bg'
-                      }`}
-                    >
-                      <span>{METHOD_ICONS[m]}</span>
-                      <span className="capitalize">{m}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-ink3 block mb-1">
-                  Reference <span className="text-ink4 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder={METHOD_PLACEHOLDER[method]}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-ink3 block mb-1">
-                  Notes <span className="text-ink4 font-normal">(optional)</span>
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-                />
-              </div>
-
-              {formError && <p className="text-xs text-rose-600">{formError}</p>}
-            </div>
-
-            <div className="flex items-center gap-2 justify-end mt-5">
-              <button
+        <Modal
+          onClose={() => setShowModal(false)}
+          title="Record Payment"
+          maxWidth="xs"
+          footer={
+            <>
+              <Button
                 onClick={() => setShowModal(false)}
-                className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
+                variant="text"
+                color="inherit"
+                size="small"
               >
                 Cancel
-              </button>
-              <button
-                onClick={submit}
-                disabled={saving}
-                className="text-xs text-white bg-teal-600 hover:bg-teal-700 px-4 py-1.5 rounded-lg font-medium disabled:opacity-50"
-              >
+              </Button>
+              <Button onClick={submit} disabled={saving} variant="contained" size="small">
                 {saving ? 'Recording...' : 'Record Payment'}
-              </button>
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <TextField
+              label="Amount"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              fullWidth
+              size="small"
+              slotProps={{
+                htmlInput: { min: '0.01', step: '0.01' },
+                input: { startAdornment: <InputAdornment position="start">$</InputAdornment> },
+              }}
+            />
+
+            {/*
+              Method picker: intentionally left as plain Tailwind buttons,
+              not MUI ToggleButtonGroup — same reasoning as the primary-
+              contact picker in DuplicatesReviewer's merge modal
+              (docs/mui-v9-migration-plan.md phase 6). It's a genuine
+              mutually-exclusive choice, but a new MUI component type for
+              one call site isn't justified; the 2x2 icon-grid layout also
+              doesn't map cleanly onto ToggleButtonGroup's default styling.
+            */}
+            <div>
+              <label className="text-xs font-medium text-ink3 block mb-2">Method</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['cash', 'check', 'stripe', 'other'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMethod(m)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                      method === m
+                        ? 'border-teal-500 bg-teal-50 text-teal-700 font-medium'
+                        : 'border-border-brand text-ink3 hover:bg-bg'
+                    }`}
+                  >
+                    <span>{METHOD_ICONS[m]}</span>
+                    <span className="capitalize">{m}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <TextField
+              label="Reference (optional)"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder={METHOD_PLACEHOLDER[method]}
+              fullWidth
+              size="small"
+            />
+
+            <TextField
+              label="Notes (optional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              multiline
+              rows={2}
+              fullWidth
+              size="small"
+            />
+
+            {formError && <p className="text-xs text-rose-600">{formError}</p>}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
