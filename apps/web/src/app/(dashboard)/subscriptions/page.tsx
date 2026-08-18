@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@nuatis/shared'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -97,64 +102,62 @@ function CancelModal({ subscriptionId, onClose, onConfirm, loading }: CancelModa
   const [immediately, setImmediately] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4 p-6">
-        <h2 className="text-base font-semibold text-ink mb-1">Cancel Subscription</h2>
-        <p className="text-sm text-ink3 mb-4">Choose when to cancel this subscription.</p>
+    <Modal
+      onClose={onClose}
+      title="Cancel Subscription"
+      maxWidth="xs"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={loading} variant="text" color="inherit">
+            Keep
+          </Button>
+          {/* color="error" (theme red) replaces the original's one-off bg-red-600 —
+              same intent, now the app-wide semantic danger color. */}
+          <Button
+            onClick={() => void onConfirm(subscriptionId, immediately)}
+            disabled={loading}
+            variant="contained"
+            color="error"
+          >
+            {loading ? 'Cancelling…' : 'Confirm Cancel'}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink3 mb-4">Choose when to cancel this subscription.</p>
 
-        <div className="space-y-2 mb-6">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="cancel_mode"
-              checked={!immediately}
-              onChange={() => setImmediately(false)}
-              className="mt-0.5 text-teal-600"
-            />
+      <RadioGroup
+        value={immediately ? 'immediately' : 'period_end'}
+        onChange={(e) => setImmediately(e.target.value === 'immediately')}
+      >
+        <FormControlLabel
+          value="period_end"
+          control={<Radio size="small" />}
+          sx={{ alignItems: 'flex-start', mb: 1 }}
+          label={
             <div>
               <p className="text-sm font-medium text-ink">Cancel at period end</p>
               <p className="text-xs text-ink4">
                 Subscription remains active until the billing period ends.
               </p>
             </div>
-          </label>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="cancel_mode"
-              checked={immediately}
-              onChange={() => setImmediately(true)}
-              className="mt-0.5 text-teal-600"
-            />
+          }
+        />
+        <FormControlLabel
+          value="immediately"
+          control={<Radio size="small" />}
+          sx={{ alignItems: 'flex-start' }}
+          label={
             <div>
               <p className="text-sm font-medium text-ink">Cancel immediately</p>
               <p className="text-xs text-ink4">
                 Subscription is cancelled right away. No refund is issued.
               </p>
             </div>
-          </label>
-        </div>
-
-        <div className="flex items-center gap-3 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-sm text-ink3 hover:text-ink rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
-          >
-            Keep
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void onConfirm(subscriptionId, immediately)}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Cancelling…' : 'Confirm Cancel'}
-          </button>
-        </div>
-      </div>
-    </div>
+          }
+        />
+      </RadioGroup>
+    </Modal>
   )
 }
 
