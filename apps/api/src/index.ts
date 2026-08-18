@@ -8,7 +8,7 @@ import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
 import { initConversationsWs } from './lib/conversations-ws.js'
-import { initSentry, Sentry } from './lib/sentry.js'
+import { Sentry } from './lib/sentry.js'
 import { shutdownPostHog } from './lib/posthog.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
@@ -133,9 +133,6 @@ import {
   setWssRef,
 } from './voice/telnyx-handler.js'
 import { maskPhone } from './voice/pre-call-lookup.js'
-
-// Initialize Sentry before Express
-initSentry()
 
 const app = express()
 app.set('trust proxy', 1)

@@ -1,19 +1,6 @@
 import * as Sentry from '@sentry/node'
 
-export function initSentry(): void {
-  const dsn = process.env['SENTRY_DSN']
-  if (!dsn) {
-    console.info('[sentry] SENTRY_DSN not set — monitoring disabled')
-    return
-  }
-
-  Sentry.init({
-    dsn,
-    environment: process.env['NODE_ENV'] ?? 'development',
-    tracesSampleRate: 0.1,
-  })
-
-  console.info('[sentry] initialized')
-}
-
+// Sentry.init() lives in src/instrument.ts, preloaded via `--import` so that
+// auto-instrumentation can patch express/http before they are imported.
+// This module only re-exports the SDK for manual capture calls.
 export { Sentry }
