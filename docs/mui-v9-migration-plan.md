@@ -1,6 +1,6 @@
 # MUI v9 migration plan
 
-Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-3 complete and verified** (foundation, pilot, shared design tokens). Phase 4+ is scoped but not started — see "Remaining work" below.
+Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-4 complete and verified** (foundation, pilot, shared design tokens, first shared primitive). Phase 5+ is scoped but not started — see "Remaining work" below.
 
 ## Context
 
@@ -82,19 +82,21 @@ This wasn't caught by inspection — it surfaced as a real regression while doin
 
 Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI itself deduped under `@mui/material`. `npm audit` after install shows 0 new vulnerabilities attributable to MUI/Emotion/the Next.js integration package — all pre-existing findings trace to `next-auth`, `next`, `sentry`/`opentelemetry`, `multer`, `sharp`, `undici`.
 
-## Files added/changed (Phase 1-3)
+## Files added/changed (Phase 1-4)
 
-| File                                                         | Purpose                                                                                                                                                                                                             |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/theme/tokens.js`                               | Phase 3. Single source of truth for color/font values — plain CJS, `require()`-able from `tailwind.config.js`, typed via JSDoc for the TS side.                                                                     |
-| `apps/web/src/theme/muiTheme.ts`                             | `createTheme()` reading from `tokens.js` (was hand-duplicated literals through Phase 2 — fixed in Phase 3).                                                                                                         |
-| `apps/web/tailwind.config.js`                                | Now reads from the same `tokens.js`. Verified byte-identical output before/after via a direct `require()` diff.                                                                                                     |
-| `eslint.config.js`                                           | `no-require-imports` off for `tailwind.config.js` (CJS config loader, not TS-transpiled); a `module`-global override for `tokens.js` itself.                                                                        |
-| `apps/web/src/theme/ThemeRegistry.tsx`                       | Client component: `AppRouterCacheProvider` (with `enableCssLayer: true`) + `ThemeProvider`. No `CssBaseline` — Tailwind's preflight already normalizes the document; two resets would fight over box-sizing/margin. |
-| `apps/web/src/app/layout.tsx`                                | Wraps `children` in `ThemeRegistry`.                                                                                                                                                                                |
-| `apps/web/src/app/globals.css`                               | The layer-order fix. As of Phase 3, covers not just `@tailwind base` but every hand-written document-base rule in this file (`:root` vars, `html`/`body`, the `h1-h6` font rule) — see "second instance" below.     |
-| `apps/web/src/app/(dashboard)/dashboard/StatCard.tsx`        | Pilot component — MUI `Card`/`CardActionArea`/`Typography` replacing the hand-rolled Tailwind stat tile. Value renders `component="p"`, not the default `h5` tag — see below.                                       |
-| `apps/web/src/app/(dashboard)/dashboard/DashboardClient.tsx` | Stat-card grid now renders `<StatCard>`; removed the now-dead `COLOR` map it replaced.                                                                                                                              |
+| File                                                                   | Purpose                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/theme/tokens.js`                                         | Phase 3. Single source of truth for color/font values — plain CJS, `require()`-able from `tailwind.config.js`, typed via JSDoc for the TS side.                                                                     |
+| `apps/web/src/theme/muiTheme.ts`                                       | `createTheme()` reading from `tokens.js` (was hand-duplicated literals through Phase 2 — fixed in Phase 3).                                                                                                         |
+| `apps/web/tailwind.config.js`                                          | Now reads from the same `tokens.js`. Verified byte-identical output before/after via a direct `require()` diff.                                                                                                     |
+| `eslint.config.js`                                                     | `no-require-imports` off for `tailwind.config.js` (CJS config loader, not TS-transpiled); a `module`-global override for `tokens.js` itself.                                                                        |
+| `apps/web/src/theme/ThemeRegistry.tsx`                                 | Client component: `AppRouterCacheProvider` (with `enableCssLayer: true`) + `ThemeProvider`. No `CssBaseline` — Tailwind's preflight already normalizes the document; two resets would fight over box-sizing/margin. |
+| `apps/web/src/app/layout.tsx`                                          | Wraps `children` in `ThemeRegistry`.                                                                                                                                                                                |
+| `apps/web/src/app/globals.css`                                         | The layer-order fix. As of Phase 3, covers not just `@tailwind base` but every hand-written document-base rule in this file (`:root` vars, `html`/`body`, the `h1-h6` font rule) — see "second instance" below.     |
+| `apps/web/src/app/(dashboard)/dashboard/StatCard.tsx`                  | Pilot component — MUI `Card`/`CardActionArea`/`Typography` replacing the hand-rolled Tailwind stat tile. Value renders `component="p"`, not the default `h5` tag — see below.                                       |
+| `apps/web/src/app/(dashboard)/dashboard/DashboardClient.tsx`           | Stat-card grid now renders `<StatCard>`; removed the now-dead `COLOR` map it replaced.                                                                                                                              |
+| `apps/web/src/components/ui/Modal.tsx`                                 | Phase 4. First shared primitive — wraps MUI `Dialog`, matches the app's existing modal convention.                                                                                                                  |
+| `apps/web/src/app/(dashboard)/settings/gift-cards/GiftCardsClient.tsx` | Phase 4 pilot — `RedeemModal` converted to the new `Modal` primitive.                                                                                                                                               |
 
 CSP: no change needed. `style-src 'self' 'unsafe-inline'` (`apps/web/next.config.ts`) already covers Emotion's injected `<style>` tags.
 
@@ -114,17 +116,34 @@ Same data contract as before (`label`, `value`, `icon`, `color`, `href`) — thi
 - Runtime, logged in against the local dev stack: dashboard renders, stat cards show live data (153 contacts / 147 pipeline, matching prod), computed-style checks (not just "no console error") confirm colors/fonts/radius/hover state all resolve to the intended theme values
 - 5-page sweep of MUI-free routes after the CSS change: 0 regressions
 
+## Phase 4: first shared primitive
+
+This codebase had **no shared UI primitives before phase 4** — every button, modal, and form field is hand-rolled per feature. That reframed "primitives first" from the original plan: there's no single existing shared component to convert for leverage, so the leverage move is building the primitive so it exists, then converting one real call site to prove the API fits real usage rather than an imagined one.
+
+**Audit before building:** ~30 files use the same hand-rolled `fixed inset-0 z-50 ... bg-black/40` modal overlay pattern. Sampled 3 at random — none handle Escape-to-close, focus trapping, or `aria-modal`. That's the concrete case for `Modal` as the first primitive, not `Button` (simpler, lower-risk to hand-roll, weaker case) or `Select`/`Menu` (fewer call sites found).
+
+`apps/web/src/components/ui/Modal.tsx` wraps MUI `Dialog`, matching the app's existing visual convention exactly (rounded panel, border, header/footer dividers, inline X icon) instead of introducing a new look. `open` defaults to `true` because the existing convention is conditional _mounting_ (`{show && <TheModal/>}`), not an open-prop toggle — adopting the primitive doesn't require restructuring a call site's state.
+
+**A phase-3 prediction confirmed correct:** MUI's `DialogTitle` defaults to `component: "h2"` — exactly the collision class flagged as a standing risk at the end of phase 3. It renders fine here because `globals.css`'s `h1-h6` rule already lives inside the `tailwind-base` layer from that fix. Any future primitive whose default tag is `button`/`a`/`input`/`h1-h6` is worth the same computed-style check before calling it done.
+
+**Pilot conversion:** `GiftCardsClient.tsx`'s `RedeemModal` — self-contained, 4 props, real backend calls (issue/redeem/error paths), small bounded scope.
+
+**One deliberate behavior change, not just a styling swap:** the original success screen's backdrop was inert — clicking outside it did nothing, only the "Done" button closed it. MUI's `Dialog` always wires backdrop-click and Escape to `onClose`. Rather than leave that as a silent gap (dismiss without refreshing the parent's list), both paths now call `onSuccess` + `onClose` together, same as "Done" — a small, deliberate correctness fix riding along with the primitive swap, documented here rather than left implicit in the diff.
+
+**Verified against the real backend**, not render-without-error: issued a real gift card through the existing (untouched) `IssueForm`, opened the converted dialog, confirmed `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` (none present before), confirmed focus starts inside the dialog, confirmed Escape closes it, redeemed $10 of $50 end-to-end (table updated to $40), tested the over-limit path (real 400 from the API, inline error banner, dialog stays open, form retains its values), confirmed Cancel closes cleanly. Swept 6 other pages (MUI and non-MUI) afterward: 0 new JS/API errors. Full check suite: typecheck 0, lint 0, web tests 15/15, build clean.
+
 ## Remaining work (not started)
 
 No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
 
-This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) is done — see above. Suggested phasing from here:
+This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) and Phase 4 (first primitive, `Modal`) are done — see above. Suggested phasing from here:
 
-1. **Primitives first** — Button, TextField/Input, Modal/Dialog, Select, Menu are used everywhere and have the highest leverage: converting them once fixes consistency across every page that uses them, without a page-by-page rewrite. Given the Phase 3 findings, audit each primitive's default rendered tag against `globals.css`'s base rules before converting — anything rendering `button`, `a`, `input`, or `h1-h6` is a candidate for the same collision the stat card hit.
-2. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
-3. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
-4. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass).
+1. **More primitives, same audit-first approach as Phase 4** — `TextField`/form-field wrapper (used everywhere, but plain MUI `TextField` may already be enough without a wrapper, unlike `Modal` which needed one to match the app's visual convention), `Select`, `Menu`. Before building each: find the real call-site count in this codebase (not an assumed one), sample a few for existing a11y/behavior gaps, and check the MUI component's default rendered tag against `globals.css`'s base rules — anything defaulting to `button`/`a`/`input`/`h1-h6` needs the same computed-style verification `DialogTitle` got in Phase 4.
+2. **Convert the other ~29 hand-rolled modals** to the now-existing `Modal` primitive — each one is a small, bounded, individually-verifiable change following the Phase 4 pilot's pattern (real backend interaction, not just render-without-error).
+3. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
+4. **Opportunistic conversion** of existing pages — prioritize the ones flagged from the earlier full-app audit as weakest (empty states with no CTA, the 54 unlabeled toggle buttons on Notifications/Modules/Voice AI — MUI's `Switch`/`IconButton` have correct `aria-label` ergonomics built in, which would fix that a11y gap as a side effect of migrating those controls).
+5. **`react-big-calendar`, `recharts`, `@hello-pangea/dnd`** are unrelated to MUI and don't need touching — they're not being replaced, just need to keep working alongside MUI surfaces on the same page (Appointments already does, per the React 19 upgrade's verification pass).
 
 ## Rollback
 
-Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and `StatCard.tsx` is a single leaf component with the same props contract as what it replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, uninstall the four packages.
+Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and `StatCard.tsx`/`GiftCardsClient.tsx`'s `RedeemModal` are single components with the same props contract as what they replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, revert `GiftCardsClient.tsx`/delete `Modal.tsx`, revert `tailwind.config.js`/`muiTheme.ts`/`eslint.config.js`/delete `tokens.js`, uninstall the four packages.
