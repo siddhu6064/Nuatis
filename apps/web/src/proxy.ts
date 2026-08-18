@@ -58,19 +58,49 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url, { request: { headers } })
   }
 
-  // Demo layout — no auth required
-  if (pathname.startsWith('/demo')) {
-    return NextResponse.next()
-  }
+  // Auth.js protects every app route. This is an allowlist of PUBLIC prefixes,
+  // deliberately inverted: a route added to the dashboard is protected by
+  // default. The previous denylist named only five prefixes, so 20 dashboard
+  // routes (/calls, /deals, /invoices, /campaigns, …) rendered unauthenticated
+  // and bypassed the canceled-subscription redirect below.
+  const PUBLIC_PREFIXES = [
+    // Auth.js's own endpoints. The /api rewrite above deliberately skips
+    // /api/auth, so these fall through to here — gating them would redirect the
+    // sign-in flow to /sign-in and make login impossible.
+    '/api/auth',
+    // (auth)
+    '/sign-in',
+    '/sign-up',
+    '/forgot-password',
+    '/reset-password',
+    // (marketing)
+    '/pricing',
+    '/products',
+    '/maya',
+    // (demo)
+    '/demo',
+    // (public) — customer-facing, no dashboard session
+    '/collect', // /collect/[slug] intake forms
+    '/portal', // /portal/[slug] client portal (own auth)
+    '/book', // /book/[slug] public booking
+    // Public quote view. Must stay narrower than '/quotes', which is a
+    // protected dashboard route (/quotes, /quotes/ledger, /quotes/payment-links).
+    '/quotes/view',
+    '/widget', // embeddable webchat widget, loaded from customer sites
+  ]
 
-  // Auth.js protects all app routes
-  if (
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/contacts') ||
-    pathname.startsWith('/pipeline') ||
-    pathname.startsWith('/appointments') ||
-    pathname.startsWith('/settings')
-  ) {
+  // Files under apps/web/public (manifest.json, sw.js, icons/*, *.png) still
+  // reach this middleware — the matcher below only exempts _next/static,
+  // _next/image and favicon.ico. Gating them would break the PWA manifest and
+  // the sign-in page's own logo, so exempt anything with a file extension.
+  const isStaticAsset = /\.[a-z0-9]+$/i.test(pathname)
+
+  const isPublic =
+    pathname === '/' ||
+    isStaticAsset ||
+    PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+
+  if (!isPublic) {
     const session = await auth()
 
     if (!session) {
