@@ -1,6 +1,6 @@
 # MUI v9 migration plan
 
-Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-6 complete and verified** (foundation, pilot, shared design tokens, first shared primitive, primitive rollout in progress — 5 of ~18 modals converted). Phase 7+ is scoped but not started — see "Remaining work" below.
+Branch: `chore/mui-v9-migration`. Status as of this document: **Phases 1-7 complete and verified** (foundation, pilot, shared design tokens, first shared primitive, primitive rollout in progress — 7 of ~18 modals converted). Phase 8+ is scoped but not started — see "Remaining work" below.
 
 ## Context
 
@@ -82,7 +82,7 @@ This wasn't caught by inspection — it surfaced as a real regression while doin
 
 Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI itself deduped under `@mui/material`. `npm audit` after install shows 0 new vulnerabilities attributable to MUI/Emotion/the Next.js integration package — all pre-existing findings trace to `next-auth`, `next`, `sentry`/`opentelemetry`, `multer`, `sharp`, `undici`.
 
-## Files added/changed (Phase 1-6)
+## Files added/changed (Phase 1-7)
 
 | File                                                                   | Purpose                                                                                                                                                                                                             |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -101,6 +101,8 @@ Dependency resolution: clean, single copy of React (19.2.8) and Emotion, MUI its
 | `apps/web/src/app/(dashboard)/subscriptions/page.tsx`                  | Phase 5 — `CancelModal` converted; raw radios → `RadioGroup`/`Radio`, one-off `bg-red-600` → `color="error"`.                                                                                                       |
 | `apps/web/src/app/(dashboard)/settings/email-templates/page.tsx`       | Phase 6 — Create/Edit template modal; `<select>` → `TextField select`, `<textarea>` → `TextField multiline`.                                                                                                        |
 | `apps/web/src/components/contacts/DuplicatesReviewer.tsx`              | Phase 6 — Merge modal; 3 independent radio choices → `RadioGroup`/`Radio`. Primary-contact card-picker stays plain buttons deliberately.                                                                            |
+| `apps/web/src/app/(dashboard)/quotes/[id]/QuotePayments.tsx`           | Phase 7 — Record Payment modal; `TextField` + `InputAdornment` for the `$` prefix (an improvement over a manually positioned span). Method picker stays plain buttons.                                              |
+| `apps/web/src/components/inventory/InventoryList.tsx`                  | Phase 7 — delete-confirm modal; simplest conversion so far, no form fields.                                                                                                                                         |
 
 CSP: no change needed. `style-src 'self' 'unsafe-inline'` (`apps/web/next.config.ts`) already covers Emotion's injected `<style>` tags.
 
@@ -167,13 +169,32 @@ Converted `email-templates`' Create/Edit modal (`<select>` → `TextField select
 
 Full check suite: typecheck 0, lint 0, web tests 15/15, build clean. Console/network swept clean of new errors across both conversions.
 
+## Phase 7: closing out one open item, finding a subtler outward-facing risk
+
+Followed up on Phase 6's open item first: checked `EmailComposeModal.tsx` before converting anything else. It hits `/api/email-integrations/send/:contactId` — the real Gmail/Outlook send endpoint (the one the `appUserId` bug fix touched, from before this migration started). Same category of side effect as `payment-links`' SMS action. Deferred again, still needs an explicit go-ahead.
+
+**A subtler version of that same check, on `QuotePayments.tsx`:** its Method picker includes a "stripe" option, which could easily have been assumed risky by pattern-matching on the word alone. Read the backend route instead of assuming: `POST /api/quotes/:id/payments` only makes a real outbound API call when `method === 'square'` (a live charge via `createSquarePayment`) — `cash`/`check`/`stripe`/`other` are pure record-keeping inserts, no live charge for any of them, and the frontend doesn't even expose `'square'` as a selectable option. Converted it, and verified using `method: 'cash'` specifically to stay clear of the one code path that does call out.
+
+Converted `QuotePayments`' Record Payment modal and `InventoryList`'s delete-confirm — deliberately paired one more-complex form against one of the simplest conversions yet (no form fields at all), for contrast.
+
+**A genuine improvement, not just a like-for-like swap:** the Amount field's `$` prefix used to be a manually `absolute`-positioned `<span>`; it's now MUI's `InputAdornment`, the component built for exactly this.
+
+**Consistent with Phase 6's stated policy, applied without re-litigating it:** `QuotePayments`' Method picker (4-button icon grid) stays plain Tailwind buttons, same reasoning as `DuplicatesReviewer`'s primary-contact picker — a real mutually-exclusive choice, but not enough to justify introducing `ToggleButtonGroup` for one call site, and the icon-grid layout doesn't map cleanly onto its default styling anyway. `InventoryList`'s confirm dialog uses `title` despite the original having no header, same reasoning as `CancelModal`/the merge modal in phases 5-6.
+
+**Verified against the real backend for both, including working around two "no test data" gaps in different ways:**
+
+- None of the 4 existing demo quotes were `accepted` status, which gates whether `QuotePayments` even mounts. Rather than force a status update through a side door, called the quote's own public accept endpoint with its real `share_token` (`POST /api/quotes/view/:token/accept`) — the same call a customer would make. Confirmed the Payments section appeared, the Amount field pre-filled with the real balance due, and the Reference placeholder derived correctly when Method changed (a state-derivation check, not just a render check). Recorded a real $50 cash payment, got a real `201`, confirmed the quote flipped to "Partial" with correct paid/balance figures.
+- `InventoryList` needed a real item to delete; created a throwaway one via the authenticated session's own fetch (same pattern as prior phases), confirmed Escape declines without deleting, then confirmed a real `200` from `DELETE /api/inventory/:id` and the row disappearing.
+
+Full check suite: typecheck 0, lint 0, web tests 15/15, build clean. Console/network swept clean of new errors.
+
 ## Remaining work (not started)
 
 No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
 
-This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) and Phase 4 (first primitive, `Modal`) are done — see above. Phases 5-6 converted 4 more of the real dialog candidates found in Phase 5's triage (`lead-scoring`, `subscriptions`, `email-templates`, `DuplicatesReviewer`) — 5 of ~18 total converted, counting Phase 4's pilot. Suggested phasing from here:
+This is a multi-week effort across 206 components; it was not attempted in one pass. Phase 3 (shared design tokens) and Phase 4 (first primitive, `Modal`) are done — see above. Phases 5-7 converted 6 more of the real dialog candidates found in Phase 5's triage (`lead-scoring`, `subscriptions`, `email-templates`, `DuplicatesReviewer`, `QuotePayments`, `InventoryList`) — 7 of ~18 total converted, counting Phase 4's pilot. Suggested phasing from here:
 
-1. **Continue the `Modal` rollout** — ~12 real dialog candidates remain. `quotes/payment-links` is explicitly held back — has a live SMS-send action, needs an explicit go-ahead before exercising for real, unlike the others which only hit this app's own API. `contacts/EmailComposeModal.tsx` hasn't been looked at closely yet — worth checking whether it also sends real email before assuming it's as safe as the ones converted so far. Each conversion should keep following the established pattern: real backend verification, not render-without-error, and a check for whether the modal has test data to exercise it against (Phase 6 had to synthesize a duplicate pair when the demo tenant had none).
+1. **Continue the `Modal` rollout** — ~10 real dialog candidates remain. Two are explicitly held back on outward-facing side effects and need an explicit go-ahead: `quotes/payment-links` (live SMS) and `contacts/EmailComposeModal.tsx` (real Gmail/Outlook send, confirmed in Phase 7). Each remaining conversion should keep following the established pattern: read the backend route before assuming risk level rather than pattern-matching on scary-looking words (Phase 7's `QuotePayments` had a "stripe" option that turned out to be pure record-keeping, not a live charge — only checking the actual route caught that), real backend verification over render-without-error, and a check for whether the modal has test data to exercise it against (Phase 6 synthesized a duplicate pair; Phase 7 used a quote's own public accept endpoint to get an `accepted` quote to test against).
 2. **More primitives, same audit-first approach as Phase 4** — `TextField`/form-field wrapper (used everywhere, but plain MUI `TextField` may already be enough without a wrapper, unlike `Modal` which needed one to match the app's visual convention), `Select`, `Menu`. Before building each: find the real call-site count in this codebase (not an assumed one), sample a few for existing a11y/behavior gaps, and check the MUI component's default rendered tag against `globals.css`'s base rules — anything defaulting to `button`/`a`/`input`/`h1-h6` needs the same computed-style verification `DialogTitle` got in Phase 4.
 3. **`Drawer` for the slide-over panels** — Phase 5's triage found 4 files (`InventorySlideOver`, `StaffSlideOver`, `ShiftSlideOver`, `AppointmentDrawer`) using the same `fixed inset-0`-adjacent overlay CSS as the modals but sliding in from an edge, not centered. That's MUI `Drawer`'s use case, not `Dialog`'s — a separate primitive, not a variant of `Modal`.
 4. **New surfaces get MUI by default** — any new page/feature built from here should use MUI primitives rather than hand-rolled Tailwind, so the split doesn't grow.
@@ -182,4 +203,4 @@ This is a multi-week effort across 206 components; it was not attempted in one p
 
 ## Rollback
 
-Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and every converted modal (`StatCard.tsx`, `GiftCardsClient.tsx`'s `RedeemModal`, `lead-scoring`'s `AddRuleModal`, `subscriptions`' `CancelModal`, `email-templates`' Create/Edit modal, `DuplicatesReviewer`'s Merge modal) is a single component with the same props contract as what it replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, revert `GiftCardsClient.tsx`/`lead-scoring/page.tsx`/`subscriptions/page.tsx`/`email-templates/page.tsx`/`DuplicatesReviewer.tsx`/delete `Modal.tsx`, revert `tailwind.config.js`/`muiTheme.ts`/`eslint.config.js`/delete `tokens.js`, uninstall the four packages.
+Every change here is additive and isolated: `ThemeRegistry` wraps `children` without altering existing markup, `globals.css`'s layer restructuring is a no-op for any page that never renders an MUI component, and every converted modal (`StatCard.tsx`, `GiftCardsClient.tsx`'s `RedeemModal`, `lead-scoring`'s `AddRuleModal`, `subscriptions`' `CancelModal`, `email-templates`' Create/Edit modal, `DuplicatesReviewer`'s Merge modal, `QuotePayments`' Record Payment modal, `InventoryList`'s delete-confirm) is a single component with the same props contract as what it replaced. Reverting is: remove the `ThemeRegistry` wrap in `layout.tsx`, revert `globals.css`, revert `DashboardClient.tsx`/delete `StatCard.tsx`, revert `GiftCardsClient.tsx`/`lead-scoring/page.tsx`/`subscriptions/page.tsx`/`email-templates/page.tsx`/`DuplicatesReviewer.tsx`/`QuotePayments.tsx`/`InventoryList.tsx`/delete `Modal.tsx`, revert `tailwind.config.js`/`muiTheme.ts`/`eslint.config.js`/delete `tokens.js`, uninstall the four packages.
