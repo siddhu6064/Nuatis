@@ -1,8 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap');
 
-@tailwind base;
+/*
+ * Layer order for MUI + Tailwind coexistence (docs/mui-v9-migration-plan.md).
+ * MUI's AppRouterCacheProvider wraps its generated CSS in `@layer mui` via
+ * `enableCssLayer: true`. Per the CSS cascade spec, ANY unlayered rule beats
+ * ANY layered rule regardless of specificity — so without this declaration,
+ * Tailwind's preflight reset (`@tailwind base`, which compiles unlayered)
+ * would silently clobber MUI component internals: `h1..h6 { font-weight:
+ * inherit }` overrides MUI Typography's bold headings, `* { border-color:
+ * theme(...) }` overrides MUI's own border colors, etc. This bare statement
+ * fixes the ordering: tailwind-base < mui < tailwind-utilities, so preflight
+ * loses to MUI, and MUI loses to Tailwind utility classes (the desired
+ * direction — a `className="text-2xl"` on an MUI component should still win).
+ */
+@layer tailwind-base, mui, tailwind-utilities;
+
+@layer tailwind-base {
+  @tailwind base;
+}
 @tailwind components;
-@tailwind utilities;
+@layer tailwind-utilities {
+  @tailwind utilities;
+}
 
 :root {
   --bg: #f9f8f5;
