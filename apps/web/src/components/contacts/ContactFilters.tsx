@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Checkbox from '@mui/material/Checkbox'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 
 export interface FilterState {
   q: string
@@ -306,142 +317,138 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
       case 'sort_by':
         return (
           <>
-            <div className="space-y-1">
+            <RadioGroup
+              value={filters.sort_by}
+              onChange={(e) =>
+                update({
+                  sort_by: e.target.value,
+                  sort_dir: e.target.value === 'lead_score' ? 'desc' : filters.sort_dir,
+                })
+              }
+            >
               {[
                 { value: 'created_at', label: 'Date Added' },
                 { value: 'full_name', label: 'Name' },
                 { value: 'last_contacted_at', label: 'Last Contacted' },
                 { value: 'lead_score', label: 'Lead Score' },
               ].map((opt) => (
-                <label
+                <FormControlLabel
                   key={opt.value}
-                  className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="sort_by"
-                    checked={filters.sort_by === opt.value}
-                    onChange={() =>
-                      update({
-                        sort_by: opt.value,
-                        sort_dir: opt.value === 'lead_score' ? 'desc' : filters.sort_dir,
-                      })
-                    }
-                    className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                  />
-                  {opt.label}
-                </label>
+                  value={opt.value}
+                  control={<Radio size="small" />}
+                  label={<span className="text-xs text-ink3">{opt.label}</span>}
+                />
               ))}
-            </div>
-            <div className="flex gap-2 mt-2">
-              {['asc', 'desc'].map((dir) => (
-                <button
-                  key={dir}
-                  onClick={() => update({ sort_dir: dir })}
-                  className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
-                    filters.sort_dir === dir
-                      ? 'border-teal-500 bg-teal-50 text-teal-700 font-medium'
-                      : 'border-border-brand text-ink3 hover:bg-bg'
-                  }`}
-                >
-                  {dir === 'asc' ? 'Ascending' : 'Descending'}
-                </button>
-              ))}
-            </div>
+            </RadioGroup>
+            <ToggleButtonGroup
+              value={filters.sort_dir}
+              exclusive
+              onChange={(_, dir: string | null) => dir && update({ sort_dir: dir })}
+              fullWidth
+              size="small"
+              sx={{ mt: 1 }}
+            >
+              <ToggleButton value="asc" sx={{ fontSize: 10 }}>
+                Ascending
+              </ToggleButton>
+              <ToggleButton value="desc" sx={{ fontSize: 10 }}>
+                Descending
+              </ToggleButton>
+            </ToggleButtonGroup>
           </>
         )
 
       case 'last_contacted':
         return (
-          <div className="space-y-1">
+          <RadioGroup
+            value={`${filters.last_contacted_from}|${filters.last_contacted_to}`}
+            onChange={(e) => {
+              const p = LAST_CONTACTED_PRESETS.find((p) => `${p.from}|${p.to}` === e.target.value)
+              if (p) update({ last_contacted_from: p.from, last_contacted_to: p.to })
+            }}
+          >
             {LAST_CONTACTED_PRESETS.map((p) => (
-              <label
+              <FormControlLabel
                 key={p.label}
-                className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="last_contacted"
-                  checked={
-                    filters.last_contacted_from === p.from && filters.last_contacted_to === p.to
-                  }
-                  onChange={() => update({ last_contacted_from: p.from, last_contacted_to: p.to })}
-                  className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                {p.label}
-              </label>
+                value={`${p.from}|${p.to}`}
+                control={<Radio size="small" />}
+                label={<span className="text-xs text-ink3">{p.label}</span>}
+              />
             ))}
-          </div>
+          </RadioGroup>
         )
 
       case 'created':
         return (
-          <div className="space-y-1">
+          <RadioGroup
+            value={`${filters.created_from}|${filters.created_to}`}
+            onChange={(e) => {
+              const p = CREATED_PRESETS.find((p) => `${p.from}|${p.to}` === e.target.value)
+              if (p) update({ created_from: p.from, created_to: p.to })
+            }}
+          >
             {CREATED_PRESETS.map((p) => (
-              <label
+              <FormControlLabel
                 key={p.label}
-                className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="created"
-                  checked={filters.created_from === p.from && filters.created_to === p.to}
-                  onChange={() => update({ created_from: p.from, created_to: p.to })}
-                  className="border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                {p.label}
-              </label>
+                value={`${p.from}|${p.to}`}
+                control={<Radio size="small" />}
+                label={<span className="text-xs text-ink3">{p.label}</span>}
+              />
             ))}
-          </div>
+          </RadioGroup>
         )
 
       case 'pipeline_stage':
         return (
-          <div className="space-y-1">
+          <div>
             {stages.map((stage) => (
-              <label
+              <FormControlLabel
                 key={stage.id}
-                className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={filters.pipeline_stage_id.includes(stage.id)}
-                  onChange={() => toggleArrayItem('pipeline_stage_id', stage.id)}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: stage.color }}
-                />
-                {stage.name}
-              </label>
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filters.pipeline_stage_id.includes(stage.id)}
+                    onChange={() => toggleArrayItem('pipeline_stage_id', stage.id)}
+                  />
+                }
+                label={
+                  <span className="flex items-center gap-1.5 text-xs text-ink3">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: stage.color }}
+                    />
+                    {stage.name}
+                  </span>
+                }
+                sx={{ display: 'flex' }}
+              />
             ))}
           </div>
         )
 
       case 'source':
         return (
-          <div className="space-y-1">
+          <div>
             {SOURCE_OPTIONS.map((s) => (
-              <label
+              <FormControlLabel
                 key={s.value}
-                className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={filters.source.includes(s.value)}
-                  onChange={() => toggleArrayItem('source', s.value)}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                {s.label}
-              </label>
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filters.source.includes(s.value)}
+                    onChange={() => toggleArrayItem('source', s.value)}
+                  />
+                }
+                label={<span className="text-xs text-ink3">{s.label}</span>}
+                sx={{ display: 'flex' }}
+              />
             ))}
           </div>
         )
 
       case 'lifecycle_stage':
         return (
-          <div className="space-y-1">
+          <div>
             {[
               { value: 'subscriber', label: 'Subscriber' },
               { value: 'lead', label: 'Lead' },
@@ -452,18 +459,18 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
               { value: 'evangelist', label: 'Evangelist' },
               { value: 'other', label: 'Other' },
             ].map((opt) => (
-              <label
+              <FormControlLabel
                 key={opt.value}
-                className="flex items-center gap-2 text-xs text-ink3 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={filters.lifecycle_stage.includes(opt.value)}
-                  onChange={() => toggleArrayItem('lifecycle_stage', opt.value)}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                {opt.label}
-              </label>
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filters.lifecycle_stage.includes(opt.value)}
+                    onChange={() => toggleArrayItem('lifecycle_stage', opt.value)}
+                  />
+                }
+                label={<span className="text-xs text-ink3">{opt.label}</span>}
+                sx={{ display: 'flex' }}
+              />
             ))}
           </div>
         )
@@ -489,12 +496,12 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                 ))}
               </div>
             )}
-            <input
-              type="text"
+            <TextField
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               placeholder="Add tag..."
-              className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
+              size="small"
+              fullWidth
             />
             {tagInput && tagSuggestions.length > 0 && (
               <div className="mt-1 border border-border-brand rounded bg-white max-h-24 overflow-y-auto">
@@ -517,74 +524,80 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       case 'has_open_quote':
         return (
-          <label className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.has_open_quote}
-              onChange={(e) => update({ has_open_quote: e.target.checked })}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-            />
-            Has open quote
-          </label>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={filters.has_open_quote}
+                onChange={(e) => update({ has_open_quote: e.target.checked })}
+              />
+            }
+            label={<span className="text-xs text-ink3">Has open quote</span>}
+          />
         )
 
       case 'assigned_to':
         return (
-          <select
+          <Select
             value={filters.assigned_to}
             onChange={(e) => update({ assigned_to: e.target.value })}
-            className="w-full text-xs border border-border-brand rounded px-2 py-1.5 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            displayEmpty
+            size="small"
+            fullWidth
           >
-            <option value="">Any</option>
-            <option value="unassigned">Unassigned</option>
+            <MenuItem value="">Any</MenuItem>
+            <MenuItem value="unassigned">Unassigned</MenuItem>
             {tenantUsers.map((user) => (
-              <option key={user.id} value={user.id}>
+              <MenuItem key={user.id} value={user.id}>
                 {user.full_name}
-              </option>
+              </MenuItem>
             ))}
-          </select>
+          </Select>
         )
 
       case 'lead_grade':
         return (
-          <div className="space-y-1">
+          <div>
             {['A', 'B', 'C', 'D', 'F'].map((g) => (
-              <label key={g} className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.grade.includes(g)}
-                  onChange={() => toggleArrayItem('grade', g)}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                {g}
-              </label>
+              <FormControlLabel
+                key={g}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filters.grade.includes(g)}
+                    onChange={() => toggleArrayItem('grade', g)}
+                  />
+                }
+                label={<span className="text-xs text-ink3">{g}</span>}
+                sx={{ display: 'flex' }}
+              />
             ))}
           </div>
         )
 
       case 'territory':
         return (
-          <input
-            type="text"
+          <TextField
             value={filters.territory}
             onChange={(e) => update({ territory: e.target.value })}
             placeholder="e.g. North, South..."
-            className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
+            size="small"
+            fullWidth
           />
         )
 
       case 'referral_source':
         return (
           <div className="relative">
-            <input
-              type="text"
+            <TextField
               value={referralInput}
               onChange={(e) => {
                 setReferralInput(e.target.value)
                 update({ referral_source: e.target.value })
               }}
               placeholder="e.g. Google, Instagram..."
-              className="w-full text-xs border border-border-brand rounded px-2 py-1.5 placeholder-gray-300"
+              size="small"
+              fullWidth
             />
             {referralInput &&
               referralSources.filter(
@@ -616,15 +629,16 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
 
       case 'has_referral_source':
         return (
-          <label className="flex items-center gap-2 text-xs text-ink3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.has_referral_source}
-              onChange={(e) => update({ has_referral_source: e.target.checked })}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-            />
-            Has referral source
-          </label>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={filters.has_referral_source}
+                onChange={(e) => update({ has_referral_source: e.target.checked })}
+              />
+            }
+            label={<span className="text-xs text-ink3">Has referral source</span>}
+          />
         )
 
       default:
@@ -644,17 +658,19 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
         </h3>
         <div className="flex items-center gap-2">
           {customizeMode && (
-            <button
+            <Button
               onClick={resetToDefault}
-              className="text-[10px] text-ink4 hover:text-ink3 underline"
+              size="small"
+              sx={{ fontSize: 10, minWidth: 0, textTransform: 'none' }}
             >
               Reset
-            </button>
+            </Button>
           )}
-          <button
+          <IconButton
             onClick={() => setCustomizeMode((v) => !v)}
             title="Customize filter layout"
-            className={`transition-colors ${customizeMode ? 'text-teal-600' : 'text-ink4 hover:text-ink3'}`}
+            size="small"
+            sx={{ color: customizeMode ? 'primary.main' : 'text.secondary' }}
           >
             {/* gear icon */}
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -664,18 +680,20 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                 clipRule="evenodd"
               />
             </svg>
-          </button>
+          </IconButton>
           {activeCount > 0 && !customizeMode && (
-            <button
+            <Button
               onClick={() => onChange(EMPTY_FILTERS)}
-              className="text-[10px] text-red-500 hover:text-red-600"
+              size="small"
+              color="error"
+              sx={{ fontSize: 10, minWidth: 0, textTransform: 'none' }}
             >
               Clear all
-            </button>
+            </Button>
           )}
-          <button onClick={onClose} className="text-ink4 hover:text-ink3 text-sm">
-            &times;
-          </button>
+          <IconButton onClick={onClose} size="small" aria-label="Close filters">
+            <span className="text-ink4 text-sm leading-none">×</span>
+          </IconButton>
         </div>
       </div>
 
