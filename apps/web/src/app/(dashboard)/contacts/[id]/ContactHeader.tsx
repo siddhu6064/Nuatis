@@ -1,6 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Alert from '@mui/material/Alert'
+import { SlideOver } from '@/components/ui/SlideOver'
 
 export interface ContactFields {
   id: string
@@ -35,11 +42,63 @@ const SOURCE_OPTIONS = [
   { value: 'web_form', label: 'Web Form' },
 ]
 
+function buildFormState(contact: ContactFields): FormState {
+  return {
+    full_name: contact.full_name,
+    email: contact.email ?? '',
+    phone: contact.phone ?? '',
+    phone_alt: contact.phone_alt ?? '',
+    source: contact.source ?? '',
+    referral_source_detail: contact.referral_source_detail ?? '',
+    referred_by: '',
+    tags: (contact.tags ?? []).join(', '),
+    notes: contact.notes ?? '',
+  }
+}
+
 function validate(form: FormState): { field: keyof FormState; msg: string } | null {
   if (!form.full_name.trim()) return { field: 'full_name', msg: 'Name is required' }
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
     return { field: 'email', msg: 'Invalid email address' }
   return null
+}
+
+// ── Icons (inline SVG — matches this app's existing icon convention; no
+// @mui/icons-material dependency in this repo) ──────────────────────────────
+
+function PhoneIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.44a2 2 0 0 1 1.95-2.17H6a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 9A16 16 0 0 0 15 16.91l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22.92 16z" />
+    </svg>
+  )
+}
+
+function EditIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  )
 }
 
 interface Props {
@@ -135,6 +194,27 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
     }
   }
 
+  const callBg =
+    callStatus === 'connected'
+      ? '#dcfce7'
+      : callStatus === 'dialing'
+        ? '#ffedd5'
+        : callStatus === 'ended'
+          ? '#f0fdfa'
+          : contact.phone
+            ? '#fff7ed'
+            : undefined
+  const callColor =
+    callStatus === 'connected'
+      ? '#16a34a'
+      : callStatus === 'dialing'
+        ? '#ea580c'
+        : callStatus === 'ended'
+          ? '#0d9488'
+          : contact.phone
+            ? '#ea580c'
+            : undefined
+
   return (
     <>
       <div className="flex items-start gap-4 mb-8">
@@ -150,7 +230,7 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
             {contact.email && <span>{contact.email}</span>}
             {contact.phone && <span>{contact.phone}</span>}
             <div className="inline-flex items-center gap-1.5">
-              <button
+              <IconButton
                 disabled={!contact.phone || callStatus !== 'idle'}
                 onClick={() => void handleCall()}
                 title={
@@ -164,31 +244,21 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
                           ? 'Call ended'
                           : `Call ${contact.phone}`
                 }
-                className={`inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors shrink-0 ${
-                  callStatus === 'connected'
-                    ? 'bg-green-100 text-green-600 animate-pulse'
-                    : callStatus === 'dialing'
-                      ? 'bg-orange-100 text-orange-600 animate-pulse'
-                      : callStatus === 'ended'
-                        ? 'bg-teal-50 text-teal-600'
-                        : contact.phone
-                          ? 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-                          : 'bg-bg2 text-ink4 opacity-40 cursor-not-allowed'
-                }`}
+                size="small"
+                className={
+                  callStatus === 'connected' || callStatus === 'dialing' ? 'animate-pulse' : ''
+                }
+                sx={{
+                  width: 28,
+                  height: 28,
+                  bgcolor: callBg,
+                  color: callColor,
+                  '&:hover': { bgcolor: callBg },
+                  '&.Mui-disabled': !contact.phone ? { opacity: 0.4 } : undefined,
+                }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.44a2 2 0 0 1 1.95-2.17H6a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 9A16 16 0 0 0 15 16.91l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22.92 16z" />
-                </svg>
-              </button>
+                <PhoneIcon />
+              </IconButton>
               {callStatus !== 'idle' && (
                 <span
                   className={`text-xs font-medium ${
@@ -219,25 +289,16 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
           </div>
         </div>
 
-        <button
+        <Button
           onClick={() => setEditOpen(true)}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
+          variant="outlined"
+          color="inherit"
+          size="small"
+          startIcon={<EditIcon />}
+          sx={{ textTransform: 'none', flexShrink: 0 }}
         >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
           Edit
-        </button>
+        </Button>
       </div>
 
       {toast && (
@@ -246,36 +307,42 @@ export default function ContactHeader({ contact: initial, onSaved }: Props) {
         </div>
       )}
 
-      {editOpen && (
-        <EditDrawer contact={contact} onClose={() => setEditOpen(false)} onSaved={handleSaved} />
-      )}
+      <EditDrawer
+        contact={contact}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={handleSaved}
+      />
     </>
   )
 }
 
 function EditDrawer({
   contact,
+  open,
   onClose,
   onSaved,
 }: {
   contact: ContactFields
+  open: boolean
   onClose: () => void
   onSaved: (updated: ContactFields) => void
 }) {
-  const [form, setForm] = useState<FormState>({
-    full_name: contact.full_name,
-    email: contact.email ?? '',
-    phone: contact.phone ?? '',
-    phone_alt: contact.phone_alt ?? '',
-    source: contact.source ?? '',
-    referral_source_detail: contact.referral_source_detail ?? '',
-    referred_by: '',
-    tags: (contact.tags ?? []).join(', '),
-    notes: contact.notes ?? '',
-  })
+  const [form, setForm] = useState<FormState>(() => buildFormState(contact))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldError, setFieldError] = useState<keyof FormState | null>(null)
+
+  // Reset the form from the latest contact data each time the drawer opens —
+  // it now stays mounted (per Phase 14/16 convention, so the slide animation
+  // plays), so state can't rely on a fresh mount to reset itself anymore.
+  useEffect(() => {
+    if (open) {
+      setForm(buildFormState(contact))
+      setError(null)
+      setFieldError(null)
+    }
+  }, [open, contact])
 
   function set(key: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -342,185 +409,142 @@ function EditDrawer({
     }
   }
 
-  const inp = (hasErr: boolean) =>
-    `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
-      hasErr ? 'border-red-300 focus:ring-red-400' : 'border-border-brand'
-    }`
-
   const tagPills = form.tags
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-
-      {/* Drawer */}
-      <div className="relative w-full max-w-md bg-white shadow-xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-brand shrink-0">
-          <h2 className="text-base font-semibold text-ink">Edit Contact</h2>
-          <button
+    <SlideOver
+      open={open}
+      onClose={onClose}
+      title="Edit Contact"
+      footer={
+        <div className="flex gap-2">
+          <Button
             onClick={onClose}
-            className="text-ink4 hover:text-ink3 transition-colors"
-            aria-label="Close"
+            disabled={saving}
+            variant="outlined"
+            color="inherit"
+            sx={{ flex: 1 }}
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            variant="contained"
+            sx={{ flex: 1 }}
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="px-6 py-5 space-y-4">
+        <TextField
+          label="Full Name"
+          required
+          value={form.full_name}
+          onChange={(e) => set('full_name', e.target.value)}
+          error={fieldError === 'full_name'}
+          placeholder="Jane Doe"
+          size="small"
+          fullWidth
+          autoFocus
+        />
+
+        <TextField
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={(e) => set('email', e.target.value)}
+          error={fieldError === 'email'}
+          placeholder="jane@example.com"
+          size="small"
+          fullWidth
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            label="Phone"
+            type="tel"
+            value={form.phone}
+            onChange={(e) => set('phone', e.target.value)}
+            placeholder="+1 (555) 000-0000"
+            size="small"
+            fullWidth
+          />
+          <TextField
+            label="Alt Phone (optional)"
+            type="tel"
+            value={form.phone_alt}
+            onChange={(e) => set('phone_alt', e.target.value)}
+            placeholder="+1 (555) 000-0000"
+            size="small"
+            fullWidth
+          />
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.full_name}
-              onChange={(e) => set('full_name', e.target.value)}
-              className={inp(fieldError === 'full_name')}
-              placeholder="Jane Doe"
-              autoFocus
-            />
-          </div>
+        <Select
+          value={form.source}
+          onChange={(e) => set('source', e.target.value)}
+          size="small"
+          fullWidth
+        >
+          {SOURCE_OPTIONS.map((o) => (
+            <MenuItem key={o.value} value={o.value}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </Select>
 
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => set('email', e.target.value)}
-              className={inp(fieldError === 'email')}
-              placeholder="jane@example.com"
-            />
-          </div>
+        <TextField
+          label="Referral Source"
+          value={form.referral_source_detail}
+          onChange={(e) => set('referral_source_detail', e.target.value)}
+          placeholder="e.g. Google, Instagram, Friend"
+          size="small"
+          fullWidth
+        />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">Phone</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
-                className={inp(false)}
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">
-                Alt Phone <span className="text-ink4 font-normal">(optional)</span>
-              </label>
-              <input
-                type="tel"
-                value={form.phone_alt}
-                onChange={(e) => set('phone_alt', e.target.value)}
-                className={inp(false)}
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Source</label>
-            <select
-              value={form.source}
-              onChange={(e) => set('source', e.target.value)}
-              className={`${inp(false)} bg-white`}
-            >
-              {SOURCE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+        <div>
+          <TextField
+            label="Tags"
+            value={form.tags}
+            onChange={(e) => set('tags', e.target.value)}
+            placeholder="vip, returning, high-priority"
+            helperText="Comma-separated"
+            size="small"
+            fullWidth
+          />
+          {tagPills.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {tagPills.map((tag, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-bg2 text-ink3"
+                >
+                  {tag}
+                </span>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Referral Source</label>
-            <input
-              type="text"
-              value={form.referral_source_detail}
-              onChange={(e) => set('referral_source_detail', e.target.value)}
-              className={inp(false)}
-              placeholder="e.g. Google, Instagram, Friend"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Tags</label>
-            <input
-              type="text"
-              value={form.tags}
-              onChange={(e) => set('tags', e.target.value)}
-              className={inp(false)}
-              placeholder="vip, returning, high-priority"
-            />
-            {tagPills.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {tagPills.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="px-2 py-0.5 rounded-full text-xs font-medium bg-bg2 text-ink3"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            <p className="text-[10px] text-ink4 mt-1">Comma-separated</p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              rows={4}
-              className={inp(false)}
-              placeholder="Any additional notes…"
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-border-brand shrink-0">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
+        <TextField
+          label="Notes"
+          value={form.notes}
+          onChange={(e) => set('notes', e.target.value)}
+          multiline
+          rows={4}
+          placeholder="Any additional notes…"
+          size="small"
+          fullWidth
+        />
+
+        {error && <Alert severity="error">{error}</Alert>}
       </div>
-    </div>
+    </SlideOver>
   )
 }
