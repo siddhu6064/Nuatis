@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
 import SnippetPicker from '@/components/SnippetPicker'
 import type {
   Conversation,
@@ -102,7 +106,7 @@ export default function ConversationsClient() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [assignees, setAssignees] = useState<Assignee[]>([])
-  const [assignDropdownOpen, setAssignDropdownOpen] = useState(false)
+  const [assignAnchorEl, setAssignAnchorEl] = useState<HTMLElement | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
   const [mainTab, setMainTab] = useState<'inbox' | 'analytics'>('inbox')
   const [analytics, setAnalytics] = useState<ConversationAnalytics | null>(null)
@@ -112,8 +116,7 @@ export default function ConversationsClient() {
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
   const composeRef = useRef<HTMLTextAreaElement>(null)
-  const linkPickerRef = useRef<HTMLDivElement>(null)
-  const [showLinkPicker, setShowLinkPicker] = useState(false)
+  const [linkAnchorEl, setLinkAnchorEl] = useState<HTMLElement | null>(null)
   const [triggerLinks, setTriggerLinks] = useState<TriggerLink[]>([])
   const [linksLoaded, setLinksLoaded] = useState(false)
 
@@ -353,24 +356,6 @@ export default function ConversationsClient() {
     }
   }, [messages])
 
-  // Dismiss link picker on outside click or Escape
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (linkPickerRef.current && !linkPickerRef.current.contains(e.target as Node)) {
-        setShowLinkPicker(false)
-      }
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setShowLinkPicker(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [])
-
   // Webchat effects
   useEffect(() => {
     if (channel === 'webchat' && mainTab === 'inbox') {
@@ -421,7 +406,7 @@ export default function ConversationsClient() {
 
   async function handleAssign(userId: string | null) {
     if (!selectedId) return
-    setAssignDropdownOpen(false)
+    setAssignAnchorEl(null)
     await fetch(`/api/conversations/${selectedId}/assign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -453,8 +438,8 @@ export default function ConversationsClient() {
     })
   }
 
-  async function openLinkPicker() {
-    setShowLinkPicker((v) => !v)
+  async function openLinkPicker(anchor: HTMLElement) {
+    setLinkAnchorEl(anchor)
     if (!linksLoaded) {
       const r = await fetch('/api/trigger-links')
       if (r.ok) {
@@ -677,12 +662,12 @@ export default function ConversationsClient() {
                     </div>
                   )}
 
-                  <input
-                    type="text"
+                  <TextField
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by name or phone…"
-                    className="w-full text-sm px-3 py-1.5 rounded-lg border border-border-brand bg-bg text-ink placeholder:text-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    size="small"
+                    fullWidth
                   />
                 </>
               )}
@@ -814,54 +799,49 @@ export default function ConversationsClient() {
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Assign dropdown */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setAssignDropdownOpen((v) => !v)}
-                        className="px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors max-w-[120px] truncate"
-                      >
+                    <Button
+                      onClick={(e) => setAssignAnchorEl(e.currentTarget)}
+                      variant="outlined"
+                      color="inherit"
+                      size="small"
+                      sx={{ maxWidth: 120, textTransform: 'none' }}
+                    >
+                      <span className="truncate">
                         {selected?.assigned_to_name
                           ? `→ ${selected.assigned_to_name}`
                           : 'Unassigned'}
-                      </button>
-                      {assignDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white border border-border-brand rounded-lg shadow-lg py-1 text-sm">
-                          <button
-                            onClick={() => void handleAssign(null)}
-                            className="w-full text-left px-3 py-1.5 text-ink3 hover:bg-bg transition-colors"
-                          >
-                            Unassigned
-                          </button>
-                          {assignees.map((a) => (
-                            <button
-                              key={a.id}
-                              onClick={() => void handleAssign(a.id)}
-                              className={`w-full text-left px-3 py-1.5 hover:bg-bg transition-colors ${
-                                selected?.assigned_to === a.id
-                                  ? 'text-teal-700 font-medium'
-                                  : 'text-ink'
-                              }`}
-                            >
-                              {a.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                      </span>
+                    </Button>
+                    <Menu
+                      anchorEl={assignAnchorEl}
+                      open={Boolean(assignAnchorEl)}
+                      onClose={() => setAssignAnchorEl(null)}
+                    >
+                      <MenuItem onClick={() => void handleAssign(null)}>Unassigned</MenuItem>
+                      {assignees.map((a) => (
+                        <MenuItem
+                          key={a.id}
+                          onClick={() => void handleAssign(a.id)}
+                          selected={selected?.assigned_to === a.id}
+                        >
+                          {a.name}
+                        </MenuItem>
+                      ))}
+                    </Menu>
 
                     {selected?.status === 'open' ? (
-                      <button
-                        onClick={() => void handleResolve()}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-                      >
+                      <Button onClick={() => void handleResolve()} variant="contained" size="small">
                         Resolve
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
                         onClick={() => void handleReopen()}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                        variant="outlined"
+                        color="inherit"
+                        size="small"
                       >
                         Reopen
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -939,92 +919,95 @@ export default function ConversationsClient() {
                         contactName={contact?.name ?? selected?.contact_name ?? undefined}
                       />
                       {sendError && <p className="text-xs text-red-500 mt-1">{sendError}</p>}
-                      <div
-                        className="relative flex items-center justify-between mt-2"
-                        ref={linkPickerRef}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => void openLinkPicker()}
-                          className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:text-ink transition-colors"
+                      <div className="flex items-center justify-between mt-2">
+                        <Button
+                          onClick={(e) => void openLinkPicker(e.currentTarget)}
+                          variant="outlined"
+                          color="inherit"
+                          size="small"
+                          startIcon={
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                            </svg>
+                          }
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                          </svg>
                           Link
-                        </button>
-                        {showLinkPicker && (
-                          <div className="absolute bottom-full left-0 mb-1 w-72 bg-white border border-border-brand rounded-lg shadow-lg z-50 overflow-hidden">
-                            {triggerLinks.length === 0 ? (
-                              <div className="px-3 py-4 text-xs text-ink4 text-center">
-                                No trigger links yet.{' '}
+                        </Button>
+                        <Menu
+                          anchorEl={linkAnchorEl}
+                          open={Boolean(linkAnchorEl)}
+                          onClose={() => setLinkAnchorEl(null)}
+                          slotProps={{ paper: { sx: { width: 288 } } }}
+                        >
+                          {triggerLinks.length === 0 ? (
+                            <div className="px-3 py-4 text-xs text-ink4 text-center">
+                              No trigger links yet.{' '}
+                              <a
+                                href="/settings/trigger-links"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-teal-600 hover:underline"
+                              >
+                                Create one in Settings →
+                              </a>
+                            </div>
+                          ) : (
+                            [
+                              ...triggerLinks.map((link) => {
+                                const url = `${process.env['NEXT_PUBLIC_API_URL'] ?? ''}/t/${link.slug}?cid=${selectedId ?? ''}`
+                                return (
+                                  <MenuItem
+                                    key={link.id}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault()
+                                      insertAtCursor(url)
+                                      setLinkAnchorEl(null)
+                                    }}
+                                    sx={{
+                                      flexDirection: 'column',
+                                      alignItems: 'flex-start',
+                                      gap: 0.25,
+                                    }}
+                                  >
+                                    <span className="text-xs font-medium text-ink">
+                                      {link.name}
+                                    </span>
+                                    <span className="text-[10px] text-ink4 truncate">{url}</span>
+                                  </MenuItem>
+                                )
+                              }),
+                              <div key="manage" className="border-t border-border-brand px-3 py-2">
                                 <a
                                   href="/settings/trigger-links"
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-teal-600 hover:underline"
+                                  className="text-[11px] text-ink4 hover:text-teal-600 transition-colors"
                                 >
-                                  Create one in Settings →
+                                  Manage Links →
                                 </a>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="max-h-48 overflow-y-auto">
-                                  {triggerLinks.map((link) => {
-                                    const url = `${process.env['NEXT_PUBLIC_API_URL'] ?? ''}/t/${link.slug}?cid=${selectedId ?? ''}`
-                                    return (
-                                      <button
-                                        key={link.id}
-                                        type="button"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault()
-                                          insertAtCursor(url)
-                                          setShowLinkPicker(false)
-                                        }}
-                                        className="w-full text-left px-3 py-2 hover:bg-bg transition-colors flex flex-col gap-0.5"
-                                      >
-                                        <span className="text-xs font-medium text-ink">
-                                          {link.name}
-                                        </span>
-                                        <span className="text-[10px] text-ink4 truncate">
-                                          {url}
-                                        </span>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                                <div className="border-t border-border-brand px-3 py-2">
-                                  <a
-                                    href="/settings/trigger-links"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[11px] text-ink4 hover:text-teal-600 transition-colors"
-                                  >
-                                    Manage Links →
-                                  </a>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                        <button
+                              </div>,
+                            ]
+                          )}
+                        </Menu>
+                        <Button
                           onClick={() => void handleSend()}
                           disabled={!compose.trim() || sending}
-                          className="px-4 py-2 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          variant="contained"
+                          size="medium"
                         >
                           {sending ? 'Sending…' : 'Send'}
-                        </button>
+                        </Button>
                       </div>
                     </>
                   )}
@@ -1069,8 +1052,7 @@ export default function ConversationsClient() {
               </div>
               <div className="px-4 py-3 border-t border-border-brand shrink-0">
                 <div className="flex gap-2">
-                  <input
-                    type="text"
+                  <TextField
                     value={webchatReply}
                     onChange={(e) => setWebchatReply(e.target.value)}
                     onKeyDown={(e) => {
@@ -1080,15 +1062,16 @@ export default function ConversationsClient() {
                       }
                     }}
                     placeholder="Reply as agent…"
-                    className="flex-1 text-sm px-3 py-2 rounded-lg border border-border-brand focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    size="small"
+                    fullWidth
                   />
-                  <button
+                  <Button
                     onClick={() => void handleWebchatReply()}
                     disabled={webchatSending || !webchatReply.trim()}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                    variant="contained"
                   >
                     Send
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
