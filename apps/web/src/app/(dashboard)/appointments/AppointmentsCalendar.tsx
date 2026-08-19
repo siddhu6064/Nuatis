@@ -5,9 +5,13 @@ import { Calendar, dateFnsLocalizer, View, Views } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { createClient } from '@supabase/supabase-js'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
 import AppointmentDrawer from './AppointmentDrawer'
 import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
+import { Modal } from '@/components/ui/Modal'
 import './calendar.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -448,157 +452,135 @@ export default function AppointmentsCalendar({
 
       {/* Blocked slot panel */}
       {selectedBlockedAppt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/20" onClick={() => setSelectedBlockedAppt(null)} />
-          <div className="relative bg-white rounded-xl border border-border-brand shadow-xl p-5 w-full max-w-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                  Blocked
-                </span>
-                <p className="mt-2 text-sm font-medium text-ink">
-                  {selectedBlockedAppt.block_reason ?? 'Blocked time'}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedBlockedAppt(null)}
-                className="text-ink4 hover:text-ink3 text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-            <p className="text-xs text-ink4 mb-4">
-              {new Date(selectedBlockedAppt.start_time).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-              {' · '}
-              {new Date(selectedBlockedAppt.start_time).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-              {' – '}
-              {new Date(selectedBlockedAppt.end_time).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-            <button
+        <Modal
+          onClose={() => setSelectedBlockedAppt(null)}
+          title={selectedBlockedAppt.block_reason ?? 'Blocked time'}
+          maxWidth="xs"
+          footer={
+            <Button
               onClick={() => void deleteBlocked(selectedBlockedAppt.id)}
-              className="w-full px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              variant="outlined"
+              color="error"
+              fullWidth
             >
               Remove Block
-            </button>
-          </div>
-        </div>
+            </Button>
+          }
+        >
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+            Blocked
+          </span>
+          <p className="text-xs text-ink4 mt-3">
+            {new Date(selectedBlockedAppt.start_time).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+            {' · '}
+            {new Date(selectedBlockedAppt.start_time).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+            {' – '}
+            {new Date(selectedBlockedAppt.end_time).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </p>
+        </Modal>
       )}
 
       {/* Block Time modal */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/30" onClick={() => setShowBlockModal(false)} />
-          <div className="relative bg-white rounded-xl border border-border-brand shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-base font-semibold text-ink mb-4">Block Off Time</h2>
-
-            <div className="space-y-3">
-              {locations.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">
-                    Calendar (optional)
-                  </label>
-                  <select
-                    value={blockCalendarId}
-                    onChange={(e) => setBlockCalendarId(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">Any calendar</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={blockDate}
-                  onChange={(e) => setBlockDate(e.target.value)}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">Start Time</label>
-                  <select
-                    value={blockStart}
-                    onChange={(e) => setBlockStart(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {TIME_SLOTS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">End Time</label>
-                  <select
-                    value={blockEnd}
-                    onChange={(e) => setBlockEnd(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {TIME_SLOTS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">
-                  Reason (optional)
-                </label>
-                <input
-                  type="text"
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Lunch / Meeting / Vacation"
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitBlock()
-                  }}
-                />
-              </div>
-
-              {blockError && <p className="text-xs text-red-600">{blockError}</p>}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowBlockModal(false)}
-                className="px-4 py-2 text-sm text-ink3 hover:text-ink2"
-              >
+        <Modal
+          onClose={() => setShowBlockModal(false)}
+          title="Block Off Time"
+          footer={
+            <>
+              <Button onClick={() => setShowBlockModal(false)} variant="text" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={() => void submitBlock()}
-                disabled={blockSaving}
-                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              </Button>
+              <Button onClick={() => void submitBlock()} disabled={blockSaving} variant="contained">
+                {blockSaving ? 'Blocking…' : 'Block Time'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {locations.length > 0 && (
+              <TextField
+                select
+                label="Calendar (optional)"
+                value={blockCalendarId}
+                onChange={(e) => setBlockCalendarId(e.target.value)}
+                fullWidth
+                size="small"
               >
-                {blockSaving ? 'Blocking...' : 'Block Time'}
-              </button>
+                <MenuItem value="">Any calendar</MenuItem>
+                {locations.map((l) => (
+                  <MenuItem key={l.id} value={l.id}>
+                    {l.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            <TextField
+              label="Date"
+              type="date"
+              value={blockDate}
+              onChange={(e) => setBlockDate(e.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <TextField
+                select
+                label="Start Time"
+                value={blockStart}
+                onChange={(e) => setBlockStart(e.target.value)}
+                fullWidth
+                size="small"
+              >
+                {TIME_SLOTS.map((s) => (
+                  <MenuItem key={s.value} value={s.value}>
+                    {s.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="End Time"
+                value={blockEnd}
+                onChange={(e) => setBlockEnd(e.target.value)}
+                fullWidth
+                size="small"
+              >
+                {TIME_SLOTS.map((s) => (
+                  <MenuItem key={s.value} value={s.value}>
+                    {s.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </div>
+
+            <TextField
+              label="Reason (optional)"
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="Lunch / Meeting / Vacation"
+              fullWidth
+              size="small"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitBlock()
+              }}
+            />
+
+            {blockError && <p className="text-xs text-red-600">{blockError}</p>}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Toast */}
