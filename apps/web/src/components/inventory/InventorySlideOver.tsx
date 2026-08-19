@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SlideOver } from '@/components/ui/SlideOver'
 
 export interface InventoryItem {
   id: string
@@ -163,192 +164,178 @@ export default function InventorySlideOver({ open, onClose, item, onSaved }: Pro
     }
   }
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-border-brand shadow-xl overflow-y-auto">
-        <div className="px-5 py-4 border-b border-border-brand flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink">{isEdit ? 'Edit item' : 'Add item'}</h2>
-          <button onClick={onClose} className="text-ink4 hover:text-ink2" aria-label="Close">
-            ✕
+    <SlideOver onClose={onClose} open={open} title={isEdit ? 'Edit item' : 'Add item'}>
+      <div className="px-5 py-5 space-y-4">
+        {/* Name */}
+        <div>
+          <label className="block text-xs font-medium text-ink3 mb-1.5">Name *</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+          />
+          {fieldErrors['name'] && (
+            <p className="text-xs text-red-500 mt-1">{fieldErrors['name']}</p>
+          )}
+        </div>
+
+        {/* SKU */}
+        <div>
+          <label className="block text-xs font-medium text-ink3 mb-1.5">SKU</label>
+          <input
+            type="text"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+          />
+        </div>
+
+        {/* Quantity + Reorder threshold */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Quantity *</label>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            />
+            {fieldErrors['quantity'] && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors['quantity']}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Reorder threshold</label>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={reorderThreshold}
+              onChange={(e) => setReorderThreshold(Number(e.target.value))}
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            />
+            {fieldErrors['reorder_threshold'] && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors['reorder_threshold']}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Unit cost + Unit */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Unit cost ($)</label>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            />
+            {fieldErrors['unit_cost'] && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors['unit_cost']}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink3 mb-1.5">Unit</label>
+            <select
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white"
+            >
+              {UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Supplier */}
+        <div>
+          <label className="block text-xs font-medium text-ink3 mb-1.5">Supplier</label>
+          <input
+            type="text"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+          />
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+          />
+        </div>
+
+        {apiError && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+            {apiError}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
           </button>
         </div>
 
-        <div className="px-5 py-5 space-y-4">
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1.5">Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-            />
-            {fieldErrors['name'] && (
-              <p className="text-xs text-red-500 mt-1">{fieldErrors['name']}</p>
-            )}
-          </div>
-
-          {/* SKU */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1.5">SKU</label>
-            <input
-              type="text"
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-            />
-          </div>
-
-          {/* Quantity + Reorder threshold */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1.5">Quantity *</label>
-              <input
-                type="number"
-                min={0}
-                step="any"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-              />
-              {fieldErrors['quantity'] && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors['quantity']}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1.5">
-                Reorder threshold
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="any"
-                value={reorderThreshold}
-                onChange={(e) => setReorderThreshold(Number(e.target.value))}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-              />
-              {fieldErrors['reorder_threshold'] && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors['reorder_threshold']}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Unit cost + Unit */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1.5">Unit cost ($)</label>
-              <input
-                type="number"
-                min={0}
-                step="any"
-                value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-              />
-              {fieldErrors['unit_cost'] && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors['unit_cost']}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1.5">Unit</label>
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white"
-              >
-                {UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Supplier */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1.5">Supplier</label>
-            <input
-              type="text"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-            />
-          </div>
-
-          {apiError && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
-              {apiError}
+        {/* Adjust quantity — edit mode only */}
+        {isEdit && (
+          <div className="mt-6 pt-5 border-t border-border-brand">
+            <h3 className="text-sm font-semibold text-ink mb-1">Adjust quantity</h3>
+            <p className="text-xs text-ink4 mb-3">
+              Current: <span className="font-medium text-ink2">{currentQty ?? 0}</span>. Enter a
+              delta (positive or negative) and a reason.
             </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-            >
-              {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
-            </button>
-          </div>
-
-          {/* Adjust quantity — edit mode only */}
-          {isEdit && (
-            <div className="mt-6 pt-5 border-t border-border-brand">
-              <h3 className="text-sm font-semibold text-ink mb-1">Adjust quantity</h3>
-              <p className="text-xs text-ink4 mb-3">
-                Current: <span className="font-medium text-ink2">{currentQty ?? 0}</span>. Enter a
-                delta (positive or negative) and a reason.
-              </p>
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <input
-                  type="number"
-                  step="any"
-                  value={adjustDelta}
-                  onChange={(e) => setAdjustDelta(e.target.value)}
-                  placeholder="Delta (e.g. -2 or 5)"
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                />
-                <input
-                  type="text"
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="Reason"
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                />
-              </div>
-              <button
-                onClick={() => void handleAdjust()}
-                disabled={adjusting}
-                className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg disabled:opacity-60"
-              >
-                {adjusting ? 'Adjusting...' : 'Adjust'}
-              </button>
-              {adjustToast && <p className="text-xs text-ink3 mt-2">{adjustToast}</p>}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <input
+                type="number"
+                step="any"
+                value={adjustDelta}
+                onChange={(e) => setAdjustDelta(e.target.value)}
+                placeholder="Delta (e.g. -2 or 5)"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              />
+              <input
+                type="text"
+                value={adjustReason}
+                onChange={(e) => setAdjustReason(e.target.value)}
+                placeholder="Reason"
+                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              />
             </div>
-          )}
-        </div>
+            <button
+              onClick={() => void handleAdjust()}
+              disabled={adjusting}
+              className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg disabled:opacity-60"
+            >
+              {adjusting ? 'Adjusting...' : 'Adjust'}
+            </button>
+            {adjustToast && <p className="text-xs text-ink3 mt-2">{adjustToast}</p>}
+          </div>
+        )}
       </div>
-    </div>
+    </SlideOver>
   )
 }
