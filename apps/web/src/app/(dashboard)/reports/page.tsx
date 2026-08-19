@@ -20,7 +20,7 @@ interface Report {
   name: string
   description: string | null
   object: DataObject
-  metric_fn: MetricFn
+  metric: MetricFn
   metric_field: string | null
   group_by: string | null
   filters: ReportFilter[]
@@ -35,7 +35,7 @@ interface Report {
 
 interface WizardState {
   object: DataObject | null
-  metric_fn: MetricFn
+  metric: MetricFn
   metric_field: string | null
   group_by: string | null
   filters: ReportFilter[]
@@ -179,7 +179,7 @@ function getObjectMeta(key: DataObject) {
 
 const DEFAULT_WIZARD: WizardState = {
   object: null,
-  metric_fn: 'count',
+  metric: 'count',
   metric_field: null,
   group_by: null,
   filters: [],
@@ -274,8 +274,8 @@ export default function ReportsPage() {
           name: wizard.name.trim(),
           description: wizard.description.trim() || null,
           object: wizard.object,
-          metric_fn: wizard.metric_fn,
-          metric_field: wizard.metric_fn !== 'count' ? wizard.metric_field : null,
+          metric: wizard.metric,
+          metric_field: wizard.metric !== 'count' ? wizard.metric_field : null,
           group_by: wizard.group_by,
           filters: wizard.filters,
           date_range: wizard.date_range,
@@ -316,9 +316,10 @@ export default function ReportsPage() {
   function canAdvance(): boolean {
     if (wizardStep === 1) return wizard.object !== null
     if (wizardStep === 2) {
-      if (wizard.metric_fn !== 'count') return !!wizard.metric_field
+      if (wizard.metric !== 'count') return !!wizard.metric_field
       return true
     }
+    if (wizardStep === 3) return wizard.group_by !== null
     if (wizardStep === 6) return wizard.name.trim().length > 0
     return true
   }
@@ -335,7 +336,12 @@ export default function ReportsPage() {
             <button
               key={obj.key}
               onClick={() =>
-                setWizard((w) => ({ ...w, object: obj.key, metric_field: null, group_by: null }))
+                setWizard((w) => ({
+                  ...w,
+                  object: obj.key,
+                  metric_field: null,
+                  group_by: GROUP_BY_FIELDS[obj.key][0]?.key ?? null,
+                }))
               }
               className={`flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-colors ${
                 wizard.object === obj.key
@@ -369,10 +375,10 @@ export default function ReportsPage() {
           <label className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors border-blue-500 bg-blue-50">
             <input
               type="radio"
-              name="metric_fn"
+              name="metric"
               value="count"
-              checked={wizard.metric_fn === 'count'}
-              onChange={() => setWizard((w) => ({ ...w, metric_fn: 'count', metric_field: null }))}
+              checked={wizard.metric === 'count'}
+              onChange={() => setWizard((w) => ({ ...w, metric: 'count', metric_field: null }))}
               className="text-blue-500"
             />
             <div>
@@ -387,24 +393,24 @@ export default function ReportsPage() {
                 <label
                   key={fn}
                   className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                    wizard.metric_fn === fn
+                    wizard.metric === fn
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-border-brand hover:border-border-brand'
                   }`}
                 >
                   <input
                     type="radio"
-                    name="metric_fn"
+                    name="metric"
                     value={fn}
-                    checked={wizard.metric_fn === fn}
-                    onChange={() => setWizard((w) => ({ ...w, metric_fn: fn }))}
+                    checked={wizard.metric === fn}
+                    onChange={() => setWizard((w) => ({ ...w, metric: fn }))}
                     className="mt-0.5 text-blue-500"
                   />
                   <div className="flex-1">
                     <div className="font-medium text-sm text-ink capitalize">
                       {fn === 'avg' ? 'Average' : fn.charAt(0).toUpperCase() + fn.slice(1)}
                     </div>
-                    {wizard.metric_fn === fn && (
+                    {wizard.metric === fn && (
                       <select
                         value={wizard.metric_field ?? ''}
                         onChange={(e) => setWizard((w) => ({ ...w, metric_field: e.target.value }))}
@@ -442,7 +448,6 @@ export default function ReportsPage() {
           onChange={(e) => setWizard((w) => ({ ...w, group_by: e.target.value || null }))}
           className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
-          <option value="">No grouping (total only)</option>
           {fields.map((f) => (
             <option key={f.key} value={f.key}>
               {f.label}

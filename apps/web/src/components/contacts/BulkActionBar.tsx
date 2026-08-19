@@ -362,7 +362,7 @@ export default function BulkActionBar({
               <>
                 <h3 className="text-sm font-bold text-ink mb-3">Assign Contacts</h3>
                 <div className="mb-4">
-                  <label className="text-xs text-ink3 mb-1 block">Assignee user ID or name</label>
+                  <label className="text-xs text-ink3 mb-1 block">Assignee user ID</label>
                   <input
                     type="text"
                     value={assignTo}
