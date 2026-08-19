@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Switch from '@mui/material/Switch'
 
 interface MemoryRow {
   id: string
@@ -89,19 +90,12 @@ export default function CallerMemoryCard({
               previous calls.
             </p>
           </div>
-          <button
-            onClick={toggleMemory}
+          <Switch
+            checked={memoryEnabled}
+            onChange={() => void toggleMemory()}
             disabled={toggling}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
-              memoryEnabled ? 'bg-teal-600' : 'bg-bg3'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                memoryEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+            slotProps={{ input: { 'aria-label': 'Enable caller memory' } }}
+          />
         </div>
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
