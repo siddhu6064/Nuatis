@@ -952,6 +952,20 @@ router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Pr
     return
   }
 
+  // FK-01: body-supplied foreign keys must belong to the caller's tenant.
+  // .maybeSingle() + ignoring `error` collapses "not found", "wrong tenant",
+  // and "not a valid uuid" into the same clean 400 rather than a raw 500.
+  const { data: userCheck } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', assignedTo.trim())
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+  if (!userCheck) {
+    res.status(400).json({ error: 'Invalid assignedTo — must be an existing user ID' })
+    return
+  }
+
   const { count, error } = await supabase
     .from('contacts')
     .update({ assigned_to_user_id: assignedTo.trim(), updated_at: new Date().toISOString() })
