@@ -8,7 +8,7 @@ const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   // Next.js still requires 'unsafe-inline' for its bootstrap/hydration scripts;
   // tighten with nonces in a follow-up. PostHog assets load from us-assets.
-  "script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://us-assets.i.posthog.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
