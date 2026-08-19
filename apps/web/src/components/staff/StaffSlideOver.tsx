@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Switch from '@mui/material/Switch'
 import { SlideOver } from '@/components/ui/SlideOver'
 import {
   COLOR_SWATCHES,
@@ -218,21 +219,12 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
               return (
                 <div key={d} className="flex items-center gap-2">
                   <div className="w-10 text-sm text-ink3">{DAY_LABEL[d]}</div>
-                  <button
-                    type="button"
-                    onClick={() => setDay(d, { enabled: !e.enabled })}
-                    role="switch"
-                    aria-checked={Boolean(e.enabled)}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                      e.enabled ? 'bg-teal-600' : 'bg-bg3'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        e.enabled ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                  <Switch
+                    size="small"
+                    checked={Boolean(e.enabled)}
+                    onChange={(ev) => setDay(d, { enabled: ev.target.checked })}
+                    slotProps={{ input: { 'aria-label': `${DAY_LABEL[d]} availability` } }}
+                  />
                   {e.enabled ? (
                     <>
                       <input

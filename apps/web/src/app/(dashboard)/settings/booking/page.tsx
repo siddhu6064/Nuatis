@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Switch from '@mui/material/Switch'
 
 interface AvailableService {
   id: string
@@ -160,20 +161,11 @@ export default function BookingSettingsPage() {
             <p className="text-sm font-medium text-ink">Enable Online Booking</p>
             <p className="text-xs text-ink4 mt-0.5">Make your booking page publicly accessible</p>
           </div>
-          <button
-            role="switch"
-            aria-checked={settings.enabled}
-            onClick={() => setSettings((s) => ({ ...s, enabled: !s.enabled }))}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
-              settings.enabled ? 'bg-teal-600' : 'bg-bg3'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                settings.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          <Switch
+            checked={settings.enabled}
+            onChange={() => setSettings((s) => ({ ...s, enabled: !s.enabled }))}
+            slotProps={{ input: { 'aria-label': 'Enable Online Booking' } }}
+          />
         </div>
       </div>
 

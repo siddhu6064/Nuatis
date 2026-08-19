@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Button from '@mui/material/Button'
+import Switch from '@mui/material/Switch'
 import { Modal } from '@/components/ui/Modal'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -427,21 +428,12 @@ function CalendarSettingsContent() {
               {!status?.connected && ' — connect a calendar above to use Google Meet'}
             </p>
           </div>
-          <button
-            onClick={() => void saveVideoSettings(!videoEnabled)}
+          <Switch
+            checked={videoEnabled}
+            onChange={() => void saveVideoSettings(!videoEnabled)}
             disabled={savingVideo}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
-              videoEnabled ? 'bg-teal-600' : 'bg-gray-200'
-            }`}
-            role="switch"
-            aria-checked={videoEnabled}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
-                videoEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+            slotProps={{ input: { 'aria-label': 'Auto-generate video links' } }}
+          />
         </div>
       </div>
 

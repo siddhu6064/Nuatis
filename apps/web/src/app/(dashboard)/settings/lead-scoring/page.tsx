@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import Switch from '@mui/material/Switch'
 import { Modal } from '@/components/ui/Modal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -246,20 +247,13 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
   return (
     <div className="flex items-start gap-4 py-3 border-b border-gray-50 last:border-0">
       {/* Active toggle */}
-      <button
-        role="switch"
-        aria-checked={rule.active}
-        onClick={() => void handleToggle()}
-        className={`mt-0.5 relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 ${
-          rule.active ? 'bg-teal-600' : 'bg-bg3'
-        }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-            rule.active ? 'translate-x-4' : 'translate-x-0'
-          }`}
-        />
-      </button>
+      <Switch
+        size="small"
+        checked={rule.active}
+        onChange={() => void handleToggle()}
+        slotProps={{ input: { 'aria-label': rule.label } }}
+        sx={{ mt: 0.25 }}
+      />
 
       {/* Label + description */}
       <div className="flex-1 min-w-0">

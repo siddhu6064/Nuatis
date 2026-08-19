@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Switch from '@mui/material/Switch'
 
 type Department = 'general' | 'scheduling' | 'billing' | 'sales' | 'support' | 'maya'
 type NumberStatus = 'active' | 'inactive'
@@ -419,19 +420,17 @@ export default function PhoneNumbersClient({
                       {/* Maya toggle */}
                       <div className="flex items-center gap-1.5" title="Maya answers this number">
                         <span className="text-xs text-ink4">Maya</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-label="Toggle Maya"
-                          aria-checked={num.maya_enabled}
+                        <Switch
+                          size="small"
+                          checked={num.maya_enabled}
                           disabled={togglingId === num.id}
-                          onClick={() => void handleToggleMaya(num.id, num.maya_enabled)}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${num.maya_enabled ? 'bg-brand' : 'bg-gray-200'}`}
-                        >
-                          <span
-                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${num.maya_enabled ? 'translate-x-4' : 'translate-x-1'}`}
-                          />
-                        </button>
+                          onChange={() => void handleToggleMaya(num.id, num.maya_enabled)}
+                          slotProps={{
+                            input: {
+                              'aria-label': `Toggle Maya for ${formatPhone(num.phone_number)}`,
+                            },
+                          }}
+                        />
                       </div>
                       {/* Edit */}
                       <button
