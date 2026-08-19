@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import Switch from '@mui/material/Switch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,27 +62,21 @@ function Toggle({
   checked,
   onChange,
   disabled,
+  ariaLabel,
 }: {
   checked: boolean
   onChange: (val: boolean) => void
   disabled?: boolean
+  ariaLabel: string
 }) {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
+    <Switch
+      size="small"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
       disabled={disabled}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-bg3'
-      }`}
-    >
-      <span
-        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
-    </button>
+      slotProps={{ input: { 'aria-label': ariaLabel } }}
+    />
   )
 }
 
@@ -260,6 +255,7 @@ export default function NotificationSettingsPage() {
                     <Toggle
                       checked={prefs[key]?.push ?? false}
                       onChange={() => toggle(key, 'push')}
+                      ariaLabel={`Push notifications for ${label}`}
                     />
                   </div>
                 </td>
@@ -268,6 +264,7 @@ export default function NotificationSettingsPage() {
                     <Toggle
                       checked={prefs[key]?.sms ?? false}
                       onChange={() => toggle(key, 'sms')}
+                      ariaLabel={`SMS notifications for ${label}`}
                     />
                   </div>
                 </td>
@@ -277,6 +274,7 @@ export default function NotificationSettingsPage() {
                       checked={prefs[key]?.email ?? false}
                       onChange={() => toggle(key, 'email')}
                       disabled
+                      ariaLabel={`Email notifications for ${label}`}
                     />
                   </div>
                 </td>
@@ -326,7 +324,12 @@ export default function NotificationSettingsPage() {
               Every Monday morning — contacts, appointments, pipeline, and Maya call summary
             </p>
           </div>
-          <Toggle checked={digestEnabled} onChange={toggleDigest} disabled={digestSaving} />
+          <Toggle
+            checked={digestEnabled}
+            onChange={toggleDigest}
+            disabled={digestSaving}
+            ariaLabel="Weekly digest"
+          />
         </div>
 
         {/* Card body */}

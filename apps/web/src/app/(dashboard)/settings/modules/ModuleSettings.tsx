@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Switch from '@mui/material/Switch'
 
 type PlanTier = 'core' | 'pro' | 'scale'
 
@@ -192,21 +193,13 @@ export default function ModuleSettings({ initialModules, isOwner, plan }: Props)
                 >
                   {enabled ? 'On' : 'Off'}
                 </span>
-                <button
-                  onClick={() => toggle(mod.key, !enabled)}
+                <Switch
+                  size="small"
+                  checked={enabled}
+                  onChange={() => toggle(mod.key, !enabled)}
                   disabled={!interactive || toggling === mod.key}
-                  aria-checked={enabled}
-                  role="switch"
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    enabled ? 'bg-teal-600' : 'bg-gray-300'
-                  } ${!interactive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      enabled ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
+                  slotProps={{ input: { 'aria-label': mod.label } }}
+                />
               </div>
             </div>
           )
