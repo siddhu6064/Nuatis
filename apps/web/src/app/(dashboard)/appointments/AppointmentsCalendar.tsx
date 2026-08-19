@@ -152,6 +152,7 @@ export default function AppointmentsCalendar({
   const [date, setDate] = useState(new Date())
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null)
+  const [apptDrawerOpen, setApptDrawerOpen] = useState(false)
   const [selectedBlockedAppt, setSelectedBlockedAppt] = useState<Appointment | null>(null)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -286,6 +287,7 @@ export default function AppointmentsCalendar({
       setSelectedBlockedAppt(event.resource)
     } else {
       setSelectedAppt(event.resource)
+      setApptDrawerOpen(true)
     }
   }, [])
 
@@ -436,16 +438,17 @@ export default function AppointmentsCalendar({
 
       {selectedAppt && (
         <AppointmentDrawer
+          open={apptDrawerOpen}
           appt={selectedAppt}
           userRole={userRole}
-          onClose={() => setSelectedAppt(null)}
+          onClose={() => setApptDrawerOpen(false)}
           onUpdated={(updated) => {
             setSelectedAppt(updated)
             setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
           }}
           onDeleted={() => {
             setAppointments((prev) => prev.filter((a) => a.id !== selectedAppt.id))
-            setSelectedAppt(null)
+            setApptDrawerOpen(false)
           }}
         />
       )}
