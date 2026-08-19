@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 interface EmailTemplate {
   id: string
@@ -144,125 +148,98 @@ export default function EmailComposeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-brand">
-          <h2 className="text-sm font-semibold text-ink">Compose Email</h2>
-          <button onClick={onClose} className="text-ink4 hover:text-ink3 text-lg leading-none">
-            &times;
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 space-y-3">
-          {accounts.length === 0 ? (
-            <div className="text-sm text-ink3 py-2">
-              No email accounts connected.{' '}
-              <a
-                href="/settings/integrations"
-                className="text-teal-600 hover:text-teal-700 font-medium"
-              >
-                Connect one in Integrations
-              </a>
-            </div>
-          ) : (
-            <>
-              {/* Template picker */}
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">Template</label>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => void handleTemplateChange(e.target.value)}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  <option value="">No template</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {loadingPreview && <p className="text-xs text-ink4 mt-1">Loading template...</p>}
-              </div>
-
-              {/* From */}
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">From</label>
-                <select
-                  value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.email_address}
-                      {a.is_default ? ' (default)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* To */}
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">To</label>
-                <input
-                  type="email"
-                  value={contactEmail || `${contactName} (no email on file)`}
-                  readOnly
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-bg text-ink3 cursor-not-allowed"
-                />
-              </div>
-
-              {/* Subject */}
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">Subject</label>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Enter subject..."
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              {/* Body */}
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">Body</label>
-                <textarea
-                  rows={8}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Write your message..."
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-                />
-              </div>
-
-              {/* Error */}
-              {error && <p className="text-xs text-red-600">{error}</p>}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border-brand">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink3 hover:text-ink rounded-lg hover:bg-bg"
-          >
+    <Modal
+      onClose={onClose}
+      title="Compose Email"
+      footer={
+        <>
+          <Button onClick={onClose} variant="text" color="inherit">
             Cancel
-          </button>
+          </Button>
           {accounts.length > 0 && (
-            <button
-              onClick={() => void handleSend()}
-              disabled={sending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {sending ? 'Sending...' : 'Send'}
-            </button>
+            <Button onClick={() => void handleSend()} disabled={sending} variant="contained">
+              {sending ? 'Sending…' : 'Send'}
+            </Button>
           )}
+        </>
+      }
+    >
+      {accounts.length === 0 ? (
+        <div className="text-sm text-ink3 py-2">
+          No email accounts connected.{' '}
+          <a
+            href="/settings/integrations"
+            className="text-teal-600 hover:text-teal-700 font-medium"
+          >
+            Connect one in Integrations
+          </a>
         </div>
-      </div>
-    </div>
+      ) : (
+        <div className="space-y-3">
+          <TextField
+            select
+            label="Template"
+            value={selectedTemplateId}
+            onChange={(e) => void handleTemplateChange(e.target.value)}
+            fullWidth
+            size="small"
+            helperText={loadingPreview ? 'Loading template…' : undefined}
+          >
+            <MenuItem value="">No template</MenuItem>
+            {templates.map((t) => (
+              <MenuItem key={t.id} value={t.id}>
+                {t.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="From"
+            value={selectedAccountId}
+            onChange={(e) => setSelectedAccountId(e.target.value)}
+            fullWidth
+            size="small"
+          >
+            {accounts.map((a) => (
+              <MenuItem key={a.id} value={a.id}>
+                {a.email_address}
+                {a.is_default ? ' (default)' : ''}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="To"
+            value={contactEmail || `${contactName} (no email on file)`}
+            slotProps={{ htmlInput: { readOnly: true } }}
+            fullWidth
+            size="small"
+          />
+
+          <TextField
+            label="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Enter subject..."
+            fullWidth
+            size="small"
+          />
+
+          <TextField
+            label="Body"
+            multiline
+            rows={8}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Write your message..."
+            fullWidth
+            size="small"
+          />
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+      )}
+    </Modal>
   )
 }
