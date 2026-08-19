@@ -1,13 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, dateFnsLocalizer, View, Views } from 'react-big-calendar'
+import { Calendar, dateFnsLocalizer, View, Views, ToolbarProps } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { createClient } from '@supabase/supabase-js'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import AppointmentDrawer from './AppointmentDrawer'
 import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
@@ -126,6 +129,76 @@ const APPT_COLUMNS = [
   { key: 'channel', label: 'Channel' },
 ]
 const APPT_DEFAULTS = Object.fromEntries(APPT_COLUMNS.map((c) => [c.key, true]))
+
+// ── Custom toolbar (replaces react-big-calendar's default plain-button bar) ────
+
+function CalendarToolbar({ view, label, onNavigate, onView }: ToolbarProps<CalendarEvent>) {
+  return (
+    <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-b border-border-brand">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => onNavigate('TODAY')}
+          sx={{
+            textTransform: 'none',
+            borderColor: '#dedad2',
+            color: 'text.primary',
+            fontWeight: 500,
+          }}
+        >
+          Today
+        </Button>
+        <div className="flex items-center -mx-1">
+          <IconButton size="small" onClick={() => onNavigate('PREV')} aria-label="Previous period">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+            </svg>
+          </IconButton>
+          <IconButton size="small" onClick={() => onNavigate('NEXT')} aria-label="Next period">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+            </svg>
+          </IconButton>
+        </div>
+        <h2 className="text-base font-semibold text-ink">{label}</h2>
+      </div>
+      <ToggleButtonGroup
+        value={view}
+        exclusive
+        onChange={(_, next: View | null) => next && onView(next)}
+        size="small"
+      >
+        <ToggleButton value={Views.MONTH} sx={{ textTransform: 'none', px: 2 }}>
+          Month
+        </ToggleButton>
+        <ToggleButton value={Views.WEEK} sx={{ textTransform: 'none', px: 2 }}>
+          Week
+        </ToggleButton>
+        <ToggleButton value={Views.DAY} sx={{ textTransform: 'none', px: 2 }}>
+          Day
+        </ToggleButton>
+        <ToggleButton value={Views.AGENDA} sx={{ textTransform: 'none', px: 2 }}>
+          Agenda
+        </ToggleButton>
+      </ToggleButtonGroup>
+    </div>
+  )
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -254,12 +327,13 @@ export default function AppointmentsCalendar({
       return {
         style: {
           backgroundColor: '#f59e0b',
-          borderColor: '#d97706',
+          borderColor: 'transparent',
           color: '#fff',
-          borderRadius: '4px',
+          borderRadius: '8px',
           fontSize: '12px',
-          padding: '2px 6px',
+          padding: '3px 8px',
           opacity: 0.85,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
         },
       }
     }
@@ -267,11 +341,12 @@ export default function AppointmentsCalendar({
     return {
       style: {
         backgroundColor: color,
-        borderColor: color,
+        borderColor: 'transparent',
         color: '#fff',
-        borderRadius: '4px',
+        borderRadius: '8px',
         fontSize: '12px',
-        padding: '2px 6px',
+        padding: '3px 8px',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
       },
     }
   }, [])
@@ -392,24 +467,27 @@ export default function AppointmentsCalendar({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {(Object.entries(STATUS_COLOR) as [AppointmentStatus, string][]).map(([status, color]) => (
-          <span key={status} className="flex items-center gap-1.5 text-xs text-ink3">
+          <span
+            key={status}
+            className="flex items-center gap-1.5 text-xs font-medium text-ink3 bg-white border border-border-brand rounded-full px-2.5 py-1"
+          >
             <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
+              className="inline-block w-2 h-2 rounded-full"
               style={{ backgroundColor: color }}
             />
             {STATUS_LABEL[status]}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 text-xs text-ink3">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-400" />
+        <span className="flex items-center gap-1.5 text-xs font-medium text-ink3 bg-white border border-border-brand rounded-full px-2.5 py-1">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
           Blocked
         </span>
       </div>
 
       <div
-        className={`rbc-wrapper relative bg-white rounded-xl border border-border-brand overflow-hidden${
+        className={`rbc-wrapper relative bg-white rounded-2xl border border-border-brand shadow-sm overflow-hidden${
           loading ? ' opacity-60 pointer-events-none' : ''
         }`}
       >
@@ -425,6 +503,7 @@ export default function AppointmentsCalendar({
           onSelectSlot={handleSelectSlot}
           selectable
           eventPropGetter={eventPropGetter}
+          components={{ toolbar: CalendarToolbar }}
           style={{ height: 680 }}
           scrollToTime={SCROLL_TO_TIME}
           popup
