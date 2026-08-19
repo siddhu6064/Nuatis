@@ -23,6 +23,18 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// The frontend's IntakeForm type (and the camelCase body it POSTs/PUTs) expects
+// isActive/linkedServiceIds, but a raw Supabase row is snake_case — without this,
+// every response silently reads as isActive=undefined and linkedServiceIds=undefined
+// on the client, regardless of the real stored value.
+function toCamelForm(form: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...form,
+    isActive: form['is_active'],
+    linkedServiceIds: form['linked_service_ids'] ?? [],
+  }
+}
+
 function validateFields(fields: unknown[]): { valid: boolean; error?: string } {
   for (const field of fields) {
     const f = field as Record<string, unknown>
@@ -82,11 +94,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
   const result = (forms ?? []).map((form) => {
     const fields = Array.isArray(form['fields']) ? (form['fields'] as unknown[]) : []
-    return {
+    return toCamelForm({
       ...form,
       fieldCount: fields.length,
       submissionCount: countMap[form['id'] as string] ?? 0,
-    }
+    })
   })
 
   res.json({ data: result })
@@ -124,11 +136,11 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
   const fields = Array.isArray(form['fields']) ? (form['fields'] as unknown[]) : []
 
   res.json({
-    data: {
+    data: toCamelForm({
       ...form,
       fieldCount: fields.length,
       submissionCount: count ?? 0,
-    },
+    }),
   })
 })
 
@@ -178,7 +190,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
-  res.status(201).json({ data: form })
+  res.status(201).json({ data: toCamelForm(form) })
 })
 
 // ── PUT /:id — update form ────────────────────────────────────
@@ -247,7 +259,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     return
   }
 
-  res.json({ data: form })
+  res.json({ data: toCamelForm(form) })
 })
 
 // ── DELETE /:id — delete form ─────────────────────────────────

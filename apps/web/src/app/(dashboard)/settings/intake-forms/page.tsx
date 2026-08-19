@@ -607,21 +607,22 @@ export default function IntakeFormsPage() {
     const res = await fetch(`/api/intake-forms`)
     if (res.ok) {
       const data = await res.json()
-      setForms(Array.isArray(data) ? data : ((data as { forms?: IntakeForm[] }).forms ?? []))
+      setForms(Array.isArray(data) ? data : ((data as { data?: IntakeForm[] }).data ?? []))
     }
   }, [])
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/intake-forms`).then((r) => (r.ok ? r.json() : { forms: [] })),
-      fetch(`/api/settings/booking`).then((r) => (r.ok ? r.json() : { services: [] })),
+      fetch(`/api/intake-forms`).then((r) => (r.ok ? r.json() : { data: [] })),
+      fetch(`/api/settings/booking`).then((r) => (r.ok ? r.json() : { availableServices: [] })),
     ])
       .then(([formsData, bookingData]) => {
         const formsArr = Array.isArray(formsData)
           ? formsData
-          : ((formsData as { forms?: IntakeForm[] }).forms ?? [])
+          : ((formsData as { data?: IntakeForm[] }).data ?? [])
         setForms(formsArr)
-        const svcs: Service[] = (bookingData as { services?: Service[] }).services ?? []
+        const svcs: Service[] =
+          (bookingData as { availableServices?: Service[] }).availableServices ?? []
         setServices(svcs)
       })
       .catch(() => {})
