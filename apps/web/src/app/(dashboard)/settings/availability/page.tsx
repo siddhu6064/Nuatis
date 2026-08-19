@@ -1,6 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Switch from '@mui/material/Switch'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +85,24 @@ const DEFAULT_HOURS: HoursMap = {
   fri: { open: '09:00', close: '17:00', enabled: true },
   sat: { open: '09:00', close: '17:00', enabled: false },
   sun: { open: '09:00', close: '17:00', enabled: false },
+}
+
+// ── Icon (inline SVG — matches this app's existing icon convention; no
+// @mui/icons-material dependency in this repo) ──────────────────────────────
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -250,13 +276,13 @@ export default function AvailabilityPage() {
             Define reusable weekly hour templates and apply them to calendars.
           </p>
         </div>
-        <button
+        <Button
           onClick={() => void createSchedule()}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+          variant="contained"
+          sx={{ textTransform: 'none' }}
         >
-          <span className="text-base leading-none">+</span>
-          New Schedule
-        </button>
+          + New Schedule
+        </Button>
       </div>
 
       {/* Body: list + editor */}
@@ -289,16 +315,17 @@ export default function AvailabilityPage() {
                     {s.applied_count} calendar{s.applied_count !== 1 ? 's' : ''}
                   </p>
                 </div>
-                <button
+                <IconButton
+                  size="small"
                   onClick={(e) => {
                     e.stopPropagation()
                     void deleteSchedule(s.id)
                   }}
-                  className="ml-2 text-ink4 hover:text-red-500 text-base leading-none shrink-0"
                   title="Delete"
+                  sx={{ color: 'text.disabled', '&:hover': { color: '#ef4444' } }}
                 >
-                  ×
-                </button>
+                  <CloseIcon />
+                </IconButton>
               </div>
             ))
           )}
@@ -310,29 +337,25 @@ export default function AvailabilityPage() {
             <div className="bg-white rounded-xl border border-border-brand p-6 space-y-6">
               {/* Name + timezone */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">Schedule Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">Timezone</label>
-                  <select
-                    value={editTimezone}
-                    onChange={(e) => setEditTimezone(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {TIMEZONES.map((tz) => (
-                      <option key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <TextField
+                  label="Schedule Name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+                <Select
+                  value={editTimezone}
+                  onChange={(e) => setEditTimezone(e.target.value)}
+                  size="small"
+                  fullWidth
+                >
+                  {TIMEZONES.map((tz) => (
+                    <MenuItem key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </MenuItem>
+                  ))}
+                </Select>
               </div>
 
               {/* Weekly hours grid */}
@@ -343,49 +366,42 @@ export default function AvailabilityPage() {
                     const day = editHours[key]
                     return (
                       <div key={key} className="flex items-center gap-3">
-                        {/* Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => toggleDay(key)}
-                          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
-                            day.enabled ? 'bg-teal-500' : 'bg-bg3'
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                              day.enabled ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
+                        <Switch
+                          size="small"
+                          checked={day.enabled}
+                          onChange={() => toggleDay(key)}
+                        />
 
                         {/* Day label */}
                         <span className="text-sm text-ink2 w-24 shrink-0">{label}</span>
 
                         {day.enabled ? (
                           <>
-                            <select
+                            <Select
                               value={day.open}
                               onChange={(e) => setDayField(key, 'open', e.target.value)}
-                              className="text-xs border border-border-brand rounded px-2 py-1.5 bg-white text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              size="small"
+                              sx={{ fontSize: '13px' }}
                             >
                               {TIME_SLOTS.map((s) => (
-                                <option key={s.value} value={s.value}>
+                                <MenuItem key={s.value} value={s.value}>
                                   {s.label}
-                                </option>
+                                </MenuItem>
                               ))}
-                            </select>
+                            </Select>
                             <span className="text-ink4 text-xs">—</span>
-                            <select
+                            <Select
                               value={day.close}
                               onChange={(e) => setDayField(key, 'close', e.target.value)}
-                              className="text-xs border border-border-brand rounded px-2 py-1.5 bg-white text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              size="small"
+                              sx={{ fontSize: '13px' }}
                             >
                               {TIME_SLOTS.map((s) => (
-                                <option key={s.value} value={s.value}>
+                                <MenuItem key={s.value} value={s.value}>
                                   {s.label}
-                                </option>
+                                </MenuItem>
                               ))}
-                            </select>
+                            </Select>
                           </>
                         ) : (
                           <span className="text-xs text-ink4 italic">Closed</span>
@@ -398,13 +414,14 @@ export default function AvailabilityPage() {
 
               {/* Save button */}
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   onClick={() => void saveSchedule()}
                   disabled={saving || !editName.trim()}
-                  className="px-5 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                  variant="contained"
+                  sx={{ textTransform: 'none' }}
                 >
                   {saving ? 'Saving...' : 'Save Schedule'}
-                </button>
+                </Button>
                 {saveSuccess && <span className="text-xs text-teal-600 font-medium">Saved!</span>}
               </div>
 
@@ -415,27 +432,31 @@ export default function AvailabilityPage() {
                   <p className="text-xs text-ink4 mb-3">
                     Select which calendars use this schedule.
                   </p>
-                  <div className="space-y-2 mb-4">
+                  <div className="mb-4">
                     {locations.map((loc) => (
-                      <label key={loc.id} className="flex items-center gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedLocationIds.has(loc.id)}
-                          onChange={() => toggleLocation(loc.id)}
-                          className="w-4 h-4 rounded border-border-brand text-teal-600 focus:ring-teal-500"
-                        />
-                        <span className="text-sm text-ink2">{loc.name}</span>
-                      </label>
+                      <FormControlLabel
+                        key={loc.id}
+                        sx={{ display: 'flex', ml: 0 }}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={selectedLocationIds.has(loc.id)}
+                            onChange={() => toggleLocation(loc.id)}
+                          />
+                        }
+                        label={<span className="text-sm text-ink2">{loc.name}</span>}
+                      />
                     ))}
                   </div>
                   <div className="flex items-center gap-3">
-                    <button
+                    <Button
                       onClick={() => void applySchedule()}
                       disabled={applying}
-                      className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                      variant="contained"
+                      sx={{ textTransform: 'none' }}
                     >
                       {applying ? 'Applying...' : 'Apply to Selected'}
-                    </button>
+                    </Button>
                     {applyMsg && (
                       <span className="text-xs text-teal-600 font-medium">{applyMsg}</span>
                     )}
