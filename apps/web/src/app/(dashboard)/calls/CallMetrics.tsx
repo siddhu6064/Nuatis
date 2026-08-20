@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 type Preset = '7d' | '30d' | '90d'
 type Direction = 'all' | 'inbound' | 'outbound'
@@ -185,30 +189,30 @@ export default function CallMetrics() {
       {/* Filters */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         {/* Direction pills */}
-        <div className="flex rounded-lg border border-border-brand overflow-hidden text-xs">
+        <ToggleButtonGroup
+          value={direction}
+          exclusive
+          onChange={(_e, value: Direction | null) => value && setDirection(value)}
+          size="small"
+        >
           {(['all', 'inbound', 'outbound'] as Direction[]).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDirection(d)}
-              className={`px-3 py-1.5 font-medium capitalize transition-colors ${
-                direction === d ? 'bg-teal-600 text-white' : 'text-ink3 hover:bg-bg'
-              }`}
-            >
+            <ToggleButton key={d} value={d} sx={{ textTransform: 'capitalize' }}>
               {d === 'all' ? 'All' : d.charAt(0).toUpperCase() + d.slice(1)}
-            </button>
+            </ToggleButton>
           ))}
-        </div>
+        </ToggleButtonGroup>
 
         {/* Date preset */}
-        <select
+        <TextField
+          select
           value={preset}
           onChange={(e) => setPreset(e.target.value as Preset)}
-          className="px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-ink2 bg-white"
+          size="small"
         >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-        </select>
+          <MenuItem value="7d">Last 7 days</MenuItem>
+          <MenuItem value="30d">Last 30 days</MenuItem>
+          <MenuItem value="90d">Last 90 days</MenuItem>
+        </TextField>
       </div>
 
       {/* Stat cards */}
