@@ -53,7 +53,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       tenant_id: authed.tenantId,
       name,
       filters,
-      created_by: authed.userId,
+      created_by: authed.appUserId ?? null,
     })
     .select('id, name, filters, created_at')
     .single()
