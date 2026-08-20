@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import { Modal } from '@/components/ui/Modal'
 
 interface Props {
   quoteId: string
@@ -63,48 +66,44 @@ export default function QuoteActions({
   return (
     <>
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Download PDF */}
-        <button
-          onClick={downloadPdf}
-          className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
-        >
+        <Button onClick={downloadPdf} size="small" color="inherit" variant="outlined">
           Download PDF
-        </button>
+        </Button>
 
-        {/* Copy share link */}
-        <button
-          onClick={copyLink}
-          className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
-        >
+        <Button onClick={copyLink} size="small" color="inherit" variant="outlined">
           {copied ? 'Copied!' : 'Copy Link'}
-        </button>
+        </Button>
 
-        {/* Approve / Reject buttons for pending approval */}
         {approvalStatus === 'pending' && (
           <>
-            <button
-              onClick={() => action('approve', `/api/quotes/${quoteId}/approve`)}
+            <Button
+              onClick={() => void action('approve', `/api/quotes/${quoteId}/approve`)}
               disabled={loading === 'approve'}
-              className="text-xs text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg font-medium disabled:opacity-50"
+              size="small"
+              variant="contained"
+              color="success"
             >
               {loading === 'approve' ? 'Approving...' : 'Approve'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowRejectModal(true)}
               disabled={loading === 'reject'}
-              className="text-xs text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-medium disabled:opacity-50"
+              size="small"
+              variant="contained"
+              color="error"
             >
               Reject
-            </button>
+            </Button>
           </>
         )}
 
         {status === 'draft' && (
           <>
-            <button
-              onClick={() => action('send', `/api/quotes/${quoteId}/send`)}
+            <Button
+              onClick={() => void action('send', `/api/quotes/${quoteId}/send`)}
               disabled={loading === 'send' || sendBlocked}
-              className="text-xs text-white bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded-lg font-medium disabled:opacity-50"
+              size="small"
+              variant="contained"
               title={sendBlocked ? 'Requires approval' : undefined}
             >
               {loading === 'send'
@@ -112,87 +111,103 @@ export default function QuoteActions({
                 : sendBlocked
                   ? 'Send (Locked)'
                   : 'Send to Customer'}
-            </button>
-            <button
-              onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
+            </Button>
+            <Button
+              onClick={() => void action('dup', `/api/quotes/${quoteId}/duplicate`)}
               disabled={loading === 'dup'}
-              className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
+              size="small"
+              color="inherit"
+              variant="outlined"
             >
               Duplicate
-            </button>
+            </Button>
           </>
         )}
 
         {(status === 'sent' || status === 'viewed') && (
           <>
-            <button
-              onClick={() => action('send', `/api/quotes/${quoteId}/send`)}
+            <Button
+              onClick={() => void action('send', `/api/quotes/${quoteId}/send`)}
               disabled={loading === 'send'}
-              className="text-xs text-teal-600 hover:text-teal-700 border border-teal-200 px-2.5 py-1.5 rounded-lg"
+              size="small"
+              variant="outlined"
             >
               Resend
-            </button>
-            <button
-              onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
+            </Button>
+            <Button
+              onClick={() => void action('dup', `/api/quotes/${quoteId}/duplicate`)}
               disabled={loading === 'dup'}
-              className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
+              size="small"
+              color="inherit"
+              variant="outlined"
             >
               Duplicate
-            </button>
+            </Button>
           </>
         )}
 
         {(status === 'accepted' || status === 'declined') && (
-          <button
-            onClick={() => action('dup', `/api/quotes/${quoteId}/duplicate`)}
+          <Button
+            onClick={() => void action('dup', `/api/quotes/${quoteId}/duplicate`)}
             disabled={loading === 'dup'}
-            className="text-xs text-ink3 hover:text-ink2 border border-border-brand px-2.5 py-1.5 rounded-lg"
+            size="small"
+            color="inherit"
+            variant="outlined"
           >
             Duplicate
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Reject modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-xl">
-            <h3 className="text-sm font-semibold text-ink mb-3">Reject Quote</h3>
-            <p className="text-xs text-ink3 mb-3">
-              Quote has a {discountPct ?? 0}% discount. Provide a reason for rejection (optional).
-            </p>
-            <textarea
-              value={rejectNote}
-              onChange={(e) => setRejectNote(e.target.value)}
-              placeholder="Reason for rejection..."
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
-              rows={3}
-            />
-            <div className="flex items-center gap-2 justify-end">
-              <button
+        <Modal
+          onClose={() => {
+            setShowRejectModal(false)
+            setRejectNote('')
+          }}
+          title="Reject Quote"
+          maxWidth="xs"
+          footer={
+            <>
+              <Button
                 onClick={() => {
                   setShowRejectModal(false)
                   setRejectNote('')
                 }}
-                className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
+                variant="text"
+                color="inherit"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setShowRejectModal(false)
-                  action('reject', `/api/quotes/${quoteId}/reject`, 'POST', {
+                  void action('reject', `/api/quotes/${quoteId}/reject`, 'POST', {
                     note: rejectNote || null,
                   })
                   setRejectNote('')
                 }}
-                className="text-xs text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-medium"
+                variant="contained"
+                color="error"
               >
                 Reject Quote
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-xs text-ink3 mb-3">
+            Quote has a {discountPct ?? 0}% discount. Provide a reason for rejection (optional).
+          </p>
+          <TextField
+            value={rejectNote}
+            onChange={(e) => setRejectNote(e.target.value)}
+            placeholder="Reason for rejection..."
+            multiline
+            rows={3}
+            fullWidth
+            size="small"
+          />
+        </Modal>
       )}
     </>
   )
