@@ -191,18 +191,12 @@ export default function DuplicatesReviewer() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openMerge(pair)}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700"
-                >
+                <Button onClick={() => openMerge(pair)} variant="contained" size="small">
                   Merge {'\u2192'}
-                </button>
-                <button
-                  onClick={() => dismiss(pair)}
-                  className="px-3 py-1.5 text-xs text-ink3 hover:text-ink2"
-                >
+                </Button>
+                <Button onClick={() => dismiss(pair)} size="small" color="inherit">
                   Not a duplicate
-                </button>
+                </Button>
               </div>
             </div>
           )

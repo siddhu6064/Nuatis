@@ -6,6 +6,7 @@ import Radio from '@mui/material/Radio'
 import RadioGroup from '@mui/material/RadioGroup'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import { getFirstName } from '@nuatis/shared'
 import type { FilterState } from './ContactFilters'
 import { Modal } from '@/components/ui/Modal'
@@ -239,49 +240,61 @@ export default function BulkActionBar({
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-border-brand rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
         <span className="text-sm font-medium text-ink2">{count} selected</span>
         <div className="w-px h-5 bg-bg3" />
-        <button
+        <Button
           onClick={() => setModal('stage')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Move Stage
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('tag')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Tag
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('assign')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Assign
-        </button>
+        </Button>
         <span title={optOutCount > 0 ? 'Some contacts have opted out' : undefined}>
-          <button
+          <Button
             onClick={() => setModal('sms')}
             disabled={optOutCount > 0}
-            className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-40 disabled:cursor-not-allowed"
+            size="small"
+            color="inherit"
+            sx={{ bgcolor: 'action.hover' }}
           >
             Send SMS
-          </button>
+          </Button>
         </span>
-        <button
+        <Button
           onClick={() => void handleExport()}
           disabled={loading}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-50"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Export
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('archive')}
-          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+          size="small"
+          color="error"
+          sx={{ bgcolor: '#fef2f2' }}
         >
           Archive
-        </button>
-        <button onClick={onClear} className="text-ink4 hover:text-ink3 text-sm ml-1">
-          &times;
-        </button>
+        </Button>
+        <IconButton onClick={onClear} size="small" aria-label="Clear selection" sx={{ ml: 0.5 }}>
+          <span className="text-ink4 text-sm">&times;</span>
+        </IconButton>
       </div>
 
       {/* Modals */}
@@ -441,14 +454,22 @@ export default function BulkActionBar({
                 slotProps={{ htmlInput: { maxLength: 160 } }}
               />
               <div className="flex items-center justify-between mt-1 mb-3">
-                <button
+                <Button
                   onClick={() =>
                     setSmsMessage((m) => (m.includes('{{first_name}}') ? m : m + '{{first_name}}'))
                   }
-                  className="text-[10px] text-teal-600 font-mono bg-teal-50 px-1.5 py-0.5 rounded"
+                  size="small"
+                  sx={{
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    minWidth: 0,
+                    py: 0.25,
+                    px: 0.75,
+                    bgcolor: '#f0fdfa',
+                  }}
                 >
                   {'{{first_name}}'}
-                </button>
+                </Button>
                 <span
                   className={`text-[10px] ${smsMessage.length >= 150 ? 'text-amber-600' : 'text-ink4'}`}
                 >

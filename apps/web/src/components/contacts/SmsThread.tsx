@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Button from '@mui/material/Button'
 import SnippetPicker from '../SnippetPicker'
 
 interface SmsMessage {
@@ -216,13 +217,14 @@ export default function SmsThread({ contactId, contactName, refreshKey }: Props)
             contactName={contactName}
             className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
           />
-          <button
+          <Button
             onClick={() => void handleSend()}
             disabled={!input.trim() || sending}
-            className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 shrink-0 text-sm"
+            variant="contained"
+            sx={{ minWidth: 0, px: 1.5, flexShrink: 0 }}
           >
             {'\u2191'}
-          </button>
+          </Button>
         </div>
         {input.length > 280 && (
           <p className="text-[10px] text-ink4 mt-1 text-right">{input.length}/320</p>
