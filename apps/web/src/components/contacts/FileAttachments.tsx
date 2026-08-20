@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import IconButton from '@mui/material/IconButton'
 
 interface Attachment {
   id: string
@@ -188,12 +189,14 @@ export default function FileAttachments({ contactId }: Props) {
                   Download
                 </a>
               )}
-              <button
+              <IconButton
                 onClick={() => void handleDelete(a.id)}
-                className="text-xs text-ink4 hover:text-red-500 shrink-0"
+                size="small"
+                aria-label={`Remove ${a.original_filename}`}
+                sx={{ flexShrink: 0 }}
               >
-                &times;
-              </button>
+                <span className="text-xs text-ink4">&times;</span>
+              </IconButton>
             </div>
           ))}
         </div>

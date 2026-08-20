@@ -1,6 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
 
 interface Task {
   id: string
@@ -171,12 +176,13 @@ export default function ContactTasks({ contactId }: Props) {
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-ink2">Tasks</h3>
-        <button
+        <Button
           onClick={() => setAdding(true)}
-          className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+          size="small"
+          sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
         >
           + Add task
-        </button>
+        </Button>
       </div>
 
       {/* Sub-tabs */}
@@ -222,51 +228,53 @@ export default function ContactTasks({ contactId }: Props) {
 
       {adding && (
         <div className="border border-border-brand rounded-lg p-3 mb-3">
-          <input
-            type="text"
+          <TextField
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Task title..."
             autoFocus
-            className="w-full text-sm border-0 focus:ring-0 p-0 placeholder-gray-300"
+            fullWidth
+            variant="standard"
+            slotProps={{ input: { disableUnderline: true } }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void addTask()
               if (e.key === 'Escape') setAdding(false)
             }}
           />
           <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border-brand">
-            <input
+            <TextField
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1"
+              size="small"
             />
-            <input
+            <TextField
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1"
+              size="small"
             />
-            <select
+            <Select
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1"
+              size="small"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+            </Select>
             <div className="flex-1" />
-            <button onClick={() => setAdding(false)} className="text-xs text-ink3 hover:text-ink2">
+            <Button onClick={() => setAdding(false)} size="small" color="inherit">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void addTask()}
               disabled={!newTitle.trim() || saving}
-              className="px-3 py-1 text-xs font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50"
+              variant="contained"
+              size="small"
             >
               {saving ? 'Adding...' : 'Add'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -293,11 +301,11 @@ export default function ContactTasks({ contactId }: Props) {
                 : (PRIORITY_COLORS[task.priority] ?? '')
             }`}
           >
-            <input
-              type="checkbox"
+            <Checkbox
+              size="small"
               checked={false}
               onChange={() => void completeTask(task.id)}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 cursor-pointer"
+              sx={{ p: 0 }}
             />
             <span className="text-sm text-ink2 flex-1">{task.title}</span>
             <span
@@ -328,12 +336,7 @@ export default function ContactTasks({ contactId }: Props) {
             <div className="mt-1 space-y-1 opacity-60">
               {completedTasks.map((task) => (
                 <div key={task.id} className="flex items-center gap-2 px-3 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked
-                    readOnly
-                    className="rounded border-border-brand text-ink4 w-3.5 h-3.5"
-                  />
+                  <Checkbox size="small" checked disabled sx={{ p: 0 }} />
                   <span className="text-sm text-ink4 line-through">{task.title}</span>
                 </div>
               ))}

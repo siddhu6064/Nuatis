@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
 
 interface Props {
   contactId: string
@@ -64,59 +68,75 @@ export default function AddNoteForm({ contactId, onNoteAdded }: Props) {
 
   if (!expanded) {
     return (
-      <button
+      <Button
         onClick={() => setExpanded(true)}
-        className="w-full text-left px-4 py-3 text-sm text-ink4 hover:text-ink3 hover:bg-bg rounded-lg border border-dashed border-border-brand transition-colors"
+        fullWidth
+        variant="outlined"
+        color="inherit"
+        sx={{
+          justifyContent: 'flex-start',
+          textTransform: 'none',
+          borderStyle: 'dashed',
+          fontWeight: 400,
+        }}
       >
         Add a note...
-      </button>
+      </Button>
     )
   }
 
   return (
     <div className="border border-border-brand rounded-lg p-3" onKeyDown={handleKeyDown}>
-      <textarea
-        ref={textareaRef}
+      <TextField
+        inputRef={textareaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
+        multiline
         rows={3}
-        maxLength={5000}
         placeholder="Write a note..."
-        className="w-full text-sm text-ink2 placeholder-gray-300 border-0 focus:ring-0 resize-none p-0"
+        fullWidth
+        variant="standard"
+        slotProps={{
+          htmlInput: { maxLength: 5000 },
+          input: { disableUnderline: true },
+        }}
       />
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-brand">
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-ink3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={pinned}
-              onChange={(e) => setPinned(e.target.checked)}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-            />
-            Pin note
-          </label>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={pinned}
+                onChange={(e) => setPinned(e.target.checked)}
+              />
+            }
+            label={<span className="text-xs text-ink3">Pin note</span>}
+          />
           {body.length > 4000 && <span className="text-[10px] text-ink4">{body.length}/5000</span>}
         </div>
         <div className="flex items-center gap-2">
           {error && <span className="text-xs text-red-500">{error}</span>}
-          <button
+          <Button
             onClick={() => {
               setExpanded(false)
               setBody('')
               setPinned(false)
               setError(null)
             }}
-            className="px-3 py-1.5 text-xs text-ink3 hover:text-ink2"
+            size="small"
+            color="inherit"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => void handleSave()}
             disabled={!body.trim() || saving}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            variant="contained"
+            size="small"
           >
             {saving ? 'Saving...' : 'Save note'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
