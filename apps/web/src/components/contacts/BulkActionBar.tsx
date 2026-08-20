@@ -428,7 +428,7 @@ export default function BulkActionBar({
 
           {modal === 'assign' && (
             <TextField
-              label="Assignee user ID or name"
+              label="Assignee user ID"
               value={assignTo}
               onChange={(e) => setAssignTo(e.target.value)}
               autoFocus

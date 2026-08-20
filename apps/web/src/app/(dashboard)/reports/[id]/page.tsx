@@ -37,7 +37,7 @@ interface ReportConfig {
   name: string
   description: string | null
   object: string
-  metric_fn: string
+  metric: string
   metric_field: string | null
   group_by: string | null
   filters: { field: string; operator: string; value: string }[]
