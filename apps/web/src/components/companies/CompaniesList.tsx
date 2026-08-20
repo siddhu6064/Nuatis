@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
 
 interface Company {
   id: string
@@ -76,62 +78,60 @@ export default function CompaniesList() {
           <h1 className="text-xl font-bold text-ink">Companies</h1>
           <p className="text-sm text-ink3 mt-0.5">{companies.length} companies</p>
         </div>
-        <button
+        <Button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+          variant="contained"
+          sx={{ textTransform: 'none' }}
         >
-          <span className="text-base leading-none">+</span>
+          <span className="text-base leading-none mr-1.5">+</span>
           New Company
-        </button>
+        </Button>
       </div>
 
       <div className="mb-4">
-        <input
-          type="text"
+        <TextField
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search companies..."
-          className="w-full px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+          fullWidth
         />
       </div>
 
       {showCreate && (
         <div className="bg-white rounded-xl border border-border-brand p-4 mb-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <input
-              type="text"
+            <TextField
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Company name *"
               autoFocus
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              size="small"
             />
-            <input
-              type="text"
+            <TextField
               value={newDomain}
               onChange={(e) => setNewDomain(e.target.value)}
               placeholder="Domain (acme.com)"
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              size="small"
             />
-            <input
-              type="text"
+            <TextField
               value={newIndustry}
               onChange={(e) => setNewIndustry(e.target.value)}
               placeholder="Industry"
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              size="small"
             />
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-xs text-ink3">
+            <Button onClick={() => setShowCreate(false)} size="small" color="inherit">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void createCompany()}
               disabled={!newName.trim() || saving}
-              className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+              variant="contained"
+              size="small"
             >
               {saving ? 'Creating...' : 'Create'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -184,15 +184,17 @@ export default function CompaniesList() {
                     })}
                   </td>
                   <td className="px-6 py-4">
-                    <button
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation()
                         void archiveCompany(co.id)
                       }}
-                      className="text-xs text-ink4 hover:text-red-500"
+                      size="small"
+                      color="inherit"
+                      sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
                     >
                       Archive
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
