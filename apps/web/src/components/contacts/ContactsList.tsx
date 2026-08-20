@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
 import ContactFilters, { type FilterState, EMPTY_FILTERS } from './ContactFilters'
 import SmartLists from './SmartLists'
 import BulkActionBar from './BulkActionBar'
@@ -420,22 +423,25 @@ export default function ContactsList() {
             >
               Duplicates
             </Link>
-            <button
+            <Button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
-                showFilters || filterCount > 0
-                  ? 'border-teal-200 bg-teal-50 text-teal-700'
-                  : 'border-border-brand text-ink3 hover:bg-bg'
-              }`}
+              variant="outlined"
+              color={showFilters || filterCount > 0 ? 'primary' : 'inherit'}
+              sx={{
+                textTransform: 'none',
+                ...(showFilters || filterCount > 0
+                  ? { bgcolor: '#f0fdfa', borderColor: 'primary.light' }
+                  : {}),
+              }}
             >
-              <span className="text-xs">&#9776;</span>
+              <span className="text-xs mr-1.5">&#9776;</span>
               Filter
               {filterCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">
                   {filterCount}
                 </span>
               )}
-            </button>
+            </Button>
             <ColumnsButton columns={CONTACTS_COLUMNS} visible={colVisible} onChange={toggleCol} />
             <Link
               href="/contacts/new"
@@ -449,12 +455,11 @@ export default function ContactsList() {
 
         {/* Search bar */}
         <div className="mb-4">
-          <input
-            type="text"
+          <TextField
             value={filters.q}
             onChange={(e) => updateFilters({ ...filters, q: e.target.value })}
             placeholder="Search by name, phone, email..."
-            className="w-full px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+            fullWidth
           />
         </div>
 
@@ -480,12 +485,14 @@ export default function ContactsList() {
                 </button>
               </span>
             ))}
-            <button
+            <Button
               onClick={() => updateFilters(EMPTY_FILTERS)}
-              className="text-[11px] text-red-500 hover:text-red-600 px-1"
+              size="small"
+              color="error"
+              sx={{ fontSize: 11, minWidth: 0, textTransform: 'none' }}
             >
               Clear all
-            </button>
+            </Button>
           </div>
         )}
 
@@ -540,12 +547,7 @@ export default function ContactsList() {
               <thead>
                 <tr className="border-b border-border-brand">
                   <th className="w-10 px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={allPageSelected}
-                      onChange={toggleSelectAll}
-                      className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
-                    />
+                    <Checkbox size="small" checked={allPageSelected} onChange={toggleSelectAll} />
                   </th>
                   {/* Sortable: Name */}
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
@@ -658,11 +660,10 @@ export default function ContactsList() {
                     }`}
                   >
                     <td className="w-10 px-3 py-4">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="small"
                         checked={selectedIds.has(contact.id)}
                         onChange={() => toggleSelect(contact.id)}
-                        className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
                       />
                     </td>
                     <td

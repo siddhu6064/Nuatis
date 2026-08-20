@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@mui/material/Button'
 
 interface Props {
   contactId: string
@@ -71,27 +72,29 @@ export default function PortalAccessCard({ contactId, contactName: _contactName 
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
 
       {state === 'idle' && (
-        <button
-          type="button"
+        <Button
           onClick={() => void handleInvite()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+          size="small"
+          sx={{ bgcolor: '#f0fdfa', textTransform: 'none' }}
+          startIcon={
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+          }
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
           Invite to Portal
-        </button>
+        </Button>
       )}
 
       {state === 'loading' && <p className="text-xs text-ink4">Processing…</p>}
@@ -112,21 +115,22 @@ export default function PortalAccessCard({ contactId, contactName: _contactName 
           </div>
           {portalUrl && <p className="text-[10px] text-ink4 break-all">{portalUrl}</p>}
           <div className="flex items-center gap-3">
-            <button
-              type="button"
+            <Button
               onClick={() => void handleResend()}
-              className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+              size="small"
+              sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
             >
               Resend invite
-            </button>
+            </Button>
             <span className="text-gray-200">|</span>
-            <button
-              type="button"
+            <Button
               onClick={() => void handleRevoke()}
-              className="text-xs text-red-500 hover:text-red-600 font-medium"
+              size="small"
+              color="error"
+              sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
             >
               Revoke
-            </button>
+            </Button>
           </div>
         </div>
       )}

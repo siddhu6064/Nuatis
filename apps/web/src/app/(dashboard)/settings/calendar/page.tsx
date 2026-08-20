@@ -2,6 +2,10 @@
 
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Button from '@mui/material/Button'
+import Switch from '@mui/material/Switch'
+import TextField from '@mui/material/TextField'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -332,12 +336,14 @@ function CalendarSettingsContent() {
                   {status.email && <p className="text-xs text-ink4 truncate">{status.email}</p>}
                 </div>
               </div>
-              <button
+              <Button
                 onClick={handleDisconnectGoogle}
-                className="shrink-0 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                size="small"
+                color="error"
+                sx={{ textTransform: 'none', flexShrink: 0 }}
               >
                 Disconnect
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-4">
@@ -351,13 +357,15 @@ function CalendarSettingsContent() {
                   {status.email && <p className="text-xs text-ink4 truncate">{status.email}</p>}
                 </div>
               </div>
-              <button
-                onClick={handleDisconnectOutlook}
+              <Button
+                onClick={() => void handleDisconnectOutlook()}
                 disabled={disconnecting}
-                className="shrink-0 text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                size="small"
+                color="error"
+                sx={{ textTransform: 'none', flexShrink: 0 }}
               >
                 {disconnecting ? 'Disconnecting…' : 'Disconnect'}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -378,34 +386,38 @@ function CalendarSettingsContent() {
 
         <div className="px-5 py-5 flex flex-col sm:flex-row gap-3">
           {/* Google Calendar */}
-          <button
+          <Button
             onClick={() => handleSwitchAttempt('google')}
             disabled={connecting !== null || disconnecting}
-            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outlined"
+            color="inherit"
+            startIcon={<GoogleCalendarIcon />}
+            sx={{ textTransform: 'none', justifyContent: 'flex-start' }}
           >
-            <GoogleCalendarIcon />
             {connecting === 'google' ? 'Redirecting…' : 'Connect Google Calendar'}
             {status?.provider === 'google' && (
-              <span className="ml-1 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
+              <span className="ml-1.5 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
                 Active
               </span>
             )}
-          </button>
+          </Button>
 
           {/* Outlook Calendar */}
-          <button
+          <Button
             onClick={() => handleSwitchAttempt('outlook')}
             disabled={connecting !== null || disconnecting}
-            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outlined"
+            color="inherit"
+            startIcon={<OutlookCalendarIcon />}
+            sx={{ textTransform: 'none', justifyContent: 'flex-start' }}
           >
-            <OutlookCalendarIcon />
             {connecting === 'outlook' ? 'Redirecting…' : 'Connect Microsoft 365 Calendar'}
             {status?.provider === 'outlook' && (
-              <span className="ml-1 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
+              <span className="ml-1.5 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
                 Active
               </span>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -425,21 +437,12 @@ function CalendarSettingsContent() {
               {!status?.connected && ' — connect a calendar above to use Google Meet'}
             </p>
           </div>
-          <button
-            onClick={() => void saveVideoSettings(!videoEnabled)}
+          <Switch
+            checked={videoEnabled}
+            onChange={() => void saveVideoSettings(!videoEnabled)}
             disabled={savingVideo}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
-              videoEnabled ? 'bg-teal-600' : 'bg-gray-200'
-            }`}
-            role="switch"
-            aria-checked={videoEnabled}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
-                videoEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+            slotProps={{ input: { 'aria-label': 'Auto-generate video links' } }}
+          />
         </div>
       </div>
 
@@ -496,13 +499,13 @@ function CalendarSettingsContent() {
 
           {reserveStatus !== 'approved' && (
             <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">Google Place ID</label>
-              <input
-                type="text"
+              <TextField
+                label="Google Place ID"
                 value={placeId}
                 onChange={(e) => setPlaceId(e.target.value)}
                 placeholder="ChIJ..."
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                size="small"
+                fullWidth
               />
               <p className="text-xs text-ink4 mt-1">
                 Find yours at{' '}
@@ -519,45 +522,57 @@ function CalendarSettingsContent() {
           )}
 
           {(reserveStatus === 'not_submitted' || reserveStatus === 'rejected') && (
-            <button
+            <Button
               onClick={() => void handleReserveSubmit()}
               disabled={submittingReserve || savingPlaceId || !placeId.trim()}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="contained"
+              sx={{ textTransform: 'none' }}
             >
               {submittingReserve ? 'Submitting…' : 'Submit for Review'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Switch Provider Confirmation Dialog */}
       {switchConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl mx-4">
-            <h3 className="text-base font-semibold text-ink mb-2">Switch Calendar Provider?</h3>
-            <p className="text-sm text-ink3 mb-5">
-              This will disconnect{' '}
-              <strong>
-                {status?.provider ? providerLabel(status.provider) : 'your current calendar'}
-              </strong>{' '}
-              and connect <strong>{providerLabel(switchConfirm)}</strong>. Continue?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setSwitchConfirm(null)}
-                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
-              >
+        <Modal
+          onClose={() => setSwitchConfirm(null)}
+          title="Switch Calendar Provider?"
+          maxWidth="xs"
+          footer={
+            <>
+              <Button onClick={() => setSwitchConfirm(null)} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={confirmSwitch}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
+              </Button>
+              {/*
+                confirmSwitch() ends in a real window.location.href redirect to
+                Google/Microsoft OAuth consent — deliberately not exercised
+                during verification (docs/mui-v9-migration-plan.md phase 8),
+                same treatment as the SMS/email sends held back in earlier
+                phases. Cancel/Escape are verified for real; this isn't.
+
+                variant="contained" with no color prop renders the theme's
+                default primary (teal), not this page's own bg-blue-600 —
+                a deliberate simplification: converted modal buttons use the
+                app-wide primary color rather than reproducing every page's
+                local accent, since the point of one shared theme is not
+                having per-page custom colors bleed into a shared component.
+              */}
+              <Button onClick={confirmSwitch} variant="contained">
                 Continue
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink3">
+            This will disconnect{' '}
+            <strong>
+              {status?.provider ? providerLabel(status.provider) : 'your current calendar'}
+            </strong>{' '}
+            and connect <strong>{providerLabel(switchConfirm)}</strong>. Continue?
+          </p>
+        </Modal>
       )}
 
       {/* Toast */}

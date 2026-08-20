@@ -1,26 +1,9 @@
 @import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
-
-.rbc-toolbar button {
-  color: #1a1814;
-  border-color: #e5e7eb;
-}
-
-.rbc-toolbar button:hover,
-.rbc-toolbar button:focus {
-  background-color: #f0fdfa;
-  color: #0d9488;
-  border-color: #0d9488;
-}
-
-.rbc-toolbar button.rbc-active,
-.rbc-toolbar button.rbc-active:hover {
-  background-color: #0d9488;
-  color: #fff;
-  border-color: #0d9488;
-  box-shadow: none;
-}
+/* The default react-big-calendar toolbar is replaced by CalendarToolbar
+   (MUI Button/ToggleButtonGroup) in AppointmentsCalendar.tsx — nothing to
+   override here anymore. */
 
 /* ── Today column highlight ──────────────────────────────────────────────── */
 
@@ -31,15 +14,17 @@
 /* ── Selected / drag slot highlight ─────────────────────────────────────── */
 
 .rbc-slot-selection {
-  background-color: rgba(13, 148, 136, 0.15);
-  border: 1px solid #0d9488;
+  background-color: rgba(13, 148, 136, 0.12);
+  border: 1.5px solid #0d9488;
+  border-radius: 6px;
 }
 
 /* ── Event fallback color ────────────────────────────────────────────────── */
 
 .rbc-event {
   background-color: #0d9488;
-  border-color: #0d9488;
+  border-color: transparent;
+  border-radius: 8px;
 }
 
 .rbc-event:focus {
@@ -47,73 +32,123 @@
   outline-offset: 2px;
 }
 
-/* ── Header row ──────────────────────────────────────────────────────────── */
+/* ── Header row (day-of-week labels above the grid) ─────────────────────── */
 
 .rbc-header {
-  background-color: #f9f8f5;
-  color: #1a1814;
-  font-weight: 500;
-  font-size: 12px;
-  border-color: #e5e7eb;
-  padding: 6px 8px;
+  background-color: transparent;
+  color: #7a7468;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-color: #ece9e2;
+  padding: 10px 8px;
 }
 
-/* ── Grid lines ──────────────────────────────────────────────────────────── */
+.rbc-header + .rbc-header {
+  border-left-color: #ece9e2;
+}
+
+/* ── Grid lines — lighter, warmer than the library default ──────────────── */
 
 .rbc-time-content,
 .rbc-time-header-content,
 .rbc-day-bg + .rbc-day-bg,
 .rbc-timeslot-group,
 .rbc-time-slot,
-.rbc-time-gutter .rbc-timeslot-group {
-  border-color: #e5e7eb;
+.rbc-time-gutter .rbc-timeslot-group,
+.rbc-month-row + .rbc-month-row,
+.rbc-day-bg,
+.rbc-month-view,
+.rbc-time-view {
+  border-color: #ece9e2;
 }
 
 /* ── Time gutter labels ──────────────────────────────────────────────────── */
 
 .rbc-label {
-  color: #9ca3af;
+  color: #a8a29a;
   font-size: 11px;
+}
+
+.rbc-current-time-indicator {
+  background-color: #0d9488;
+  height: 2px;
 }
 
 /* ── Month view date cells ───────────────────────────────────────────────── */
 
 .rbc-date-cell {
-  color: #1a1814;
-  font-size: 12px;
+  color: #3d3a34;
+  font-size: 13px;
+  padding: 6px 8px 0 0;
+}
+
+.rbc-date-cell.rbc-now {
+  font-weight: 700;
+}
+
+.rbc-date-cell.rbc-now .rbc-button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background-color: #0d9488;
+  color: #fff;
 }
 
 .rbc-off-range .rbc-date-cell,
 .rbc-off-range-bg {
-  background-color: #f9f8f5;
-  color: #9ca3af;
+  background-color: #fbfaf8;
+  color: #cfcabf;
 }
 
 /* ── Agenda view ─────────────────────────────────────────────────────────── */
 
 .rbc-agenda-view table.rbc-agenda-table thead > tr > th,
 .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
-  border-color: #e5e7eb;
+  border-color: #ece9e2;
   color: #1a1814;
+  padding: 10px 12px;
 }
 
 .rbc-agenda-date-cell,
 .rbc-agenda-time-cell {
-  color: #6b7280;
+  color: #7a7468;
   font-size: 12px;
 }
 
 /* ── Popup (overflow events) ─────────────────────────────────────────────── */
 
 .rbc-overlay {
-  border-color: #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #ece9e2;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(26, 24, 20, 0.1);
+  padding: 8px;
 }
 
 .rbc-overlay-header {
-  background-color: #f9f8f5;
+  background-color: transparent;
   color: #1a1814;
   font-size: 12px;
-  border-color: #e5e7eb;
+  font-weight: 600;
+  border-color: #ece9e2;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+/* ── Show-more link ("+2 more") ──────────────────────────────────────────── */
+
+.rbc-show-more {
+  color: #0d9488;
+  font-weight: 600;
+  font-size: 11px;
+  background-color: transparent;
+}
+
+.rbc-show-more:hover {
+  color: #0f766e;
 }

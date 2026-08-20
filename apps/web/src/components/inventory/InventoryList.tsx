@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 import InventorySlideOver, { type InventoryItem } from './InventorySlideOver'
 
 interface Props {
@@ -225,29 +227,29 @@ export default function InventoryList({ pageTitle }: Props) {
 
       {/* Delete confirm */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelete(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-md p-5">
-            <h3 className="text-base font-semibold text-ink mb-1">Delete item?</h3>
-            <p className="text-sm text-ink3 mb-5">
-              Remove <strong>{confirmDelete.name}</strong>? This soft-deletes the record.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-              >
+        <Modal
+          onClose={() => setConfirmDelete(null)}
+          title="Delete item?"
+          maxWidth="xs"
+          footer={
+            <>
+              <Button onClick={() => setConfirmDelete(null)} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void handleDelete(confirmDelete)}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                variant="contained"
+                color="error"
               >
                 Delete
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink3">
+            Remove <strong>{confirmDelete.name}</strong>? This soft-deletes the record.
+          </p>
+        </Modal>
       )}
 
       {/* Toast */}

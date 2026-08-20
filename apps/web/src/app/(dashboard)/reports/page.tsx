@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -782,100 +784,88 @@ export default function ReportsPage() {
 
       {/* Wizard Modal */}
       {showWizard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-border-brand">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-ink">New Report</h2>
-                <button
-                  onClick={closeWizard}
-                  className="text-ink4 hover:text-ink3 text-xl leading-none"
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* Step indicators */}
-              <div className="flex items-center gap-1">
-                {STEP_LABELS.map((_label, i) => {
-                  const step = i + 1
-                  const active = wizardStep === step
-                  const done = wizardStep > step
-                  return (
-                    <div key={step} className="flex items-center gap-1 flex-1">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                          active
-                            ? 'bg-blue-500 text-white'
-                            : done
-                              ? 'bg-green-500 text-white'
-                              : 'bg-bg3 text-ink3'
-                        }`}
-                      >
-                        {done ? '✓' : step}
-                      </div>
-                      {i < STEP_LABELS.length - 1 && (
-                        <div className={`h-0.5 flex-1 ${done ? 'bg-green-400' : 'bg-bg3'}`} />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="mt-1 text-xs text-ink4 text-center">
-                Step {wizardStep} of {STEP_LABELS.length}: {STEP_LABELS[wizardStep - 1]}
-              </div>
-            </div>
-
-            {/* Step Content */}
-            <div className="px-6 py-5 flex-1 overflow-y-auto">
-              {wizardStep === 1 && renderStep1()}
-              {wizardStep === 2 && wizard.object && renderStep2()}
-              {wizardStep === 3 && wizard.object && renderStep3()}
-              {wizardStep === 4 && wizard.object && renderStep4()}
-              {wizardStep === 5 && renderStep5()}
-              {wizardStep === 6 && renderStep6()}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-border-brand flex items-center justify-between">
-              <button
+        <Modal
+          onClose={closeWizard}
+          title="New Report"
+          footer={
+            // Modal's footer slot (DialogActions) defaults to flex-end; this
+            // wizard needs Back pinned to the far left, Cancel/Next grouped
+            // on the right. Rather than add a layout prop to the shared
+            // primitive for this one case, a full-width flex wrapper inside
+            // the slot gets the same result without touching Modal.tsx.
+            <div className="flex items-center justify-between w-full">
+              <Button
                 onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
                 disabled={wizardStep === 1}
-                className="px-4 py-2 text-sm font-medium text-ink3 hover:bg-bg2 rounded-lg transition-colors disabled:opacity-40"
+                variant="text"
+                color="inherit"
               >
                 Back
-              </button>
-
+              </Button>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={closeWizard}
-                  className="px-4 py-2 text-sm font-medium text-ink3 hover:bg-bg2 rounded-lg transition-colors"
-                >
+                <Button onClick={closeWizard} variant="text" color="inherit">
                   Cancel
-                </button>
-
+                </Button>
                 {wizardStep < 6 ? (
-                  <button
+                  <Button
                     onClick={() => setWizardStep((s) => s + 1)}
                     disabled={!canAdvance()}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-40"
+                    variant="contained"
                   >
                     Next
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     onClick={handleSaveReport}
                     disabled={saving || !wizard.name.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-40"
+                    variant="contained"
                   >
                     {saving ? 'Saving…' : 'Save Report'}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
+          }
+        >
+          {/* Step indicators — wizard's own progress UI, unrelated to the
+              Modal primitive; kept exactly as-is inside children. */}
+          <div className="flex items-center gap-1 mb-1">
+            {STEP_LABELS.map((_label, i) => {
+              const step = i + 1
+              const active = wizardStep === step
+              const done = wizardStep > step
+              return (
+                <div key={step} className="flex items-center gap-1 flex-1">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      active
+                        ? 'bg-blue-500 text-white'
+                        : done
+                          ? 'bg-green-500 text-white'
+                          : 'bg-bg3 text-ink3'
+                    }`}
+                  >
+                    {done ? '✓' : step}
+                  </div>
+                  {i < STEP_LABELS.length - 1 && (
+                    <div className={`h-0.5 flex-1 ${done ? 'bg-green-400' : 'bg-bg3'}`} />
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
+          <div className="text-xs text-ink4 text-center mb-4">
+            Step {wizardStep} of {STEP_LABELS.length}: {STEP_LABELS[wizardStep - 1]}
+          </div>
+
+          {/* Step content — untouched wizard internals, same functions as before. */}
+          {wizardStep === 1 && renderStep1()}
+          {wizardStep === 2 && wizard.object && renderStep2()}
+          {wizardStep === 3 && wizard.object && renderStep3()}
+          {wizardStep === 4 && wizard.object && renderStep4()}
+          {wizardStep === 5 && renderStep5()}
+          {wizardStep === 6 && renderStep6()}
+        </Modal>
       )}
     </div>
   )

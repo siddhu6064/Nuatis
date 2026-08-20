@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import { PostHogProvider } from '@/components/PostHogProvider'
+import { ThemeRegistry } from '@/theme/ThemeRegistry'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <PostHogProvider>{children}</PostHogProvider>
+        <ThemeRegistry>
+          <PostHogProvider>{children}</PostHogProvider>
+        </ThemeRegistry>
         <ServiceWorkerRegistration />
       </body>
     </html>

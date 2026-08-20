@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Radio from '@mui/material/Radio'
+import Alert from '@mui/material/Alert'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,6 +29,54 @@ interface CalendarGroup {
 interface Location {
   id: string
   name: string
+}
+
+// ── Icons (inline SVG — matches this app's existing icon convention; no
+// @mui/icons-material dependency in this repo) ──────────────────────────────
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 15l-6-6-6 6" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -231,22 +286,19 @@ export default function CalendarGroupsPage() {
             Group calendars for round-robin or load-balanced booking
           </p>
         </div>
-        <button
-          onClick={handleNewGroup}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+        <Button
+          onClick={() => void handleNewGroup()}
+          variant="contained"
+          sx={{ textTransform: 'none' }}
         >
           + New Group
-        </button>
+        </Button>
       </div>
 
       {message && (
-        <div
-          className={`mb-4 px-4 py-2 rounded-lg text-sm ${
-            message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-          }`}
-        >
+        <Alert severity={message.type === 'success' ? 'success' : 'error'} sx={{ mb: 2 }}>
           {message.text}
-        </div>
+        </Alert>
       )}
 
       {loading ? (
@@ -277,16 +329,17 @@ export default function CalendarGroupsPage() {
                     {g.assignment_mode === 'round_robin' ? 'Round robin' : 'Load balanced'}
                   </p>
                 </div>
-                <button
+                <IconButton
+                  size="small"
                   onClick={(e) => {
                     e.stopPropagation()
                     void handleDeleteGroup(g.id)
                   }}
-                  className="ml-2 text-ink4 hover:text-red-500 transition-colors shrink-0 text-base leading-none"
                   title="Delete group"
+                  sx={{ color: 'text.disabled', '&:hover': { color: '#ef4444' } }}
                 >
-                  ×
-                </button>
+                  <CloseIcon />
+                </IconButton>
               </div>
             ))}
           </div>
@@ -295,48 +348,40 @@ export default function CalendarGroupsPage() {
           {selectedGroup ? (
             <div className="flex-1 bg-white rounded-xl border border-border-brand p-6 space-y-5">
               {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1.5">Group Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
+              <TextField
+                label="Group Name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                size="small"
+                fullWidth
+              />
 
               {/* Description */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1.5">
-                  Description (optional)
-                </label>
-                <input
-                  type="text"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="e.g. Sales team east coast"
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-                />
-              </div>
+              <TextField
+                label="Description (optional)"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="e.g. Sales team east coast"
+                size="small"
+                fullWidth
+              />
 
               {/* Assignment mode */}
               <div>
                 <label className="block text-xs font-medium text-ink2 mb-2">Assignment Mode</label>
                 <div className="space-y-2">
                   <label
-                    className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    className={`flex items-start gap-1 px-2 py-1.5 rounded-lg border cursor-pointer transition-colors ${
                       editMode === 'round_robin'
                         ? 'border-teal-500 bg-teal-50'
                         : 'border-border-brand hover:bg-bg'
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="assignment_mode"
-                      value="round_robin"
+                    <Radio
+                      size="small"
                       checked={editMode === 'round_robin'}
                       onChange={() => setEditMode('round_robin')}
-                      className="mt-0.5 text-teal-600 focus:ring-teal-500"
+                      sx={{ mt: 0.25 }}
                     />
                     <div>
                       <p className="text-sm font-medium text-ink">Round Robin</p>
@@ -346,19 +391,17 @@ export default function CalendarGroupsPage() {
                     </div>
                   </label>
                   <label
-                    className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    className={`flex items-start gap-1 px-2 py-1.5 rounded-lg border cursor-pointer transition-colors ${
                       editMode === 'load_balanced'
                         ? 'border-teal-500 bg-teal-50'
                         : 'border-border-brand hover:bg-bg'
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="assignment_mode"
-                      value="load_balanced"
+                    <Radio
+                      size="small"
                       checked={editMode === 'load_balanced'}
                       onChange={() => setEditMode('load_balanced')}
-                      className="mt-0.5 text-teal-600 focus:ring-teal-500"
+                      sx={{ mt: 0.25 }}
                     />
                     <div>
                       <p className="text-sm font-medium text-ink">Load Balanced</p>
@@ -399,31 +442,32 @@ export default function CalendarGroupsPage() {
                       <span className="flex-1 text-sm text-ink truncate">{m.location_name}</span>
 
                       {/* Up / Down */}
-                      <button
+                      <IconButton
+                        size="small"
                         onClick={() => moveUp(i)}
                         disabled={i === 0}
-                        className="text-ink4 hover:text-ink2 disabled:opacity-30 text-xs px-1"
                         title="Move up"
                       >
-                        ▲
-                      </button>
-                      <button
+                        <ChevronUpIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
                         onClick={() => moveDown(i)}
                         disabled={i === editMembers.length - 1}
-                        className="text-ink4 hover:text-ink2 disabled:opacity-30 text-xs px-1"
                         title="Move down"
                       >
-                        ▼
-                      </button>
+                        <ChevronDownIcon />
+                      </IconButton>
 
                       {/* Remove */}
-                      <button
+                      <IconButton
+                        size="small"
                         onClick={() => void handleRemoveMember(m.location_id)}
-                        className="text-ink4 hover:text-red-500 transition-colors text-base leading-none ml-1"
                         title="Remove"
+                        sx={{ color: 'text.disabled', '&:hover': { color: '#ef4444' } }}
                       >
-                        ×
-                      </button>
+                        <CloseIcon />
+                      </IconButton>
                     </div>
                   ))}
                 </div>
@@ -431,38 +475,42 @@ export default function CalendarGroupsPage() {
                 {/* Add calendar */}
                 {availableLocations.length > 0 && (
                   <div className="flex gap-2">
-                    <select
+                    <Select
                       value={addLocationId}
                       onChange={(e) => setAddLocationId(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-ink2"
+                      size="small"
+                      displayEmpty
+                      fullWidth
                     >
-                      <option value="">Add a calendar…</option>
+                      <MenuItem value="">Add a calendar…</MenuItem>
                       {availableLocations.map((l) => (
-                        <option key={l.id} value={l.id}>
+                        <MenuItem key={l.id} value={l.id}>
                           {l.name}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
-                    <button
+                    </Select>
+                    <Button
                       onClick={() => void handleAddMember()}
                       disabled={!addLocationId || addingMember}
-                      className="px-3 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      variant="contained"
+                      sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
                     >
                       {addingMember ? '…' : 'Add'}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
 
               {/* Save */}
               <div className="flex items-center gap-3 pt-2 border-t border-border-brand">
-                <button
+                <Button
                   onClick={() => void handleSave()}
                   disabled={saving}
-                  className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  variant="contained"
+                  sx={{ textTransform: 'none' }}
                 >
                   {saving ? 'Saving…' : 'Save Changes'}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (

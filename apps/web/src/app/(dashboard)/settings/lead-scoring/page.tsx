@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import Switch from '@mui/material/Switch'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,85 +110,77 @@ function AddRuleModal({ onClose, onSave, authHeaders }: AddRuleModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-base font-semibold text-ink mb-5">Add Custom Rule</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-ink2 mb-1">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as Category)}
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-          </div>
+    <Modal onClose={onClose} title="Add Custom Rule" maxWidth="xs">
+      {/*
+        No `footer` prop here — the original design has no border-t divider
+        before the buttons, just inline pt-2 spacing inside the form. Using
+        `footer` would put the submit button outside this <form> in the DOM
+        (DialogActions is a sibling of DialogContent, not nested inside it),
+        breaking native submit-on-Enter. Keeping both fields and buttons as
+        form children avoids that entirely.
+      */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <TextField
+          select
+          label="Category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as Category)}
+          fullWidth
+          size="small"
+        >
+          {CATEGORIES.map((c) => (
+            <MenuItem key={c} value={c}>
+              {CATEGORY_LABELS[c]}
+            </MenuItem>
+          ))}
+        </TextField>
 
-          <div>
-            <label className="block text-sm font-medium text-ink2 mb-1">Label</label>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Attended Webinar"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-            {ruleKey && (
-              <p className="text-xs text-ink4 mt-1">
-                Key: <span className="font-mono">{ruleKey}</span>
-              </p>
-            )}
-          </div>
+        <div>
+          <TextField
+            label="Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. Attended Webinar"
+            fullWidth
+            size="small"
+          />
+          {ruleKey && (
+            <p className="text-xs text-ink4 mt-1">
+              Key: <span className="font-mono">{ruleKey}</span>
+            </p>
+          )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-ink2 mb-1">Points</label>
-            <input
-              type="number"
-              value={points}
-              onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
-              className="w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
+        <TextField
+          label="Points"
+          type="number"
+          value={points}
+          onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
+          size="small"
+          sx={{ width: 128 }}
+        />
 
-          <div>
-            <label className="block text-sm font-medium text-ink2 mb-1">
-              Description <span className="text-ink4 font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="When does this rule apply?"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
+        <TextField
+          label="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="When does this rule apply?"
+          fullWidth
+          size="small"
+        />
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-ink3 border border-border-brand rounded-lg hover:bg-bg"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
-            >
-              {saving ? 'Adding...' : 'Add Rule'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" onClick={onClose} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button type="submit" variant="contained" disabled={saving}>
+            {saving ? 'Adding...' : 'Add Rule'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -250,20 +247,13 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
   return (
     <div className="flex items-start gap-4 py-3 border-b border-gray-50 last:border-0">
       {/* Active toggle */}
-      <button
-        role="switch"
-        aria-checked={rule.active}
-        onClick={() => void handleToggle()}
-        className={`mt-0.5 relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 ${
-          rule.active ? 'bg-teal-600' : 'bg-bg3'
-        }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-            rule.active ? 'translate-x-4' : 'translate-x-0'
-          }`}
-        />
-      </button>
+      <Switch
+        size="small"
+        checked={rule.active}
+        onChange={() => void handleToggle()}
+        slotProps={{ input: { 'aria-label': rule.label } }}
+        sx={{ mt: 0.25 }}
+      />
 
       {/* Label + description */}
       <div className="flex-1 min-w-0">

@@ -2,6 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatDate } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Switch from '@mui/material/Switch'
+import Chip from '@mui/material/Chip'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import Alert from '@mui/material/Alert'
+import { Modal } from '@/components/ui/Modal'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +69,56 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 ]
 
 const PLACEHOLDER_TYPES: FieldType[] = ['text', 'email', 'phone', 'number']
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVG — matches this app's existing icon convention; no
+// @mui/icons-material dependency in this repo)
+// ---------------------------------------------------------------------------
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 15l-6-6-6 6" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,58 +196,65 @@ function FieldCard({
     <div className="bg-bg rounded-lg border border-border-brand p-4 space-y-3">
       {/* Header row */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium bg-teal-50 text-teal-700 px-2 py-0.5 rounded shrink-0">
-          {typeLabel}
-        </span>
-        <input
-          type="text"
+        <Chip
+          label={typeLabel}
+          size="small"
+          sx={{
+            bgcolor: '#f0fdfa',
+            color: '#0f766e',
+            fontWeight: 600,
+            fontSize: '10px',
+            height: 20,
+            flexShrink: 0,
+          }}
+        />
+        <TextField
           value={field.label}
           onChange={(e) => onChange({ ...field, label: e.target.value })}
           placeholder="Field label"
-          className="flex-1 px-2 py-1 text-sm border border-border-brand rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+          size="small"
+          fullWidth
         />
-        <label className="flex items-center gap-1 text-xs text-ink3 shrink-0 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={field.required}
-            onChange={(e) => onChange({ ...field, required: e.target.checked })}
-            className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
-          />
-          Required
-        </label>
-        <button
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={field.required}
+              onChange={(e) => onChange({ ...field, required: e.target.checked })}
+            />
+          }
+          label="Required"
+          sx={{ mr: 0, flexShrink: 0, '& .MuiFormControlLabel-label': { fontSize: '12px' } }}
+        />
+        <IconButton
+          size="small"
           onClick={() => onMove('up')}
           disabled={index === 0}
           title="Move up"
-          className="text-ink4 hover:text-ink2 disabled:opacity-30 text-xs p-0.5"
         >
-          ▲
-        </button>
-        <button
+          <ChevronUpIcon />
+        </IconButton>
+        <IconButton
+          size="small"
           onClick={() => onMove('down')}
           disabled={index === total - 1}
           title="Move down"
-          className="text-ink4 hover:text-ink2 disabled:opacity-30 text-xs p-0.5"
         >
-          ▼
-        </button>
-        <button
-          onClick={onDelete}
-          title="Delete field"
-          className="text-red-400 hover:text-red-600 text-xs px-1"
-        >
-          ✕
-        </button>
+          <ChevronDownIcon />
+        </IconButton>
+        <IconButton size="small" onClick={onDelete} title="Delete field" sx={{ color: '#f87171' }}>
+          <CloseIcon />
+        </IconButton>
       </div>
 
       {/* Placeholder */}
       {showPlaceholder && (
-        <input
-          type="text"
+        <TextField
           value={field.placeholder ?? ''}
           onChange={(e) => onChange({ ...field, placeholder: e.target.value })}
           placeholder="Placeholder text (optional)"
-          className="w-full px-2 py-1 text-xs border border-border-brand rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+          size="small"
+          fullWidth
         />
       )}
 
@@ -196,27 +264,21 @@ function FieldCard({
           <p className="text-[10px] font-medium text-ink3 uppercase tracking-wide">Options</p>
           {(field.options ?? []).map((opt, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <input
-                type="text"
+              <TextField
                 value={opt}
                 onChange={(e) => updateOption(i, e.target.value)}
                 placeholder={`Option ${i + 1}`}
-                className="flex-1 px-2 py-1 text-xs border border-border-brand rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                size="small"
+                fullWidth
               />
-              <button
-                onClick={() => removeOption(i)}
-                className="text-red-400 hover:text-red-600 text-xs"
-              >
-                ✕
-              </button>
+              <IconButton size="small" onClick={() => removeOption(i)} sx={{ color: '#f87171' }}>
+                <CloseIcon />
+              </IconButton>
             </div>
           ))}
-          <button
-            onClick={addOption}
-            className="text-xs text-teal-600 hover:text-teal-700 font-medium"
-          >
+          <Button onClick={addOption} size="small" sx={{ textTransform: 'none' }}>
             + Add Option
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -245,7 +307,7 @@ function FormBuilderModal({
     editingForm?.linkedServiceIds ?? []
   )
   const [isActive, setIsActive] = useState(editingForm?.isActive ?? true)
-  const [showFieldTypeMenu, setShowFieldTypeMenu] = useState(false)
+  const [fieldMenuAnchor, setFieldMenuAnchor] = useState<HTMLElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -259,7 +321,7 @@ function FormBuilderModal({
       options: type === 'select' ? [] : undefined,
     }
     setFields((prev) => [...prev, newField])
-    setShowFieldTypeMenu(false)
+    setFieldMenuAnchor(null)
   }
 
   function updateField(index: number, updated: FormField) {
@@ -330,160 +392,134 @@ function FormBuilderModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto pt-16 pb-16">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-brand">
-          <h2 className="text-sm font-semibold text-ink">
-            {editingForm ? 'Edit Form' : 'Create Intake Form'}
-          </h2>
-          <button onClick={onClose} className="text-ink4 hover:text-ink3 text-lg leading-none">
-            ✕
-          </button>
-        </div>
+    <Modal
+      onClose={onClose}
+      title={editingForm ? 'Edit Form' : 'Create Intake Form'}
+      maxWidth="md"
+      footer={
+        <>
+          <Button onClick={onClose} variant="text" color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={() => void save()} disabled={saving} variant="contained">
+            {saving ? 'Saving...' : editingForm ? 'Update Form' : 'Create Form'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        {/* Name */}
+        <TextField
+          label="Form Name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. New Patient Intake"
+          fullWidth
+          size="small"
+          autoFocus
+        />
 
-        <div className="px-6 py-5 space-y-5">
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Form Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. New Patient Intake"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-              autoFocus
-            />
+        {/* Description */}
+        <TextField
+          label="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Describe when this form is used..."
+          fullWidth
+          multiline
+          rows={2}
+          size="small"
+        />
+
+        {/* Active toggle (edit only) */}
+        {editingForm && (
+          <FormControlLabel
+            control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />}
+            label={isActive ? 'Active' : 'Inactive'}
+            sx={{ ml: 0 }}
+          />
+        )}
+
+        {/* Fields */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-ink2">Fields ({fields.length})</label>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(e) => setFieldMenuAnchor(e.currentTarget)}
+              sx={{ textTransform: 'none' }}
+            >
+              + Add Field
+            </Button>
+            <Menu
+              anchorEl={fieldMenuAnchor}
+              open={Boolean(fieldMenuAnchor)}
+              onClose={() => setFieldMenuAnchor(null)}
+            >
+              {FIELD_TYPES.map((ft) => (
+                <MenuItem key={ft.value} onClick={() => addField(ft.value)}>
+                  {ft.label}
+                </MenuItem>
+              ))}
+            </Menu>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Description (optional)
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Describe when this form is used..."
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-            />
-          </div>
-
-          {/* Active toggle (edit only) */}
-          {editingForm && (
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-medium text-ink2">Status</label>
-              <button
-                onClick={() => setIsActive((v) => !v)}
-                className={`relative w-9 h-5 rounded-full transition-colors ${isActive ? 'bg-teal-600' : 'bg-gray-300'}`}
-              >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isActive ? 'translate-x-4' : 'translate-x-0.5'}`}
+          {fields.length === 0 ? (
+            <div className="border-2 border-dashed border-border-brand rounded-lg py-6 text-center">
+              <p className="text-xs text-ink4">
+                No fields yet — click &ldquo;+ Add Field&rdquo; to start
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {fields.map((field, i) => (
+                <FieldCard
+                  key={field.id}
+                  field={field}
+                  index={i}
+                  total={fields.length}
+                  onChange={(updated) => updateField(i, updated)}
+                  onDelete={() => deleteField(i)}
+                  onMove={(dir) => moveField(i, dir)}
                 />
-              </button>
-              <span className="text-xs text-ink3">{isActive ? 'Active' : 'Inactive'}</span>
+              ))}
             </div>
           )}
+        </div>
 
-          {/* Fields */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-ink2">Fields ({fields.length})</label>
-              <div className="relative">
-                <button
-                  onClick={() => setShowFieldTypeMenu((v) => !v)}
-                  className="text-xs text-teal-600 hover:text-teal-700 font-medium border border-teal-200 rounded px-2 py-1"
-                >
-                  + Add Field
-                </button>
-                {showFieldTypeMenu && (
-                  <div className="absolute right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-10 w-48 py-1">
-                    {FIELD_TYPES.map((ft) => (
-                      <button
-                        key={ft.value}
-                        onClick={() => addField(ft.value)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-ink2 hover:bg-bg"
-                      >
-                        {ft.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {fields.length === 0 ? (
-              <div className="border-2 border-dashed border-border-brand rounded-lg py-6 text-center">
-                <p className="text-xs text-ink4">
-                  No fields yet — click &ldquo;+ Add Field&rdquo; to start
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {fields.map((field, i) => (
-                  <FieldCard
-                    key={field.id}
-                    field={field}
-                    index={i}
-                    total={fields.length}
-                    onChange={(updated) => updateField(i, updated)}
-                    onDelete={() => deleteField(i)}
-                    onMove={(dir) => moveField(i, dir)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Link to services */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-2">
-              Link to Services ({linkedServiceIds.length} selected)
-            </label>
-            {services.length === 0 ? (
-              <p className="text-xs text-ink4">No services found</p>
-            ) : (
-              <div className="border border-border-brand rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-50">
-                {services.map((svc) => (
-                  <label
-                    key={svc.id}
-                    className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-bg"
-                  >
-                    <input
-                      type="checkbox"
+        {/* Link to services */}
+        <div>
+          <label className="block text-xs font-medium text-ink2 mb-2">
+            Link to Services ({linkedServiceIds.length} selected)
+          </label>
+          {services.length === 0 ? (
+            <p className="text-xs text-ink4">No services found</p>
+          ) : (
+            <div className="border border-border-brand rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-50">
+              {services.map((svc) => (
+                <FormControlLabel
+                  key={svc.id}
+                  className="w-full"
+                  sx={{ mx: 0, px: 1.5, py: 0.5, width: '100%' }}
+                  control={
+                    <Checkbox
+                      size="small"
                       checked={linkedServiceIds.includes(svc.id)}
                       onChange={() => toggleService(svc.id)}
-                      className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
                     />
-                    <span className="text-ink2 text-xs">{svc.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+                  }
+                  label={<span className="text-ink2 text-xs">{svc.name}</span>}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-brand">
-          <button
-            onClick={onClose}
-            className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="text-xs text-white bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg font-medium disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : editingForm ? 'Update Form' : 'Create Form'}
-          </button>
-        </div>
+        {error && <Alert severity="error">{error}</Alert>}
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -521,16 +557,18 @@ function SubmissionsPanel({ form, onClose }: { form: IntakeForm; onClose: () => 
         </div>
         <div className="flex items-center gap-2">
           {submissions.length > 0 && (
-            <button
+            <Button
               onClick={() => exportCsv(form, submissions)}
-              className="text-xs text-ink3 hover:text-ink2 border border-border-brand rounded px-2.5 py-1.5 font-medium"
+              size="small"
+              variant="outlined"
+              sx={{ textTransform: 'none' }}
             >
               Export CSV
-            </button>
+            </Button>
           )}
-          <button onClick={onClose} className="text-xs text-ink4 hover:text-ink3 px-2 py-1">
-            ✕ Close
-          </button>
+          <Button onClick={onClose} size="small" color="inherit" sx={{ textTransform: 'none' }}>
+            Close
+          </Button>
         </div>
       </div>
 
@@ -686,12 +724,9 @@ export default function IntakeFormsPage() {
             Build custom forms to collect client information before appointments
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
+        <Button onClick={openCreate} variant="contained" sx={{ textTransform: 'none' }}>
           + Create Form
-        </button>
+        </Button>
       </div>
 
       {/* Toast */}
@@ -710,12 +745,9 @@ export default function IntakeFormsPage() {
           <p className="text-xs text-gray-300 mt-1">
             Create your first form to start collecting client information
           </p>
-          <button
-            onClick={openCreate}
-            className="mt-4 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          <Button onClick={openCreate} variant="contained" sx={{ textTransform: 'none', mt: 2 }}>
             + Create Form
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -734,13 +766,17 @@ export default function IntakeFormsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-semibold text-ink">{form.name}</h3>
-                      <span
-                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                          form.isActive ? 'bg-green-50 text-green-700' : 'bg-bg2 text-ink3'
-                        }`}
-                      >
-                        {form.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      <Chip
+                        label={form.isActive ? 'Active' : 'Inactive'}
+                        size="small"
+                        sx={{
+                          height: 18,
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          bgcolor: form.isActive ? '#f0fdf4' : '#f2f0eb',
+                          color: form.isActive ? '#15803d' : '#7a7468',
+                        }}
+                      />
                     </div>
                     {form.description && (
                       <p className="text-xs text-ink4 mt-0.5 line-clamp-1">{form.description}</p>
@@ -765,32 +801,35 @@ export default function IntakeFormsPage() {
 
                   {/* Right: actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
+                    <Button
                       onClick={() =>
                         setViewingSubmissionsFor(
                           viewingSubmissionsFor?.id === form.id ? null : form
                         )
                       }
-                      className={`text-xs px-2.5 py-1.5 rounded font-medium border transition-colors ${
-                        viewingSubmissionsFor?.id === form.id
-                          ? 'bg-teal-50 text-teal-700 border-teal-200'
-                          : 'text-ink3 border-border-brand hover:border-border-brand hover:text-ink2'
-                      }`}
+                      size="small"
+                      variant={viewingSubmissionsFor?.id === form.id ? 'outlined' : 'text'}
+                      color={viewingSubmissionsFor?.id === form.id ? 'primary' : 'inherit'}
+                      sx={{ textTransform: 'none' }}
                     >
                       {viewingSubmissionsFor?.id === form.id ? 'Hide' : 'Submissions'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => openEdit(form)}
-                      className="text-xs text-ink3 hover:text-ink2 px-2 py-1"
+                      size="small"
+                      color="inherit"
+                      sx={{ textTransform: 'none' }}
                     >
                       Edit
-                    </button>
-                    <button
-                      onClick={() => deleteForm(form)}
-                      className="text-xs text-red-400 hover:text-red-600 px-2 py-1"
+                    </Button>
+                    <Button
+                      onClick={() => void deleteForm(form)}
+                      size="small"
+                      color="error"
+                      sx={{ textTransform: 'none' }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -815,7 +854,7 @@ export default function IntakeFormsPage() {
             setShowBuilder(false)
             setEditingForm(null)
           }}
-          onSaved={handleSaved}
+          onSaved={() => void handleSaved()}
         />
       )}
     </div>

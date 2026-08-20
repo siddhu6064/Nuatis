@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 const REPORT_LABELS: Record<string, string> = {
   velocity: 'Sales Velocity',
@@ -255,141 +262,122 @@ export default function ScheduledReportsPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-border-brand flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink">Schedule a Report</h2>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-ink4 hover:text-ink transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              {/* Report type */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1.5">Report</label>
-                <select
-                  value={form.report_type}
-                  onChange={(e) => setForm((f) => ({ ...f, report_type: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                >
-                  {Object.entries(REPORT_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Frequency */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1.5">Frequency</label>
-                <div className="flex gap-3">
-                  {(['weekly', 'monthly'] as const).map((f) => (
-                    <label
-                      key={f}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm flex-1 transition-colors ${
-                        form.frequency === f
-                          ? 'border-teal-500 bg-teal-50 text-teal-700'
-                          : 'border-border-brand text-ink3 hover:bg-bg'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="frequency"
-                        value={f}
-                        checked={form.frequency === f}
-                        onChange={() => setForm((s) => ({ ...s, frequency: f }))}
-                        className="text-teal-600 focus:ring-teal-500"
-                      />
-                      <span className="capitalize">{f}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Day selector */}
-              {form.frequency === 'weekly' ? (
-                <div>
-                  <label className="block text-xs font-medium text-ink2 mb-1.5">Day of Week</label>
-                  <select
-                    value={form.day_of_week}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, day_of_week: parseInt(e.target.value, 10) }))
-                    }
-                    className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                  >
-                    {DOW_LABELS.map((d, i) => (
-                      <option key={i} value={i}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-ink2 mb-1.5">Day of Month</label>
-                  <select
-                    value={form.day_of_month}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, day_of_month: parseInt(e.target.value, 10) }))
-                    }
-                    className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                  >
-                    {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Recipients */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1.5">Recipients</label>
-                <input
-                  type="text"
-                  value={form.recipients}
-                  onChange={(e) => setForm((s) => ({ ...s, recipients: e.target.value }))}
-                  placeholder="alice@example.com, bob@example.com"
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder:text-gray-300"
-                />
-                <p className="text-[11px] text-ink4 mt-1">Comma-separated email addresses</p>
-              </div>
-
-              {formError && (
-                <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-border-brand flex justify-end gap-2">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 text-sm text-ink3 border border-border-brand rounded-lg hover:bg-bg transition-colors"
-              >
+        <Modal
+          onClose={() => setModalOpen(false)}
+          title="Schedule a Report"
+          footer={
+            <>
+              <Button onClick={() => setModalOpen(false)} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={() => void saveReport()}
-                disabled={saving}
-                className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white rounded-lg disabled:opacity-50 transition-colors"
-              >
+              </Button>
+              <Button onClick={() => void saveReport()} disabled={saving} variant="contained">
                 {saving ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <TextField
+              select
+              label="Report"
+              value={form.report_type}
+              onChange={(e) => setForm((f) => ({ ...f, report_type: e.target.value }))}
+              fullWidth
+              size="small"
+            >
+              {Object.entries(REPORT_LABELS).map(([v, l]) => (
+                <MenuItem key={v} value={v}>
+                  {l}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-1.5">Frequency</label>
+              <RadioGroup
+                row
+                value={form.frequency}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, frequency: e.target.value as 'weekly' | 'monthly' }))
+                }
+                sx={{ gap: 1.5, flexWrap: 'nowrap' }}
+              >
+                {(['weekly', 'monthly'] as const).map((f) => (
+                  <FormControlLabel
+                    key={f}
+                    value={f}
+                    control={<Radio size="small" />}
+                    label={<span className="capitalize text-sm">{f}</span>}
+                    sx={{
+                      flex: 1,
+                      m: 0,
+                      px: 1,
+                      borderRadius: '8px',
+                      border: '1px solid',
+                      borderColor: form.frequency === f ? 'primary.main' : 'divider',
+                      // #f0fdfa matches Tailwind's bg-teal-50, the original's exact
+                      // selected-state color — theme.palette only defines
+                      // main/light/dark, not numbered shades like primary.50.
+                      bgcolor: form.frequency === f ? '#f0fdfa' : 'transparent',
+                    }}
+                  />
+                ))}
+              </RadioGroup>
             </div>
+
+            {form.frequency === 'weekly' ? (
+              <TextField
+                select
+                label="Day of Week"
+                value={form.day_of_week}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, day_of_week: parseInt(e.target.value, 10) }))
+                }
+                fullWidth
+                size="small"
+              >
+                {DOW_LABELS.map((d, i) => (
+                  <MenuItem key={i} value={i}>
+                    {d}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : (
+              <TextField
+                select
+                label="Day of Month"
+                value={form.day_of_month}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, day_of_month: parseInt(e.target.value, 10) }))
+                }
+                fullWidth
+                size="small"
+              >
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {d}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            <div>
+              <TextField
+                label="Recipients"
+                value={form.recipients}
+                onChange={(e) => setForm((s) => ({ ...s, recipients: e.target.value }))}
+                placeholder="alice@example.com, bob@example.com"
+                fullWidth
+                size="small"
+              />
+              <p className="text-[11px] text-ink4 mt-1">Comma-separated email addresses</p>
+            </div>
+
+            {formError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

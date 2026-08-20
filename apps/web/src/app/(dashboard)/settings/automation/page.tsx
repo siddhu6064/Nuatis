@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Switch from '@mui/material/Switch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,36 +38,6 @@ const SAMPLE_DATA: Record<string, string> = {
   '{{last_name}}': 'Smith',
   '{{business_name}}': 'Your Business',
   '{{review_url}}': 'https://g.page/...',
-}
-
-// ─── Toggle ───────────────────────────────────────────────────────────────────
-
-function Toggle({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean
-  onChange: (val: boolean) => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'bg-teal-600' : 'bg-bg3'
-      }`}
-    >
-      <span
-        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -182,9 +153,10 @@ export default function ReviewAutomationPage() {
               Automatically send review requests when a job is marked complete.
             </p>
           </div>
-          <Toggle
+          <Switch
             checked={settings.enabled}
-            onChange={(val) => setSettings((prev) => ({ ...prev, enabled: val }))}
+            onChange={(e) => setSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
+            slotProps={{ input: { 'aria-label': 'Enable Google Review Automation' } }}
           />
         </div>
       </div>

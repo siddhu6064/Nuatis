@@ -1,8 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import TextField from '@mui/material/TextField'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import { getFirstName } from '@nuatis/shared'
 import type { FilterState } from './ContactFilters'
+import { Modal } from '@/components/ui/Modal'
 
 interface Contact {
   id: string
@@ -27,7 +34,8 @@ interface Props {
   onComplete: () => void
 }
 
-type Modal = null | 'stage' | 'tag' | 'sms' | 'assign' | 'archive'
+// Named ModalKind, not Modal, to avoid shadowing the imported Modal primitive.
+type ModalKind = null | 'stage' | 'tag' | 'sms' | 'assign' | 'archive'
 
 export default function BulkActionBar({
   selectedIds,
@@ -37,7 +45,7 @@ export default function BulkActionBar({
   onClear,
   onComplete,
 }: Props) {
-  const [modal, setModal] = useState<Modal>(null)
+  const [modal, setModal] = useState<ModalKind>(null)
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -211,6 +219,14 @@ export default function BulkActionBar({
   const firstContact = selectedContacts[0]
   const firstName = getFirstName(firstContact?.full_name, 'John')
 
+  const modalTitle: Record<Exclude<ModalKind, null>, string> = {
+    stage: 'Move to Stage',
+    tag: 'Edit Tags',
+    assign: 'Assign Contacts',
+    sms: 'Send Bulk SMS',
+    archive: 'Archive Contacts',
+  }
+
   return (
     <>
       {/* Toast */}
@@ -224,256 +240,263 @@ export default function BulkActionBar({
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-border-brand rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
         <span className="text-sm font-medium text-ink2">{count} selected</span>
         <div className="w-px h-5 bg-bg3" />
-        <button
+        <Button
           onClick={() => setModal('stage')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Move Stage
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('tag')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Tag
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('assign')}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Assign
-        </button>
+        </Button>
         <span title={optOutCount > 0 ? 'Some contacts have opted out' : undefined}>
-          <button
+          <Button
             onClick={() => setModal('sms')}
             disabled={optOutCount > 0}
-            className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-40 disabled:cursor-not-allowed"
+            size="small"
+            color="inherit"
+            sx={{ bgcolor: 'action.hover' }}
           >
             Send SMS
-          </button>
+          </Button>
         </span>
-        <button
+        <Button
           onClick={() => void handleExport()}
           disabled={loading}
-          className="px-3 py-1.5 text-xs font-medium text-ink2 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-50"
+          size="small"
+          color="inherit"
+          sx={{ bgcolor: 'action.hover' }}
         >
           Export
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setModal('archive')}
-          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+          size="small"
+          color="error"
+          sx={{ bgcolor: '#fef2f2' }}
         >
           Archive
-        </button>
-        <button onClick={onClear} className="text-ink4 hover:text-ink3 text-sm ml-1">
-          &times;
-        </button>
+        </Button>
+        <IconButton onClick={onClear} size="small" aria-label="Clear selection" sx={{ ml: 0.5 }}>
+          <span className="text-ink4 text-sm">&times;</span>
+        </IconButton>
       </div>
 
       {/* Modals */}
       {modal && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setModal(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-md p-5">
-            {modal === 'stage' && (
-              <>
-                <h3 className="text-sm font-bold text-ink mb-3">Move to Stage</h3>
-                <div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
-                  {stages.map((s) => (
-                    <label
-                      key={s.id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-bg cursor-pointer text-sm"
-                    >
-                      <input
-                        type="radio"
-                        name="stage"
-                        value={s.id}
-                        checked={selectedStage === s.id}
-                        onChange={() => setSelectedStage(s.id)}
-                        className="text-teal-600"
-                      />
-                      <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: s.color }}
-                      />
-                      {s.name}
-                    </label>
-                  ))}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setModal(null)} className="px-3 py-1.5 text-xs text-ink3">
+        <Modal
+          onClose={() => setModal(null)}
+          title={modalTitle[modal]}
+          maxWidth="xs"
+          footer={
+            <>
+              {modal === 'stage' && (
+                <>
+                  <Button onClick={() => setModal(null)} variant="text" color="inherit">
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void handleStage()}
                     disabled={!selectedStage || loading}
-                    className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+                    variant="contained"
                   >
-                    {loading ? 'Moving...' : `Move ${count} contacts`}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modal === 'tag' && (
-              <>
-                <h3 className="text-sm font-bold text-ink mb-3">Edit Tags</h3>
-                <div className="space-y-3 mb-4">
-                  <div>
-                    <label className="text-xs text-ink3 mb-1 block">
-                      Add tags (comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={tagsToAdd}
-                      onChange={(e) => setTagsToAdd(e.target.value)}
-                      placeholder="vip, follow-up"
-                      className="w-full text-sm border border-border-brand rounded px-3 py-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-ink3 mb-1 block">
-                      Remove tags (comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={tagsToRemove}
-                      onChange={(e) => setTagsToRemove(e.target.value)}
-                      placeholder="old-lead"
-                      className="w-full text-sm border border-border-brand rounded px-3 py-1.5"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setModal(null)} className="px-3 py-1.5 text-xs text-ink3">
+                    {loading ? 'Moving…' : `Move ${count} contacts`}
+                  </Button>
+                </>
+              )}
+              {modal === 'tag' && (
+                <>
+                  <Button onClick={() => setModal(null)} variant="text" color="inherit">
                     Cancel
-                  </button>
-                  <button
-                    onClick={() => void handleTag()}
-                    disabled={loading}
-                    className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
-                  >
-                    {loading ? 'Updating...' : 'Update tags'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modal === 'assign' && (
-              <>
-                <h3 className="text-sm font-bold text-ink mb-3">Assign Contacts</h3>
-                <div className="mb-4">
-                  <label className="text-xs text-ink3 mb-1 block">Assignee user ID</label>
-                  <input
-                    type="text"
-                    value={assignTo}
-                    onChange={(e) => setAssignTo(e.target.value)}
-                    autoFocus
-                    placeholder="User ID..."
-                    className="w-full text-sm border border-border-brand rounded px-3 py-1.5"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void handleAssign()
-                    }}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
+                  </Button>
+                  <Button onClick={() => void handleTag()} disabled={loading} variant="contained">
+                    {loading ? 'Updating…' : 'Update tags'}
+                  </Button>
+                </>
+              )}
+              {modal === 'assign' && (
+                <>
+                  <Button
                     onClick={() => {
                       setModal(null)
                       setAssignTo('')
                     }}
-                    className="px-3 py-1.5 text-xs text-ink3"
+                    variant="text"
+                    color="inherit"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void handleAssign()}
                     disabled={!assignTo.trim() || loading}
-                    className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+                    variant="contained"
                   >
-                    {loading ? 'Assigning...' : `Assign ${count} contacts`}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modal === 'sms' && (
-              <>
-                <h3 className="text-sm font-bold text-ink mb-3">Send Bulk SMS</h3>
-                <textarea
-                  value={smsMessage}
-                  onChange={(e) => setSmsMessage(e.target.value.slice(0, 160))}
-                  maxLength={160}
-                  rows={4}
-                  placeholder="Type your message..."
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 mb-1"
-                />
-                <div className="flex items-center justify-between mb-3">
-                  <button
-                    onClick={() =>
-                      setSmsMessage((m) =>
-                        m.includes('{{first_name}}') ? m : m + '{{first_name}}'
-                      )
-                    }
-                    className="text-[10px] text-teal-600 font-mono bg-teal-50 px-1.5 py-0.5 rounded"
-                  >
-                    {'{{first_name}}'}
-                  </button>
-                  <span
-                    className={`text-[10px] ${smsMessage.length >= 150 ? 'text-amber-600' : 'text-ink4'}`}
-                  >
-                    {smsMessage.length}/160
-                  </span>
-                </div>
-                {smsMessage.includes('{{first_name}}') && (
-                  <p className="text-[10px] text-ink4 mb-2">
-                    Preview: &ldquo;{smsMessage.replace(/\{\{first_name\}\}/g, firstName)}&rdquo;
-                  </p>
-                )}
-                {smsBlockedCount > 0 && (
-                  <p className="text-[10px] text-amber-600 mb-2">
-                    {noPhoneCount > 0 && `${noPhoneCount} skipped (no phone)`}
-                    {noPhoneCount > 0 && optOutCount > 0 && ' · '}
-                    {optOutCount > 0 && `${optOutCount} skipped (opted out)`}
-                  </p>
-                )}
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setModal(null)} className="px-3 py-1.5 text-xs text-ink3">
+                    {loading ? 'Assigning…' : `Assign ${count} contacts`}
+                  </Button>
+                </>
+              )}
+              {modal === 'sms' && (
+                <>
+                  <Button onClick={() => setModal(null)} variant="text" color="inherit">
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void handleSms()}
                     disabled={!smsMessage.trim() || loading}
-                    className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+                    variant="contained"
                   >
-                    {loading ? 'Queuing...' : `Queue ${count - smsBlockedCount} SMS`}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {modal === 'archive' && (
-              <>
-                <h3 className="text-sm font-bold text-ink mb-2">Archive Contacts</h3>
-                <p className="text-sm text-ink3 mb-4">
-                  Archive {count} contacts? They won&apos;t appear in your contacts list but their
-                  history is preserved.
-                </p>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setModal(null)} className="px-3 py-1.5 text-xs text-ink3">
+                    {loading ? 'Queuing…' : `Queue ${count - smsBlockedCount} SMS`}
+                  </Button>
+                </>
+              )}
+              {modal === 'archive' && (
+                <>
+                  <Button onClick={() => setModal(null)} variant="text" color="inherit">
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void handleArchive()}
                     disabled={loading}
-                    className="px-4 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                    variant="contained"
+                    color="error"
                   >
-                    {loading ? 'Archiving...' : `Archive ${count} contacts`}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+                    {loading ? 'Archiving…' : `Archive ${count} contacts`}
+                  </Button>
+                </>
+              )}
+            </>
+          }
+        >
+          {modal === 'stage' && (
+            <div className="max-h-48 overflow-y-auto">
+              <RadioGroup value={selectedStage} onChange={(e) => setSelectedStage(e.target.value)}>
+                {stages.map((s) => (
+                  <FormControlLabel
+                    key={s.id}
+                    value={s.id}
+                    control={<Radio size="small" />}
+                    label={
+                      <span className="flex items-center gap-2 text-sm">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: s.color }}
+                        />
+                        {s.name}
+                      </span>
+                    }
+                  />
+                ))}
+              </RadioGroup>
+            </div>
+          )}
+
+          {modal === 'tag' && (
+            <div className="space-y-3">
+              <TextField
+                label="Add tags (comma-separated)"
+                value={tagsToAdd}
+                onChange={(e) => setTagsToAdd(e.target.value)}
+                placeholder="vip, follow-up"
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Remove tags (comma-separated)"
+                value={tagsToRemove}
+                onChange={(e) => setTagsToRemove(e.target.value)}
+                placeholder="old-lead"
+                fullWidth
+                size="small"
+              />
+            </div>
+          )}
+
+          {modal === 'assign' && (
+            <TextField
+              label="Assignee user ID"
+              value={assignTo}
+              onChange={(e) => setAssignTo(e.target.value)}
+              autoFocus
+              placeholder="User ID…"
+              fullWidth
+              size="small"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleAssign()
+              }}
+            />
+          )}
+
+          {modal === 'sms' && (
+            <div>
+              <TextField
+                value={smsMessage}
+                onChange={(e) => setSmsMessage(e.target.value.slice(0, 160))}
+                multiline
+                rows={4}
+                placeholder="Type your message…"
+                fullWidth
+                size="small"
+                slotProps={{ htmlInput: { maxLength: 160 } }}
+              />
+              <div className="flex items-center justify-between mt-1 mb-3">
+                <Button
+                  onClick={() =>
+                    setSmsMessage((m) => (m.includes('{{first_name}}') ? m : m + '{{first_name}}'))
+                  }
+                  size="small"
+                  sx={{
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    minWidth: 0,
+                    py: 0.25,
+                    px: 0.75,
+                    bgcolor: '#f0fdfa',
+                  }}
+                >
+                  {'{{first_name}}'}
+                </Button>
+                <span
+                  className={`text-[10px] ${smsMessage.length >= 150 ? 'text-amber-600' : 'text-ink4'}`}
+                >
+                  {smsMessage.length}/160
+                </span>
+              </div>
+              {smsMessage.includes('{{first_name}}') && (
+                <p className="text-[10px] text-ink4 mb-2">
+                  Preview: &ldquo;{smsMessage.replace(/\{\{first_name\}\}/g, firstName)}&rdquo;
+                </p>
+              )}
+              {smsBlockedCount > 0 && (
+                <p className="text-[10px] text-amber-600 mb-2">
+                  {noPhoneCount > 0 && `${noPhoneCount} skipped (no phone)`}
+                  {noPhoneCount > 0 && optOutCount > 0 && ' · '}
+                  {optOutCount > 0 && `${optOutCount} skipped (opted out)`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {modal === 'archive' && (
+            <p className="text-sm text-ink3">
+              {`Archive ${count} contacts? They won't appear in your contacts list but their history is preserved.`}
+            </p>
+          )}
+        </Modal>
       )}
     </>
   )

@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
 import type {
   VideoCollector,
   VideoTestimonial,
   VideoCollectorStatus,
   VideoTestimonialStatus,
 } from '@nuatis/shared'
+import { Modal } from '@/components/ui/Modal'
 
 // ── helpers ────────────────────────────────────────────────────
 
@@ -169,125 +171,111 @@ function SubmissionModal({ submission, onClose, onAction, onDelete }: Submission
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <Modal
+      onClose={onClose}
+      title={submission.submitter_name ?? 'Anonymous'}
+      maxWidth="md"
+      footer={
+        <div className="flex items-center gap-2 flex-wrap w-full">
+          <Button
+            onClick={() => void doAction('approve')}
+            disabled={!!acting || submission.status === 'approved'}
+            variant="contained"
+            color="success"
+            size="small"
+          >
+            {acting === 'approve' ? '…' : 'Approve'}
+          </Button>
+          <Button
+            onClick={() => void doAction('reject')}
+            disabled={!!acting || submission.status === 'rejected'}
+            variant="contained"
+            color="error"
+            size="small"
+          >
+            {acting === 'reject' ? '…' : 'Reject'}
+          </Button>
+          <Button
+            onClick={() => void doAction('feature')}
+            disabled={!!acting || submission.status === 'featured'}
+            variant="contained"
+            size="small"
+          >
+            {acting === 'feature' ? '…' : 'Feature'}
+          </Button>
+
+          <div className="flex-1" />
+
+          <Button
+            onClick={() => void doDelete()}
+            disabled={deleting}
+            variant="outlined"
+            color="error"
+            size="small"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </div>
+      }
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 space-y-5">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-base font-semibold text-ink">
-                {submission.submitter_name ?? 'Anonymous'}
-              </p>
-              {submission.submitter_email && (
-                <p className="text-xs text-ink3">{submission.submitter_email}</p>
-              )}
-              <p className="text-xs text-ink4 mt-0.5">
-                {new Date(submission.submitted_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-ink4 hover:text-ink text-lg leading-none shrink-0"
-            >
-              ✕
-            </button>
-          </div>
+      <div className="space-y-5">
+        {submission.submitter_email && (
+          <p className="text-xs text-ink3 -mt-3">{submission.submitter_email}</p>
+        )}
+        <p className="text-xs text-ink4">
+          {new Date(submission.submitted_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </p>
 
-          {/* Video player */}
-          <div className="rounded-xl overflow-hidden bg-gray-900 aspect-video flex items-center justify-center">
-            {submission.signed_url ? (
-              <video
-                controls
-                className="w-full h-full object-contain"
-                src={submission.signed_url}
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-gray-500">
-                <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                <p className="text-xs">Video unavailable</p>
-              </div>
-            )}
-          </div>
-
-          {/* Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {submission.sentiment && (
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(submission.sentiment)}`}
-              >
-                {submission.sentiment}
-              </span>
-            )}
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(submission.status)}`}
-            >
-              {submission.status}
-            </span>
-            {submission.duration_seconds != null && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-ink4">
-                {submission.duration_seconds}s
-              </span>
-            )}
-          </div>
-
-          {/* Transcript */}
-          {submission.transcript && (
-            <div>
-              <p className="text-xs font-medium text-ink3 mb-1">Transcript</p>
-              <div className="bg-bg rounded-lg p-3 text-sm text-ink3 max-h-36 overflow-y-auto leading-relaxed border border-border-brand">
-                {submission.transcript}
-              </div>
+        {/* Video player */}
+        <div className="rounded-xl overflow-hidden bg-gray-900 aspect-video flex items-center justify-center">
+          {submission.signed_url ? (
+            <video controls className="w-full h-full object-contain" src={submission.signed_url} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-gray-500">
+              <svg className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <p className="text-xs">Video unavailable</p>
             </div>
           )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border-brand">
-            <button
-              onClick={() => void doAction('approve')}
-              disabled={!!acting || submission.status === 'approved'}
-              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {acting === 'approve' ? '...' : 'Approve'}
-            </button>
-            <button
-              onClick={() => void doAction('reject')}
-              disabled={!!acting || submission.status === 'rejected'}
-              className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {acting === 'reject' ? '...' : 'Reject'}
-            </button>
-            <button
-              onClick={() => void doAction('feature')}
-              disabled={!!acting || submission.status === 'featured'}
-              className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {acting === 'feature' ? '...' : 'Feature'}
-            </button>
-
-            <div className="flex-1" />
-
-            <button
-              onClick={() => void doDelete()}
-              disabled={deleting}
-              className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {deleting ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
         </div>
+
+        {/* Badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {submission.sentiment && (
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${sentimentBadge(submission.sentiment)}`}
+            >
+              {submission.sentiment}
+            </span>
+          )}
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${submissionStatusBadge(submission.status)}`}
+          >
+            {submission.status}
+          </span>
+          {submission.duration_seconds != null && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-ink4">
+              {submission.duration_seconds}s
+            </span>
+          )}
+        </div>
+
+        {/* Transcript */}
+        {submission.transcript && (
+          <div>
+            <p className="text-xs font-medium text-ink3 mb-1">Transcript</p>
+            <div className="bg-bg rounded-lg p-3 text-sm text-ink3 max-h-36 overflow-y-auto leading-relaxed border border-border-brand">
+              {submission.transcript}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

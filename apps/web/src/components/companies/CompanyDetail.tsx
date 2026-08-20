@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
 
 interface Company {
   id: string
@@ -134,57 +136,53 @@ export default function CompanyDetail({ companyId }: Props) {
       <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         {editing ? (
           <div className="space-y-2 mb-3">
-            <input
-              type="text"
+            <TextField
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full text-lg font-bold border border-border-brand rounded px-2 py-1"
+              fullWidth
+              size="small"
+              sx={{ '& input': { fontSize: 18, fontWeight: 700 } }}
             />
             <div className="grid grid-cols-3 gap-2">
-              <input
-                type="text"
+              <TextField
                 value={editDomain}
                 onChange={(e) => setEditDomain(e.target.value)}
                 placeholder="Domain"
-                className="text-sm border border-border-brand rounded px-2 py-1"
+                size="small"
               />
-              <input
-                type="text"
+              <TextField
                 value={editIndustry}
                 onChange={(e) => setEditIndustry(e.target.value)}
                 placeholder="Industry"
-                className="text-sm border border-border-brand rounded px-2 py-1"
+                size="small"
               />
-              <input
-                type="text"
+              <TextField
                 value={editWebsite}
                 onChange={(e) => setEditWebsite(e.target.value)}
                 placeholder="Website"
-                className="text-sm border border-border-brand rounded px-2 py-1"
+                size="small"
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => void saveEdits()}
-                className="px-3 py-1 text-xs font-medium text-white bg-teal-600 rounded hover:bg-teal-700"
-              >
+              <Button onClick={() => void saveEdits()} variant="contained" size="small">
                 Save
-              </button>
-              <button onClick={() => setEditing(false)} className="px-3 py-1 text-xs text-ink3">
+              </Button>
+              <Button onClick={() => setEditing(false)} size="small" color="inherit">
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-ink">{company.name}</h2>
-              <button
+              <Button
                 onClick={() => setEditing(true)}
-                className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                size="small"
+                sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
               >
                 Edit
-              </button>
+              </Button>
             </div>
             <div className="flex items-center gap-4 text-sm text-ink3">
               {company.domain && <span>{company.domain}</span>}
@@ -212,28 +210,29 @@ export default function CompanyDetail({ companyId }: Props) {
       <div className="bg-white rounded-xl border border-border-brand p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-ink2">Contacts ({company.contacts.length})</h3>
-          <button
+          <Button
             onClick={() => {
               setLinkOpen((o) => !o)
               setLinkSearch('')
               setLinkResults([])
             }}
-            className="text-xs font-medium text-teal-600 hover:text-teal-700"
+            size="small"
+            sx={{ fontSize: 12, minWidth: 0, textTransform: 'none' }}
           >
             + Link Contact
-          </button>
+          </Button>
         </div>
 
         {/* Inline contact search */}
         {linkOpen && (
           <div className="mb-3 relative">
-            <input
+            <TextField
               autoFocus
-              type="text"
               value={linkSearch}
               onChange={(e) => handleLinkSearch(e.target.value)}
               placeholder="Search contacts by name…"
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              size="small"
+              fullWidth
             />
             {linkResults.length > 0 && (
               <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg max-h-56 overflow-y-auto">
@@ -282,13 +281,15 @@ export default function CompanyDetail({ companyId }: Props) {
                     </span>
                   )}
                 </Link>
-                <button
+                <Button
                   disabled={unlinkingId === c.id}
                   onClick={() => void unlinkContact(c.id)}
-                  className="text-xs text-ink4 hover:text-red-500 disabled:opacity-50 ml-2 shrink-0"
+                  size="small"
+                  color="inherit"
+                  sx={{ fontSize: 12, minWidth: 0, textTransform: 'none', ml: 1, flexShrink: 0 }}
                 >
                   Unlink
-                </button>
+                </Button>
               </div>
             ))}
           </div>

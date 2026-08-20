@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { VERTICALS as VERTICALS_CONFIG } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import { Modal } from '@/components/ui/Modal'
 
 interface PackageItem {
   service_id: string
@@ -31,6 +39,39 @@ const VERTICALS = Object.keys(VERTICALS_CONFIG)
 const VERTICAL_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(VERTICALS_CONFIG).map(([slug, config]) => [slug, config.label])
 )
+
+// ── Icons (inline SVG — matches this app's existing icon convention; no
+// @mui/icons-material dependency in this repo) ──────────────────────────────
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 15l-6-6-6 6" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
 
 export default function PackageManager() {
   const [packages, setPackages] = useState<Package[]>([])
@@ -215,12 +256,9 @@ export default function PackageManager() {
         <div>
           <p className="text-sm text-ink3">{packages.length} active packages</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
+        <Button onClick={openCreate} variant="contained" sx={{ textTransform: 'none' }}>
           + New Package
-        </button>
+        </Button>
       </div>
 
       {toast && (
@@ -271,34 +309,38 @@ export default function PackageManager() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 ml-4">
-                    <button
-                      onClick={() => movePackage(pkg.id, 'up')}
+                    <IconButton
+                      size="small"
+                      onClick={() => void movePackage(pkg.id, 'up')}
                       disabled={idx === 0}
-                      className="text-gray-300 hover:text-ink3 disabled:opacity-30 p-1 text-xs"
                       title="Move up"
                     >
-                      ▲
-                    </button>
-                    <button
-                      onClick={() => movePackage(pkg.id, 'down')}
+                      <ChevronUpIcon />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => void movePackage(pkg.id, 'down')}
                       disabled={idx === pkgs.length - 1}
-                      className="text-gray-300 hover:text-ink3 disabled:opacity-30 p-1 text-xs"
                       title="Move down"
                     >
-                      ▼
-                    </button>
-                    <button
+                      <ChevronDownIcon />
+                    </IconButton>
+                    <Button
                       onClick={() => openEdit(pkg)}
-                      className="text-xs text-ink3 hover:text-ink2 px-2 py-1"
+                      size="small"
+                      color="inherit"
+                      sx={{ textTransform: 'none' }}
                     >
                       Edit
-                    </button>
-                    <button
-                      onClick={() => deactivate(pkg.id)}
-                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                    </Button>
+                    <Button
+                      onClick={() => void deactivate(pkg.id)}
+                      size="small"
+                      color="error"
+                      sx={{ textTransform: 'none' }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -309,138 +351,130 @@ export default function PackageManager() {
 
       {/* Create/Edit form modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-start justify-center z-50 pt-20 overflow-y-auto">
-          <div className="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl mb-20">
-            <h3 className="text-sm font-semibold text-ink mb-4">
-              {editingId ? 'Edit Package' : 'New Package'}
-            </h3>
+        <Modal
+          onClose={resetForm}
+          title={editingId ? 'Edit Package' : 'New Package'}
+          footer={
+            <>
+              <Button onClick={resetForm} variant="text" color="inherit">
+                Cancel
+              </Button>
+              <Button onClick={() => void savePackage()} disabled={formSaving} variant="contained">
+                {formSaving ? 'Saving...' : editingId ? 'Update Package' : 'Create Package'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Select
+              value={formVertical}
+              onChange={(e) => setFormVertical(e.target.value)}
+              size="small"
+              fullWidth
+            >
+              {VERTICALS.map((v) => (
+                <MenuItem key={v} value={v}>
+                  {VERTICAL_LABELS[v] ?? v}
+                </MenuItem>
+              ))}
+            </Select>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Vertical</label>
-                <select
-                  value={formVertical}
-                  onChange={(e) => setFormVertical(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  {VERTICALS.map((v) => (
-                    <option key={v} value={v}>
-                      {VERTICAL_LABELS[v] ?? v}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <TextField
+              label="Name"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="e.g. New Patient Package"
+              size="small"
+              fullWidth
+            />
 
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. New Patient Package"
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
+            <TextField
+              label="Description (optional)"
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              multiline
+              rows={2}
+              size="small"
+              fullWidth
+            />
 
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">
-                  Description (optional)
-                </label>
-                <textarea
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              {/* Service picker */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-2">
-                  Services ({formItems.length} selected)
-                </label>
-                <div className="border border-border-brand rounded-lg max-h-48 overflow-y-auto">
-                  {services.length === 0 ? (
-                    <p className="px-3 py-4 text-xs text-ink4 text-center">No services found</p>
-                  ) : (
-                    services.map((svc) => {
-                      const selected = formItems.find((i) => i.service_id === svc.id)
-                      return (
-                        <div
-                          key={svc.id}
-                          className={`flex items-center justify-between px-3 py-2 border-b border-gray-50 last:border-0 ${selected ? 'bg-teal-50' : ''}`}
-                        >
-                          <label className="flex items-center gap-2 text-sm cursor-pointer flex-1">
-                            <input
-                              type="checkbox"
+            {/* Service picker */}
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-2">
+                Services ({formItems.length} selected)
+              </label>
+              <div className="border border-border-brand rounded-lg max-h-48 overflow-y-auto">
+                {services.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-ink4 text-center">No services found</p>
+                ) : (
+                  services.map((svc) => {
+                    const selected = formItems.find((i) => i.service_id === svc.id)
+                    return (
+                      <div
+                        key={svc.id}
+                        className={`flex items-center justify-between pr-3 border-b border-gray-50 last:border-0 ${selected ? 'bg-teal-50' : ''}`}
+                      >
+                        <FormControlLabel
+                          sx={{ flex: 1, ml: 0 }}
+                          control={
+                            <Checkbox
+                              size="small"
                               checked={!!selected}
                               onChange={() => toggleServiceInForm(svc.id)}
-                              className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
                             />
-                            <span className="text-ink2">{svc.name}</span>
-                            <span className="text-ink4 ml-auto">
-                              ${Number(svc.unit_price).toFixed(2)}
+                          }
+                          label={
+                            <span className="text-sm text-ink2 flex items-center w-full">
+                              {svc.name}
                             </span>
-                          </label>
-                          {selected && (
-                            <input
-                              type="number"
-                              value={selected.qty}
-                              onChange={(e) =>
-                                updateFormItemQty(svc.id, parseInt(e.target.value) || 1)
-                              }
-                              className="w-14 px-2 py-1 text-xs border border-border-brand rounded ml-2 text-center"
-                              min="1"
-                            />
-                          )}
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-                {listPriceTotal > 0 && (
-                  <p className="text-xs text-ink3 mt-1">
-                    List price total: ${listPriceTotal.toFixed(2)}
-                  </p>
+                          }
+                        />
+                        <span className="text-ink4 text-sm shrink-0">
+                          ${Number(svc.unit_price).toFixed(2)}
+                        </span>
+                        {selected && (
+                          <TextField
+                            type="number"
+                            value={selected.qty}
+                            onChange={(e) =>
+                              updateFormItemQty(svc.id, parseInt(e.target.value) || 1)
+                            }
+                            size="small"
+                            sx={{ width: 64, ml: 1 }}
+                            slotProps={{ htmlInput: { min: 1, style: { textAlign: 'center' } } }}
+                          />
+                        )}
+                      </div>
+                    )
+                  })
                 )}
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Bundle Price</label>
-                <input
-                  type="number"
-                  value={formBundlePrice}
-                  onChange={(e) => setFormBundlePrice(parseFloat(e.target.value) || 0)}
-                  className="w-40 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  min="0"
-                  step="0.01"
-                />
-                {computedDiscountPct > 0 && (
-                  <p className="text-xs text-green-600 mt-1">
-                    You&apos;re saving customers {computedDiscountPct}% ($
-                    {(listPriceTotal - formBundlePrice).toFixed(2)} off)
-                  </p>
-                )}
-              </div>
+              {listPriceTotal > 0 && (
+                <p className="text-xs text-ink3 mt-1">
+                  List price total: ${listPriceTotal.toFixed(2)}
+                </p>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 mt-6 justify-end">
-              <button
-                onClick={resetForm}
-                className="text-xs text-ink3 px-3 py-1.5 rounded-lg hover:bg-bg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={savePackage}
-                disabled={formSaving}
-                className="text-xs text-white bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg font-medium disabled:opacity-50"
-              >
-                {formSaving ? 'Saving...' : editingId ? 'Update Package' : 'Create Package'}
-              </button>
+            <div>
+              <TextField
+                label="Bundle Price"
+                type="number"
+                value={formBundlePrice}
+                onChange={(e) => setFormBundlePrice(parseFloat(e.target.value) || 0)}
+                size="small"
+                sx={{ width: 160 }}
+                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+              />
+              {computedDiscountPct > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  You&apos;re saving customers {computedDiscountPct}% ($
+                  {(listPriceTotal - formBundlePrice).toFixed(2)} off)
+                </p>
+              )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

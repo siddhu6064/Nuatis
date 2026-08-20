@@ -1,6 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Switch from '@mui/material/Switch'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
 
 interface AvailableService {
   id: string
@@ -138,12 +143,6 @@ export default function BookingSettingsPage() {
 
   const bookingUrl = `${origin}/book/${settings.slug}`
 
-  const inputCls =
-    'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-
-  const narrowInputCls =
-    'w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-
   return (
     <div className="px-8 py-8 max-w-2xl space-y-6">
       <div>
@@ -160,44 +159,33 @@ export default function BookingSettingsPage() {
             <p className="text-sm font-medium text-ink">Enable Online Booking</p>
             <p className="text-xs text-ink4 mt-0.5">Make your booking page publicly accessible</p>
           </div>
-          <button
-            role="switch"
-            aria-checked={settings.enabled}
-            onClick={() => setSettings((s) => ({ ...s, enabled: !s.enabled }))}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
-              settings.enabled ? 'bg-teal-600' : 'bg-bg3'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                settings.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          <Switch
+            checked={settings.enabled}
+            onChange={() => setSettings((s) => ({ ...s, enabled: !s.enabled }))}
+            slotProps={{ input: { 'aria-label': 'Enable Online Booking' } }}
+          />
         </div>
       </div>
 
       {/* Slug + URL Preview */}
       <div className="bg-white rounded-xl border border-border-brand p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-ink mb-1">Booking Page URL Slug</label>
-          <p className="text-xs text-ink4 mb-2">
-            Lowercase letters, numbers, and hyphens. Between 3 and 50 characters.
+        <TextField
+          label="Booking Page URL Slug"
+          helperText={
+            slugError ?? 'Lowercase letters, numbers, and hyphens. Between 3 and 50 characters.'
+          }
+          error={!!slugError}
+          value={settings.slug ?? ''}
+          onChange={(e) => handleSlugChange(e.target.value)}
+          placeholder="bright-smile-dental"
+          fullWidth
+          size="small"
+        />
+        {settings.slug && !slugError && (
+          <p className="text-xs text-ink4 break-all">
+            Preview: <span className="text-teal-600 font-mono">{bookingUrl}</span>
           </p>
-          <input
-            type="text"
-            value={settings.slug ?? ''}
-            onChange={(e) => handleSlugChange(e.target.value)}
-            placeholder="bright-smile-dental"
-            className={`${inputCls} ${slugError ? 'border-red-300 focus:ring-red-500' : ''}`}
-          />
-          {slugError && <p className="text-xs text-red-600 mt-1">{slugError}</p>}
-          {settings.slug && !slugError && (
-            <p className="text-xs text-ink4 mt-1.5 break-all">
-              Preview: <span className="text-teal-600 font-mono">{bookingUrl}</span>
-            </p>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Service Picker */}
@@ -205,22 +193,27 @@ export default function BookingSettingsPage() {
         <div className="bg-white rounded-xl border border-border-brand p-6">
           <p className="text-sm font-medium text-ink mb-1">Available Services</p>
           <p className="text-xs text-ink4 mb-4">Choose which services clients can book online.</p>
-          <div className="space-y-2">
+          <div>
             {settings.availableServices.map((svc) => (
-              <label key={svc.id} className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={settings.serviceIds.includes(svc.id)}
-                  onChange={() => toggleService(svc.id)}
-                  className="h-4 w-4 rounded border-border-brand text-teal-600 focus:ring-teal-500"
-                />
-                <span className="text-sm text-ink2 group-hover:text-ink">
-                  {svc.name}
-                  {svc.durationMinutes != null && (
-                    <span className="ml-1.5 text-xs text-ink4">({svc.durationMinutes} min)</span>
-                  )}
-                </span>
-              </label>
+              <FormControlLabel
+                key={svc.id}
+                sx={{ display: 'flex', ml: 0 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={settings.serviceIds.includes(svc.id)}
+                    onChange={() => toggleService(svc.id)}
+                  />
+                }
+                label={
+                  <span className="text-sm text-ink2">
+                    {svc.name}
+                    {svc.durationMinutes != null && (
+                      <span className="ml-1.5 text-xs text-ink4">({svc.durationMinutes} min)</span>
+                    )}
+                  </span>
+                }
+              />
             ))}
           </div>
         </div>
@@ -235,7 +228,7 @@ export default function BookingSettingsPage() {
             Buffer Between Appointments (minutes)
           </label>
           <p className="text-xs text-ink4 mb-2">Between 5 and 60 minutes.</p>
-          <input
+          <TextField
             type="number"
             value={settings.bufferMinutes}
             onChange={(e) =>
@@ -244,10 +237,9 @@ export default function BookingSettingsPage() {
                 bufferMinutes: Math.min(60, Math.max(5, parseInt(e.target.value) || 5)),
               }))
             }
-            className={narrowInputCls}
-            min="5"
-            max="60"
-            step="5"
+            size="small"
+            sx={{ width: 128 }}
+            slotProps={{ htmlInput: { min: 5, max: 60, step: 5 } }}
           />
         </div>
 
@@ -258,7 +250,7 @@ export default function BookingSettingsPage() {
           <p className="text-xs text-ink4 mb-2">
             How many days ahead clients can schedule. Between 1 and 90.
           </p>
-          <input
+          <TextField
             type="number"
             value={settings.advanceDays}
             onChange={(e) =>
@@ -267,39 +259,39 @@ export default function BookingSettingsPage() {
                 advanceDays: Math.min(90, Math.max(1, parseInt(e.target.value) || 1)),
               }))
             }
-            className={narrowInputCls}
-            min="1"
-            max="90"
-            step="1"
+            size="small"
+            sx={{ width: 128 }}
+            slotProps={{ htmlInput: { min: 1, max: 90, step: 1 } }}
           />
         </div>
       </div>
 
       {/* Confirmation Message */}
       <div className="bg-white rounded-xl border border-border-brand p-6">
-        <label className="block text-sm font-medium text-ink mb-1">Confirmation Message</label>
-        <p className="text-xs text-ink4 mb-2">Shown to the client after they complete a booking.</p>
-        <textarea
+        <TextField
+          label="Confirmation Message"
+          helperText="Shown to the client after they complete a booking."
           value={settings.confirmationMessage}
           onChange={(e) => setSettings((s) => ({ ...s, confirmationMessage: e.target.value }))}
+          multiline
           rows={3}
           placeholder="Thanks for booking! We'll send a reminder 24 hours before your appointment."
-          className={inputCls}
+          fullWidth
+          size="small"
         />
       </div>
 
       {/* Google Review URL */}
       <div className="bg-white rounded-xl border border-border-brand p-6">
-        <label className="block text-sm font-medium text-ink mb-1">Google Review URL</label>
-        <p className="text-xs text-ink4 mb-2">
-          Optionally shown on the booking confirmation page to encourage reviews.
-        </p>
-        <input
+        <TextField
+          label="Google Review URL"
+          helperText="Optionally shown on the booking confirmation page to encourage reviews."
           type="url"
           value={settings.googleReviewUrl ?? ''}
           onChange={(e) => setSettings((s) => ({ ...s, googleReviewUrl: e.target.value }))}
           placeholder="https://g.page/your-business/review"
-          className={inputCls}
+          fullWidth
+          size="small"
         />
       </div>
 
@@ -308,16 +300,13 @@ export default function BookingSettingsPage() {
         <label className="block text-sm font-medium text-ink mb-1">Accent Color</label>
         <p className="text-xs text-ink4 mb-2">Hex code used on your public booking page.</p>
         <div className="flex items-center gap-3">
-          <input
-            type="text"
+          <TextField
             value={settings.accentColor}
             onChange={(e) => setSettings((s) => ({ ...s, accentColor: e.target.value }))}
             placeholder="#0d9488"
-            className={`w-36 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono ${
-              settings.accentColor && !isValidHex(settings.accentColor)
-                ? 'border-red-300 focus:ring-red-500'
-                : 'border-border-brand'
-            }`}
+            error={!!settings.accentColor && !isValidHex(settings.accentColor)}
+            size="small"
+            sx={{ width: 144, '& input': { fontFamily: 'DM Mono, ui-monospace, monospace' } }}
           />
           {isValidHex(settings.accentColor) && (
             <span
@@ -345,22 +334,23 @@ export default function BookingSettingsPage() {
 
       {/* Actions */}
       <div className="flex items-center gap-3 pb-8">
-        <button
-          onClick={save}
+        <Button
+          onClick={() => void save()}
           disabled={saving || !!slugError}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          variant="contained"
+          sx={{ textTransform: 'none' }}
         >
           {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        </Button>
 
         {settings.slug && !slugError && (
-          <button
-            type="button"
+          <Button
             onClick={() => window.open(`/book/${settings.slug}`, '_blank')}
-            className="px-4 py-2 bg-white text-teal-600 text-sm font-medium rounded-lg border border-teal-200 hover:bg-teal-50 transition-colors"
+            variant="outlined"
+            sx={{ textTransform: 'none' }}
           >
             Preview Page
-          </button>
+          </Button>
         )}
       </div>
     </div>

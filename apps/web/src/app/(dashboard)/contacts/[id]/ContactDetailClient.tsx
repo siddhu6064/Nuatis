@@ -3,6 +3,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Switch from '@mui/material/Switch'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Checkbox from '@mui/material/Checkbox'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import AddNoteForm from '@/components/contacts/AddNoteForm'
 import ContactTasks from '@/components/contacts/ContactTasks'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
@@ -876,8 +884,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                     <span className="text-ink4 text-xs block mb-0.5">Referral Source</span>
                     {editingReferral ? (
                       <div className="relative">
-                        <input
-                          type="text"
+                        <TextField
                           value={referralSource}
                           onChange={(e) => {
                             setReferralSource(e.target.value)
@@ -893,7 +900,8 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                           }}
                           placeholder="e.g. Google, Instagram, Friend"
                           autoFocus
-                          className="w-full text-sm border border-border-brand rounded px-2 py-1"
+                          size="small"
+                          fullWidth
                         />
                         {showReferralSuggestions && filteredSuggestions.length > 0 && (
                           <div className="absolute top-full left-0 w-full mt-1 bg-white border border-border-brand rounded shadow-lg z-10 max-h-32 overflow-y-auto">
@@ -969,18 +977,20 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                   ) : (
                     <span className="text-sm text-ink4">Unassigned</span>
                   )}
-                  <select
+                  <Select
                     value={assignedUserId ?? ''}
                     onChange={(e) => void handleAssigneeChange(e.target.value || null)}
-                    className="text-xs border border-border-brand rounded px-1.5 py-1 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    size="small"
+                    displayEmpty
+                    sx={{ fontSize: 12, minWidth: 120 }}
                   >
-                    <option value="">Unassigned</option>
+                    <MenuItem value="">Unassigned</MenuItem>
                     {tenantUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
+                      <MenuItem key={user.id} value={user.id}>
                         {user.full_name}
-                      </option>
+                      </MenuItem>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
               {/* Followers */}
@@ -1013,29 +1023,29 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                     )
                   })}
                   {showFollowerPicker ? (
-                    <div className="relative">
-                      <select
-                        autoFocus
-                        size={1}
-                        onChange={(e) => {
-                          if (e.target.value) addFollower(e.target.value)
-                        }}
-                        onBlur={() => setTimeout(() => setShowFollowerPicker(false), 150)}
-                        className="text-xs border border-border-brand rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
-                        defaultValue=""
-                      >
-                        <option value="" disabled>
-                          Add follower…
-                        </option>
-                        {tenantUsers
-                          .filter((u) => !followers.includes(u.id))
-                          .map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.full_name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
+                    <Select
+                      autoFocus
+                      open
+                      displayEmpty
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) addFollower(e.target.value)
+                      }}
+                      onClose={() => setShowFollowerPicker(false)}
+                      size="small"
+                      sx={{ fontSize: 12, minWidth: 140 }}
+                    >
+                      <MenuItem value="" disabled>
+                        Add follower…
+                      </MenuItem>
+                      {tenantUsers
+                        .filter((u) => !followers.includes(u.id))
+                        .map((u) => (
+                          <MenuItem key={u.id} value={u.id}>
+                            {u.full_name}
+                          </MenuItem>
+                        ))}
+                    </Select>
                   ) : (
                     <button
                       onClick={() => setShowFollowerPicker(true)}
@@ -1060,23 +1070,25 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                   >
                     {lifecycleLabel(lifecycleStage)}
                   </span>
-                  <select
+                  <Select
                     value={lifecycleStage ?? ''}
                     onChange={(e) => {
                       if (e.target.value)
                         void handleLifecycleChange(e.target.value as LifecycleStage)
                     }}
-                    className="text-sm border border-border-brand rounded px-2 py-1 text-ink3 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    displayEmpty
+                    size="small"
+                    sx={{ fontSize: 14, minWidth: 160 }}
                   >
-                    <option value="" disabled>
+                    <MenuItem value="" disabled>
                       Change stage…
-                    </option>
+                    </MenuItem>
                     {lifecycleOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
+                      <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
-                      </option>
+                      </MenuItem>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </section>
             )}
@@ -1101,13 +1113,15 @@ export default function ContactDetailClient({ contact: initial }: Props) {
               <p className="text-xs text-ink4 mb-3">
                 Last updated: {formatRelativeTime(leadScoreUpdatedAt)}
               </p>
-              <button
+              <Button
                 onClick={() => void handleRecalculate()}
                 disabled={recalculating}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="outlined"
+                color="inherit"
+                size="small"
               >
                 {recalculating ? 'Recalculating…' : 'Recalculate'}
-              </button>
+              </Button>
             </section>
 
             {/* Portal Access */}
@@ -1140,30 +1154,34 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                     const extra = isObj ? (raw as Record<string, unknown>) : {}
                     return (
                       <div key={field.key}>
-                        <label className="flex items-start gap-2 text-sm text-ink2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              if (field.type === 'boolean') {
-                                handleComplianceChange(field.key, e.target.checked)
-                              } else {
-                                handleComplianceChange(field.key, {
-                                  ...extra,
-                                  checked: e.target.checked,
-                                })
-                              }
-                            }}
-                            className="mt-0.5 rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4"
-                          />
-                          <span>
-                            {field.label}
-                            {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                          </span>
-                        </label>
+                        <FormControlLabel
+                          className="!items-start"
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (field.type === 'boolean') {
+                                  handleComplianceChange(field.key, e.target.checked)
+                                } else {
+                                  handleComplianceChange(field.key, {
+                                    ...extra,
+                                    checked: e.target.checked,
+                                  })
+                                }
+                              }}
+                            />
+                          }
+                          label={
+                            <span className="text-sm text-ink2">
+                              {field.label}
+                              {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                            </span>
+                          }
+                        />
                         {field.type === 'boolean_with_date' && checked && (
-                          <div className="ml-6 mt-1.5">
-                            <input
+                          <div className="ml-9 mt-1">
+                            <TextField
                               type="date"
                               value={(extra['date'] as string | undefined) ?? ''}
                               onChange={(e) =>
@@ -1173,14 +1191,13 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                                   date: e.target.value,
                                 })
                               }
-                              className="text-sm border border-border-brand rounded px-2 py-1 text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              size="small"
                             />
                           </div>
                         )}
                         {field.type === 'boolean_with_notes' && checked && (
-                          <div className="ml-6 mt-1.5">
-                            <input
-                              type="text"
+                          <div className="ml-9 mt-1">
+                            <TextField
                               value={(extra['notes'] as string | undefined) ?? ''}
                               onChange={(e) =>
                                 handleComplianceChange(field.key, {
@@ -1190,7 +1207,8 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                                 })
                               }
                               placeholder="Notes..."
-                              className="w-full text-sm border border-border-brand rounded px-2 py-1 text-ink2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              size="small"
+                              fullWidth
                             />
                           </div>
                         )}
@@ -1198,33 +1216,37 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                     )
                   })}
                 </div>
-                <button
+                <Button
                   onClick={() => void saveComplianceFields()}
                   disabled={complianceSaving}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                  sx={{ mt: 2 }}
                 >
                   {complianceSaving ? 'Saving…' : 'Save Compliance'}
-                </button>
+                </Button>
               </section>
             )}
 
             {/* G25g — Hide empty + Created by + Audit log */}
             <div className="pt-4 border-t border-border-brand space-y-2">
-              <label className="flex items-center gap-2 text-xs text-ink3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={hideEmpty}
-                  onChange={(e) => {
-                    setHideEmpty(e.target.checked)
-                    localStorage.setItem(
-                      'nuatis_contact_hide_empty',
-                      e.target.checked ? 'true' : 'false'
-                    )
-                  }}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                />
-                Hide empty fields
-              </label>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={hideEmpty}
+                    onChange={(e) => {
+                      setHideEmpty(e.target.checked)
+                      localStorage.setItem(
+                        'nuatis_contact_hide_empty',
+                        e.target.checked ? 'true' : 'false'
+                      )
+                    }}
+                  />
+                }
+                label={<span className="text-xs text-ink3">Hide empty fields</span>}
+              />
               <p className="text-[10px] text-ink4">
                 Created by{' '}
                 <span className="text-ink3">
@@ -1260,45 +1282,33 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                 <p className="text-sm font-medium text-ink2">SMS</p>
                 <p className="text-xs text-ink4 mt-0.5">Opt in to receive text messages</p>
               </div>
-              <button
-                onClick={() => void handleOptInToggle('sms_opt_in', !smsOptIn)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${smsOptIn ? 'bg-teal-600' : 'bg-gray-200'}`}
-                aria-label="SMS opt-in toggle"
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${smsOptIn ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-                />
-              </button>
+              <Switch
+                checked={smsOptIn}
+                onChange={(e) => void handleOptInToggle('sms_opt_in', e.target.checked)}
+                aria-label="SMS opt-in"
+              />
             </div>
             <div className="flex items-center justify-between py-3 border-b border-border-brand">
               <div>
                 <p className="text-sm font-medium text-ink2">Email</p>
                 <p className="text-xs text-ink4 mt-0.5">Opt in to receive emails</p>
               </div>
-              <button
-                onClick={() => void handleOptInToggle('email_opt_in', !(emailOptIn ?? true))}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(emailOptIn ?? true) ? 'bg-teal-600' : 'bg-gray-200'}`}
-                aria-label="Email opt-in toggle"
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${(emailOptIn ?? true) ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-                />
-              </button>
+              <Switch
+                checked={emailOptIn ?? true}
+                onChange={(e) => void handleOptInToggle('email_opt_in', e.target.checked)}
+                aria-label="Email opt-in"
+              />
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium text-ink2">Calls</p>
                 <p className="text-xs text-ink4 mt-0.5">Opt in to receive calls</p>
               </div>
-              <button
-                onClick={() => void handleOptInToggle('call_opt_in', !(callOptIn ?? true))}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(callOptIn ?? true) ? 'bg-teal-600' : 'bg-gray-200'}`}
-                aria-label="Call opt-in toggle"
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${(callOptIn ?? true) ? 'translate-x-[18px]' : 'translate-x-[2px]'}`}
-                />
-              </button>
+              <Switch
+                checked={callOptIn ?? true}
+                onChange={(e) => void handleOptInToggle('call_opt_in', e.target.checked)}
+                aria-label="Call opt-in"
+              />
             </div>
           </div>
         )}
@@ -1359,8 +1369,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
             {tags.length < 10 &&
               (addingTag ? (
                 <div className="relative">
-                  <input
-                    type="text"
+                  <TextField
                     value={tagInput}
                     autoFocus
                     onChange={(e) => {
@@ -1385,7 +1394,12 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                       }, 150)
                     }
                     placeholder="Add tag…"
-                    className="text-xs border border-border-brand rounded-full px-2.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    size="small"
+                    sx={{
+                      width: 112,
+                      '& .MuiOutlinedInput-root': { borderRadius: 999 },
+                      '& .MuiOutlinedInput-input': { py: 0.5, px: 1.5, fontSize: 12 },
+                    }}
                   />
                   {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-20 min-w-[160px] max-h-36 overflow-y-auto">
@@ -1413,12 +1427,14 @@ export default function ContactDetailClient({ contact: initial }: Props) {
 
           {/* Action buttons */}
           <div className="mt-3 flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setShowEmailModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border-brand bg-white px-3 py-1.5 text-sm font-medium text-ink2 hover:bg-bg"
+              variant="outlined"
+              color="inherit"
+              size="small"
             >
               Send Email
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1528,12 +1544,14 @@ export default function ContactDetailClient({ contact: initial }: Props) {
 
           {composeTab === 'sms' && (
             <div>
-              <textarea
+              <TextField
                 value={smsText}
                 onChange={(e) => setSmsText(e.target.value)}
+                multiline
                 rows={2}
                 placeholder="Send a message…"
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                fullWidth
+                size="small"
               />
               <div className="flex items-center justify-between mt-1.5">
                 <div className="flex items-center gap-2">
@@ -1561,34 +1579,38 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                     <span className="text-[11px] text-red-600 font-medium">{smsError}</span>
                   )}
                 </div>
-                <button
+                <Button
                   onClick={() => void handleSendSms()}
                   disabled={smsSending || !smsText.trim() || !headerContact.phone || !smsOptIn}
-                  className="px-3 py-1 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  variant="contained"
+                  size="small"
                 >
                   {smsSending ? 'Sending…' : 'Send'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {composeTab === 'note' && (
             <div>
-              <textarea
+              <TextField
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
+                multiline
                 rows={2}
                 placeholder="Add an internal note…"
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                fullWidth
+                size="small"
               />
               <div className="flex justify-end mt-1.5">
-                <button
+                <Button
                   onClick={() => void handleSaveNote()}
                   disabled={noteSaving || !noteText.trim()}
-                  className="px-3 py-1 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  variant="contained"
+                  size="small"
                 >
                   {noteSaving ? 'Saving…' : 'Save Note'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1604,13 +1626,13 @@ export default function ContactDetailClient({ contact: initial }: Props) {
               <span className="text-sm font-semibold text-ink2">
                 {RAIL_ICONS.find((i) => i.key === activePanel)?.label}
               </span>
-              <button
+              <IconButton
                 onClick={() => setActivePanel(null)}
-                className="text-ink4 hover:text-ink3 text-lg leading-none"
+                size="small"
                 aria-label="Close panel"
               >
-                ×
-              </button>
+                <span className="text-ink4 text-lg leading-none">×</span>
+              </IconButton>
             </div>
             <div className="flex-1 overflow-y-auto">{renderRightPanelContent()}</div>
           </div>
@@ -1619,18 +1641,21 @@ export default function ContactDetailClient({ contact: initial }: Props) {
         {/* Icon rail */}
         <div className="w-14 flex flex-col items-center py-4 gap-1 bg-white border-l border-border-brand">
           {RAIL_ICONS.map(({ key, label, Icon }) => (
-            <button
+            <IconButton
               key={key}
               title={label}
               onClick={() => togglePanel(key)}
-              className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                activePanel === key
-                  ? 'bg-teal-50 text-teal-700'
-                  : 'text-ink3 hover:bg-bg2 hover:text-ink2'
-              }`}
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                color: activePanel === key ? 'primary.main' : 'text.secondary',
+                bgcolor: activePanel === key ? '#f0fdfa' : 'transparent',
+                '&:hover': { bgcolor: activePanel === key ? '#f0fdfa' : 'action.hover' },
+              }}
             >
               <Icon />
-            </button>
+            </IconButton>
           ))}
         </div>
       </div>

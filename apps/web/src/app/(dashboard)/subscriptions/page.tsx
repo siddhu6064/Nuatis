@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@nuatis/shared'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -97,64 +105,62 @@ function CancelModal({ subscriptionId, onClose, onConfirm, loading }: CancelModa
   const [immediately, setImmediately] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4 p-6">
-        <h2 className="text-base font-semibold text-ink mb-1">Cancel Subscription</h2>
-        <p className="text-sm text-ink3 mb-4">Choose when to cancel this subscription.</p>
+    <Modal
+      onClose={onClose}
+      title="Cancel Subscription"
+      maxWidth="xs"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={loading} variant="text" color="inherit">
+            Keep
+          </Button>
+          {/* color="error" (theme red) replaces the original's one-off bg-red-600 —
+              same intent, now the app-wide semantic danger color. */}
+          <Button
+            onClick={() => void onConfirm(subscriptionId, immediately)}
+            disabled={loading}
+            variant="contained"
+            color="error"
+          >
+            {loading ? 'Cancelling…' : 'Confirm Cancel'}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink3 mb-4">Choose when to cancel this subscription.</p>
 
-        <div className="space-y-2 mb-6">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="cancel_mode"
-              checked={!immediately}
-              onChange={() => setImmediately(false)}
-              className="mt-0.5 text-teal-600"
-            />
+      <RadioGroup
+        value={immediately ? 'immediately' : 'period_end'}
+        onChange={(e) => setImmediately(e.target.value === 'immediately')}
+      >
+        <FormControlLabel
+          value="period_end"
+          control={<Radio size="small" />}
+          sx={{ alignItems: 'flex-start', mb: 1 }}
+          label={
             <div>
               <p className="text-sm font-medium text-ink">Cancel at period end</p>
               <p className="text-xs text-ink4">
                 Subscription remains active until the billing period ends.
               </p>
             </div>
-          </label>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="cancel_mode"
-              checked={immediately}
-              onChange={() => setImmediately(true)}
-              className="mt-0.5 text-teal-600"
-            />
+          }
+        />
+        <FormControlLabel
+          value="immediately"
+          control={<Radio size="small" />}
+          sx={{ alignItems: 'flex-start' }}
+          label={
             <div>
               <p className="text-sm font-medium text-ink">Cancel immediately</p>
               <p className="text-xs text-ink4">
                 Subscription is cancelled right away. No refund is issued.
               </p>
             </div>
-          </label>
-        </div>
-
-        <div className="flex items-center gap-3 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-sm text-ink3 hover:text-ink rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
-          >
-            Keep
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void onConfirm(subscriptionId, immediately)}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Cancelling…' : 'Confirm Cancel'}
-          </button>
-        </div>
-      </div>
-    </div>
+          }
+        />
+      </RadioGroup>
+    </Modal>
   )
 }
 
@@ -243,179 +249,153 @@ function NewSubscriptionModal({ onClose, onCreated }: NewSubModalProps) {
 
   if (clientSecret) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-        <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-sm mx-4 p-6">
-          <h2 className="text-base font-semibold text-ink mb-2">Subscription Created</h2>
-          <p className="text-sm text-ink3 mb-4">
-            Payment is required to activate this subscription. A payment intent has been created.
-          </p>
-          <div className="bg-bg rounded-lg p-3 mb-4">
-            <p className="text-[10px] font-mono text-ink4 break-all">{clientSecret}</p>
-          </div>
-          <p className="text-xs text-ink4 mb-4">
-            Stripe Elements integration will be added in a future step to collect payment.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              onCreated()
-            }}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
-          >
+      <Modal
+        onClose={onCreated}
+        title="Subscription Created"
+        maxWidth="xs"
+        footer={
+          <Button onClick={onCreated} variant="contained" fullWidth>
             Done
-          </button>
+          </Button>
+        }
+      >
+        <p className="text-sm text-ink3 mb-4">
+          Payment is required to activate this subscription. A payment intent has been created.
+        </p>
+        <div className="bg-bg rounded-lg p-3 mb-4">
+          <p className="text-[10px] font-mono text-ink4 break-all">{clientSecret}</p>
         </div>
-      </div>
+        <p className="text-xs text-ink4">
+          Stripe Elements integration will be added in a future step to collect payment.
+        </p>
+      </Modal>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-xl border border-border-brand shadow-xl w-full max-w-md mx-4">
-        <div className="px-6 py-5 border-b border-border-brand flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink">New Subscription</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink4 hover:text-ink transition-colors text-lg leading-none"
-          >
-            ×
-          </button>
+    <Modal
+      onClose={onClose}
+      title="New Subscription"
+      maxWidth="sm"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={loading} variant="text" color="inherit">
+            Cancel
+          </Button>
+          <Button type="submit" form="new-subscription-form" disabled={loading} variant="contained">
+            {loading ? 'Creating…' : 'Create Subscription'}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={(e) => void handleSubmit(e)} id="new-subscription-form" className="space-y-4">
+        {/* Contact search */}
+        <div className="relative">
+          <label className="block text-xs font-medium text-ink3 mb-1">Contact</label>
+          {selectedContact ? (
+            <div className="flex items-center gap-2 px-3 py-2 border border-border-brand rounded-lg bg-bg">
+              <span className="text-sm text-ink flex-1">{selectedContact.full_name}</span>
+              <IconButton
+                onClick={() => {
+                  setSelectedContact(null)
+                  setContactQuery('')
+                }}
+                size="small"
+                aria-label="Clear selected contact"
+              >
+                <span className="text-ink4 text-sm leading-none">&times;</span>
+              </IconButton>
+            </div>
+          ) : (
+            <>
+              <TextField
+                placeholder="Search contacts…"
+                value={contactQuery}
+                onChange={(e) => {
+                  setContactQuery(e.target.value)
+                  setSelectedContact(null)
+                }}
+                autoComplete="off"
+                fullWidth
+                size="small"
+              />
+              {searchOpen && contactSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                  {contactSuggestions.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedContact(c)
+                        setContactQuery(c.full_name)
+                        setSearchOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg transition-colors"
+                    >
+                      <span className="font-medium">{c.full_name}</span>
+                      {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="px-6 py-5 space-y-4">
-          {/* Contact search */}
-          <div className="relative">
-            <label className="block text-xs font-medium text-ink3 mb-1">Contact</label>
-            {selectedContact ? (
-              <div className="flex items-center gap-2 px-3 py-2 border border-border-brand rounded-lg bg-bg">
-                <span className="text-sm text-ink flex-1">{selectedContact.full_name}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedContact(null)
-                    setContactQuery('')
-                  }}
-                  className="text-ink4 hover:text-ink text-sm leading-none"
-                >
-                  ×
-                </button>
-              </div>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  placeholder="Search contacts…"
-                  value={contactQuery}
-                  onChange={(e) => {
-                    setContactQuery(e.target.value)
-                    setSelectedContact(null)
-                  }}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white text-ink placeholder-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  autoComplete="off"
-                />
-                {searchOpen && contactSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {contactSuggestions.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedContact(c)
-                          setContactQuery(c.full_name)
-                          setSearchOpen(false)
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg transition-colors"
-                      >
-                        <span className="font-medium">{c.full_name}</span>
-                        {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        {/* Plan name */}
+        <TextField
+          label="Plan Name"
+          placeholder="e.g. Monthly Retainer"
+          value={planName}
+          onChange={(e) => setPlanName(e.target.value)}
+          required
+          fullWidth
+          size="small"
+        />
 
-          {/* Plan name */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1">Plan Name</label>
-            <input
-              type="text"
-              placeholder="e.g. Monthly Retainer"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              required
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white text-ink placeholder-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            />
-          </div>
+        {/* Amount + Interval */}
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            label="Amount (USD)"
+            type="number"
+            slotProps={{ htmlInput: { step: '0.01', min: '0.01' } }}
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            size="small"
+          />
+          <TextField
+            select
+            label="Billing Interval"
+            value={interval}
+            onChange={(e) => setInterval(e.target.value)}
+            fullWidth
+            size="small"
+          >
+            <MenuItem value="weekly">Weekly</MenuItem>
+            <MenuItem value="monthly">Monthly</MenuItem>
+            <MenuItem value="quarterly">Quarterly</MenuItem>
+            <MenuItem value="annually">Annually</MenuItem>
+          </TextField>
+        </div>
 
-          {/* Amount + Interval */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1">Amount (USD)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white text-ink placeholder-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink3 mb-1">Billing Interval</label>
-              <select
-                value={interval}
-                onChange={(e) => setInterval(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white text-ink focus:outline-none focus:ring-1 focus:ring-teal-500"
-              >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="annually">Annually</option>
-              </select>
-            </div>
-          </div>
+        {/* Description */}
+        <TextField
+          label="Description (optional)"
+          placeholder="Additional details…"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          multiline
+          rows={2}
+          fullWidth
+          size="small"
+        />
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-medium text-ink3 mb-1">
-              Description (optional)
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Additional details…"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white text-ink placeholder-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none"
-            />
-          </div>
-
-          {error && <p className="text-xs text-red-600">{error}</p>}
-
-          <div className="flex items-center gap-3 justify-end pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 text-sm text-ink3 hover:text-ink rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Creating…' : 'Create Subscription'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </form>
+    </Modal>
   )
 }
 
@@ -600,14 +580,9 @@ export default function SubscriptionsPage() {
           <h1 className="text-xl font-bold text-ink">Subscriptions</h1>
           <p className="text-sm text-ink3 mt-0.5">{subscriptions.length} shown</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          New Subscription
-        </button>
+        <Button onClick={() => setShowNewModal(true)} variant="contained">
+          + New Subscription
+        </Button>
       </div>
 
       {/* Summary cards */}
@@ -647,13 +622,9 @@ export default function SubscriptionsPage() {
             <p className="text-xs text-gray-300 mt-1">
               Create your first subscription to start recurring billing
             </p>
-            <button
-              type="button"
-              onClick={() => setShowNewModal(true)}
-              className="mt-4 text-xs text-teal-600 font-medium hover:text-teal-700"
-            >
+            <Button onClick={() => setShowNewModal(true)} size="small" sx={{ mt: 2 }}>
               New Subscription &rarr;
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -717,37 +688,39 @@ export default function SubscriptionsPage() {
                         <div className="flex items-center gap-2">
                           {/* Pause — active only */}
                           {sub.status === 'active' && (
-                            <button
-                              type="button"
+                            <Button
                               disabled={isPauseLoading}
                               onClick={() => void handlePause(sub.id)}
-                              className="text-xs text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                              size="small"
+                              sx={{ color: 'warning.main', minWidth: 0 }}
                             >
                               {isPauseLoading ? 'Pausing…' : 'Pause'}
-                            </button>
+                            </Button>
                           )}
 
                           {/* Resume — paused only */}
                           {sub.status === 'paused' && (
-                            <button
-                              type="button"
+                            <Button
                               disabled={isResumeLoading}
                               onClick={() => void handleResume(sub.id)}
-                              className="text-xs text-green-600 hover:text-green-700 font-medium disabled:opacity-50"
+                              size="small"
+                              color="success"
+                              sx={{ minWidth: 0 }}
                             >
                               {isResumeLoading ? 'Resuming…' : 'Resume'}
-                            </button>
+                            </Button>
                           )}
 
                           {/* Cancel — not cancelled */}
                           {sub.status !== 'cancelled' && (
-                            <button
-                              type="button"
+                            <Button
                               onClick={() => setCancelTarget(sub.id)}
-                              className="text-xs text-red-500 hover:text-red-600 font-medium"
+                              size="small"
+                              color="error"
+                              sx={{ minWidth: 0 }}
                             >
                               Cancel
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -760,25 +733,25 @@ export default function SubscriptionsPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-3 border-t border-border-brand">
-                <button
-                  type="button"
+                <Button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="text-xs text-ink3 hover:text-ink disabled:opacity-40 font-medium"
+                  size="small"
+                  color="inherit"
                 >
                   ← Previous
-                </button>
+                </Button>
                 <span className="text-xs text-ink4">
                   Page {page} of {totalPages}
                 </span>
-                <button
-                  type="button"
+                <Button
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="text-xs text-ink3 hover:text-ink disabled:opacity-40 font-medium"
+                  size="small"
+                  color="inherit"
                 >
                   Next →
-                </button>
+                </Button>
               </div>
             )}
           </>

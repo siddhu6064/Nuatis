@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SlideOver } from '@/components/ui/SlideOver'
 import type { Shift, StaffMember } from './types'
 
 interface Props {
@@ -136,24 +137,23 @@ export default function ShiftSlideOver({
     }
   }
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative ml-auto bg-white h-full w-full max-w-md border-l border-border-brand shadow-xl overflow-y-auto">
-        <div className="px-5 py-4 border-b border-border-brand flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-ink">
-              {isEdit ? 'Edit shift' : 'Add shift'}
-            </h2>
-            {staffName && !isEdit && <p className="text-xs text-ink4 mt-0.5">for {staffName}</p>}
-          </div>
-          <button onClick={onClose} className="text-ink4 hover:text-ink2" aria-label="Close">
-            ✕
-          </button>
+    <SlideOver
+      onClose={onClose}
+      open={open}
+      title={
+        <div>
+          <div>{isEdit ? 'Edit shift' : 'Add shift'}</div>
+          {staffName && !isEdit && (
+            <p className="text-xs text-ink4 font-normal mt-0.5">for {staffName}</p>
+          )}
         </div>
-
+      }
+    >
+      {/* relative: confirmDel below positions against this panel's content
+          area, not the full page — see Phase 15 notes on why this stays
+          plain Tailwind instead of a nested Modal. */}
+      <div className="relative">
         <div className="px-5 py-5 space-y-4">
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Staff member *</label>
@@ -277,6 +277,6 @@ export default function ShiftSlideOver({
           </div>
         )}
       </div>
-    </div>
+    </SlideOver>
   )
 }

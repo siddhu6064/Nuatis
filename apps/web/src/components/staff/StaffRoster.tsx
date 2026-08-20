@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Switch from '@mui/material/Switch'
 import StaffSlideOver from './StaffSlideOver'
 import { DAY_KEYS, DAY_LABEL, type Availability, type DayKey, type StaffMember } from './types'
 
@@ -144,10 +145,18 @@ export default function StaffRoster() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((m) => (
-            <button
+            <div
               key={m.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setSlideOver({ open: true, member: m })}
-              className={`text-left bg-white rounded-xl border border-border-brand p-5 hover:border-border-brand transition-colors ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setSlideOver({ open: true, member: m })
+                }
+              }}
+              className={`text-left bg-white rounded-xl border border-border-brand p-5 hover:border-border-brand transition-colors cursor-pointer ${
                 !m.is_active ? 'opacity-60' : ''
               }`}
             >
@@ -160,30 +169,20 @@ export default function StaffRoster() {
                   <p className="font-semibold text-ink truncate">{m.name}</p>
                   <p className="text-sm text-ink3 truncate">{m.role}</p>
                 </div>
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void toggleActive(m)
-                  }}
-                  role="switch"
-                  aria-checked={m.is_active}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                    m.is_active ? 'bg-teal-600' : 'bg-bg3'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      m.is_active ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </div>
+                <Switch
+                  size="small"
+                  checked={m.is_active}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => void toggleActive(m)}
+                  slotProps={{ input: { 'aria-label': `${m.name} active` } }}
+                />
               </div>
               <div className="space-y-1 text-xs text-ink3">
                 {m.email && <p className="truncate">{m.email}</p>}
                 {m.phone && <p className="truncate">{m.phone}</p>}
                 <p className="text-ink4 pt-1">{summarizeAvailability(m.availability)}</p>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

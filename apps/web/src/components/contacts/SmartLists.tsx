@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Chip from '@mui/material/Chip'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
 import type { FilterState } from './ContactFilters'
 
 interface SmartList {
@@ -99,50 +102,43 @@ export default function SmartLists({
     <div className="mb-4">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {lists.map((list) => (
-          <button
+          <Chip
             key={list.id}
+            label={list.name}
             onClick={() => onSelectList(list)}
-            className={`inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
-              activeListId === list.id
-                ? 'bg-teal-600 text-white'
-                : 'bg-white border border-gray-300 text-ink3 hover:border-teal-400 hover:text-teal-700'
-            }`}
-          >
-            {list.name}
-            <span
-              onClick={(e) => {
-                e.stopPropagation()
-                void deleteList(list.id)
-              }}
-              className={`cursor-pointer text-sm leading-none transition-colors ${
-                activeListId === list.id
-                  ? 'text-teal-200 hover:text-white'
-                  : 'text-gray-400 hover:text-red-500'
-              }`}
-            >
-              &times;
-            </span>
-          </button>
+            onDelete={() => void deleteList(list.id)}
+            color={activeListId === list.id ? 'primary' : 'default'}
+            variant={activeListId === list.id ? 'filled' : 'outlined'}
+            size="small"
+            sx={{ flexShrink: 0 }}
+          />
         ))}
 
         {hasActiveFilters && !showSaveInput && (
-          <button
+          <Button
             onClick={() => setShowSaveInput(true)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border border-dashed border-teal-400 text-teal-600 hover:bg-teal-50 transition-colors shrink-0"
+            size="small"
+            sx={{
+              borderRadius: 999,
+              borderStyle: 'dashed',
+              textTransform: 'none',
+              flexShrink: 0,
+            }}
+            variant="outlined"
           >
             + Save filters
-          </button>
+          </Button>
         )}
 
         {showSaveInput && (
           <div className="inline-flex items-center gap-1.5 shrink-0">
-            <input
-              ref={inputRef}
-              type="text"
+            <TextField
+              inputRef={inputRef}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="List name..."
-              className="text-xs border border-border-brand rounded-full px-3 py-1.5 w-32 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              size="small"
+              sx={{ width: 128, '& .MuiOutlinedInput-root': { borderRadius: 999 } }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void saveList()
                 if (e.key === 'Escape') {
@@ -151,22 +147,25 @@ export default function SmartLists({
                 }
               }}
             />
-            <button
+            <Button
               onClick={() => void saveList()}
               disabled={!newName.trim() || saving}
-              className="text-xs font-medium text-teal-600 hover:text-teal-700 disabled:opacity-50"
+              size="small"
+              sx={{ textTransform: 'none' }}
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setShowSaveInput(false)
                 setNewName('')
               }}
-              className="text-xs text-ink4 hover:text-ink3"
+              size="small"
+              color="inherit"
+              sx={{ textTransform: 'none' }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </div>

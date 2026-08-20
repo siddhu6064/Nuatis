@@ -1,13 +1,20 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, dateFnsLocalizer, View, Views } from 'react-big-calendar'
+import { Calendar, dateFnsLocalizer, View, Views, ToolbarProps } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { createClient } from '@supabase/supabase-js'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import AppointmentDrawer from './AppointmentDrawer'
 import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
+import { Modal } from '@/components/ui/Modal'
 import './calendar.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -123,6 +130,76 @@ const APPT_COLUMNS = [
 ]
 const APPT_DEFAULTS = Object.fromEntries(APPT_COLUMNS.map((c) => [c.key, true]))
 
+// ── Custom toolbar (replaces react-big-calendar's default plain-button bar) ────
+
+function CalendarToolbar({ view, label, onNavigate, onView }: ToolbarProps<CalendarEvent>) {
+  return (
+    <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-b border-border-brand">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => onNavigate('TODAY')}
+          sx={{
+            textTransform: 'none',
+            borderColor: '#dedad2',
+            color: 'text.primary',
+            fontWeight: 500,
+          }}
+        >
+          Today
+        </Button>
+        <div className="flex items-center -mx-1">
+          <IconButton size="small" onClick={() => onNavigate('PREV')} aria-label="Previous period">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+            </svg>
+          </IconButton>
+          <IconButton size="small" onClick={() => onNavigate('NEXT')} aria-label="Next period">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+            </svg>
+          </IconButton>
+        </div>
+        <h2 className="text-base font-semibold text-ink">{label}</h2>
+      </div>
+      <ToggleButtonGroup
+        value={view}
+        exclusive
+        onChange={(_, next: View | null) => next && onView(next)}
+        size="small"
+      >
+        <ToggleButton value={Views.MONTH} sx={{ textTransform: 'none', px: 2 }}>
+          Month
+        </ToggleButton>
+        <ToggleButton value={Views.WEEK} sx={{ textTransform: 'none', px: 2 }}>
+          Week
+        </ToggleButton>
+        <ToggleButton value={Views.DAY} sx={{ textTransform: 'none', px: 2 }}>
+          Day
+        </ToggleButton>
+        <ToggleButton value={Views.AGENDA} sx={{ textTransform: 'none', px: 2 }}>
+          Agenda
+        </ToggleButton>
+      </ToggleButtonGroup>
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -148,6 +225,7 @@ export default function AppointmentsCalendar({
   const [date, setDate] = useState(new Date())
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null)
+  const [apptDrawerOpen, setApptDrawerOpen] = useState(false)
   const [selectedBlockedAppt, setSelectedBlockedAppt] = useState<Appointment | null>(null)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -249,12 +327,13 @@ export default function AppointmentsCalendar({
       return {
         style: {
           backgroundColor: '#f59e0b',
-          borderColor: '#d97706',
+          borderColor: 'transparent',
           color: '#fff',
-          borderRadius: '4px',
+          borderRadius: '8px',
           fontSize: '12px',
-          padding: '2px 6px',
+          padding: '3px 8px',
           opacity: 0.85,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
         },
       }
     }
@@ -262,11 +341,12 @@ export default function AppointmentsCalendar({
     return {
       style: {
         backgroundColor: color,
-        borderColor: color,
+        borderColor: 'transparent',
         color: '#fff',
-        borderRadius: '4px',
+        borderRadius: '8px',
         fontSize: '12px',
-        padding: '2px 6px',
+        padding: '3px 8px',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
       },
     }
   }, [])
@@ -282,6 +362,7 @@ export default function AppointmentsCalendar({
       setSelectedBlockedAppt(event.resource)
     } else {
       setSelectedAppt(event.resource)
+      setApptDrawerOpen(true)
     }
   }, [])
 
@@ -386,24 +467,27 @@ export default function AppointmentsCalendar({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {(Object.entries(STATUS_COLOR) as [AppointmentStatus, string][]).map(([status, color]) => (
-          <span key={status} className="flex items-center gap-1.5 text-xs text-ink3">
+          <span
+            key={status}
+            className="flex items-center gap-1.5 text-xs font-medium text-ink3 bg-white border border-border-brand rounded-full px-2.5 py-1"
+          >
             <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
+              className="inline-block w-2 h-2 rounded-full"
               style={{ backgroundColor: color }}
             />
             {STATUS_LABEL[status]}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 text-xs text-ink3">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-400" />
+        <span className="flex items-center gap-1.5 text-xs font-medium text-ink3 bg-white border border-border-brand rounded-full px-2.5 py-1">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
           Blocked
         </span>
       </div>
 
       <div
-        className={`rbc-wrapper relative bg-white rounded-xl border border-border-brand overflow-hidden${
+        className={`rbc-wrapper relative bg-white rounded-2xl border border-border-brand shadow-sm overflow-hidden${
           loading ? ' opacity-60 pointer-events-none' : ''
         }`}
       >
@@ -419,6 +503,7 @@ export default function AppointmentsCalendar({
           onSelectSlot={handleSelectSlot}
           selectable
           eventPropGetter={eventPropGetter}
+          components={{ toolbar: CalendarToolbar }}
           style={{ height: 680 }}
           scrollToTime={SCROLL_TO_TIME}
           popup
@@ -432,173 +517,152 @@ export default function AppointmentsCalendar({
 
       {selectedAppt && (
         <AppointmentDrawer
+          open={apptDrawerOpen}
           appt={selectedAppt}
           userRole={userRole}
-          onClose={() => setSelectedAppt(null)}
+          onClose={() => setApptDrawerOpen(false)}
           onUpdated={(updated) => {
             setSelectedAppt(updated)
             setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
           }}
           onDeleted={() => {
             setAppointments((prev) => prev.filter((a) => a.id !== selectedAppt.id))
-            setSelectedAppt(null)
+            setApptDrawerOpen(false)
           }}
         />
       )}
 
       {/* Blocked slot panel */}
       {selectedBlockedAppt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/20" onClick={() => setSelectedBlockedAppt(null)} />
-          <div className="relative bg-white rounded-xl border border-border-brand shadow-xl p-5 w-full max-w-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                  Blocked
-                </span>
-                <p className="mt-2 text-sm font-medium text-ink">
-                  {selectedBlockedAppt.block_reason ?? 'Blocked time'}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedBlockedAppt(null)}
-                className="text-ink4 hover:text-ink3 text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-            <p className="text-xs text-ink4 mb-4">
-              {new Date(selectedBlockedAppt.start_time).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-              {' · '}
-              {new Date(selectedBlockedAppt.start_time).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-              {' – '}
-              {new Date(selectedBlockedAppt.end_time).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-            <button
+        <Modal
+          onClose={() => setSelectedBlockedAppt(null)}
+          title={selectedBlockedAppt.block_reason ?? 'Blocked time'}
+          maxWidth="xs"
+          footer={
+            <Button
               onClick={() => void deleteBlocked(selectedBlockedAppt.id)}
-              className="w-full px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              variant="outlined"
+              color="error"
+              fullWidth
             >
               Remove Block
-            </button>
-          </div>
-        </div>
+            </Button>
+          }
+        >
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+            Blocked
+          </span>
+          <p className="text-xs text-ink4 mt-3">
+            {new Date(selectedBlockedAppt.start_time).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+            {' · '}
+            {new Date(selectedBlockedAppt.start_time).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+            {' – '}
+            {new Date(selectedBlockedAppt.end_time).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </p>
+        </Modal>
       )}
 
       {/* Block Time modal */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/30" onClick={() => setShowBlockModal(false)} />
-          <div className="relative bg-white rounded-xl border border-border-brand shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-base font-semibold text-ink mb-4">Block Off Time</h2>
-
-            <div className="space-y-3">
-              {locations.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">
-                    Calendar (optional)
-                  </label>
-                  <select
-                    value={blockCalendarId}
-                    onChange={(e) => setBlockCalendarId(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">Any calendar</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={blockDate}
-                  onChange={(e) => setBlockDate(e.target.value)}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">Start Time</label>
-                  <select
-                    value={blockStart}
-                    onChange={(e) => setBlockStart(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {TIME_SLOTS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink3 mb-1">End Time</label>
-                  <select
-                    value={blockEnd}
-                    onChange={(e) => setBlockEnd(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {TIME_SLOTS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-ink3 mb-1">
-                  Reason (optional)
-                </label>
-                <input
-                  type="text"
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Lunch / Meeting / Vacation"
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitBlock()
-                  }}
-                />
-              </div>
-
-              {blockError && <p className="text-xs text-red-600">{blockError}</p>}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowBlockModal(false)}
-                className="px-4 py-2 text-sm text-ink3 hover:text-ink2"
-              >
+        <Modal
+          onClose={() => setShowBlockModal(false)}
+          title="Block Off Time"
+          footer={
+            <>
+              <Button onClick={() => setShowBlockModal(false)} variant="text" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={() => void submitBlock()}
-                disabled={blockSaving}
-                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              </Button>
+              <Button onClick={() => void submitBlock()} disabled={blockSaving} variant="contained">
+                {blockSaving ? 'Blocking…' : 'Block Time'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {locations.length > 0 && (
+              <TextField
+                select
+                label="Calendar (optional)"
+                value={blockCalendarId}
+                onChange={(e) => setBlockCalendarId(e.target.value)}
+                fullWidth
+                size="small"
               >
-                {blockSaving ? 'Blocking...' : 'Block Time'}
-              </button>
+                <MenuItem value="">Any calendar</MenuItem>
+                {locations.map((l) => (
+                  <MenuItem key={l.id} value={l.id}>
+                    {l.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            <TextField
+              label="Date"
+              type="date"
+              value={blockDate}
+              onChange={(e) => setBlockDate(e.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <TextField
+                select
+                label="Start Time"
+                value={blockStart}
+                onChange={(e) => setBlockStart(e.target.value)}
+                fullWidth
+                size="small"
+              >
+                {TIME_SLOTS.map((s) => (
+                  <MenuItem key={s.value} value={s.value}>
+                    {s.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="End Time"
+                value={blockEnd}
+                onChange={(e) => setBlockEnd(e.target.value)}
+                fullWidth
+                size="small"
+              >
+                {TIME_SLOTS.map((s) => (
+                  <MenuItem key={s.value} value={s.value}>
+                    {s.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </div>
+
+            <TextField
+              label="Reason (optional)"
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="Lunch / Meeting / Vacation"
+              fullWidth
+              size="small"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitBlock()
+              }}
+            />
+
+            {blockError && <p className="text-xs text-red-600">{blockError}</p>}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Toast */}

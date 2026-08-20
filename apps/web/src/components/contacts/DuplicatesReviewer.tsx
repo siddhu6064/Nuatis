@@ -1,6 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 interface ContactSummary {
   id: string
@@ -186,18 +191,12 @@ export default function DuplicatesReviewer() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openMerge(pair)}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700"
-                >
+                <Button onClick={() => openMerge(pair)} variant="contained" size="small">
                   Merge {'\u2192'}
-                </button>
-                <button
-                  onClick={() => dismiss(pair)}
-                  className="px-3 py-1.5 text-xs text-ink3 hover:text-ink2"
-                >
+                </Button>
+                <Button onClick={() => dismiss(pair)} size="small" color="inherit">
                   Not a duplicate
-                </button>
+                </Button>
               </div>
             </div>
           )
@@ -206,95 +205,104 @@ export default function DuplicatesReviewer() {
 
       {/* Merge modal */}
       {mergeModal && primary && secondary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMergeModal(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-border-brand w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-sm font-bold text-ink mb-4">Merge Contacts</h3>
-
-            {/* Primary selector */}
-            <div className="mb-4">
-              <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Keep as primary</p>
-              <div className="flex gap-2">
-                {[mergeModal.contact_a, mergeModal.contact_b].map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setPrimaryId(c.id)}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs text-left border transition-colors ${
-                      primaryId === c.id
-                        ? 'border-teal-500 bg-teal-50 text-teal-700'
-                        : 'border-border-brand text-ink3 hover:bg-bg'
-                    }`}
-                  >
-                    <span className="font-medium">{c.full_name}</span>
-                    <br />
-                    {c.phone ?? c.email ?? ''}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Field choices */}
-            <div className="space-y-2 mb-4">
-              {(['name', 'phone', 'email'] as const).map((field) => {
-                const pVal =
-                  field === 'name'
-                    ? primary.full_name
-                    : field === 'phone'
-                      ? primary.phone
-                      : primary.email
-                const sVal =
-                  field === 'name'
-                    ? secondary.full_name
-                    : field === 'phone'
-                      ? secondary.phone
-                      : secondary.email
-
-                return (
-                  <div key={field} className="flex items-center gap-3 text-xs">
-                    <span className="w-14 text-ink4 capitalize">{field}</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name={field}
-                        checked={fieldChoices[field] !== 'secondary'}
-                        onChange={() => setFieldChoices({ ...fieldChoices, [field]: 'primary' })}
-                        className="w-3 h-3 text-teal-600"
-                      />
-                      <span className="text-ink2">{pVal ?? '\u2014'}</span>
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name={field}
-                        checked={fieldChoices[field] === 'secondary'}
-                        onChange={() => setFieldChoices({ ...fieldChoices, [field]: 'secondary' })}
-                        className="w-3 h-3 text-teal-600"
-                      />
-                      <span className="text-ink2">{sVal ?? '\u2014'}</span>
-                    </label>
-                  </div>
-                )
-              })}
-              <div className="flex items-center gap-3 text-xs">
-                <span className="w-14 text-ink4">Tags</span>
-                <span className="text-ink3 italic">Merge both</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-3 border-t border-border-brand">
-              <button onClick={() => setMergeModal(null)} className="px-4 py-2 text-xs text-ink3">
+        <Modal
+          onClose={() => setMergeModal(null)}
+          title="Merge Contacts"
+          maxWidth="sm"
+          footer={
+            <>
+              <Button
+                onClick={() => setMergeModal(null)}
+                variant="text"
+                color="inherit"
+                size="small"
+              >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void doMerge()}
                 disabled={merging}
-                className="px-4 py-2 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                variant="contained"
+                size="small"
               >
                 {merging ? 'Merging...' : 'Merge contacts'}
-              </button>
+              </Button>
+            </>
+          }
+        >
+          {/*
+            Primary selector: intentionally left as plain Tailwind buttons,
+            not MUI ToggleButtonGroup. This is a custom card-picker, not a
+            semantic radio choice \u2014 introducing a new MUI component type
+            here isn't justified by this one usage. The field choices below
+            ARE a real radio choice (mutually exclusive per field), so those
+            convert to RadioGroup/Radio, matching the pattern already
+            established in subscriptions' CancelModal.
+          */}
+          <div className="mb-4">
+            <p className="text-[10px] font-medium text-ink4 uppercase mb-1.5">Keep as primary</p>
+            <div className="flex gap-2">
+              {[mergeModal.contact_a, mergeModal.contact_b].map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setPrimaryId(c.id)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs text-left border transition-colors ${
+                    primaryId === c.id
+                      ? 'border-teal-500 bg-teal-50 text-teal-700'
+                      : 'border-border-brand text-ink3 hover:bg-bg'
+                  }`}
+                >
+                  <span className="font-medium">{c.full_name}</span>
+                  <br />
+                  {c.phone ?? c.email ?? ''}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
+
+          <div className="space-y-2 mb-4">
+            {(['name', 'phone', 'email'] as const).map((field) => {
+              const pVal =
+                field === 'name'
+                  ? primary.full_name
+                  : field === 'phone'
+                    ? primary.phone
+                    : primary.email
+              const sVal =
+                field === 'name'
+                  ? secondary.full_name
+                  : field === 'phone'
+                    ? secondary.phone
+                    : secondary.email
+
+              return (
+                <div key={field} className="flex items-center gap-3 text-xs">
+                  <span className="w-14 text-ink4 capitalize">{field}</span>
+                  <RadioGroup
+                    row
+                    value={fieldChoices[field] === 'secondary' ? 'secondary' : 'primary'}
+                    onChange={(e) => setFieldChoices({ ...fieldChoices, [field]: e.target.value })}
+                  >
+                    <FormControlLabel
+                      value="primary"
+                      control={<Radio size="small" />}
+                      label={<span className="text-ink2 text-xs">{pVal ?? '\u2014'}</span>}
+                    />
+                    <FormControlLabel
+                      value="secondary"
+                      control={<Radio size="small" />}
+                      label={<span className="text-ink2 text-xs">{sVal ?? '\u2014'}</span>}
+                    />
+                  </RadioGroup>
+                </div>
+              )
+            })}
+            <div className="flex items-center gap-3 text-xs">
+              <span className="w-14 text-ink4">Tags</span>
+              <span className="text-ink3 italic">Merge both</span>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

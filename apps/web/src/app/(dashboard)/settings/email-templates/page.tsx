@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { VERTICALS as VERTICALS_CONFIG } from '@nuatis/shared'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import { Modal } from '@/components/ui/Modal'
 
 const VERTICALS = Object.entries(VERTICALS_CONFIG).map(([slug, config]) => ({
   value: slug,
@@ -238,103 +242,91 @@ export default function EmailTemplatesPage() {
 
       {/* Create / Edit Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl mx-4">
-            <h2 className="text-base font-semibold text-ink mb-5">
-              {editingTemplate ? 'Edit Template' : 'Create Template'}
-            </h2>
-
-            <div className="space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Welcome Email"
-                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Subject */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Subject</label>
-                <input
-                  type="text"
-                  value={form.subject}
-                  onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-                  placeholder="e.g. Welcome to {{business_name}}!"
-                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Vertical */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">
-                  Vertical <span className="text-ink4 font-normal">(optional)</span>
-                </label>
-                <select
-                  value={form.vertical}
-                  onChange={(e) => setForm((prev) => ({ ...prev, vertical: e.target.value }))}
-                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">— Any vertical —</option>
-                  {VERTICALS.map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Body */}
-              <div>
-                <label className="block text-xs font-medium text-ink2 mb-1">Body</label>
-
-                {/* Merge tag buttons */}
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {MERGE_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => insertTag(tag)}
-                      className="rounded border border-border-brand bg-bg px-2 py-0.5 text-xs text-ink3 hover:bg-bg2 transition-colors font-mono"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-
-                <textarea
-                  rows={8}
-                  value={form.body}
-                  onChange={(e) => setForm((prev) => ({ ...prev, body: e.target.value }))}
-                  placeholder="Write your email body here…"
-                  className="w-full rounded-lg border border-border-brand px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={closeModal}
-                disabled={saving}
-                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg transition-colors"
-              >
+        <Modal
+          onClose={closeModal}
+          title={editingTemplate ? 'Edit Template' : 'Create Template'}
+          footer={
+            <>
+              <Button onClick={closeModal} disabled={saving} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSave}
                 disabled={saving || !form.name.trim() || !form.subject.trim() || !form.body.trim()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                variant="contained"
               >
                 {saving ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <TextField
+              label="Name"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Welcome Email"
+              fullWidth
+              size="small"
+            />
+
+            <TextField
+              label="Subject"
+              value={form.subject}
+              onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+              placeholder="e.g. Welcome to {{business_name}}!"
+              fullWidth
+              size="small"
+            />
+
+            <TextField
+              select
+              label="Vertical (optional)"
+              value={form.vertical}
+              onChange={(e) => setForm((prev) => ({ ...prev, vertical: e.target.value }))}
+              fullWidth
+              size="small"
+            >
+              <MenuItem value="">— Any vertical —</MenuItem>
+              {VERTICALS.map((v) => (
+                <MenuItem key={v.value} value={v.value}>
+                  {v.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <div>
+              <label className="block text-xs font-medium text-ink2 mb-1">Body</label>
+
+              {/* Merge tag buttons — plain Tailwind buttons kept as-is, not
+                  worth an MUI Button here: they're small inline chips, not
+                  a case the earlier button-collision checklist item flags
+                  (button has no globals.css rule to collide with). */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {MERGE_TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => insertTag(tag)}
+                    className="rounded border border-border-brand bg-bg px-2 py-0.5 text-xs text-ink3 hover:bg-bg2 transition-colors font-mono"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              <TextField
+                multiline
+                rows={8}
+                value={form.body}
+                onChange={(e) => setForm((prev) => ({ ...prev, body: e.target.value }))}
+                placeholder="Write your email body here…"
+                fullWidth
+                size="small"
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

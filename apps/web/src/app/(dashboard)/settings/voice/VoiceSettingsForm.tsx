@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Switch from '@mui/material/Switch'
 
 interface BusinessHours {
   mon_fri: string
@@ -285,19 +286,12 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
               </p>
             </div>
           </div>
-          <button
-            onClick={toggleMaya}
+          <Switch
+            checked={form.maya_enabled}
+            onChange={() => void toggleMaya()}
             disabled={toggling}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 ${
-              form.maya_enabled ? 'bg-teal-600' : 'bg-bg3'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                form.maya_enabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+            slotProps={{ input: { 'aria-label': 'Maya enabled' } }}
+          />
         </div>
         {!form.maya_enabled && (
           <div className="mt-3 px-3 py-2 bg-amber-50 rounded-lg">
@@ -463,18 +457,11 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-semibold text-ink">After-Hours Mode</h2>
-          <button
-            onClick={() => setAhEnabled((v) => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
-              ahEnabled ? 'bg-teal-600' : 'bg-bg3'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                ahEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+          <Switch
+            checked={ahEnabled}
+            onChange={(e) => setAhEnabled(e.target.checked)}
+            slotProps={{ input: { 'aria-label': 'After-hours mode' } }}
+          />
         </div>
         <p className="text-xs text-ink4 mb-4">
           When enabled, Maya delivers a custom message to callers outside your business hours
@@ -506,19 +493,12 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
                   const day = ahSchedule[key] ?? { open: '09:00', close: '17:00', enabled: false }
                   return (
                     <div key={key} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateDaySchedule(key, 'enabled', !day.enabled)}
-                        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
-                          day.enabled ? 'bg-teal-600' : 'bg-bg3'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                            day.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
+                      <Switch
+                        size="small"
+                        checked={day.enabled}
+                        onChange={(e) => updateDaySchedule(key, 'enabled', e.target.checked)}
+                        slotProps={{ input: { 'aria-label': `${label} after-hours` } }}
+                      />
                       <span className="w-20 text-sm text-ink">{label}</span>
                       {day.enabled ? (
                         <>

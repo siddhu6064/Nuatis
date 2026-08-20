@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Switch from '@mui/material/Switch'
 
 const API_URL = ''
 
@@ -103,23 +104,12 @@ export default function LabsClient() {
                   </div>
                   <p className="text-xs text-ink3 mt-0.5">{f.description}</p>
                 </div>
-                {/* Toggle switch */}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={enabled}
+                <Switch
+                  checked={enabled}
                   disabled={!f.available || isSaving}
-                  onClick={() => toggle(f.key, !enabled)}
-                  className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors ${
-                    !f.available ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-                  } ${enabled ? 'bg-teal-600' : 'bg-gray-200'}`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      enabled ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                  onChange={() => toggle(f.key, !enabled)}
+                  slotProps={{ input: { 'aria-label': f.label } }}
+                />
               </div>
             )
           })}
