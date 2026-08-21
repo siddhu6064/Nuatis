@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import { Modal } from '@/components/ui/Modal'
 
 interface Contact {
@@ -200,12 +201,9 @@ export default function PaymentLinksPage() {
           <h1 className="text-xl font-bold text-ink">Payment Links</h1>
           <p className="text-sm text-ink4 mt-0.5">Collect deposits and fees instantly via Stripe</p>
         </div>
-        <button
-          onClick={openModal}
-          className="text-sm text-white bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg font-medium"
-        >
+        <Button onClick={openModal} variant="contained">
           Get Payment Link
-        </button>
+        </Button>
       </div>
 
       {/* Links table */}
@@ -261,20 +259,23 @@ export default function PaymentLinksPage() {
                   </td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center gap-2 justify-end">
-                      <button
+                      <Button
                         onClick={() => copyUrl(link.url, link.id)}
-                        className="text-xs text-teal-600 hover:text-teal-700"
+                        size="small"
+                        sx={{ fontSize: 12, minWidth: 0, p: 0 }}
                       >
                         {copiedId === link.id ? 'Copied!' : 'Copy'}
-                      </button>
+                      </Button>
                       <span className="text-ink4">·</span>
-                      <button
+                      <Button
                         onClick={() => void deactivate(link.id)}
                         disabled={deactivating === link.id}
-                        className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+                        size="small"
+                        color="error"
+                        sx={{ fontSize: 12, minWidth: 0, p: 0 }}
                       >
                         {deactivating === link.id ? 'Deactivating...' : 'Deactivate'}
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -381,25 +382,26 @@ export default function PaymentLinksPage() {
                 {selectedContact ? (
                   <div className="flex items-center justify-between px-3 py-2 border border-teal-300 bg-teal-50 rounded-lg">
                     <span className="text-sm text-teal-700">{selectedContact.full_name}</span>
-                    <button
+                    <IconButton
                       onClick={() => {
                         setSelectedContact(null)
                         setContactSearch('')
                       }}
-                      className="text-xs text-teal-500 hover:text-teal-700"
+                      size="small"
+                      sx={{ color: '#0f766e' }}
                     >
                       ×
-                    </button>
+                    </IconButton>
                   </div>
                 ) : (
                   <div className="relative" ref={searchRef}>
-                    <input
-                      type="text"
+                    <TextField
                       value={contactSearch}
                       onChange={(e) => setContactSearch(e.target.value)}
                       onFocus={() => contactResults.length > 0 && setSearchOpen(true)}
                       placeholder="Search contacts..."
-                      className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      fullWidth
+                      size="small"
                     />
                     {searchOpen && contactResults.length > 0 && (
                       <div className="absolute z-10 top-full mt-1 w-full bg-white border border-border-brand rounded-lg shadow-lg overflow-hidden">

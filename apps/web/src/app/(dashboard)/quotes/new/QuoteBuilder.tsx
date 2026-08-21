@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Switch from '@mui/material/Switch'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 interface Contact {
   id: string
@@ -316,9 +323,6 @@ export default function QuoteBuilder({
     }
   }
 
-  const inputCls =
-    'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-bold text-ink mb-6">New Quote</h1>
@@ -328,27 +332,30 @@ export default function QuoteBuilder({
         <div className="bg-white rounded-xl border border-border-brand p-6 space-y-4">
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Contact</label>
-            <select
+            <TextField
+              select
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
-              className={inputCls}
+              fullWidth
+              size="small"
+              slotProps={{ select: { displayEmpty: true } }}
             >
-              <option value="">Select a contact...</option>
+              <MenuItem value="">Select a contact...</MenuItem>
               {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
+                <MenuItem key={c.id} value={c.id}>
                   {c.full_name} {c.phone ? `(${c.phone})` : ''}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           </div>
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Title</label>
-            <input
-              type="text"
+            <TextField
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Dental Treatment Plan"
-              className={inputCls}
+              fullWidth
+              size="small"
             />
           </div>
         </div>
@@ -357,25 +364,24 @@ export default function QuoteBuilder({
         <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-ink">Line Items</h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               {/* Catalog tab selector */}
-              <div className="flex items-center border border-border-brand rounded-lg overflow-hidden text-xs">
-                <button
-                  onClick={() => setCatalogTab('services')}
-                  className={`px-3 py-1.5 ${catalogTab === 'services' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
-                >
+              <ToggleButtonGroup
+                value={catalogTab}
+                exclusive
+                onChange={(_e, v: 'services' | 'packages' | null) => v && setCatalogTab(v)}
+                size="small"
+              >
+                <ToggleButton value="services" sx={{ fontSize: 12, py: 0.5 }}>
                   Services
-                </button>
-                <button
-                  onClick={() => setCatalogTab('packages')}
-                  className={`px-3 py-1.5 border-l border-border-brand ${catalogTab === 'packages' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
-                >
+                </ToggleButton>
+                <ToggleButton value="packages" sx={{ fontSize: 12, py: 0.5 }}>
                   Packages
-                </button>
-              </div>
-              <button onClick={addCustom} className="text-xs text-ink3 font-medium hover:text-ink2">
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Button onClick={addCustom} size="small" sx={{ fontSize: 12 }}>
                 + Custom Item
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -472,13 +478,14 @@ export default function QuoteBuilder({
                         {/* Package header */}
                         <div className="flex items-center justify-between py-1">
                           <span className="text-xs font-semibold text-indigo-700">{pkgName}</span>
-                          <button
+                          <IconButton
                             onClick={() => removePackageGroup(item.package_id!)}
-                            className="text-gray-300 hover:text-red-500 text-sm"
+                            size="small"
                             title="Remove entire package"
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
                           >
                             &times;
-                          </button>
+                          </IconButton>
                         </div>
                         {groupItems.map((gi) => (
                           <div
@@ -516,48 +523,49 @@ export default function QuoteBuilder({
                     rendered.push(
                       <div key={item.key} className="grid grid-cols-12 gap-2 items-center">
                         <div className="col-span-5">
-                          <input
-                            type="text"
+                          <TextField
                             value={item.description}
                             onChange={(e) => updateItem(item.key, 'description', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                             placeholder="Description"
+                            fullWidth
+                            size="small"
                           />
                         </div>
                         <div className="col-span-2">
-                          <input
+                          <TextField
                             type="number"
                             value={item.quantity}
                             onChange={(e) =>
                               updateItem(item.key, 'quantity', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
-                            min="0"
-                            step="1"
+                            fullWidth
+                            size="small"
+                            slotProps={{ htmlInput: { min: 0, step: 1 } }}
                           />
                         </div>
                         <div className="col-span-2">
-                          <input
+                          <TextField
                             type="number"
                             value={item.unit_price}
                             onChange={(e) =>
                               updateItem(item.key, 'unit_price', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full px-2 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
-                            min="0"
-                            step="0.01"
+                            fullWidth
+                            size="small"
+                            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                           />
                         </div>
                         <div className="col-span-2 text-sm text-ink2 font-medium px-1">
                           ${(item.quantity * item.unit_price).toFixed(2)}
                         </div>
                         <div className="col-span-1 text-right">
-                          <button
+                          <IconButton
                             onClick={() => removeItem(item.key)}
-                            className="text-gray-300 hover:text-red-500 text-sm"
+                            size="small"
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
                           >
                             &times;
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                     )
@@ -575,67 +583,70 @@ export default function QuoteBuilder({
             <div className="w-64 space-y-2">
               {/* Inline discount toggle */}
               {!discountEnabled ? (
-                <button
-                  type="button"
+                <Button
                   onClick={() => setDiscountEnabled(true)}
-                  className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 pb-1"
+                  size="small"
+                  sx={{ fontSize: 12, display: 'flex', mb: 0.5 }}
                 >
                   + Add Discount
-                </button>
+                </Button>
               ) : (
                 <div className="space-y-1.5 pb-2 border-b border-dashed border-border-brand">
                   <div className="flex items-center gap-1.5">
-                    <div className="flex border border-border-brand rounded overflow-hidden text-xs shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDiscountType('percentage')
-                          setDiscountValue(0)
-                        }}
-                        className={`px-2 py-1 ${discountType === 'percentage' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
-                      >
+                    <ToggleButtonGroup
+                      value={discountType}
+                      exclusive
+                      onChange={(_e, v: 'percentage' | 'fixed' | null) => {
+                        if (!v) return
+                        setDiscountType(v)
+                        setDiscountValue(0)
+                      }}
+                      size="small"
+                      sx={{ flexShrink: 0 }}
+                    >
+                      <ToggleButton value="percentage" sx={{ fontSize: 12, px: 1, py: 0.5 }}>
                         %
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDiscountType('fixed')
-                          setDiscountValue(0)
-                        }}
-                        className={`px-2 py-1 border-l border-border-brand ${discountType === 'fixed' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'}`}
-                      >
+                      </ToggleButton>
+                      <ToggleButton value="fixed" sx={{ fontSize: 12, px: 1, py: 0.5 }}>
                         $
-                      </button>
-                    </div>
-                    <input
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                    <TextField
                       type="number"
                       value={discountValue}
                       onChange={(e) =>
                         setDiscountValue(Math.max(0, parseFloat(e.target.value) || 0))
                       }
-                      className={`w-16 px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-1 ${discountExceedsMax ? 'border-red-300 focus:ring-red-500' : 'border-border-brand focus:ring-teal-500'}`}
+                      error={discountExceedsMax}
                       placeholder="0"
-                      min="0"
-                      step={discountType === 'percentage' ? 1 : 0.01}
+                      size="small"
+                      sx={{ width: 72 }}
+                      slotProps={{
+                        htmlInput: { min: 0, step: discountType === 'percentage' ? 1 : 0.01 },
+                      }}
                     />
-                    <input
-                      type="text"
+                    <TextField
                       value={discountLabel}
                       onChange={(e) => setDiscountLabel(e.target.value)}
-                      className="flex-1 min-w-0 px-2 py-1 text-xs border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
                       placeholder="SUMMER20 or New Client"
+                      size="small"
+                      fullWidth
                     />
-                    <button
-                      type="button"
+                    <IconButton
                       onClick={() => {
                         setDiscountEnabled(false)
                         setDiscountValue(0)
                         setDiscountLabel('')
                       }}
-                      className="text-gray-300 hover:text-red-500 text-sm shrink-0"
+                      size="small"
+                      sx={{
+                        color: 'text.disabled',
+                        '&:hover': { color: 'error.main' },
+                        flexShrink: 0,
+                      }}
                     >
                       &times;
-                    </button>
+                    </IconButton>
                   </div>
                   {discountExceedsMax && (
                     <p className="text-xs text-red-600">
@@ -669,13 +680,13 @@ export default function QuoteBuilder({
               )}
               <div className="flex justify-between text-sm items-center gap-2">
                 <span className="text-ink3">{taxLabel} (%)</span>
-                <input
+                <TextField
                   type="number"
                   value={taxRate}
                   onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                  className="w-20 px-2 py-1 text-sm text-right border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  min="0"
-                  step="0.01"
+                  size="small"
+                  sx={{ width: 90 }}
+                  slotProps={{ htmlInput: { min: 0, step: 0.01, style: { textAlign: 'right' } } }}
                 />
               </div>
               {taxRate > 0 && (
@@ -726,41 +737,41 @@ export default function QuoteBuilder({
           <div className="grid grid-cols-2 gap-4 mt-6">
             <div>
               <label className="block text-xs font-medium text-ink2 mb-1.5">Valid for</label>
-              <select
+              <TextField
+                select
                 value={validDays}
                 onChange={(e) => setValidDays(parseInt(e.target.value))}
-                className={inputCls}
+                fullWidth
+                size="small"
               >
                 {VALID_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <MenuItem key={o.value} value={o.value}>
                     {o.label}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
             </div>
             <div>
               <label className="block text-xs font-medium text-ink2 mb-1.5">Notes</label>
-              <input
-                type="text"
+              <TextField
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes..."
-                className={inputCls}
+                fullWidth
+                size="small"
               />
             </div>
           </div>
         </div>
 
         {/* E-signature toggle — only shown for new (draft) quotes */}
-        <div className="bg-white rounded-xl border border-border-brand p-4 flex items-start gap-3">
-          <input
-            id="require-signature"
-            type="checkbox"
+        <div className="bg-white rounded-xl border border-border-brand p-4 flex items-center gap-3">
+          <Switch
             checked={requireSignature}
             onChange={(e) => setRequireSignature(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border-brand text-teal-600 focus:ring-teal-500 cursor-pointer"
+            size="small"
           />
-          <label htmlFor="require-signature" className="cursor-pointer select-none">
+          <label className="cursor-pointer select-none">
             <span className="block text-sm font-medium text-ink">Require e-signature</span>
             <span className="block text-xs text-ink3 mt-0.5">
               Client must sign before quote is accepted.
@@ -772,20 +783,17 @@ export default function QuoteBuilder({
         {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => save(false)}
-            disabled={saving}
-            className="px-4 py-2 bg-bg2 text-ink2 text-sm font-medium rounded-lg hover:bg-bg3 disabled:opacity-50 transition-colors"
-          >
+          <Button onClick={() => save(false)} disabled={saving} variant="outlined" color="inherit">
             Save as Draft
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => save(true)}
             disabled={saving || discountExceedsMax}
-            className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors ${needsApproval ? 'bg-amber-500 hover:bg-amber-600' : 'bg-teal-600 hover:bg-teal-700'}`}
+            variant="contained"
+            color={needsApproval ? 'warning' : 'primary'}
           >
             {saving ? 'Saving...' : needsApproval ? 'Save & Submit for Approval' : 'Save & Send'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

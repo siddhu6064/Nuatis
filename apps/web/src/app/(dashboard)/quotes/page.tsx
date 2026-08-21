@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { NewQuoteButton, NewQuoteLink } from './NewQuoteButton'
 
 interface Quote {
   id: string
@@ -70,13 +71,7 @@ export default async function QuotesPage() {
           <h1 className="text-xl font-bold text-ink">Quotes</h1>
           <p className="text-sm text-ink3 mt-0.5">{quotes?.length ?? 0} total</p>
         </div>
-        <Link
-          href="/quotes/new"
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          New Quote
-        </Link>
+        <NewQuoteButton />
       </div>
 
       <div className="bg-white rounded-xl border border-border-brand">
@@ -89,9 +84,7 @@ export default async function QuotesPage() {
             <p className="text-xs text-gray-300 mt-1">
               Create your first quote to send proposals to customers
             </p>
-            <Link href="/quotes/new" className="mt-4 text-xs text-teal-600 font-medium">
-              New Quote &rarr;
-            </Link>
+            <NewQuoteLink />
           </div>
         ) : (
           <table className="w-full">
