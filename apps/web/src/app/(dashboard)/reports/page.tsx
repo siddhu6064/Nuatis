@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import { Modal } from '@/components/ui/Modal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -373,65 +381,67 @@ export default function ReportsPage() {
         <h3 className="text-base font-semibold text-ink mb-1">Metric</h3>
         <p className="text-sm text-ink3 mb-4">What do you want to measure?</p>
 
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors border-blue-500 bg-blue-50">
-            <input
-              type="radio"
-              name="metric"
-              value="count"
-              checked={wizard.metric === 'count'}
-              onChange={() => setWizard((w) => ({ ...w, metric: 'count', metric_field: null }))}
-              className="text-blue-500"
-            />
-            <div>
-              <div className="font-medium text-sm text-ink">Count</div>
-              <div className="text-xs text-ink3">Number of {getObjectMeta(obj)?.label}</div>
-            </div>
-          </label>
+        <RadioGroup
+          value={wizard.metric}
+          onChange={(_e, v) =>
+            setWizard((w) => ({
+              ...w,
+              metric: v as MetricFn,
+              metric_field: v === 'count' ? null : w.metric_field,
+            }))
+          }
+        >
+          <FormControlLabel
+            value="count"
+            control={<Radio size="small" />}
+            label={
+              <div>
+                <div className="font-medium text-sm text-ink">Count</div>
+                <div className="text-xs text-ink3">Number of {getObjectMeta(obj)?.label}</div>
+              </div>
+            }
+            className="!items-start !ml-0 !mb-2 !p-3 rounded-lg border-2 border-blue-500 bg-blue-50"
+          />
 
-          {hasFields && (
-            <>
-              {(['sum', 'avg', 'min', 'max'] as MetricFn[]).map((fn) => (
-                <label
-                  key={fn}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                    wizard.metric === fn
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-border-brand hover:border-border-brand'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="metric"
-                    value={fn}
-                    checked={wizard.metric === fn}
-                    onChange={() => setWizard((w) => ({ ...w, metric: fn }))}
-                    className="mt-0.5 text-blue-500"
-                  />
-                  <div className="flex-1">
+          {hasFields &&
+            (['sum', 'avg', 'min', 'max'] as MetricFn[]).map((fn) => (
+              <div
+                key={fn}
+                className={`p-3 mb-2 rounded-lg border-2 transition-colors ${
+                  wizard.metric === fn ? 'border-blue-500 bg-blue-50' : 'border-border-brand'
+                }`}
+              >
+                <FormControlLabel
+                  value={fn}
+                  control={<Radio size="small" />}
+                  label={
                     <div className="font-medium text-sm text-ink capitalize">
                       {fn === 'avg' ? 'Average' : fn.charAt(0).toUpperCase() + fn.slice(1)}
                     </div>
-                    {wizard.metric === fn && (
-                      <select
-                        value={wizard.metric_field ?? ''}
-                        onChange={(e) => setWizard((w) => ({ ...w, metric_field: e.target.value }))}
-                        className="mt-2 block w-full text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      >
-                        <option value="">Select field…</option>
-                        {fields.map((f) => (
-                          <option key={f.key} value={f.key}>
-                            {f.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </label>
-              ))}
-            </>
-          )}
-        </div>
+                  }
+                  className="!items-start !ml-0"
+                />
+                {wizard.metric === fn && (
+                  <TextField
+                    select
+                    value={wizard.metric_field ?? ''}
+                    onChange={(e) => setWizard((w) => ({ ...w, metric_field: e.target.value }))}
+                    fullWidth
+                    size="small"
+                    slotProps={{ select: { displayEmpty: true } }}
+                    sx={{ mt: 1 }}
+                  >
+                    <MenuItem value="">Select field…</MenuItem>
+                    {fields.map((f) => (
+                      <MenuItem key={f.key} value={f.key}>
+                        {f.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              </div>
+            ))}
+        </RadioGroup>
       </div>
     )
   }
@@ -445,17 +455,19 @@ export default function ReportsPage() {
         <h3 className="text-base font-semibold text-ink mb-1">Group By</h3>
         <p className="text-sm text-ink3 mb-4">How do you want to break it down?</p>
 
-        <select
+        <TextField
+          select
           value={wizard.group_by ?? ''}
           onChange={(e) => setWizard((w) => ({ ...w, group_by: e.target.value || null }))}
-          className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          fullWidth
+          size="small"
         >
           {fields.map((f) => (
-            <option key={f.key} value={f.key}>
+            <MenuItem key={f.key} value={f.key}>
               {f.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
+        </TextField>
 
         {wizard.group_by && (
           <p className="mt-3 text-xs text-ink4">
@@ -507,56 +519,57 @@ export default function ReportsPage() {
               key={i}
               className="flex items-center gap-2 p-3 bg-bg rounded-lg border border-border-brand"
             >
-              <select
+              <TextField
+                select
                 value={filter.field}
                 onChange={(e) => updateFilter(i, { field: e.target.value })}
-                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                size="small"
               >
                 {fields.map((f) => (
-                  <option key={f.key} value={f.key}>
+                  <MenuItem key={f.key} value={f.key}>
                     {f.label}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
 
-              <select
+              <TextField
+                select
                 value={filter.operator}
                 onChange={(e) =>
                   updateFilter(i, { operator: e.target.value as ReportFilter['operator'] })
                 }
-                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                size="small"
               >
                 {Object.entries(OPERATOR_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
+                  <MenuItem key={k} value={k}>
                     {v}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
 
-              <input
-                type="text"
+              <TextField
                 value={filter.value}
                 onChange={(e) => updateFilter(i, { value: e.target.value })}
                 placeholder="Value"
-                className="flex-1 text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                fullWidth
+                size="small"
               />
 
-              <button
+              <Button
                 onClick={() => removeFilter(i)}
-                className="text-red-400 hover:text-red-600 text-sm px-2"
+                size="small"
+                color="error"
+                sx={{ fontSize: 13 }}
               >
                 Remove
-              </button>
+              </Button>
             </div>
           ))}
         </div>
 
-        <button
-          onClick={addFilter}
-          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          <span>+</span> Add Filter
-        </button>
+        <Button onClick={addFilter} size="small" sx={{ color: '#2563eb', fontSize: 14 }}>
+          + Add Filter
+        </Button>
       </div>
     )
   }
@@ -567,40 +580,50 @@ export default function ReportsPage() {
         <h3 className="text-base font-semibold text-ink mb-1">Date Range</h3>
         <p className="text-sm text-ink3 mb-4">Choose the time window for this report.</p>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <ToggleButtonGroup
+          value={wizard.date_range}
+          exclusive
+          onChange={(_e, v: string | null) => v && setWizard((w) => ({ ...w, date_range: v }))}
+          size="small"
+          sx={{
+            flexWrap: 'wrap',
+            gap: 1,
+            mb: 2,
+            '& .MuiToggleButtonGroup-grouped': {
+              borderRadius: '9999px !important',
+              border: '1px solid transparent !important',
+            },
+          }}
+        >
           {DATE_RANGE_PRESETS.map((preset) => (
-            <button
+            <ToggleButton
               key={preset.key}
-              onClick={() => setWizard((w) => ({ ...w, date_range: preset.key }))}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                wizard.date_range === preset.key
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-bg2 text-ink3 hover:bg-bg3'
-              }`}
+              value={preset.key}
+              sx={{ fontSize: 13, px: 1.5, py: 0.5 }}
             >
               {preset.label}
-            </button>
+            </ToggleButton>
           ))}
-        </div>
+        </ToggleButtonGroup>
 
         {wizard.date_range === 'custom' && (
           <div className="flex items-center gap-3 mt-3">
             <div>
               <label className="block text-xs text-ink3 mb-1">From</label>
-              <input
+              <TextField
                 type="date"
                 value={wizard.date_from}
                 onChange={(e) => setWizard((w) => ({ ...w, date_from: e.target.value }))}
-                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                size="small"
               />
             </div>
             <div>
               <label className="block text-xs text-ink3 mb-1">To</label>
-              <input
+              <TextField
                 type="date"
                 value={wizard.date_to}
                 onChange={(e) => setWizard((w) => ({ ...w, date_to: e.target.value }))}
-                className="text-sm border border-border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                size="small"
               />
             </div>
           </div>
@@ -617,34 +640,35 @@ export default function ReportsPage() {
 
         <div className="mb-5">
           <label className="block text-xs font-medium text-ink3 mb-2">Chart Type</label>
-          <div className="grid grid-cols-3 gap-2">
+          <ToggleButtonGroup
+            value={wizard.chart_type}
+            exclusive
+            onChange={(_e, v: ChartType | null) => v && setWizard((w) => ({ ...w, chart_type: v }))}
+            sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}
+          >
             {CHART_TYPES.map((ct) => (
-              <button
+              <ToggleButton
                 key={ct.key}
-                onClick={() => setWizard((w) => ({ ...w, chart_type: ct.key }))}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
-                  wizard.chart_type === ct.key
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-border-brand hover:border-border-brand'
-                }`}
+                value={ct.key}
+                sx={{ flexDirection: 'column', gap: 0.5, py: 1.5 }}
               >
                 <span className="text-xl">{ct.icon}</span>
                 <span className="text-xs text-ink3 font-medium">{ct.label}</span>
-              </button>
+              </ToggleButton>
             ))}
-          </div>
+          </ToggleButtonGroup>
         </div>
 
         <div className="mb-4">
           <label className="block text-xs font-medium text-ink3 mb-1">
             Report Name <span className="text-red-400">*</span>
           </label>
-          <input
-            type="text"
+          <TextField
             value={wizard.name}
             onChange={(e) => setWizard((w) => ({ ...w, name: e.target.value }))}
             placeholder="e.g. Contacts by Lifecycle Stage"
-            className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            fullWidth
+            size="small"
           />
         </div>
 
@@ -652,12 +676,14 @@ export default function ReportsPage() {
           <label className="block text-xs font-medium text-ink3 mb-1">
             Description <span className="text-ink4 font-normal">(optional)</span>
           </label>
-          <textarea
+          <TextField
+            multiline
+            rows={3}
             value={wizard.description}
             onChange={(e) => setWizard((w) => ({ ...w, description: e.target.value }))}
             placeholder="Briefly describe what this report shows…"
-            rows={3}
-            className="block w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            fullWidth
+            size="small"
           />
         </div>
       </div>
@@ -689,12 +715,13 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold text-ink">Reports</h1>
           <p className="text-sm text-ink3 mt-1">Build custom reports from your CRM data.</p>
         </div>
-        <button
+        <Button
           onClick={openWizard}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          variant="contained"
+          sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
         >
-          <span>+</span> Create Report
-        </button>
+          + Create Report
+        </Button>
       </div>
 
       {/* Report List */}
@@ -705,12 +732,13 @@ export default function ReportsPage() {
           <div className="text-4xl mb-3">📊</div>
           <div className="text-ink3 font-medium">No reports yet</div>
           <div className="text-sm text-ink4 mt-1">Create your first report to get started.</div>
-          <button
+          <Button
             onClick={openWizard}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+            variant="contained"
+            sx={{ mt: 2, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
           >
             Create Report
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -751,29 +779,33 @@ export default function ReportsPage() {
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
+                    <IconButton
                       onClick={() => handleTogglePin(report.id)}
                       title={report.pinned ? 'Unpin' : 'Pin to dashboard'}
-                      className={`p-1.5 rounded-lg transition-colors text-sm ${
-                        report.pinned
-                          ? 'text-yellow-500 hover:bg-yellow-50'
-                          : 'text-ink4 hover:bg-bg2 hover:text-yellow-500'
-                      }`}
+                      size="small"
+                      sx={{
+                        color: report.pinned ? '#eab308' : 'text.disabled',
+                        '&:hover': { color: '#eab308' },
+                      }}
                     >
                       ★
-                    </button>
-                    <button
+                    </IconButton>
+                    <Button
                       onClick={() => router.push(`/reports/${report.id}`)}
-                      className="p-1.5 rounded-lg text-ink4 hover:bg-bg2 hover:text-blue-600 transition-colors text-xs font-medium"
+                      size="small"
+                      color="inherit"
+                      sx={{ fontSize: 12 }}
                     >
                       View
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDelete(report.id)}
-                      className="p-1.5 rounded-lg text-ink4 hover:bg-red-50 hover:text-red-500 transition-colors text-xs"
+                      size="small"
+                      color="error"
+                      sx={{ fontSize: 12 }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

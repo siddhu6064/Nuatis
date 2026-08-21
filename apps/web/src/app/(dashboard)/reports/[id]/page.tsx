@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import {
   BarChart,
   Bar,
@@ -344,12 +347,14 @@ export default function ReportDetailPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <button
+            <Button
               onClick={() => router.push('/reports')}
-              className="text-ink4 hover:text-ink3 text-sm"
+              size="small"
+              color="inherit"
+              sx={{ fontSize: 14, minWidth: 0, p: 0 }}
             >
               ← Reports
-            </button>
+            </Button>
           </div>
           <h1 className="text-2xl font-bold text-ink">{report.name}</h1>
           {report.description && <p className="text-sm text-ink3 mt-1">{report.description}</p>}
@@ -369,72 +374,80 @@ export default function ReportDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <button
+          <Button
             onClick={handleTogglePin}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+            variant="outlined"
+            size="small"
+            sx={
               report.pinned
-                ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                : 'bg-white text-ink3 border-border-brand hover:bg-bg'
-            }`}
+                ? { bgcolor: '#fefce8', color: '#a16207', borderColor: '#fde68a' }
+                : { color: 'text.secondary' }
+            }
           >
-            <span>{report.pinned ? '★' : '☆'}</span>
-            {report.pinned ? 'Pinned' : 'Pin to Dashboard'}
-          </button>
+            {report.pinned ? '★ Pinned' : '☆ Pin to Dashboard'}
+          </Button>
 
-          <button
+          <Button
             onClick={handleRefresh}
             disabled={refreshing || loadingData}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-brand text-ink3 text-sm font-medium rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
+            variant="outlined"
+            color="inherit"
+            size="small"
           >
             {refreshing ? 'Refreshing…' : '↻ Refresh'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={handleExportCSV}
             disabled={!result?.rows?.length}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-border-brand text-ink3 text-sm font-medium rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
+            variant="outlined"
+            color="inherit"
+            size="small"
           >
             ↓ Export CSV
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => router.push('/reports')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            variant="contained"
+            size="small"
+            sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
           >
             Edit Report
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Date Range Selector */}
       <div className="flex items-center gap-3 flex-wrap">
         <label className="text-sm font-medium text-ink3">Date Range:</label>
-        <select
+        <TextField
+          select
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          className="text-sm border border-border-brand rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          size="small"
         >
           {DATE_RANGE_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key}>
+            <MenuItem key={opt.key} value={opt.key}>
               {opt.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
+        </TextField>
 
         {dateRange === 'custom' && (
           <>
-            <input
+            <TextField
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="text-sm border border-border-brand rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              size="small"
             />
             <span className="text-ink4 text-sm">to</span>
-            <input
+            <TextField
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="text-sm border border-border-brand rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              size="small"
             />
           </>
         )}
