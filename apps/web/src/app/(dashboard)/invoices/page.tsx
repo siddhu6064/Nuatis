@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { formatCurrency } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -203,13 +206,9 @@ export default function InvoicesPage() {
             {filter === 'all' ? `${invoices.length} shown` : `${invoices.length} ${filter}`}
           </p>
         </div>
-        <Link
-          href="/invoices/new"
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          New Invoice
-        </Link>
+        <Button component={Link} href="/invoices/new" variant="contained">
+          + New Invoice
+        </Button>
       </div>
 
       {/* Summary cards */}
@@ -236,25 +235,23 @@ export default function InvoicesPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 mb-4 bg-bg rounded-lg p-1 w-fit">
+      <ToggleButtonGroup
+        value={filter}
+        exclusive
+        onChange={(_e, v: FilterTab | null) => {
+          if (!v) return
+          setFilter(v)
+          setPage(1)
+        }}
+        size="small"
+        sx={{ mb: 2 }}
+      >
         {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => {
-              setFilter(tab.key)
-              setPage(1)
-            }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              filter === tab.key
-                ? 'bg-white text-ink shadow-sm'
-                : 'text-ink3 hover:text-ink hover:bg-white/60'
-            }`}
-          >
+          <ToggleButton key={tab.key} value={tab.key} sx={{ fontSize: 13, px: 1.5, py: 0.5 }}>
             {tab.label}
-          </button>
+          </ToggleButton>
         ))}
-      </div>
+      </ToggleButtonGroup>
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-border-brand">
@@ -275,9 +272,14 @@ export default function InvoicesPage() {
                 : `No ${filter} invoices`}
             </p>
             {filter === 'all' && (
-              <Link href="/invoices/new" className="mt-4 text-xs text-teal-600 font-medium">
+              <Button
+                component={Link}
+                href="/invoices/new"
+                size="small"
+                sx={{ mt: 1.5, fontSize: 12 }}
+              >
                 New Invoice &rarr;
-              </Link>
+              </Button>
             )}
           </div>
         ) : (
@@ -371,14 +373,14 @@ export default function InvoicesPage() {
 
                           {/* Send — draft or due */}
                           {(inv.status === 'draft' || inv.status === 'due') && (
-                            <button
-                              type="button"
+                            <Button
                               disabled={isSendLoading}
                               onClick={() => void handleSend(inv.id)}
-                              className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                              size="small"
+                              sx={{ fontSize: 12, minWidth: 0, p: 0, color: '#2563eb' }}
                             >
                               {isSendLoading ? 'Sending…' : 'Send'}
-                            </button>
+                            </Button>
                           )}
 
                           {/* Record Payment — sent, due, overdue */}
@@ -393,14 +395,15 @@ export default function InvoicesPage() {
 
                           {/* Void — not received, not already void */}
                           {inv.status !== 'received' && inv.status !== 'void' && (
-                            <button
-                              type="button"
+                            <Button
                               disabled={isVoidLoading}
                               onClick={() => void handleVoid(inv.id, inv.invoice_number)}
-                              className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
+                              size="small"
+                              color="error"
+                              sx={{ fontSize: 12, minWidth: 0, p: 0 }}
                             >
                               {isVoidLoading ? 'Voiding…' : 'Void'}
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -413,25 +416,27 @@ export default function InvoicesPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-3 border-t border-border-brand">
-                <button
-                  type="button"
+                <Button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="text-xs text-ink3 hover:text-ink disabled:opacity-40 font-medium"
+                  size="small"
+                  color="inherit"
+                  sx={{ fontSize: 12 }}
                 >
                   ← Previous
-                </button>
+                </Button>
                 <span className="text-xs text-ink4">
                   Page {page} of {totalPages}
                 </span>
-                <button
-                  type="button"
+                <Button
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="text-xs text-ink3 hover:text-ink disabled:opacity-40 font-medium"
+                  size="small"
+                  color="inherit"
+                  sx={{ fontSize: 12 }}
                 >
                   Next →
-                </button>
+                </Button>
               </div>
             )}
           </>
