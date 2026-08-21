@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import AutomationOverviewClient from './AutomationOverviewClient'
 import CustomAutomationBuilder from './CustomAutomationBuilder'
 
@@ -20,21 +22,15 @@ export default function AutomationTabs({ settingsContent }: Props) {
   return (
     <>
       {/* Tab nav */}
-      <div className="flex gap-1 mb-6 border-b border-border-brand">
+      <Tabs
+        value={tab}
+        onChange={(_e, v: 'overview' | 'custom' | 'settings') => setTab(v)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
         {(['overview', 'custom', 'settings'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-              tab === t
-                ? 'border-teal-600 text-teal-700'
-                : 'border-transparent text-ink3 hover:text-ink'
-            }`}
-          >
-            {TAB_LABELS[t]}
-          </button>
+          <Tab key={t} value={t} label={TAB_LABELS[t]} />
         ))}
-      </div>
+      </Tabs>
       {tab === 'overview' && <AutomationOverviewClient />}
       {tab === 'custom' && <CustomAutomationBuilder />}
       {tab === 'settings' && settingsContent}
