@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 interface InboxThread {
   contact_id: string
@@ -125,37 +128,33 @@ export default function InboxList() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex gap-1 mb-4 border-b border-border-brand">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-              activeTab === tab.key
-                ? 'text-teal-700 border-b-2 border-teal-600'
-                : 'text-ink3 hover:text-ink2'
-            }`}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span
-                className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-bg2 text-ink3'
-                }`}
-              >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 mb-4 border-b border-border-brand">
+        <ToggleButtonGroup
+          value={activeTab}
+          exclusive
+          onChange={(_e, value: InboxTab | null) => value && setActiveTab(value)}
+          size="small"
+        >
+          {tabs.map((tab) => (
+            <ToggleButton key={tab.key} value={tab.key} sx={{ border: 0, borderRadius: 0 }}>
+              {tab.label}
+              {tab.count > 0 && (
+                <span
+                  className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-bg2 text-ink3'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
 
         {activeTab !== 'chat' && threads.length > 0 && (
-          <button
-            onClick={() => void markAllRead()}
-            className="ml-auto text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-2"
-          >
+          <Button onClick={() => void markAllRead()} size="small" sx={{ ml: 'auto' }}>
             Mark all read
-          </button>
+          </Button>
         )}
       </div>
 

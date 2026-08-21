@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 type Preset = '7d' | '30d' | '90d' | 'this_month'
 
@@ -152,16 +154,17 @@ export default function AppointmentReportPage() {
             {loading ? '…' : `${data?.totalAppointments ?? 0} appointments in selected period`}
           </p>
         </div>
-        <select
+        <TextField
+          select
           value={preset}
           onChange={(e) => setPreset(e.target.value as Preset)}
-          className="px-3 py-2 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-ink2 bg-white"
+          size="small"
         >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-          <option value="this_month">This month</option>
-        </select>
+          <MenuItem value="7d">Last 7 days</MenuItem>
+          <MenuItem value="30d">Last 30 days</MenuItem>
+          <MenuItem value="90d">Last 90 days</MenuItem>
+          <MenuItem value="this_month">This month</MenuItem>
+        </TextField>
       </div>
 
       {/* Status cards */}
