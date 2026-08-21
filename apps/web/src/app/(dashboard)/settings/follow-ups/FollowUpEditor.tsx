@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
 
 interface MergedStep {
   step_index: number
@@ -252,11 +255,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
             <div className="flex items-center gap-3">
               {/* Enabled toggle */}
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={current._is_enabled}
                   onChange={(e) => updateStep(selectedStep, { _is_enabled: e.target.checked })}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
+                  size="small"
+                  sx={{ p: 0 }}
                 />
                 <span className="text-xs text-ink3">Enabled</span>
               </label>
@@ -275,11 +278,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {current.channel === 'email' && (
             <div className="mb-3">
               <label className="block text-xs font-medium text-ink3 mb-1">Subject</label>
-              <input
-                type="text"
+              <TextField
                 value={current._subject}
                 onChange={(e) => updateStep(selectedStep, { _subject: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                fullWidth
+                size="small"
               />
             </div>
           )}
@@ -287,11 +290,13 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {/* Body textarea */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-ink3 mb-1">Body</label>
-            <textarea
+            <TextField
+              multiline
               rows={5}
               value={current._body}
               onChange={(e) => updateStep(selectedStep, { _body: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              fullWidth
+              size="small"
             />
             {current.channel === 'sms' && (
               <p className="text-[10px] text-ink4 mt-1">{current._body.length} characters</p>
@@ -330,13 +335,13 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}
           {saveSuccess && <p className="text-sm text-teal-600">Changes saved.</p>}
         </div>
-        <button
+        <Button
           onClick={() => void handleSave()}
           disabled={saving || !anyDirty}
-          className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          variant="contained"
         >
           {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </div>
     </div>
   )

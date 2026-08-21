@@ -159,12 +159,9 @@ export default function EmailTemplatesPage() {
           <h1 className="text-xl font-bold text-ink">Email Templates</h1>
           <p className="text-sm text-ink3 mt-0.5">Manage reusable email templates for your team</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
+        <Button onClick={openCreate} variant="contained">
           + Create Template
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
@@ -201,38 +198,35 @@ export default function EmailTemplatesPage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => openEdit(t)}
-                  className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg transition-colors"
-                >
+                <Button onClick={() => openEdit(t)} size="small" color="inherit">
                   Edit
-                </button>
+                </Button>
                 {deleteConfirm === t.id ? (
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-ink3">Are you sure?</span>
-                    <button
+                    <Button
                       onClick={() => handleDelete(t.id)}
                       disabled={deleting}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      size="small"
+                      variant="contained"
+                      color="error"
                     >
                       {deleting ? 'Deleting…' : 'Yes, delete'}
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(null)}
-                      className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg transition-colors"
-                    >
+                    </Button>
+                    <Button onClick={() => setDeleteConfirm(null)} size="small" color="inherit">
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => setDeleteConfirm(t.id)}
                     disabled={t.is_default}
                     title={t.is_default ? 'Default templates cannot be deleted' : 'Delete template'}
-                    className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    size="small"
+                    color="error"
                   >
                     Delete
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
