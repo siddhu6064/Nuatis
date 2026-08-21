@@ -394,12 +394,16 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
   const handleSaveNote = async () => {
     if (!activePopover || !popoverText.trim()) return
     try {
-      await fetch(`/api/contacts/${activePopover.contactId}/notes`, {
+      const res = await fetch(`/api/contacts/${activePopover.contactId}/notes`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: popoverText, type: 'note' }),
+        body: JSON.stringify({ body: popoverText }),
       })
+      if (!res.ok) {
+        showToast('Failed to save note', 'error')
+        return
+      }
       showToast('Note saved')
       closePopover()
     } catch {
