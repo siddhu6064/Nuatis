@@ -32,6 +32,7 @@ interface Service {
   id: string
   name: string
   unit_price: number
+  vertical: string | null
 }
 
 const VERTICALS = Object.keys(VERTICALS_CONFIG)
@@ -404,50 +405,62 @@ export default function PackageManager() {
                 Services ({formItems.length} selected)
               </label>
               <div className="border border-border-brand rounded-lg max-h-48 overflow-y-auto">
-                {services.length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-ink4 text-center">No services found</p>
-                ) : (
-                  services.map((svc) => {
-                    const selected = formItems.find((i) => i.service_id === svc.id)
-                    return (
-                      <div
-                        key={svc.id}
-                        className={`flex items-center justify-between pr-3 border-b border-gray-50 last:border-0 ${selected ? 'bg-teal-50' : ''}`}
-                      >
-                        <FormControlLabel
-                          sx={{ flex: 1, ml: 0 }}
-                          control={
-                            <Checkbox
-                              size="small"
-                              checked={!!selected}
-                              onChange={() => toggleServiceInForm(svc.id)}
-                            />
-                          }
-                          label={
-                            <span className="text-sm text-ink2 flex items-center w-full">
-                              {svc.name}
-                            </span>
-                          }
-                        />
-                        <span className="text-ink4 text-sm shrink-0">
-                          ${Number(svc.unit_price).toFixed(2)}
-                        </span>
-                        {selected && (
-                          <TextField
-                            type="number"
-                            value={selected.qty}
-                            onChange={(e) =>
-                              updateFormItemQty(svc.id, parseInt(e.target.value) || 1)
+                {(() => {
+                  // Scope the picker to this package's own vertical — otherwise all
+                  // verticals' services show at once (task_5af45bca). Already-selected
+                  // services stay visible even on a vertical mismatch (e.g. incomplete
+                  // `services.vertical` backfill) so an existing selection never
+                  // silently disappears from view.
+                  const visibleServices = services.filter(
+                    (svc) =>
+                      svc.vertical === formVertical ||
+                      formItems.some((i) => i.service_id === svc.id)
+                  )
+                  return visibleServices.length === 0 ? (
+                    <p className="px-3 py-4 text-xs text-ink4 text-center">No services found</p>
+                  ) : (
+                    visibleServices.map((svc) => {
+                      const selected = formItems.find((i) => i.service_id === svc.id)
+                      return (
+                        <div
+                          key={svc.id}
+                          className={`flex items-center justify-between pr-3 border-b border-gray-50 last:border-0 ${selected ? 'bg-teal-50' : ''}`}
+                        >
+                          <FormControlLabel
+                            sx={{ flex: 1, ml: 0 }}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={!!selected}
+                                onChange={() => toggleServiceInForm(svc.id)}
+                              />
                             }
-                            size="small"
-                            sx={{ width: 64, ml: 1 }}
-                            slotProps={{ htmlInput: { min: 1, style: { textAlign: 'center' } } }}
+                            label={
+                              <span className="text-sm text-ink2 flex items-center w-full">
+                                {svc.name}
+                              </span>
+                            }
                           />
-                        )}
-                      </div>
-                    )
-                  })
-                )}
+                          <span className="text-ink4 text-sm shrink-0">
+                            ${Number(svc.unit_price).toFixed(2)}
+                          </span>
+                          {selected && (
+                            <TextField
+                              type="number"
+                              value={selected.qty}
+                              onChange={(e) =>
+                                updateFormItemQty(svc.id, parseInt(e.target.value) || 1)
+                              }
+                              size="small"
+                              sx={{ width: 64, ml: 1 }}
+                              slotProps={{ htmlInput: { min: 1, style: { textAlign: 'center' } } }}
+                            />
+                          )}
+                        </div>
+                      )
+                    })
+                  )
+                })()}
               </div>
               {listPriceTotal > 0 && (
                 <p className="text-xs text-ink3 mt-1">
