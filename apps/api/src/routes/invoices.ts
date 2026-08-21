@@ -397,14 +397,22 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
   const itemRows = lineItems.map((item, i) => ({
     invoice_id: invoice.id,
+    tenant_id: authed.tenantId,
     description: item.description,
     quantity: item.quantity,
     unit_price: item.unit_price,
-    total: Number((item.quantity * item.unit_price).toFixed(2)),
     sort_order: i,
   }))
 
-  const { data: items } = await supabase.from('invoice_line_items').insert(itemRows).select('*')
+  const { data: items, error: itemsErr } = await supabase
+    .from('invoice_line_items')
+    .insert(itemRows)
+    .select('*')
+
+  if (itemsErr) {
+    res.status(500).json({ error: `Failed to save line items: ${itemsErr.message}` })
+    return
+  }
 
   res.status(201).json({ ...invoice, line_items: items ?? [] })
 })
