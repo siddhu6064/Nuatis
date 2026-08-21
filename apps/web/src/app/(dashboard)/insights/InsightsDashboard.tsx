@@ -705,10 +705,10 @@ export default function InsightsDashboard({
   useEffect(() => {
     fetch('/api/pipelines?type=deals')
       .then((r) => r.json())
-      .then((data: Pipeline[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setPipelines(data)
-          setSelectedPipelineId(data[0]!.id)
+      .then((data: { pipelines: Pipeline[] }) => {
+        if (Array.isArray(data.pipelines) && data.pipelines.length > 0) {
+          setPipelines(data.pipelines)
+          setSelectedPipelineId(data.pipelines[0]!.id)
         }
       })
       .catch(() => {})
@@ -726,10 +726,24 @@ export default function InsightsDashboard({
         r.json()
       ),
     ])
-      .then(([forecast, funnel]: [PipelineForecastData, FunnelStage[]]) => {
-        setForecastData(forecast)
-        setFunnelData(Array.isArray(funnel) ? funnel : [])
-      })
+      .then(
+        ([forecast, funnel]: [
+          PipelineForecastData,
+          { stage: { name: string }; count: number; total_value: number; drop_off_pct: number }[],
+        ]) => {
+          setForecastData(forecast)
+          setFunnelData(
+            Array.isArray(funnel)
+              ? funnel.map((f) => ({
+                  stage: f.stage.name,
+                  count: f.count,
+                  total_value: f.total_value,
+                  drop_off_pct: f.drop_off_pct,
+                }))
+              : []
+          )
+        }
+      )
       .catch(() => {})
       .finally(() => setForecastLoading(false))
   }, [selectedPipelineId])
