@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -154,12 +157,9 @@ function UpgradePrompt() {
           AI-powered campaigns let you reach clients via SMS and email with AI-generated copy.
           Enable the module to get started.
         </p>
-        <Link
-          href="/settings/modules"
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
+        <Button component={Link} href="/settings/modules" variant="contained">
           Enable Campaigns →
-        </Link>
+        </Button>
       </div>
     </div>
   )
@@ -263,33 +263,25 @@ export default function CampaignsPage() {
           <h1 className="text-xl font-bold text-ink">Campaigns</h1>
           <p className="text-sm text-ink3 mt-0.5">AI-powered multi-channel campaigns</p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/campaigns/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          New Campaign
-        </button>
+        <Button onClick={() => router.push('/campaigns/new')} variant="contained">
+          + New Campaign
+        </Button>
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-1.5 mb-4">
+      <ToggleButtonGroup
+        value={statusFilter}
+        exclusive
+        onChange={(_e, v: string | null) => v !== null && setStatusFilter(v)}
+        size="small"
+        sx={{ mb: 2 }}
+      >
         {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-              statusFilter === f.value
-                ? 'bg-teal-600 text-white'
-                : 'bg-white text-ink3 border border-border-brand hover:bg-bg'
-            }`}
-          >
+          <ToggleButton key={f.value} value={f.value} sx={{ fontSize: 12, px: 1.5, py: 0.5 }}>
             {f.label}
-          </button>
+          </ToggleButton>
         ))}
-      </div>
+      </ToggleButtonGroup>
 
       {/* Error */}
       {error && (
@@ -316,13 +308,9 @@ export default function CampaignsPage() {
             <p className="text-sm text-ink3 mb-6">
               Create your first AI-powered campaign to re-engage clients.
             </p>
-            <button
-              type="button"
-              onClick={() => router.push('/campaigns/new')}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-            >
+            <Button onClick={() => router.push('/campaigns/new')} variant="contained">
               New Campaign
-            </button>
+            </Button>
           </div>
         ) : (
           <table className="w-full">
@@ -394,13 +382,14 @@ export default function CampaignsPage() {
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-ink2">{formatSchedule(c)}</span>
                       {c.status === 'scheduled' && (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => handleCancel(c.id)}
-                          className="shrink-0 text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
+                          size="small"
+                          color="error"
+                          sx={{ fontSize: 12, minWidth: 0, p: 0, flexShrink: 0 }}
                         >
                           Cancel
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
