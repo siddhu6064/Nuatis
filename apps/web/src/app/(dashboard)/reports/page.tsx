@@ -38,7 +38,7 @@ interface Report {
   date_from: string | null
   date_to: string | null
   chart_type: ChartType
-  pinned: boolean
+  pinned_to_dashboard: boolean
   last_run: string | null
   created_at: string
 }
@@ -254,15 +254,20 @@ export default function ReportsPage() {
   }
 
   async function handleTogglePin(id: string) {
+    const current = reports.find((r) => r.id === id)
+    if (!current) return
     try {
       const res = await fetch(`/api/reports/${id}/pin`, {
         method: 'PUT',
         headers: authHeaders,
+        body: JSON.stringify({ pinned: !current.pinned_to_dashboard }),
       })
       if (res.ok) {
         const data = await res.json()
         setReports((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, pinned: data.pinned ?? !r.pinned } : r))
+          prev.map((r) =>
+            r.id === id ? { ...r, pinned_to_dashboard: data.pinned_to_dashboard } : r
+          )
         )
       }
     } catch {
@@ -289,8 +294,8 @@ export default function ReportsPage() {
           group_by: wizard.group_by,
           filters: wizard.filters,
           date_range: wizard.date_range,
-          date_from: wizard.date_range === 'custom' ? wizard.date_from : null,
-          date_to: wizard.date_range === 'custom' ? wizard.date_to : null,
+          date_from: wizard.date_range === 'custom' ? wizard.date_from || null : null,
+          date_to: wizard.date_range === 'custom' ? wizard.date_to || null : null,
           chart_type: wizard.chart_type,
         }),
       })
@@ -330,6 +335,9 @@ export default function ReportsPage() {
       return true
     }
     if (wizardStep === 3) return wizard.group_by !== null
+    if (wizardStep === 5 && wizard.date_range === 'custom') {
+      return wizard.date_from.trim().length > 0 && wizard.date_to.trim().length > 0
+    }
     if (wizardStep === 6) return wizard.name.trim().length > 0
     return true
   }
@@ -758,7 +766,9 @@ export default function ReportsPage() {
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-ink text-sm">{report.name}</span>
-                      {report.pinned && <span className="text-yellow-400 text-xs">★ Pinned</span>}
+                      {report.pinned_to_dashboard && (
+                        <span className="text-yellow-400 text-xs">★ Pinned</span>
+                      )}
                     </div>
                     {report.description && (
                       <p className="text-xs text-ink3 mb-2 truncate">{report.description}</p>
@@ -781,10 +791,10 @@ export default function ReportsPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <IconButton
                       onClick={() => handleTogglePin(report.id)}
-                      title={report.pinned ? 'Unpin' : 'Pin to dashboard'}
+                      title={report.pinned_to_dashboard ? 'Unpin' : 'Pin to dashboard'}
                       size="small"
                       sx={{
-                        color: report.pinned ? '#eab308' : 'text.disabled',
+                        color: report.pinned_to_dashboard ? '#eab308' : 'text.disabled',
                         '&:hover': { color: '#eab308' },
                       }}
                     >

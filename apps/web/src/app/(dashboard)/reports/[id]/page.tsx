@@ -48,7 +48,7 @@ interface ReportConfig {
   date_from: string | null
   date_to: string | null
   chart_type: ChartType
-  pinned: boolean
+  pinned_to_dashboard: boolean
   last_run: string | null
   created_at: string
 }
@@ -178,11 +178,15 @@ export default function ReportDetailPage() {
       const res = await fetch(`/api/reports/${id}/pin`, {
         method: 'PUT',
         headers: authHeaders,
+        body: JSON.stringify({ pinned: !report.pinned_to_dashboard }),
       })
       if (res.ok) {
         const data = await res.json()
-        setReport((r) => (r ? { ...r, pinned: data.pinned ?? !r.pinned } : r))
-        showToast('success', data.pinned ? 'Pinned to dashboard' : 'Unpinned from dashboard')
+        setReport((r) => (r ? { ...r, pinned_to_dashboard: data.pinned_to_dashboard } : r))
+        showToast(
+          'success',
+          data.pinned_to_dashboard ? 'Pinned to dashboard' : 'Unpinned from dashboard'
+        )
       }
     } catch {
       showToast('error', 'Failed to update pin')
@@ -379,12 +383,12 @@ export default function ReportDetailPage() {
             variant="outlined"
             size="small"
             sx={
-              report.pinned
+              report.pinned_to_dashboard
                 ? { bgcolor: '#fefce8', color: '#a16207', borderColor: '#fde68a' }
                 : { color: 'text.secondary' }
             }
           >
-            {report.pinned ? '★ Pinned' : '☆ Pin to Dashboard'}
+            {report.pinned_to_dashboard ? '★ Pinned' : '☆ Pin to Dashboard'}
           </Button>
 
           <Button
