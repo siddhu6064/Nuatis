@@ -713,6 +713,8 @@ Third sub-phase of the Sales nav-section sweep. Covers the full Invoices group: 
 
 Full check suite: typecheck (web) 0, lint 0, web tests 15/15, build clean.
 
+**Bug fix — both `task_96756772` and `task_a1c43806` fixed, on user request, immediately after this phase.** `apps/web/src/app/(dashboard)/invoices/new/page.tsx` + `InvoiceBuilder.tsx` (new files) give Invoices a real creation page, following the `QuoteBuilder.tsx` shape (contact search, line items, tax rate, notes, save-as-draft → `POST /api/invoices` → redirect to the created invoice's detail page) — "New Invoice" no longer 404s. `apps/api/src/routes/invoices.ts`'s `POST /` handler was fixed to match the already-correct `PUT /:id` insert shape: `tenant_id` is now set on each `invoice_line_items` row, the nonexistent `total` field was dropped (the real generated column is `amount`), and the insert's `error` is now checked (a failure now returns `500` instead of silently succeeding with `line_items: []`). Verified live: created a real draft invoice through the new page, confirmed via `GET /api/invoices/:id` that the actual line item persisted (not an empty array), then voided the test invoice to clean up. Full check suite re-run clean (typecheck web+api 0, lint 0, web tests 15/15, api tests 915/915, build clean). Committed `11e6818`, pushed. These fixes are backend/feature bugs unrelated to the MUI rollout itself — same category as the PR #15/#16 fixes noted at the top of this doc — but landed directly on this branch since that's what was asked, rather than a separate PR.
+
 ## Remaining work (not started)
 
 No production user base yet — app is pre-launch, still in active development. Clear to proceed with wider rollout without a compatibility sign-off step.
