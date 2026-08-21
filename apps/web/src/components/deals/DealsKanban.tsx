@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 const TAG_COLORS = [
   'bg-teal-50 text-teal-700 border-teal-200',
@@ -295,32 +301,27 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
           >
             Manage Pipelines
           </Link>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <span className="text-base leading-none">+</span>
-            New Deal
-          </button>
+          <Button onClick={() => setShowCreate(true)} variant="contained">
+            + New Deal
+          </Button>
         </div>
       </div>
 
       {/* Pipeline tab bar */}
       {pipelines.length > 0 && (
-        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-border-brand pb-0">
-          {pipelines.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => switchPipeline(p.id)}
-              className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
-                activePipelineId === p.id
-                  ? 'border-teal-600 text-teal-700 bg-teal-50'
-                  : 'border-transparent text-ink3 hover:text-ink2 hover:bg-bg'
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
+        <div className="mb-5 shrink-0 border-b border-border-brand pb-0">
+          <ToggleButtonGroup
+            value={activePipelineId}
+            exclusive
+            onChange={(_e, value: string | null) => value && switchPipeline(value)}
+            size="small"
+          >
+            {pipelines.map((p) => (
+              <ToggleButton key={p.id} value={p.id}>
+                {p.name}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </div>
       )}
 
@@ -331,60 +332,60 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
             Deals track individual opportunities. A contact can have multiple deals.
           </p>
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <input
-              type="text"
+            <TextField
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Deal title *"
               autoFocus
-              className="text-sm border border-border-brand rounded px-3 py-2 col-span-2"
+              size="small"
+              className="col-span-2"
             />
-            <input
+            <TextField
               type="number"
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
               placeholder="Value ($)"
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              size="small"
             />
-            <input
+            <TextField
               type="date"
               value={newCloseDate}
               onChange={(e) => setNewCloseDate(e.target.value)}
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              size="small"
             />
-            <input
+            <TextField
               type="number"
               value={newProbability}
               onChange={(e) => setNewProbability(e.target.value)}
               placeholder="Probability (%)"
-              min="0"
-              max="100"
-              className="text-sm border border-border-brand rounded px-3 py-2"
+              slotProps={{ htmlInput: { min: 0, max: 100 } }}
+              size="small"
             />
           </div>
 
           {/* Contact search */}
           <div className="relative mb-3" ref={contactSearchRef}>
-            <input
-              type="text"
+            <TextField
               value={selectedContact ? selectedContact.full_name : contactSearch}
               onChange={(e) => handleContactSearch(e.target.value)}
               onFocus={() => contactResults.length > 0 && setContactDropOpen(true)}
               placeholder="Search contacts... (optional)"
-              className="w-full text-sm border border-border-brand rounded px-3 py-2"
+              fullWidth
+              size="small"
             />
             {selectedContact && (
-              <button
-                type="button"
+              <IconButton
                 onClick={() => {
                   setSelectedContact(null)
                   setContactSearch('')
                   setContactResults([])
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink4 hover:text-ink3 text-lg leading-none"
+                size="small"
+                aria-label="Clear selected contact"
+                sx={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
               >
-                ×
-              </button>
+                <span className="text-sm leading-none">&times;</span>
+              </IconButton>
             )}
             {contactDropOpen && contactResults.length > 0 && (
               <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -408,16 +409,17 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
           </div>
 
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-xs text-ink3">
+            <Button onClick={() => setShowCreate(false)} size="small" color="inherit">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void createDeal()}
               disabled={!newTitle.trim() || saving}
-              className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+              size="small"
+              variant="contained"
             >
               {saving ? 'Creating...' : 'Create Deal'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -486,21 +488,23 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
                             </span>
                           </div>
                           {/* Stage selector */}
-                          <select
+                          <TextField
+                            select
+                            fullWidth
                             value={deal.pipeline_stage_id ?? ''}
                             onChange={(e) => {
-                              e.stopPropagation()
                               void moveDeal(deal.id, e.target.value)
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="mt-2 w-full text-[10px] border border-border-brand rounded px-1 py-0.5 text-ink3"
+                            sx={{ mt: 1 }}
+                            slotProps={{ select: { sx: { fontSize: 10, py: 0.5 } } }}
                           >
                             {stages.map((s) => (
-                              <option key={s.id} value={s.id}>
+                              <MenuItem key={s.id} value={s.id} sx={{ fontSize: 12 }}>
                                 {s.name}
-                              </option>
+                              </MenuItem>
                             ))}
-                          </select>
+                          </TextField>
                           {/* Tag chips */}
                           {deal.tags && deal.tags.length > 0 && (
                             <div

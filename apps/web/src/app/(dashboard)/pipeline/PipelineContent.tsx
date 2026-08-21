@@ -6,6 +6,12 @@ import Link from 'next/link'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
 import { formatCurrencyWhole } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 interface Pipeline {
   id: string
@@ -495,9 +501,12 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
               left: activePopover.left,
             }}
           >
-            <textarea
+            <TextField
               autoFocus
+              multiline
               rows={2}
+              fullWidth
+              size="small"
               value={popoverText}
               onChange={(e) =>
                 setPopoverText(
@@ -505,22 +514,21 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                 )
               }
               placeholder={activePopover.type === 'sms' ? 'Send a message…' : 'Log a note…'}
-              className="w-full text-sm border border-border-brand rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
             {activePopover.type === 'sms' && (
               <p className="text-[10px] text-ink4 text-right mt-0.5">{popoverText.length}/160</p>
             )}
             <div className="flex justify-end mt-2">
-              <button
-                type="button"
+              <Button
                 onClick={() =>
                   activePopover.type === 'sms' ? void handleSendSMS() : void handleSaveNote()
                 }
                 disabled={!popoverText.trim()}
-                className="px-3 py-1 bg-teal-600 text-white text-xs font-medium rounded hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                size="small"
+                variant="contained"
               >
                 {activePopover.type === 'sms' ? 'Send' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
         </>
@@ -537,76 +545,51 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
         </div>
         <div className="flex items-center gap-3">
           {/* Color mode toggle */}
-          <div className="flex items-center border border-border-brand rounded overflow-hidden">
-            <button
-              type="button"
-              title="Dot mode"
-              onClick={() => setColorModeAndSave('dot')}
-              className={`px-2 py-1 text-xs transition-colors ${
-                colorMode === 'dot'
-                  ? 'bg-teal-50 text-teal-700'
-                  : 'text-ink4 hover:text-ink3 hover:bg-bg'
-              }`}
-            >
+          <ToggleButtonGroup
+            value={colorMode}
+            exclusive
+            onChange={(_e, value: 'none' | 'dot' | 'tint' | null) =>
+              value && setColorModeAndSave(value)
+            }
+            size="small"
+          >
+            <ToggleButton value="dot" title="Dot mode">
               ⊙
-            </button>
-            <button
-              type="button"
-              title="Tint mode"
-              onClick={() => setColorModeAndSave('tint')}
-              className={`px-2 py-1 text-xs transition-colors border-x border-border-brand ${
-                colorMode === 'tint'
-                  ? 'bg-teal-50 text-teal-700'
-                  : 'text-ink4 hover:text-ink3 hover:bg-bg'
-              }`}
-            >
+            </ToggleButton>
+            <ToggleButton value="tint" title="Tint mode">
               ▤
-            </button>
-            <button
-              type="button"
-              title="No color"
-              onClick={() => setColorModeAndSave('none')}
-              className={`px-2 py-1 text-xs transition-colors ${
-                colorMode === 'none'
-                  ? 'bg-teal-50 text-teal-700'
-                  : 'text-ink4 hover:text-ink3 hover:bg-bg'
-              }`}
-            >
+            </ToggleButton>
+            <ToggleButton value="none" title="No color">
               ✕
-            </button>
-          </div>
+            </ToggleButton>
+          </ToggleButtonGroup>
           <Link
             href="/settings/pipelines"
             className="text-xs text-ink3 hover:text-ink2 underline underline-offset-2"
           >
             Manage Pipelines
           </Link>
-          <Link
-            href="/contacts/new"
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <span className="text-base leading-none">+</span>
-            Add Contact
-          </Link>
+          <Button component={Link} href="/contacts/new" variant="contained">
+            + Add Contact
+          </Button>
         </div>
       </div>
 
       {/* Pipeline tab bar — only show when multiple pipelines match */}
       {pipelines.length > 1 && (
-        <div className="flex items-center gap-1 mb-5 shrink-0 border-b border-border-brand pb-0">
-          {pipelines.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => switchPipeline(p.id)}
-              className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
-                activePipelineId === p.id
-                  ? 'border-teal-600 text-teal-700 bg-teal-50'
-                  : 'border-transparent text-ink3 hover:text-ink2 hover:bg-bg'
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
+        <div className="mb-5 shrink-0 border-b border-border-brand pb-0">
+          <ToggleButtonGroup
+            value={activePipelineId}
+            exclusive
+            onChange={(_e, value: string | null) => value && switchPipeline(value)}
+            size="small"
+          >
+            {pipelines.map((p) => (
+              <ToggleButton key={p.id} value={p.id}>
+                {p.name}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </div>
       )}
 
@@ -660,14 +643,15 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                             /* ── Collapsed column ── */
                             <div className="flex flex-col items-center pt-2 pb-2 flex-1">
                               {/* Expand button */}
-                              <button
-                                type="button"
+                              <IconButton
                                 title="Expand column"
+                                aria-label="Expand column"
                                 onClick={() => toggleCollapse(stage.id)}
-                                className="h-5 w-5 flex items-center justify-center text-ink4 hover:text-ink rounded mb-2 shrink-0"
+                                size="small"
+                                sx={{ mb: 2 }}
                               >
                                 <ChevronRightIcon />
-                              </button>
+                              </IconButton>
                               {/* Card count badge */}
                               <span className="font-mono text-[10px] text-ink3 bg-white border border-border-brand rounded-full w-5 h-5 flex items-center justify-center mb-3 shrink-0 tabular-nums leading-none">
                                 {cards.length}
@@ -713,17 +697,19 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                                     {cards.length}
                                   </span>
                                   {/* Collapse button — visible on header hover */}
-                                  <button
-                                    type="button"
+                                  <IconButton
                                     title="Collapse column"
+                                    aria-label="Collapse column"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       toggleCollapse(stage.id)
                                     }}
-                                    className="h-5 w-5 flex items-center justify-center text-ink4 hover:text-ink rounded opacity-0 group-hover/header:opacity-100 transition-opacity shrink-0"
+                                    size="small"
+                                    className="opacity-0 group-hover/header:opacity-100"
+                                    sx={{ transition: 'opacity 0.15s' }}
                                   >
                                     <ChevronLeftIcon />
-                                  </button>
+                                  </IconButton>
                                 </div>
                                 <p className="text-[11px] text-ink3 mt-0.5 tabular-nums">
                                   {cards.length} deal{cards.length !== 1 ? 's' : ''}{' '}
@@ -811,74 +797,96 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                                           )}
 
                                           {/* Stage selector */}
-                                          <select
+                                          <TextField
+                                            select
+                                            fullWidth
                                             value={contact.pipeline_stage ?? defaultStage}
                                             disabled={movingContact === contact.id}
                                             onChange={(e) =>
                                               void moveContact(contact.id, e.target.value)
                                             }
-                                            className="w-full text-[11px] border border-border-brand rounded px-2 py-1 bg-[#f9f8f5] text-ink3 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50 cursor-pointer"
+                                            slotProps={{
+                                              select: {
+                                                sx: { fontSize: 11, py: 0.5, bgcolor: '#f9f8f5' },
+                                              },
+                                            }}
                                           >
                                             {stages.map((s) => (
-                                              <option key={s.name} value={s.name}>
+                                              <MenuItem
+                                                key={s.name}
+                                                value={s.name}
+                                                sx={{ fontSize: 12 }}
+                                              >
                                                 {s.name}
-                                              </option>
+                                              </MenuItem>
                                             ))}
-                                          </select>
+                                          </TextField>
 
                                           {/* Micro-action buttons */}
                                           <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             {/* Call */}
-                                            <button
-                                              type="button"
+                                            <IconButton
                                               title={contact.phone ? 'Call' : 'No phone number'}
+                                              aria-label="Call"
                                               disabled={!contact.phone}
                                               onClick={(e) => void handleCall(e, contact)}
-                                              className={`h-6 w-6 rounded flex items-center justify-center bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors ${
-                                                !contact.phone
-                                                  ? 'opacity-40 cursor-not-allowed'
-                                                  : ''
-                                              }`}
+                                              size="small"
+                                              sx={{
+                                                bgcolor: '#fff7ed',
+                                                color: '#ea580c',
+                                                borderRadius: 1,
+                                              }}
                                             >
                                               <PhoneIcon />
-                                            </button>
+                                            </IconButton>
                                             {/* SMS */}
-                                            <button
-                                              type="button"
+                                            <IconButton
                                               title={contact.phone ? 'Send SMS' : 'No phone number'}
+                                              aria-label="Send SMS"
                                               disabled={!contact.phone}
                                               onClick={(e) => handleOpenPopover(e, 'sms', contact)}
-                                              className={`h-6 w-6 rounded flex items-center justify-center bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors ${
-                                                !contact.phone
-                                                  ? 'opacity-40 cursor-not-allowed'
-                                                  : ''
-                                              }`}
+                                              size="small"
+                                              sx={{
+                                                bgcolor: '#eff6ff',
+                                                color: '#1d4ed8',
+                                                borderRadius: 1,
+                                              }}
                                             >
                                               <MessageSquareIcon />
-                                            </button>
+                                            </IconButton>
                                             {/* Note */}
-                                            <button
-                                              type="button"
+                                            <IconButton
                                               title="Log Note"
+                                              aria-label="Log Note"
                                               onClick={(e) => handleOpenPopover(e, 'note', contact)}
-                                              className="h-6 w-6 rounded flex items-center justify-center bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
+                                              size="small"
+                                              sx={{
+                                                bgcolor: '#faf5ff',
+                                                color: '#7e22ce',
+                                                borderRadius: 1,
+                                              }}
                                             >
                                               <FileTextIcon />
-                                            </button>
+                                            </IconButton>
                                             {/* Book Appointment */}
-                                            <button
-                                              type="button"
+                                            <IconButton
                                               title="Book Appointment"
+                                              aria-label="Book Appointment"
                                               onClick={(e) => {
                                                 e.stopPropagation()
                                                 router.push(
                                                   `/appointments/new?contactId=${contact.id}&name=${encodeURIComponent(contact.full_name)}`
                                                 )
                                               }}
-                                              className="h-6 w-6 rounded flex items-center justify-center bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+                                              size="small"
+                                              sx={{
+                                                bgcolor: '#f0fdfa',
+                                                color: '#0f766e',
+                                                borderRadius: 1,
+                                              }}
                                             >
                                               <CalendarIcon />
-                                            </button>
+                                            </IconButton>
                                           </div>
                                         </div>
                                       )}

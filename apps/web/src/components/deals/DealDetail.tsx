@@ -3,21 +3,27 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Chip from '@mui/material/Chip'
 
 const TAG_COLORS = [
-  'bg-teal-50 text-teal-700 border-teal-200',
-  'bg-blue-50 text-blue-700 border-blue-200',
-  'bg-purple-50 text-purple-700 border-purple-200',
-  'bg-amber-50 text-amber-700 border-amber-200',
-  'bg-green-50 text-green-700 border-green-200',
+  { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
+  { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  { bg: '#faf5ff', text: '#7e22ce', border: '#e9d5ff' },
+  { bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
+  { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
 ]
 
-function tagColorClass(tag: string): string {
+function tagColorSx(tag: string) {
   let hash = 0
   for (let i = 0; i < tag.length; i++) {
     hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
   }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
+  const c = TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
+  return { bgcolor: c.bg, color: c.text, border: `1px solid ${c.border}` }
 }
 
 interface DealContact {
@@ -322,25 +328,30 @@ export default function DealDetail({ dealId }: Props) {
           </div>
           <div>
             <span className="text-ink4 text-xs">Stage</span>
-            <select
+            <TextField
+              select
+              fullWidth
+              size="small"
               value={deal.pipeline_stage_id ?? ''}
               onChange={(e) => void updateDeal({ pipeline_stage_id: e.target.value })}
-              className="mt-0.5 w-full text-sm border border-border-brand rounded px-2 py-1"
+              sx={{ mt: 0.5 }}
             >
               {stages.map((s) => (
-                <option key={s.id} value={s.id}>
+                <MenuItem key={s.id} value={s.id}>
                   {s.name}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           </div>
           <div>
             <span className="text-ink4 text-xs">Close Date</span>
-            <input
+            <TextField
               type="date"
+              fullWidth
+              size="small"
               value={deal.close_date ?? ''}
               onChange={(e) => void updateDeal({ close_date: e.target.value || null })}
-              className="mt-0.5 w-full text-sm border border-border-brand rounded px-2 py-1"
+              sx={{ mt: 0.5 }}
             />
           </div>
           {/* Tags */}
@@ -348,27 +359,21 @@ export default function DealDetail({ dealId }: Props) {
             <span className="text-ink4 text-xs block mb-1.5">Tags</span>
             <div className="flex flex-wrap gap-1.5 items-center">
               {tags.map((tag) => (
-                <span
+                <Chip
                   key={tag}
-                  className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-full border ${tagColorClass(tag)}`}
-                >
-                  {tag}
-                  <button
-                    onClick={() => removeTag(tag)}
-                    className="ml-0.5 hover:opacity-60 leading-none"
-                    aria-label={`Remove ${tag}`}
-                  >
-                    &times;
-                  </button>
-                </span>
+                  label={tag}
+                  size="small"
+                  onDelete={() => removeTag(tag)}
+                  sx={{ height: 22, fontSize: 11, fontWeight: 500, ...tagColorSx(tag) }}
+                />
               ))}
               {tags.length < 10 &&
                 (addingTag ? (
                   <div className="relative">
-                    <input
-                      type="text"
+                    <TextField
                       value={tagInput}
                       autoFocus
+                      size="small"
                       onChange={(e) => {
                         setTagInput(e.target.value)
                         setShowTagSuggestions(true)
@@ -391,7 +396,8 @@ export default function DealDetail({ dealId }: Props) {
                         }, 150)
                       }
                       placeholder="Add tag…"
-                      className="text-xs border border-border-brand rounded-full px-2.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      sx={{ width: 120 }}
+                      slotProps={{ input: { sx: { borderRadius: 5, fontSize: 12 } } }}
                     />
                     {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                       <div className="absolute top-full left-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-20 min-w-[160px] max-h-36 overflow-y-auto">
@@ -408,12 +414,14 @@ export default function DealDetail({ dealId }: Props) {
                     )}
                   </div>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => setAddingTag(true)}
-                    className="text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-0.5 rounded-full border border-dashed border-teal-300 hover:border-teal-400 transition-colors"
+                    size="small"
+                    variant="outlined"
+                    sx={{ borderRadius: 5, borderStyle: 'dashed' }}
                   >
                     + tag
-                  </button>
+                  </Button>
                 ))}
             </div>
           </div>
@@ -422,29 +430,29 @@ export default function DealDetail({ dealId }: Props) {
         <div className="flex gap-2 flex-wrap">
           {!isClosed && (
             <>
-              <button
+              <Button
                 onClick={() => void updateDeal({ is_closed_won: true })}
                 disabled={saving}
-                className="px-4 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                size="small"
+                variant="contained"
+                color="success"
               >
                 Mark Won
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void updateDeal({ is_closed_lost: true })}
                 disabled={saving}
-                className="px-4 py-1.5 text-xs font-medium text-ink3 bg-bg2 rounded-md hover:bg-bg3 disabled:opacity-50"
+                size="small"
+                color="inherit"
               >
                 Mark Lost
-              </button>
+              </Button>
             </>
           )}
           {deal.contact_id && (
-            <button
-              onClick={openBooking}
-              className="px-4 py-1.5 text-xs font-medium text-teal-600 border border-teal-200 rounded-md hover:bg-teal-50 transition-colors"
-            >
+            <Button onClick={openBooking} size="small" variant="outlined">
               📅 Book Appointment
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -453,16 +461,16 @@ export default function DealDetail({ dealId }: Props) {
       {bookingMode && (
         <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <button
+            <IconButton
               onClick={() => {
                 setBookingMode(false)
                 setBookingSuccess(null)
               }}
-              className="text-ink4 hover:text-ink transition-colors text-sm leading-none"
+              size="small"
               aria-label="Back"
             >
-              ←
-            </button>
+              <span className="text-sm leading-none">←</span>
+            </IconButton>
             <h3 className="text-sm font-semibold text-ink">Book Appointment</h3>
           </div>
 
@@ -477,15 +485,17 @@ export default function DealDetail({ dealId }: Props) {
                 <Link href="/appointments" className="text-xs text-teal-600 hover:underline">
                   View appointment →
                 </Link>
-                <button
+                <Button
                   onClick={() => {
                     setBookingMode(false)
                     setBookingSuccess(null)
                   }}
-                  className="text-xs text-ink3 hover:text-ink px-3 py-1.5 border border-border-brand rounded-md"
+                  size="small"
+                  color="inherit"
+                  variant="outlined"
                 >
                   Done
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -494,104 +504,101 @@ export default function DealDetail({ dealId }: Props) {
                 <p className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{bookingError}</p>
               )}
 
-              <div>
-                <label className="text-xs text-ink4 mb-1 block">Title</label>
-                <input
-                  type="text"
-                  value={apptTitle}
-                  onChange={(e) => setApptTitle(e.target.value)}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                />
-              </div>
+              <TextField
+                label="Title"
+                fullWidth
+                size="small"
+                value={apptTitle}
+                onChange={(e) => setApptTitle(e.target.value)}
+              />
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-ink4 mb-1 block">Date</label>
-                  <input
-                    type="date"
-                    value={apptDate}
-                    onChange={(e) => setApptDate(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-ink4 mb-1 block">Time</label>
-                  <select
-                    value={apptTime}
-                    onChange={(e) => setApptTime(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                  >
-                    {TIME_SLOTS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <TextField
+                  label="Date"
+                  type="date"
+                  fullWidth
+                  size="small"
+                  value={apptDate}
+                  onChange={(e) => setApptDate(e.target.value)}
+                />
+                <TextField
+                  select
+                  label="Time"
+                  fullWidth
+                  size="small"
+                  value={apptTime}
+                  onChange={(e) => setApptTime(e.target.value)}
+                >
+                  {TIME_SLOTS.map((s) => (
+                    <MenuItem key={s.value} value={s.value}>
+                      {s.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </div>
 
-              <div>
-                <label className="text-xs text-ink4 mb-1 block">Duration</label>
-                <select
-                  value={apptDuration}
-                  onChange={(e) => setApptDuration(Number(e.target.value))}
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                >
-                  {[15, 30, 45, 60, 90, 120].map((d) => (
-                    <option key={d} value={d}>
-                      {d} min
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <TextField
+                select
+                label="Duration"
+                fullWidth
+                size="small"
+                value={apptDuration}
+                onChange={(e) => setApptDuration(Number(e.target.value))}
+              >
+                {[15, 30, 45, 60, 90, 120].map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {d} min
+                  </MenuItem>
+                ))}
+              </TextField>
 
               {calendars.length > 0 && (
-                <div>
-                  <label className="text-xs text-ink4 mb-1 block">Calendar</label>
-                  <select
-                    value={apptCalendarId}
-                    onChange={(e) => setApptCalendarId(e.target.value)}
-                    className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-                  >
-                    {calendars.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <TextField
+                  select
+                  label="Calendar"
+                  fullWidth
+                  size="small"
+                  value={apptCalendarId}
+                  onChange={(e) => setApptCalendarId(e.target.value)}
+                >
+                  {calendars.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
               )}
 
-              <div>
-                <label className="text-xs text-ink4 mb-1 block">
-                  Notes <span className="text-ink4">(optional)</span>
-                </label>
-                <textarea
-                  value={apptNotes}
-                  onChange={(e) => setApptNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Add notes..."
-                  className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none placeholder-gray-300"
-                />
-              </div>
+              <TextField
+                label="Notes (optional)"
+                multiline
+                rows={2}
+                fullWidth
+                size="small"
+                value={apptNotes}
+                onChange={(e) => setApptNotes(e.target.value)}
+                placeholder="Add notes..."
+              />
 
               <div className="flex gap-2 pt-1">
-                <button
+                <Button
                   onClick={() => void submitBooking()}
                   disabled={bookingLoading || !apptDate || !apptTitle}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                  size="small"
+                  variant="contained"
                 >
                   {bookingLoading ? 'Booking...' : 'Book Appointment'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
                     setBookingMode(false)
                     setBookingSuccess(null)
                   }}
-                  className="px-4 py-2 text-xs text-ink3 hover:text-ink transition-colors"
+                  size="small"
+                  color="inherit"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -638,41 +645,40 @@ export default function DealDetail({ dealId }: Props) {
         {dealContacts.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {dealContacts.map((c) => (
-              <div
+              <Chip
                 key={c.id}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-bg2 rounded-full text-xs"
-              >
-                <Link
-                  href={`/contacts/${c.id}`}
-                  className="font-medium text-teal-600 hover:text-teal-700"
-                >
-                  {c.full_name}
-                </Link>
-                {c.role && (
-                  <span className="text-[10px] text-ink4 bg-white border border-border-brand rounded px-1 py-0.5">
-                    {c.role}
+                onDelete={() => void removeContact(c.id)}
+                sx={{ height: 26 }}
+                label={
+                  <span className="flex items-center gap-1.5">
+                    <Link
+                      href={`/contacts/${c.id}`}
+                      className="font-medium text-teal-600 hover:text-teal-700"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {c.full_name}
+                    </Link>
+                    {c.role && (
+                      <span className="text-[10px] text-ink4 bg-white border border-border-brand rounded px-1 py-0.5">
+                        {c.role}
+                      </span>
+                    )}
                   </span>
-                )}
-                <button
-                  onClick={() => void removeContact(c.id)}
-                  className="text-ink4 hover:text-red-500 leading-none ml-0.5"
-                  aria-label={`Remove ${c.full_name}`}
-                >
-                  ×
-                </button>
-              </div>
+                }
+              />
             ))}
           </div>
         )}
 
         {dealContacts.length < 5 && (
           <div className="relative">
-            <input
+            <TextField
               value={contactSearch}
               onChange={(e) => setContactSearch(e.target.value)}
               onBlur={() => setTimeout(() => setSearchResults([]), 150)}
               placeholder="Search contacts to add..."
-              className="w-full text-sm border border-border-brand rounded px-3 py-1.5 placeholder-gray-300"
+              fullWidth
+              size="small"
             />
             {filteredResults.length > 0 && (
               <div className="absolute top-full mt-1 w-full bg-white border border-border-brand rounded-lg shadow-lg z-10">
@@ -695,15 +701,17 @@ export default function DealDetail({ dealId }: Props) {
       {/* Notes */}
       <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
         <h3 className="text-sm font-semibold text-ink2 mb-2">Notes</h3>
-        <textarea
+        <TextField
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => {
             if (notes !== (deal.notes ?? '')) void updateDeal({ notes })
           }}
+          multiline
           rows={3}
+          fullWidth
+          size="small"
           placeholder="Add notes..."
-          className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 placeholder-gray-300 resize-none"
         />
       </div>
 
