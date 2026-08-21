@@ -205,7 +205,7 @@ router.put('/collectors/:id', requireAuth, async (req: Request, res: Response): 
   if (typeof prompt === 'string') updates['prompt'] = prompt
   if (typeof max_duration_seconds === 'number')
     updates['max_duration_seconds'] = max_duration_seconds
-  if (typeof status === 'string' && ['active', 'paused'].includes(status))
+  if (typeof status === 'string' && ['active', 'paused', 'archived'].includes(status))
     updates['status'] = status
 
   const { data, error } = await supabase
