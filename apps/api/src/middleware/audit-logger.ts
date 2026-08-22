@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import type { AuthenticatedRequest } from '../lib/auth.js'
 
 export interface AuditEvent {
   tenantId: string
@@ -42,12 +43,14 @@ const SUB_ACTIONS = new Set([
   'upload',
 ])
 
-function extractResourceType(path: string): string {
+function extractResourceType(url: string): string {
+  const path = url.split('?')[0] ?? url
   const match = path.match(/^\/api\/([^/]+)/)
   return match?.[1] ?? 'unknown'
 }
 
-function extractResourceId(path: string): string | null {
+function extractResourceId(url: string): string | null {
+  const path = url.split('?')[0] ?? url
   const segments = path.split('/').filter(Boolean)
   // segments[0] = 'api', segments[1] = resource_type, segments[2] = potential id
   const candidate = segments[2]
@@ -114,17 +117,28 @@ export function auditLoggerMiddleware(req: Request, res: Response, next: NextFun
   }
 
   // Log after response completes (fire-and-forget)
+  // req.originalUrl is captured once at the top of the middleware stack and
+  // is never rewritten by nested router dispatch, unlike req.path/req.url —
+  // those get mount-relative inside a sub-router and are typically never
+  // restored, since restoration is tied to a route handler calling next(),
+  // which REST endpoints don't do after sending a response. Reading req.path
+  // here (as this used to) meant every logged path was missing its /api/xxx
+  // prefix, so extractResourceType() never matched and always fell back to
+  // 'unknown'.
+  const originalUrl = req.originalUrl
+
   res.on('finish', () => {
     const tenantId = (res.locals['tenantId'] as string) ?? ''
     if (!tenantId) return
 
+    const authed = req as AuthenticatedRequest
     void logAuditEvent({
       tenantId,
-      userId: (req as unknown as Record<string, unknown>)['userId'] as string | undefined,
+      userId: authed.appUserId ?? authed.userId,
       action,
-      resourceType: extractResourceType(req.path),
-      resourceId: extractResourceId(req.path) ?? undefined,
-      details: { method: req.method, path: req.path, status: res.statusCode },
+      resourceType: extractResourceType(originalUrl),
+      resourceId: extractResourceId(originalUrl) ?? undefined,
+      details: { method: req.method, path: originalUrl, status: res.statusCode },
       ipAddress: req.ip ?? req.socket.remoteAddress,
       userAgent: req.headers['user-agent'],
     })
