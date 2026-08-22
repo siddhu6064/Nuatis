@@ -113,7 +113,9 @@ router.post('/contacts', requireAuth, async (req: Request, res: Response): Promi
     .from('import_jobs')
     .insert({
       tenant_id: authed.tenantId,
-      created_by_user_id: authed.userId,
+      // import_jobs.created_by_user_id FKs public.users(id) — that is appUserId,
+      // not the Auth.js `sub` on authed.userId (same shape as data-export.ts).
+      created_by_user_id: authed.appUserId ?? null,
       filename: `import-${Date.now()}.csv`,
       row_count: rows.length,
       status: 'pending',

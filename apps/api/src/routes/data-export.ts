@@ -48,6 +48,14 @@ router.post(
 
     const tables = requestedTables as string[]
 
+    // export_jobs.requested_by FKs public.users(id) — that is appUserId, not the
+    // Auth.js `sub` on authed.userId. Passing `sub` (empty for sessions without a
+    // resolved domain user) made Postgres reject it as a malformed uuid → 500.
+    if (!authed.appUserId) {
+      res.status(400).json({ error: 'No resolved user account for this session' })
+      return
+    }
+
     // Rate limit: check for pending/processing export for this tenant
     const { data: existing, error: checkErr } = await supabase
       .from('export_jobs')
@@ -74,7 +82,7 @@ router.post(
       .from('export_jobs')
       .insert({
         tenant_id: authed.tenantId,
-        requested_by: authed.userId,
+        requested_by: authed.appUserId,
         status: 'pending',
         tables_included: tables,
       })
@@ -92,7 +100,7 @@ router.post(
       await queue.add('data-export', {
         tenantId: authed.tenantId,
         exportJobId: job.id,
-        requestedBy: authed.userId,
+        requestedBy: authed.appUserId,
         tables,
       })
     } catch (err) {

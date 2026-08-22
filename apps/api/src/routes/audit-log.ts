@@ -32,7 +32,7 @@ router.get(
     let query = supabase
       .from('audit_log')
       .select(
-        'id, created_at, action, resource_type, entity_id, actor_type, actor_id, ip_address, metadata',
+        'id, created_at, action, resource_type, entity_id:resource_id, actor_id:user_id, ip_address, metadata:details',
         { count: 'exact' }
       )
       .eq('tenant_id', authed.tenantId)
@@ -40,7 +40,7 @@ router.get(
 
     if (action) query = query.eq('action', action)
     if (resourceType) query = query.eq('resource_type', resourceType)
-    if (search) query = query.ilike('entity_id', `%${search}%`)
+    if (search) query = query.ilike('resource_id', `%${search}%`)
 
     query = query.range(offset, offset + limit - 1)
 
