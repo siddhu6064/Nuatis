@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 const VERTICAL_LABELS: Record<string, string> = {
   sales_crm: 'Sales CRM',
@@ -169,12 +172,9 @@ export default function MayaOnboardingWizard({
                 <p className="text-xs text-ink3">{VERTICAL_LABELS[vertical] ?? vertical}</p>
               </div>
             </div>
-            <button
-              onClick={goNext}
-              className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"
-            >
+            <Button onClick={goNext} variant="contained" fullWidth>
               Continue
-            </button>
+            </Button>
           </div>
         )}
 
@@ -194,39 +194,35 @@ export default function MayaOnboardingWizard({
                     <p className="text-xs text-green-600">Number provisioned</p>
                   </div>
                 </div>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   Continue
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <select
+                <TextField
+                  select
+                  label="Area code"
                   value={areaCode}
                   onChange={(e) => setAreaCode(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  fullWidth
+                  size="small"
                 >
                   {AREA_CODES.map((ac) => (
-                    <option key={ac.code} value={ac.code}>
+                    <MenuItem key={ac.code} value={ac.code}>
                       {ac.label}
-                    </option>
+                    </MenuItem>
                   ))}
-                </select>
+                </TextField>
                 {error && (
                   <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
                 )}
-                <button
-                  onClick={provisionPhone}
-                  disabled={loading}
-                  className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
-                >
+                <Button onClick={provisionPhone} disabled={loading} variant="contained" fullWidth>
                   {loading ? 'Provisioning...' : 'Get My Number'}
-                </button>
-                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
+                </Button>
+                <Button onClick={goNext} fullWidth color="inherit">
                   Skip for now
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -245,24 +241,18 @@ export default function MayaOnboardingWizard({
                   <span className="text-green-600 text-lg">✓</span>
                   <p className="text-sm font-semibold text-ink">Google Calendar connected</p>
                 </div>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   Continue
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <button
-                  onClick={connectCalendar}
-                  className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"
-                >
+                <Button onClick={connectCalendar} variant="contained" fullWidth>
                   Connect Google Calendar
-                </button>
-                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
+                </Button>
+                <Button onClick={goNext} fullWidth color="inherit">
                   Skip for now
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -284,33 +274,24 @@ export default function MayaOnboardingWizard({
                 <p className="text-xl font-bold text-teal-800">{formatPhone(phone)}</p>
               </div>
             )}
-            <button
-              onClick={finish}
-              className="w-full py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 mb-4"
-            >
+            <Button onClick={finish} variant="contained" fullWidth sx={{ mb: 2 }}>
               Go to Call Log
-            </button>
+            </Button>
             <div className="p-3 bg-bg rounded-lg">
               <p className="text-xs text-ink3">
                 Want a full CRM with pipeline, automation, and quotes?
               </p>
-              <button
-                onClick={() => router.push('/upgrade')}
-                className="text-xs text-teal-600 font-medium mt-1 hover:text-teal-700"
-              >
+              <Button onClick={() => router.push('/upgrade')} size="small">
                 Upgrade to Nuatis Suite &rarr;
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {step > 1 && step < 4 && (
-          <button
-            onClick={() => setStep((s) => Math.max(s - 1, 1))}
-            className="mt-4 text-sm text-ink4 hover:text-ink3"
-          >
+          <Button onClick={() => setStep((s) => Math.max(s - 1, 1))} color="inherit" sx={{ mt: 1 }}>
             &larr; Back
-          </button>
+          </Button>
         )}
       </div>
     </div>
