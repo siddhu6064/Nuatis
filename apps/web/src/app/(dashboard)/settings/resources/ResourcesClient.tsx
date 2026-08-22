@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 interface Resource {
   id: string
@@ -240,13 +243,9 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
       <div className="bg-white rounded-xl border border-border-brand">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-brand">
           <h2 className="text-sm font-semibold text-ink">Resources</h2>
-          <button
-            type="button"
-            onClick={() => setShowAddForm(true)}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2"
-          >
+          <Button onClick={() => setShowAddForm(true)} size="small" color="inherit">
             Add Resource
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -262,24 +261,27 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
             className="bg-white rounded-xl border border-border-brand p-4 mb-4 space-y-3 mx-6 mt-4"
           >
             <h3 className="text-sm font-semibold text-ink">New Resource</h3>
-            <input
+            <TextField
               required
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g. Treatment Room 1"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-teal-400"
+              size="small"
+              fullWidth
             />
-            <select
+            <TextField
+              select
               value={newType}
               onChange={(e) => setNewType(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-1 focus:ring-teal-400"
+              size="small"
+              fullWidth
             >
-              <option value="room">Room</option>
-              <option value="station">Station</option>
-              <option value="equipment">Equipment</option>
-              <option value="vehicle">Vehicle</option>
-              <option value="other">Other</option>
-            </select>
+              <MenuItem value="room">Room</MenuItem>
+              <MenuItem value="station">Station</MenuItem>
+              <MenuItem value="equipment">Equipment</MenuItem>
+              <MenuItem value="vehicle">Vehicle</MenuItem>
+              <MenuItem value="other">Other</MenuItem>
+            </TextField>
             <div className="flex gap-2 flex-wrap">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -291,27 +293,22 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
                 />
               ))}
             </div>
-            <textarea
+            <TextField
               value={newNotes}
               onChange={(e) => setNewNotes(e.target.value)}
               placeholder="Notes (optional)"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full resize-none h-16 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              multiline
+              rows={3}
+              size="small"
+              fullWidth
             />
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-40"
-              >
+              <Button type="submit" disabled={saving} variant="contained">
                 {saving ? 'Saving...' : 'Add Resource'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 bg-gray-100 text-ink3 rounded-lg text-sm font-medium hover:bg-gray-200"
-              >
+              </Button>
+              <Button onClick={() => setShowAddForm(false)} color="inherit">
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -337,24 +334,26 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
                     /* Inline edit row */
                     <tr key={r.id} className="bg-bg">
                       <td className="px-6 py-3">
-                        <input
+                        <TextField
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="border border-gray-200 rounded px-2 py-1 text-sm w-full focus:outline-none focus:ring-1 focus:ring-teal-400"
+                          size="small"
+                          fullWidth
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <select
+                        <TextField
+                          select
                           value={editType}
                           onChange={(e) => setEditType(e.target.value)}
-                          className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none"
+                          size="small"
                         >
-                          <option value="room">Room</option>
-                          <option value="station">Station</option>
-                          <option value="equipment">Equipment</option>
-                          <option value="vehicle">Vehicle</option>
-                          <option value="other">Other</option>
-                        </select>
+                          <MenuItem value="room">Room</MenuItem>
+                          <MenuItem value="station">Station</MenuItem>
+                          <MenuItem value="equipment">Equipment</MenuItem>
+                          <MenuItem value="vehicle">Vehicle</MenuItem>
+                          <MenuItem value="other">Other</MenuItem>
+                        </TextField>
                       </td>
                       <td className="px-4 py-3 text-ink3 text-xs">{r.status}</td>
                       <td className="px-4 py-3">
@@ -372,21 +371,16 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
                       </td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-3">
-                          <button
-                            type="button"
+                          <Button
                             onClick={() => void handleSaveEdit(r.id)}
                             disabled={saving}
-                            className="text-xs text-teal-600 hover:underline disabled:opacity-50"
+                            size="small"
                           >
                             {saving ? 'Saving...' : 'Save'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="text-xs text-ink4 hover:underline"
-                          >
+                          </Button>
+                          <Button onClick={() => setEditingId(null)} size="small" color="inherit">
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -424,29 +418,25 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-3">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(r)}
-                            className="text-xs text-ink4 hover:text-ink transition-colors"
-                          >
+                          <Button onClick={() => startEdit(r)} size="small" color="inherit">
                             Edit
-                          </button>
+                          </Button>
                           {r.status !== 'maintenance' && (
-                            <button
-                              type="button"
+                            <Button
                               onClick={() => void handleMaintenance(r.id)}
-                              className="text-xs text-ink4 hover:text-amber-600 transition-colors"
+                              size="small"
+                              color="warning"
                             >
                               Maintenance
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            type="button"
+                          <Button
                             onClick={() => void handleDelete(r.id)}
-                            className="text-xs text-ink4 hover:text-red-500 transition-colors"
+                            size="small"
+                            color="error"
                           >
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -464,11 +454,11 @@ export default function ResourcesClient({ initialResources, tenantId: _tenantId 
           <h2 className="text-sm font-semibold text-ink">Resource Calendar</h2>
           <div className="flex items-center gap-2">
             {loadingCal && <span className="text-xs text-ink4">Loading...</span>}
-            <input
+            <TextField
               type="date"
               value={calDate}
               onChange={(e) => setCalDate(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+              size="small"
             />
           </div>
         </div>

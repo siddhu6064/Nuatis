@@ -6,6 +6,9 @@ import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 import Switch from '@mui/material/Switch'
+import IconButton from '@mui/material/IconButton'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import { Modal } from '@/components/ui/Modal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -19,8 +22,35 @@ interface ScoringRule {
   label: string
   description: string
   points: number
-  active: boolean
-  is_custom: boolean
+  is_active: boolean
+}
+
+// apps/api/src/scripts/seed-lead-scoring-rules.ts's DEFAULT_RULES — the schema
+// has no is_custom column, so "custom" is derived as "not a seeded rule_key".
+const DEFAULT_RULE_KEYS = new Set([
+  'call_completed',
+  'appointment_booked',
+  'appointment_attended',
+  'email_opened',
+  'email_replied',
+  'sms_replied',
+  'form_submitted',
+  'quote_viewed',
+  'quote_accepted',
+  'booking_page_visit',
+  'has_email',
+  'has_phone',
+  'has_address',
+  'referred_contact',
+  'appointment_no_show',
+  'quote_declined',
+  'inactive_30d',
+  'inactive_60d',
+  'inactive_90d',
+])
+
+function isCustomRule(ruleKey: string): boolean {
+  return !DEFAULT_RULE_KEYS.has(ruleKey)
 }
 
 interface RulesByCategory {
@@ -218,16 +248,16 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
   }
 
   async function handleToggle() {
-    const next = !rule.active
-    onUpdate(rule.id, { active: next })
+    const next = !rule.is_active
+    onUpdate(rule.id, { is_active: next })
     try {
       await fetch(`/api/lead-scoring/rules/${rule.id}`, {
         method: 'PUT',
         headers: authHeaders,
-        body: JSON.stringify({ active: next }),
+        body: JSON.stringify({ is_active: next }),
       })
     } catch {
-      onUpdate(rule.id, { active: rule.active }) // revert
+      onUpdate(rule.id, { is_active: rule.is_active }) // revert
     }
   }
 
@@ -249,7 +279,7 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
       {/* Active toggle */}
       <Switch
         size="small"
-        checked={rule.active}
+        checked={rule.is_active}
         onChange={() => void handleToggle()}
         slotProps={{ input: { 'aria-label': rule.label } }}
         sx={{ mt: 0.25 }}
@@ -262,26 +292,29 @@ function RuleRow({ rule, onUpdate, onDelete, authHeaders }: RuleRowProps) {
       </div>
 
       {/* Points */}
-      <input
+      <TextField
         type="number"
         value={points}
         onChange={(e) => handlePointsChange(parseInt(e.target.value) || 0)}
         onBlur={() => void savePoints(points)}
-        className="w-20 px-2 py-1 text-sm text-right border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         title="Points"
+        size="small"
+        sx={{ width: 80 }}
+        slotProps={{ htmlInput: { style: { textAlign: 'right' } } }}
       />
       <span className="text-xs text-ink4 self-center">pts</span>
 
       {/* Delete (custom rules only) */}
-      {rule.is_custom && (
-        <button
+      {isCustomRule(rule.rule_key) && (
+        <IconButton
           onClick={() => void handleDelete()}
           disabled={deleting}
-          className="self-center text-gray-300 hover:text-red-400 transition-colors text-lg leading-none disabled:opacity-40"
           title="Delete rule"
+          size="small"
+          sx={{ alignSelf: 'center' }}
         >
           ×
-        </button>
+        </IconButton>
       )}
     </div>
   )
@@ -475,33 +508,33 @@ export default function LeadScoringSettingsPage() {
       <div className="rounded-xl border border-border-brand bg-white p-6 space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-ink">Scoring Rules</p>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          <Button onClick={() => setShowAddModal(true)} size="small" variant="contained">
             + Add Custom Rule
-          </button>
+          </Button>
         </div>
 
         {/* Category tabs */}
-        <div className="flex items-center gap-1 border-b border-border-brand">
+        <Tabs
+          value={activeTab}
+          onChange={(_e, val) => setActiveTab(val as Category)}
+          sx={{ minHeight: 0, borderBottom: 1, borderColor: 'divider' }}
+        >
           {CATEGORIES.map((cat) => (
-            <button
+            <Tab
               key={cat}
-              onClick={() => setActiveTab(cat)}
-              className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
-                activeTab === cat
-                  ? 'border-teal-600 text-teal-700 font-medium'
-                  : 'border-transparent text-ink3 hover:text-ink'
-              }`}
-            >
-              {CATEGORY_LABELS[cat]}
-              {rules[cat].length > 0 && (
-                <span className="ml-1.5 text-xs text-ink4">({rules[cat].length})</span>
-              )}
-            </button>
+              value={cat}
+              sx={{ minHeight: 0 }}
+              label={
+                <>
+                  {CATEGORY_LABELS[cat]}
+                  {rules[cat].length > 0 && (
+                    <span className="ml-1.5 text-xs text-ink4">({rules[cat].length})</span>
+                  )}
+                </>
+              }
+            />
           ))}
-        </div>
+        </Tabs>
 
         {/* Rules list */}
         {activeRules.length === 0 ? (
@@ -540,13 +573,14 @@ export default function LeadScoringSettingsPage() {
             Recalculate scores and grades for every contact based on the current rules.
           </p>
         </div>
-        <button
+        <Button
           onClick={() => void handleRescoreAll()}
           disabled={rescoring}
-          className="px-4 py-2 text-sm font-medium bg-white text-ink2 border border-border-brand rounded-lg hover:bg-bg disabled:opacity-50 transition-colors"
+          color="inherit"
+          variant="outlined"
         >
           {rescoring ? 'Re-scoring...' : 'Re-score All'}
-        </button>
+        </Button>
       </div>
 
       {/* Add Rule Modal */}
