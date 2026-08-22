@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
+import Button from '@mui/material/Button'
 
 const API_URL = ''
 
@@ -179,24 +180,24 @@ function PaymentsSettingsContent() {
           {!squareLoading && (
             <div className="pt-1">
               {squareStatus?.connected ? (
-                <button
-                  type="button"
+                <Button
                   onClick={() => void handleDisconnectSquare()}
                   disabled={connectingSquare}
-                  className="px-3 py-1.5 bg-white text-red-600 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  color="error"
+                  variant="outlined"
+                  size="small"
                 >
                   {connectingSquare ? 'Disconnecting…' : 'Disconnect'}
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
+                <Button
                   onClick={() => void handleConnectSquare()}
                   disabled={connectingSquare}
-                  className="px-3 py-1.5 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
-                  style={{ backgroundColor: '#006AFF' }}
+                  size="small"
+                  sx={{ bgcolor: '#006AFF', color: 'white', '&:hover': { bgcolor: '#0055cc' } }}
                 >
                   {connectingSquare ? 'Connecting…' : 'Connect Square'}
-                </button>
+                </Button>
               )}
             </div>
           )}
