@@ -20,6 +20,8 @@ interface MergedStep {
   subject?: string
   is_enabled: boolean
   is_customized: boolean
+  default_body: string
+  default_subject?: string
 }
 
 function getDefaultCadence(vertical: string) {
@@ -48,6 +50,11 @@ function mergeSteps(
   return defaults.map((step, i) => {
     const key = `${i}:${step.channel}`
     const override = overrideMap.get(key)
+    const isCustomized =
+      !!override &&
+      (override.body !== step.template ||
+        (override.subject ?? undefined) !== step.subject ||
+        override.is_enabled !== true)
     return {
       step_index: i,
       days_after: step.days_after,
@@ -55,7 +62,9 @@ function mergeSteps(
       body: override?.body ?? step.template,
       subject: override?.subject ?? step.subject,
       is_enabled: override?.is_enabled ?? true,
-      is_customized: !!override,
+      is_customized: isCustomized,
+      default_body: step.template,
+      default_subject: step.subject,
     }
   })
 }

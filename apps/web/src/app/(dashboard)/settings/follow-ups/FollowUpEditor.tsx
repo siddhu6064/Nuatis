@@ -13,6 +13,8 @@ interface MergedStep {
   subject?: string
   is_enabled: boolean
   is_customized: boolean
+  default_body: string
+  default_subject?: string
 }
 
 interface EditableStep extends MergedStep {
@@ -90,13 +92,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
   async function resetStep(index: number) {
     const step = steps[index]
     if (!step) return
-    // PUT with is_customized cleared by re-saving all steps with this step's body reset to default
-    // We fetch fresh to get default, then save only this step's override removed via re-fetch
-    // Simplest: delete the override by saving the default body back — backend upserts, no delete endpoint needed
-    // Actually just re-fetch after reverting locally so server sees the change on next PUT
     setSteps((prev) =>
       prev.map((s, i) =>
-        i === index ? { ...s, _body: s.body, _subject: s.subject ?? '', _dirty: true } : s
+        i === index
+          ? { ...s, _body: s.default_body, _subject: s.default_subject ?? '', _dirty: true }
+          : s
       )
     )
   }
