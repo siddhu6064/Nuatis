@@ -1,6 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, KeyboardEvent } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import IconButton from '@mui/material/IconButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,13 +52,6 @@ const EMOJI_OPTIONS: Array<{ value: NonNullable<BrandVoice['emoji_use']>; label:
   { value: 'minimal', label: 'Minimal' },
   { value: 'moderate', label: 'Moderate' },
 ]
-
-// ─── Shared class constants ───────────────────────────────────────────────────
-
-const inputCls =
-  'w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-const saveBtnCls =
-  'px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
 
 // ─── Tag input component ──────────────────────────────────────────────────────
 
@@ -105,17 +103,17 @@ function TagInput({
             className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-ink text-xs rounded-md"
           >
             {tag}
-            <button
-              type="button"
+            <IconButton
               onClick={(e) => {
                 e.stopPropagation()
                 removeTag(i)
               }}
-              className="text-ink3 hover:text-ink transition-colors leading-none"
+              size="small"
               aria-label={`Remove ${tag}`}
+              sx={{ p: 0, ml: 0.5 }}
             >
               ×
-            </button>
+            </IconButton>
           </span>
         ))}
         {!atMax && (
@@ -287,49 +285,39 @@ export default function BrandVoicePage() {
         {/* Formality toggle */}
         <div>
           <p className="text-sm font-medium text-ink mb-2">Formality</p>
-          <div className="inline-flex rounded-lg overflow-hidden border border-border-brand">
-            {FORMALITY_OPTIONS.map(({ value, label }) => {
-              const selected = form.formality === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => patch({ formality: value })}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    selected
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <ToggleButtonGroup
+            value={form.formality ?? null}
+            exclusive
+            onChange={(_e, v: BrandVoice['formality'] | null) =>
+              v !== null && patch({ formality: v })
+            }
+            size="small"
+          >
+            {FORMALITY_OPTIONS.map(({ value, label }) => (
+              <ToggleButton key={value} value={value}>
+                {label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </div>
 
         {/* Emoji use toggle */}
         <div>
           <p className="text-sm font-medium text-ink mb-2">Emoji use</p>
-          <div className="inline-flex rounded-lg overflow-hidden border border-border-brand">
-            {EMOJI_OPTIONS.map(({ value, label }) => {
-              const selected = form.emoji_use === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => patch({ emoji_use: value })}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    selected
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <ToggleButtonGroup
+            value={form.emoji_use ?? null}
+            exclusive
+            onChange={(_e, v: BrandVoice['emoji_use'] | null) =>
+              v !== null && patch({ emoji_use: v })
+            }
+            size="small"
+          >
+            {EMOJI_OPTIONS.map(({ value, label }) => (
+              <ToggleButton key={value} value={value}>
+                {label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </div>
       </section>
 
@@ -373,14 +361,14 @@ export default function BrandVoicePage() {
           <label className="block text-sm font-medium text-ink mb-1" htmlFor="signature">
             Sign-off line
           </label>
-          <input
+          <TextField
             id="signature"
-            type="text"
-            maxLength={100}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
             value={form.signature ?? ''}
             onChange={(e) => patch({ signature: e.target.value })}
             placeholder="The team at Sunrise Dental"
-            className={inputCls}
+            fullWidth
+            size="small"
           />
           <p className="text-[11px] text-ink4 mt-1 text-right">{signatureCount}/100</p>
         </div>
@@ -393,16 +381,18 @@ export default function BrandVoicePage() {
           <p className="text-xs text-ink3 mb-2">
             Write a sample message in your voice — AI will match this style.
           </p>
-          <textarea
+          <TextField
             id="sample_message"
-            maxLength={500}
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+            multiline
             rows={5}
             value={form.sample_message ?? ''}
             onChange={(e) => patch({ sample_message: e.target.value })}
             placeholder={
               "Hi Sarah! Just a reminder your cleaning is tomorrow at 2pm with Dr. Kim.\nText us if you need to reschedule — we're always happy to help! See you soon 😊 — Sunrise Dental"
             }
-            className={`${inputCls} resize-none`}
+            fullWidth
+            size="small"
           />
           <p className="text-[11px] text-ink4 mt-1 text-right">{sampleCount}/500</p>
         </div>
@@ -414,14 +404,9 @@ export default function BrandVoicePage() {
         <p className="text-xs text-ink3">
           Generate a sample message to see how your AI will sound with these settings.
         </p>
-        <button
-          type="button"
-          onClick={generatePreview}
-          disabled={previewing}
-          className="px-4 py-2 bg-white text-ink text-sm font-medium rounded-lg border border-border-brand hover:bg-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
+        <Button onClick={generatePreview} disabled={previewing} variant="outlined" color="inherit">
           {previewing ? 'Generating...' : 'Preview'}
-        </button>
+        </Button>
         {preview !== null && (
           <div className="mt-3">
             <p className="text-[11px] text-ink4 mb-1.5 uppercase tracking-wide font-medium">
@@ -447,9 +432,9 @@ export default function BrandVoicePage() {
 
       {/* ── Save button ──────────────────────────────────────────────────────── */}
       <div>
-        <button type="button" onClick={save} disabled={saving} className={saveBtnCls}>
+        <Button onClick={save} disabled={saving} variant="contained">
           {saving ? 'Saving...' : 'Save Brand Voice'}
-        </button>
+        </Button>
       </div>
     </div>
   )

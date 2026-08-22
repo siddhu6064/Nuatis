@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
 
 interface LocationItem {
   id: string
@@ -21,7 +23,7 @@ export default function LocationsManager({
   initialLocations: LocationItem[]
 }) {
   const router = useRouter()
-  const [locations] = useState(initialLocations)
+  const locations = initialLocations
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newAddress, setNewAddress] = useState('')
@@ -84,18 +86,22 @@ export default function LocationsManager({
             <div className="flex items-center gap-2">
               {!loc.is_primary && (
                 <>
-                  <button
+                  <Button
                     onClick={() => setPrimary(loc.id)}
-                    className="text-[10px] text-teal-600 hover:text-teal-700 font-medium"
+                    size="small"
+                    color="inherit"
+                    sx={{ fontSize: 10 }}
                   >
                     Set Primary
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => deleteLocation(loc.id)}
-                    className="text-[10px] text-red-400 hover:text-red-600"
+                    size="small"
+                    color="error"
+                    sx={{ fontSize: 10 }}
                   >
                     Delete
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -110,44 +116,45 @@ export default function LocationsManager({
 
       {adding ? (
         <div className="bg-white rounded-xl border border-border-brand p-5 space-y-3">
-          <input
-            type="text"
+          <TextField
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Location name"
-            className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             autoFocus
+            fullWidth
+            size="small"
           />
-          <input
-            type="text"
+          <TextField
             value={newAddress}
             onChange={(e) => setNewAddress(e.target.value)}
             placeholder="Address (optional)"
-            className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            fullWidth
+            size="small"
           />
           <div className="flex gap-2">
-            <button
-              onClick={addLocation}
-              disabled={saving || !newName.trim()}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
-            >
+            <Button onClick={addLocation} disabled={saving || !newName.trim()} variant="contained">
               {saving ? 'Adding...' : 'Add Location'}
-            </button>
-            <button
-              onClick={() => setAdding(false)}
-              className="px-4 py-2 text-sm text-ink3 hover:text-ink2"
-            >
+            </Button>
+            <Button onClick={() => setAdding(false)} color="inherit">
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <button
+        <Button
           onClick={() => setAdding(true)}
-          className="w-full py-3 border-2 border-dashed border-border-brand rounded-xl text-sm text-ink4 hover:border-teal-300 hover:text-teal-600 transition-colors"
+          fullWidth
+          color="inherit"
+          sx={{
+            py: 1.5,
+            border: '2px dashed',
+            borderColor: 'divider',
+            borderRadius: 3,
+            '&:hover': { borderColor: 'primary.light' },
+          }}
         >
           + Add Location
-        </button>
+        </Button>
       )}
     </div>
   )

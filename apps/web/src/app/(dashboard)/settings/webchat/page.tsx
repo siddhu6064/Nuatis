@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Switch from '@mui/material/Switch'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 interface WebchatConfig {
   webchat_enabled: boolean
@@ -108,32 +113,24 @@ export default function WebchatSettingsPage() {
             <h2 className="text-sm font-semibold text-ink">Enable Webchat</h2>
             <p className="text-xs text-ink4 mt-0.5">Show the chat widget on your website</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfig((c) => ({ ...c, webchat_enabled: !c.webchat_enabled }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              config.webchat_enabled ? 'bg-teal-600' : 'bg-gray-200'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                config.webchat_enabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+          <Switch
+            checked={config.webchat_enabled}
+            onChange={(e) => setConfig((c) => ({ ...c, webchat_enabled: e.target.checked }))}
+            slotProps={{ input: { 'aria-label': 'Enable Webchat' } }}
+          />
         </div>
       </div>
 
       {/* Greeting */}
       <div className="bg-white rounded-xl border border-border-brand px-6 py-5 mb-4">
         <h2 className="text-sm font-semibold text-ink mb-3">Greeting Message</h2>
-        <input
-          type="text"
+        <TextField
           value={config.webchat_greeting}
           onChange={(e) => setConfig((c) => ({ ...c, webchat_greeting: e.target.value }))}
-          maxLength={200}
-          className="w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          slotProps={{ htmlInput: { maxLength: 200 } }}
           placeholder="Hi! How can we help you today?"
+          fullWidth
+          size="small"
         />
         <p className="text-xs text-ink4 mt-1">{config.webchat_greeting.length}/200</p>
       </div>
@@ -169,34 +166,24 @@ export default function WebchatSettingsPage() {
       {/* Position */}
       <div className="bg-white rounded-xl border border-border-brand px-6 py-5 mb-4">
         <h2 className="text-sm font-semibold text-ink mb-3">Widget Position</h2>
-        <div className="flex gap-2">
-          {(['bottom-right', 'bottom-left'] as const).map((pos) => (
-            <button
-              key={pos}
-              type="button"
-              onClick={() => setConfig((c) => ({ ...c, webchat_position: pos }))}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                config.webchat_position === pos
-                  ? 'bg-teal-600 text-white border-teal-600'
-                  : 'bg-white text-ink3 border-border-brand hover:text-ink'
-              }`}
-            >
-              {pos === 'bottom-right' ? '↘ Bottom Right' : '↙ Bottom Left'}
-            </button>
-          ))}
-        </div>
+        <ToggleButtonGroup
+          value={config.webchat_position}
+          exclusive
+          onChange={(_e, v: WebchatConfig['webchat_position'] | null) =>
+            v !== null && setConfig((c) => ({ ...c, webchat_position: v }))
+          }
+          fullWidth
+        >
+          <ToggleButton value="bottom-right">↘ Bottom Right</ToggleButton>
+          <ToggleButton value="bottom-left">↙ Bottom Left</ToggleButton>
+        </ToggleButtonGroup>
       </div>
 
       {/* Save button */}
       <div className="flex items-center gap-3 mb-8">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-        >
+        <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Changes'}
-        </button>
+        </Button>
       </div>
 
       {/* Embed snippet */}
@@ -208,13 +195,9 @@ export default function WebchatSettingsPage() {
               Paste this before the closing &lt;/body&gt; tag on your website
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
-          >
+          <Button onClick={() => void handleCopy()} size="small">
             {copied ? 'Copied!' : 'Copy'}
-          </button>
+          </Button>
         </div>
         <pre className="text-xs bg-gray-50 rounded-lg p-4 overflow-x-auto text-ink3 font-mono border border-border-brand">
           {embedSnippet}
