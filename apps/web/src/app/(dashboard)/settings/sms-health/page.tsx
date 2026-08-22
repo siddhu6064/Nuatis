@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import Button from '@mui/material/Button'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import {
   LineChart,
   Line,
@@ -100,7 +103,7 @@ export default function DeliveryHealthPage() {
               Last updated: {activeTab === 'sms' ? smsLastUpdated : emailLastUpdated}
             </span>
           )}
-          <button
+          <Button
             onClick={() => void (activeTab === 'sms' ? fetchStats() : fetchEmailStats())}
             disabled={activeTab === 'sms' ? loading : emailLoading}
             aria-label={
@@ -113,29 +116,23 @@ export default function DeliveryHealthPage() {
                   : 'Refresh email health data'
             }
             aria-busy={activeTab === 'sms' ? loading : emailLoading}
-            className="px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            variant="contained"
+            size="small"
           >
             {(activeTab === 'sms' ? loading : emailLoading) ? 'Loading…' : 'Refresh'}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 border-b border-border-brand mb-6">
-        {(['sms', 'email'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === tab
-                ? 'border-teal-600 text-teal-700'
-                : 'border-transparent text-ink3 hover:text-ink'
-            }`}
-          >
-            {tab === 'sms' ? 'SMS' : 'Email'}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={activeTab}
+        onChange={(_e, val) => setActiveTab(val as 'sms' | 'email')}
+        sx={{ mb: 3, minHeight: 0 }}
+      >
+        <Tab label="SMS" value="sms" sx={{ minHeight: 0 }} />
+        <Tab label="Email" value="email" sx={{ minHeight: 0 }} />
+      </Tabs>
 
       {/* ── SMS Tab ── */}
       {activeTab === 'sms' && (
