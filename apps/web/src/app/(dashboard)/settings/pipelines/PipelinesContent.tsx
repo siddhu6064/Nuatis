@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,7 +49,13 @@ function toTitle(slug: string): string {
 
 // ── Inline stage editor ───────────────────────────────────────────────────────
 
-function StageEditor({ pipelineId }: { pipelineId: string }) {
+function StageEditor({
+  pipelineId,
+  onCountChange,
+}: {
+  pipelineId: string
+  onCountChange: (count: number) => void
+}) {
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -69,6 +77,10 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!loading) onCountChange(stages.length)
+  }, [stages.length, loading, onCountChange])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -214,7 +226,7 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
                 )}
               </div>
               {editingId === stage.id ? (
-                <input
+                <TextField
                   autoFocus
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
@@ -222,7 +234,8 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
                     if (e.key === 'Enter') void renameStage(stage.id)
                     if (e.key === 'Escape') setEditingId(null)
                   }}
-                  className="flex-1 text-sm border border-teal-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  size="small"
+                  sx={{ flex: 1 }}
                 />
               ) : (
                 <span className="flex-1 text-sm text-ink">{stage.name}</span>
@@ -230,36 +243,32 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
 
               {editingId === stage.id ? (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => void renameStage(stage.id)}
-                    className="text-xs font-medium text-teal-600 hover:text-teal-800"
-                  >
+                  <Button onClick={() => void renameStage(stage.id)} size="small">
                     Save
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="text-xs text-ink4 hover:text-ink3"
-                  >
+                  </Button>
+                  <Button onClick={() => setEditingId(null)} size="small" color="inherit">
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button
                     onClick={() => {
                       setEditingId(stage.id)
                       setEditingName(stage.name)
                     }}
-                    className="text-xs text-ink4 hover:text-teal-600 transition-colors"
+                    size="small"
+                    color="inherit"
                   >
                     Rename
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void deleteStage(stage.id, stage.name)}
-                    className="text-xs text-ink4 hover:text-red-600 transition-colors"
+                    size="small"
+                    color="error"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -269,22 +278,24 @@ function StageEditor({ pipelineId }: { pipelineId: string }) {
 
       {/* Add stage row */}
       <div className="flex items-center gap-2 pt-1">
-        <input
+        <TextField
           value={addingName}
           onChange={(e) => setAddingName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void addStage()
           }}
           placeholder="New stage name"
-          className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          size="small"
+          sx={{ flex: 1 }}
         />
-        <button
+        <Button
           onClick={() => void addStage()}
           disabled={adding || !addingName.trim()}
-          className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          size="small"
+          variant="contained"
         >
           Add stage
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -430,33 +441,43 @@ export default function PipelinesContent({ vertical }: { vertical: string }) {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {!pipeline.is_default && (
-                    <button
+                    <Button
                       onClick={() => void setDefault(pipeline.id)}
-                      className="text-xs text-ink4 hover:text-ink3 transition-colors"
+                      size="small"
+                      color="inherit"
                     >
                       Set default
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
                     onClick={() =>
                       setExpandedId((prev) => (prev === pipeline.id ? null : pipeline.id))
                     }
-                    className="text-xs font-medium text-teal-600 hover:text-teal-800 transition-colors"
+                    size="small"
                   >
                     {expandedId === pipeline.id ? 'Close' : 'Edit stages'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void deletePipeline(pipeline.id, pipeline.name)}
-                    className="text-xs text-ink4 hover:text-red-600 transition-colors"
+                    size="small"
+                    color="error"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Inline stage editor */}
               {expandedId === pipeline.id && (
-                <StageEditor key={pipeline.id} pipelineId={pipeline.id} />
+                <StageEditor
+                  key={pipeline.id}
+                  pipelineId={pipeline.id}
+                  onCountChange={(count) =>
+                    setPipelines((prev) =>
+                      prev.map((p) => (p.id === pipeline.id ? { ...p, stage_count: count } : p))
+                    )
+                  }
+                />
               )}
             </div>
           ))}
@@ -467,7 +488,7 @@ export default function PipelinesContent({ vertical }: { vertical: string }) {
       <div className="bg-white rounded-xl border border-border-brand p-5">
         {creating ? (
           <div className="flex items-center gap-3">
-            <input
+            <TextField
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -479,32 +500,28 @@ export default function PipelinesContent({ vertical }: { vertical: string }) {
                 }
               }}
               placeholder="Pipeline name"
-              className="flex-1 text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              size="small"
+              sx={{ flex: 1 }}
             />
-            <button
+            <Button
               onClick={() => void createPipeline()}
               disabled={saving || !newName.trim()}
-              className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              variant="contained"
             >
               {saving ? 'Creating...' : 'Create'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setCreating(false)
                 setNewName('')
               }}
-              className="text-sm text-ink4 hover:text-ink3 transition-colors"
+              color="inherit"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            onClick={() => setCreating(true)}
-            className="text-sm font-medium text-teal-600 hover:text-teal-800 transition-colors"
-          >
-            + Create Pipeline
-          </button>
+          <Button onClick={() => setCreating(true)}>+ Create Pipeline</Button>
         )}
       </div>
     </div>

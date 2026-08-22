@@ -148,8 +148,9 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
+  const pipelineTypeInput = b['pipelineType'] ?? b['pipeline_type']
   const pipelineType =
-    b['pipelineType'] === 'deals' ? 'deals' : b['pipelineType'] === 'contacts' ? 'contacts' : null
+    pipelineTypeInput === 'deals' ? 'deals' : pipelineTypeInput === 'contacts' ? 'contacts' : null
   if (!pipelineType) {
     res.status(400).json({ error: 'pipelineType must be "contacts" or "deals"' })
     return
@@ -444,7 +445,7 @@ router.post(
       return
     }
 
-    const color = typeof b['color'] === 'string' ? b['color'] : null
+    const color = typeof b['color'] === 'string' ? b['color'] : '#6B7280'
     const probability = typeof b['probability'] === 'number' ? b['probability'] : 0
 
     // Auto-assign position if not provided (max existing + 1)
