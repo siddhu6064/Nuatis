@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import Button from '@mui/material/Button'
 
 type PanelState = 'idle' | 'connecting' | 'active' | 'error'
 
@@ -522,19 +523,22 @@ export default function TestMayaPanel() {
       {/* State: IDLE */}
       {state === 'idle' && (
         <div className="flex flex-col items-start gap-2">
-          <button
+          <Button
             onClick={() => void startTest()}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors"
+            variant="contained"
+            color="warning"
+            startIcon={
+              <svg width={16} height={16} fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            }
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
-                clipRule="evenodd"
-              />
-            </svg>
             Start Test
-          </button>
+          </Button>
           <p className="text-[11px] text-ink4">Your browser will request microphone access</p>
         </div>
       )}
@@ -591,12 +595,9 @@ export default function TestMayaPanel() {
                 </>
               )}
             </div>
-            <button
-              onClick={endTest}
-              className="px-3 py-1 text-xs font-medium border border-rose-300 text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
-            >
+            <Button onClick={endTest} size="small" variant="outlined" color="error">
               End Test
-            </button>
+            </Button>
           </div>
 
           {/* Transcript */}
@@ -631,12 +632,9 @@ export default function TestMayaPanel() {
           <div className="px-3 py-2 bg-red-50 rounded-lg">
             <p className="text-xs text-red-600">{error}</p>
           </div>
-          <button
-            onClick={() => setState('idle')}
-            className="px-3 py-1.5 text-xs font-medium border border-border-brand text-ink3 rounded-lg hover:bg-bg transition-colors"
-          >
+          <Button onClick={() => setState('idle')} size="small" color="inherit">
             Try again
-          </button>
+          </Button>
         </div>
       )}
 

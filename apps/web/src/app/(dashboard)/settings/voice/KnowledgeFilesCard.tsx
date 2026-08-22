@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 
 interface KbFile {
   id: string
@@ -120,15 +122,15 @@ export default function KnowledgeFilesCard({ initialFiles }: { initialFiles: KbF
     <div className="bg-white rounded-xl border border-border-brand p-6 mt-6">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold text-ink">Knowledge Files</h2>
-        <button
-          type="button"
+        <Button
           onClick={() => !atMax && fileInputRef.current?.click()}
           disabled={uploading || atMax}
           title={atMax ? 'Maximum 5 files reached' : undefined}
-          className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="small"
+          color="inherit"
         >
           {uploading ? 'Uploading…' : 'Upload PDF'}
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -166,12 +168,12 @@ export default function KnowledgeFilesCard({ initialFiles }: { initialFiles: KbF
                   {f.status}
                 </span>
               </div>
-              <button
-                type="button"
+              <IconButton
                 onClick={() => handleDelete(f.id, f.file_name)}
                 disabled={deletingId === f.id}
                 title="Delete"
-                className="ml-3 text-ink4 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40"
+                size="small"
+                sx={{ ml: 1.5, flexShrink: 0 }}
               >
                 <svg
                   className="w-4 h-4"
@@ -186,7 +188,7 @@ export default function KnowledgeFilesCard({ initialFiles }: { initialFiles: KbF
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
                 </svg>
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
