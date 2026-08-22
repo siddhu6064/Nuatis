@@ -331,7 +331,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           lead_grade?: string
           lead_score_updated_at?: string
           assigned_to_user_id?: string | null
-          custom_fields?: Record<string, unknown>
+          vertical_data?: Record<string, unknown>
           enrichment_suggested_company?: string | null
           compliance_fields?: Record<string, unknown>
           source?: string | null
@@ -362,7 +362,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           setAssignedUserId(c.assigned_to_user_id ?? null)
           const suggestion =
             c.enrichment_suggested_company ??
-            (c.custom_fields?.enrichment_suggested_company as string | undefined) ??
+            (c.vertical_data?.enrichment_suggested_company as string | undefined) ??
             null
           setEnrichmentSuggestion(suggestion || null)
           if (c.referred_by_contact_id) {

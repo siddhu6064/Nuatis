@@ -22,10 +22,13 @@ type SignedUrlResult = {
 }
 type RemoveResult = { data: unknown; error: null | { message: string } }
 
+type CreateBucketResult = { data: { name: string } | null; error: null | { message: string } }
+
 export interface StorageMock {
   upload: jest.Mock<(path: string, body: unknown, opts?: unknown) => Promise<UploadResult>>
   createSignedUrl: jest.Mock<(path: string, seconds: number) => Promise<SignedUrlResult>>
   remove: jest.Mock<(paths: string[]) => Promise<RemoveResult>>
+  createBucket: jest.Mock<(name: string, opts?: unknown) => Promise<CreateBucketResult>>
 }
 
 export interface MockStore {
@@ -45,7 +48,10 @@ export function createStore(): MockStore {
   const remove = jest
     .fn<(paths: string[]) => Promise<RemoveResult>>()
     .mockResolvedValue({ data: [], error: null })
-  return { tables: {}, storage: { upload, createSignedUrl, remove } }
+  const createBucket = jest
+    .fn<(name: string, opts?: unknown) => Promise<CreateBucketResult>>()
+    .mockResolvedValue({ data: { name: 'mock-bucket' }, error: null })
+  return { tables: {}, storage: { upload, createSignedUrl, remove, createBucket } }
 }
 
 type Op = 'select' | 'insert' | 'update' | 'delete'
@@ -463,6 +469,7 @@ export function createMockSupabase(store: MockStore): unknown {
       },
     },
     storage: {
+      createBucket: store.storage.createBucket,
       from(_bucket: string) {
         return {
           upload: store.storage.upload,

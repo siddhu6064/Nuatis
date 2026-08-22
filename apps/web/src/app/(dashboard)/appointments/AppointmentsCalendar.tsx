@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, dateFnsLocalizer, View, Views, ToolbarProps } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
-import { createClient } from '@supabase/supabase-js'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
@@ -109,15 +108,6 @@ const localizer = dateFnsLocalizer({
 // Initial scroll position for week/day time grids — open at 8 AM, not midnight
 const SCROLL_TO_TIME = new Date(1970, 0, 1, 8, 0, 0)
 
-// ── Supabase browser client ───────────────────────────────────────────────────
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 // ── Column visibility (G65) ───────────────────────────────────────────────────
 
 const APPT_COLUMNS = [
@@ -203,18 +193,12 @@ function CalendarToolbar({ view, label, onNavigate, onView }: ToolbarProps<Calen
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  tenantId: string
   initialAppointments: Appointment[]
   staff: StaffMember[]
   userRole: string
 }
 
-export default function AppointmentsCalendar({
-  tenantId,
-  initialAppointments,
-  staff,
-  userRole,
-}: Props) {
+export default function AppointmentsCalendar({ initialAppointments, staff, userRole }: Props) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [view, setView] = useState<View>(Views.WEEK)
   // TODO(G65): When a list/table view is added to appointments, use colVisible to gate columns
@@ -251,16 +235,12 @@ export default function AppointmentsCalendar({
   // Fetch locations for calendar dropdown
   useEffect(() => {
     void (async () => {
-      const supabase = getSupabase()
-      const { data } = await supabase
-        .from('locations')
-        .select('id, name')
-        .eq('tenant_id', tenantId)
-        .order('name', { ascending: true })
-        .returns<Location[]>()
-      if (data) setLocations(data)
+      const res = await fetch('/api/locations', { credentials: 'include' })
+      if (!res.ok) return
+      const body = (await res.json()) as { locations?: Location[] }
+      if (body.locations) setLocations(body.locations)
     })()
-  }, [tenantId])
+  }, [])
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -269,25 +249,23 @@ export default function AppointmentsCalendar({
     return () => clearTimeout(t)
   }, [toast])
 
-  const fetchRange = useCallback(
-    async (start: Date, end: Date) => {
-      setLoading(true)
-      const supabase = getSupabase()
-      const { data } = await supabase
-        .from('appointments')
-        .select(
-          'id, title, start_time, end_time, status, notes, is_blocked, block_reason, contacts(full_name), staff_members!appointments_assigned_staff_id_fkey(id, name, color_hex)'
-        )
-        .eq('tenant_id', tenantId)
-        .gte('start_time', start.toISOString())
-        .lt('start_time', end.toISOString())
-        .order('start_time', { ascending: true })
-        .returns<Appointment[]>()
-      setAppointments(data ?? [])
+  const fetchRange = useCallback(async (start: Date, end: Date) => {
+    setLoading(true)
+    const res = await fetch('/api/appointments', { credentials: 'include' })
+    if (!res.ok) {
       setLoading(false)
-    },
-    [tenantId]
-  )
+      return
+    }
+    const body = (await res.json()) as { data?: Appointment[] }
+    const startMs = start.getTime()
+    const endMs = end.getTime()
+    const inRange = (body.data ?? []).filter((a) => {
+      const t = new Date(a.start_time).getTime()
+      return t >= startMs && t < endMs
+    })
+    setAppointments(inRange)
+    setLoading(false)
+  }, [])
 
   const handleRangeChange = useCallback(
     (range: Date[] | { start: Date; end: Date }) => {
@@ -423,47 +401,46 @@ export default function AppointmentsCalendar({
         <h1 className="text-xl font-bold text-ink">Appointments</h1>
         <div className="flex items-center gap-3">
           {staff.length > 0 && (
-            <select
+            <TextField
+              select
               value={staffFilter}
               onChange={(e) => setStaffFilter(e.target.value)}
-              className="text-sm border border-border-brand rounded-lg px-3 py-2 bg-white text-ink2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              size="small"
             >
-              <option value="all">All Staff</option>
+              <MenuItem value="all">All Staff</MenuItem>
               {staff.map((s) => (
-                <option key={s.id} value={s.id}>
+                <MenuItem key={s.id} value={s.id}>
                   {s.name}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           )}
-          <button
+          <Button
             onClick={() => {
               setBlockError(null)
               setShowBlockModal(true)
             }}
-            className="flex items-center gap-2 px-4 py-2 border border-border-brand text-sm font-medium text-ink2 rounded-lg hover:bg-bg2 transition-colors"
+            color="inherit"
+            startIcon={
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 15 15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <circle cx="7.5" cy="7.5" r="6" />
+                <line x1="3.2" y1="3.2" x2="11.8" y2="11.8" />
+              </svg>
+            }
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 15 15"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <circle cx="7.5" cy="7.5" r="6" />
-              <line x1="3.2" y1="3.2" x2="11.8" y2="11.8" />
-            </svg>
             Block Time
-          </button>
+          </Button>
           <ColumnsButton columns={APPT_COLUMNS} visible={colVisible} onChange={toggleCol} />
-          <a
-            href="/appointments/new"
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <span className="text-base leading-none">+</span>
-            New Appointment
-          </a>
+          <Button component="a" href="/appointments/new" variant="contained">
+            + New Appointment
+          </Button>
         </div>
       </div>
 

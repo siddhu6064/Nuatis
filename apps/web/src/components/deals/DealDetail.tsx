@@ -251,18 +251,17 @@ export default function DealDetail({ dealId }: Props) {
     setBookingLoading(true)
     setBookingError(null)
     try {
-      const scheduledAt = new Date(`${apptDate}T${apptTime}`).toISOString()
+      const startTime = new Date(`${apptDate}T${apptTime}`)
+      const endTime = new Date(startTime.getTime() + apptDuration * 60_000)
       const res = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: apptTitle,
           contact_id: contactId,
-          calendar_id: apptCalendarId || undefined,
-          scheduled_at: scheduledAt,
-          duration_minutes: apptDuration,
-          notes: apptNotes || undefined,
-          source: 'manual',
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          description: apptNotes || undefined,
         }),
       })
       if (res.ok) {

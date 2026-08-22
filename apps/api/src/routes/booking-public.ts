@@ -391,7 +391,7 @@ router.post(
           if (enrichResult.updates.timezone)
             enrichUpdates['timezone'] = enrichResult.updates.timezone
           if (enrichResult.suggestedCompany) {
-            enrichUpdates['custom_fields'] = {
+            enrichUpdates['vertical_data'] = {
               enrichment_suggested_company: enrichResult.suggestedCompany,
             }
           }

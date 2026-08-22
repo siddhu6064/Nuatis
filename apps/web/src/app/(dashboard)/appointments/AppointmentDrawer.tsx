@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { SlideOver } from '@/components/ui/SlideOver'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 type AppointmentStatus =
   | 'scheduled'
@@ -106,9 +109,6 @@ interface Props {
   onDeleted: () => void
 }
 
-const INP =
-  'w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-
 export default function AppointmentDrawer({
   open,
   appt,
@@ -212,47 +212,38 @@ export default function AppointmentDrawer({
         <p className="text-sm text-ink2 font-medium">Delete this appointment?</p>
         <p className="text-xs text-ink3">This cannot be undone.</p>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => setDeleteConfirm(false)}
             disabled={deleting}
-            className="flex-1 px-4 py-2 text-sm font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
+            color="inherit"
+            fullWidth
           >
             Keep
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => void handleDelete()}
             disabled={deleting}
-            className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            color="error"
+            variant="contained"
+            fullWidth
           >
             {deleting ? 'Deleting…' : 'Yes, Delete'}
-          </button>
+          </Button>
         </div>
       </div>
     ) : (
       <div className="flex gap-2 w-full">
         {canDelete && (
-          <button
-            onClick={() => setDeleteConfirm(true)}
-            disabled={saving}
-            className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
+          <Button onClick={() => setDeleteConfirm(true)} disabled={saving} color="error">
             Delete
-          </button>
+          </Button>
         )}
-        <button
-          onClick={cancelEdit}
-          disabled={saving}
-          className="flex-1 px-4 py-2 text-sm font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors disabled:opacity-50"
-        >
+        <Button onClick={cancelEdit} disabled={saving} color="inherit" fullWidth>
           Cancel
-        </button>
-        <button
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="flex-1 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-        >
+        </Button>
+        <Button onClick={() => void handleSave()} disabled={saving} variant="contained" fullWidth>
           {saving ? 'Saving…' : 'Save Changes'}
-        </button>
+        </Button>
       </div>
     )
   ) : (
@@ -267,12 +258,9 @@ export default function AppointmentDrawer({
           Join Video Call →
         </a>
       )}
-      <button
-        onClick={enterEdit}
-        className="block w-full text-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-      >
+      <Button onClick={enterEdit} variant="contained" fullWidth>
         Edit Appointment
-      </button>
+      </Button>
     </div>
   )
 
@@ -286,75 +274,71 @@ export default function AppointmentDrawer({
     >
       {isEditing ? (
         <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Title</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => set('title', e.target.value)}
-              className={INP}
-              autoFocus
-            />
-          </div>
+          <TextField
+            label="Title"
+            value={form.title}
+            onChange={(e) => set('title', e.target.value)}
+            autoFocus
+            fullWidth
+            size="small"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Date</label>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => set('date', e.target.value)}
-              className={INP}
-            />
-          </div>
+          <TextField
+            label="Date"
+            type="date"
+            value={form.date}
+            onChange={(e) => set('date', e.target.value)}
+            fullWidth
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">Start Time</label>
-              <input
-                type="time"
-                value={form.startTime}
-                onChange={(e) => set('startTime', e.target.value)}
-                className={INP}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">End Time</label>
-              <input
-                type="time"
-                value={form.endTime}
-                onChange={(e) => set('endTime', e.target.value)}
-                className={INP}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Status</label>
-            <select
-              value={form.status}
-              onChange={(e) => set('status', e.target.value as AppointmentStatus)}
-              className={`${INP} bg-white`}
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Notes <span className="text-ink4 font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              rows={3}
-              className={INP}
-              placeholder="Internal notes…"
+            <TextField
+              label="Start Time"
+              type="time"
+              value={form.startTime}
+              onChange={(e) => set('startTime', e.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="End Time"
+              type="time"
+              value={form.endTime}
+              onChange={(e) => set('endTime', e.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </div>
+
+          <TextField
+            select
+            label="Status"
+            value={form.status}
+            onChange={(e) => set('status', e.target.value as AppointmentStatus)}
+            fullWidth
+            size="small"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="Notes (optional)"
+            value={form.notes}
+            onChange={(e) => set('notes', e.target.value)}
+            multiline
+            rows={3}
+            placeholder="Internal notes…"
+            fullWidth
+            size="small"
+          />
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

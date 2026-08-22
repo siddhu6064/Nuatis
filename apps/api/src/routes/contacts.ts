@@ -430,9 +430,9 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
     if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
     if (enrichResult.suggestedCompany) {
-      const existingCustom = contact.custom_fields || {}
-      enrichUpdates['custom_fields'] = {
-        ...existingCustom,
+      const existingVerticalData = contact.vertical_data || {}
+      enrichUpdates['vertical_data'] = {
+        ...existingVerticalData,
         enrichment_suggested_company: enrichResult.suggestedCompany,
       }
     }
@@ -457,7 +457,7 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
 
   const { data: existing } = await supabase
     .from('contacts')
-    .select('id, assigned_to_user_id')
+    .select('id, assigned_to_user_id, vertical_data')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -502,6 +502,42 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (typeof b['company_id'] === 'string') updates['company_id'] = b['company_id'] || null
   if (b['company_id'] === null) updates['company_id'] = null
   if (typeof b['sms_opt_in'] === 'boolean') updates['sms_opt_in'] = b['sms_opt_in']
+
+  // ContactDetailClient.tsx's enrichment banner sends a plain company name (not
+  // a company_id) to link — find-or-create it by name within the tenant.
+  if (typeof b['company'] === 'string' && b['company'].trim()) {
+    const companyName = b['company'].trim()
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('tenant_id', authed.tenantId)
+      .ilike('name', companyName)
+      .maybeSingle()
+    if (existingCompany) {
+      updates['company_id'] = existingCompany.id as string
+    } else {
+      const { data: newCompany, error: companyErr } = await supabase
+        .from('companies')
+        .insert({ tenant_id: authed.tenantId, name: companyName })
+        .select('id')
+        .single()
+      if (companyErr) {
+        res.status(500).json({ error: companyErr.message })
+        return
+      }
+      updates['company_id'] = (newCompany as { id: string }).id
+    }
+  }
+
+  // Same banner's vertical_data patch — merge rather than overwrite, since
+  // vertical_data also holds unrelated keys (e.g. other enrichment data).
+  if (b['custom_fields'] && typeof b['custom_fields'] === 'object') {
+    const existingVerticalData = (existing.vertical_data as Record<string, unknown> | null) ?? {}
+    updates['vertical_data'] = {
+      ...existingVerticalData,
+      ...(b['custom_fields'] as Record<string, unknown>),
+    }
+  }
 
   // FK-01: body-supplied foreign keys must belong to the caller's tenant.
   if (typeof updates['assigned_to_user_id'] === 'string') {
@@ -621,9 +657,9 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
       if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
       if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
       if (enrichResult.suggestedCompany) {
-        const existingCustom = updated.custom_fields || {}
-        enrichUpdates['custom_fields'] = {
-          ...existingCustom,
+        const existingVerticalData = updated.vertical_data || {}
+        enrichUpdates['vertical_data'] = {
+          ...existingVerticalData,
           enrichment_suggested_company: enrichResult.suggestedCompany,
         }
       }
