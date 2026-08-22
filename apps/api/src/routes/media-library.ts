@@ -14,6 +14,20 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Public bucket — media_files.public_url is rendered directly as an <img src>
+// (unlike maya-kb.ts's private bucket, which is only ever read server-side).
+// Same lazy-create-on-first-upload pattern as maya-kb.ts's ensureBucket().
+async function ensureBucket(): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase.storage.createBucket(BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_SIZE_BYTES,
+  })
+  if (error && !error.message.toLowerCase().includes('already exists')) {
+    console.warn('[media-library] bucket create warning:', error.message)
+  }
+}
+
 // POST /api/media/upload — raw binary, image/* only, max 10MB
 // Registered before GET / to avoid path conflict
 router.post('/upload', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -39,6 +53,8 @@ router.post('/upload', requireAuth, async (req: Request, res: Response): Promise
     const fileName =
       (req.headers['x-file-name'] as string | undefined) ?? `upload-${Date.now()}.${ext}`
     const storagePath = `${authed.tenantId}/${randomUUID()}.${ext}`
+
+    await ensureBucket()
 
     const { error: uploadErr } = await supabase.storage
       .from(BUCKET)
