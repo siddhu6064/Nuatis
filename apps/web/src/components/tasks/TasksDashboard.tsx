@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 
@@ -188,11 +194,11 @@ export default function TasksDashboard() {
               key={task.id}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border-l-2 bg-white ${PRIORITY_BORDER[task.priority] ?? ''}`}
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={false}
                 onChange={() => void completeTask(task.id)}
-                className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                size="small"
+                sx={{ p: 0 }}
               />
               <span className="text-sm text-ink2 flex-1">{task.title}</span>
               {task.contacts?.full_name && (
@@ -227,79 +233,77 @@ export default function TasksDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <ColumnsButton columns={TASKS_COLUMNS} visible={colVisible} onChange={toggleCol} />
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <span className="text-base leading-none">+</span>
-            Add Task
-          </button>
+          <Button onClick={() => setShowAdd(true)} variant="contained">
+            + Add Task
+          </Button>
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 mb-6">
-        {(['all', 'mine', 'unassigned'] as FilterTab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              filter === tab ? 'bg-teal-50 text-teal-700' : 'text-ink3 hover:bg-bg hover:text-ink2'
-            }`}
-          >
-            {tab === 'all' ? 'All' : tab === 'mine' ? 'Mine' : 'Unassigned'}
-          </button>
-        ))}
-      </div>
+      <ToggleButtonGroup
+        value={filter}
+        exclusive
+        onChange={(_e, v: FilterTab | null) => v !== null && setFilter(v)}
+        size="small"
+        sx={{ mb: 3 }}
+      >
+        <ToggleButton value="all">All</ToggleButton>
+        <ToggleButton value="mine">Mine</ToggleButton>
+        <ToggleButton value="unassigned">Unassigned</ToggleButton>
+      </ToggleButtonGroup>
 
       {/* Add task modal */}
       {showAdd && (
         <div className="bg-white rounded-xl border border-border-brand p-4 mb-6">
-          <input
-            type="text"
+          <TextField
+            variant="standard"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Task title..."
             autoFocus
-            className="w-full text-sm border-0 focus:ring-0 p-0 placeholder-gray-300 mb-3"
+            fullWidth
+            slotProps={{ input: { disableUnderline: true } }}
+            sx={{ mb: 2 }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void addTask()
               if (e.key === 'Escape') setShowAdd(false)
             }}
           />
           <div className="flex items-center gap-3">
-            <input
+            <TextField
               type="date"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1.5"
+              size="small"
             />
-            <input
+            <TextField
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1.5"
+              size="small"
             />
-            <select
+            <TextField
+              select
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
-              className="text-xs border border-border-brand rounded px-2 py-1.5"
+              size="small"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+            </TextField>
             <div className="flex-1" />
-            <button onClick={() => setShowAdd(false)} className="text-xs text-ink3 hover:text-ink2">
+            <Button onClick={() => setShowAdd(false)} size="small" color="inherit">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void addTask()}
               disabled={!newTitle.trim() || saving}
-              className="px-4 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50"
+              size="small"
+              variant="contained"
             >
               {saving ? 'Adding...' : 'Add Task'}
-            </button>
+            </Button>
           </div>
         </div>
       )}

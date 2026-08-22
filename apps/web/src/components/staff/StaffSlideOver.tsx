@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
 import { SlideOver } from '@/components/ui/SlideOver'
 import {
   COLOR_SWATCHES,
@@ -143,50 +145,50 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
         {/* Name */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Name *</label>
-          <input
-            type="text"
+          <TextField
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            error={!!fieldErrors['name']}
+            helperText={fieldErrors['name']}
+            fullWidth
+            size="small"
           />
-          {fieldErrors['name'] && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors['name']}</p>
-          )}
         </div>
 
         {/* Role */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Role *</label>
-          <input
-            type="text"
+          <TextField
             value={role}
             onChange={(e) => setRole(e.target.value)}
             placeholder="e.g. Dentist, Stylist, Agent"
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            error={!!fieldErrors['role']}
+            helperText={fieldErrors['role']}
+            fullWidth
+            size="small"
           />
-          {fieldErrors['role'] && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors['role']}</p>
-          )}
         </div>
 
         {/* Email + Phone */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Email</label>
-            <input
+            <TextField
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              fullWidth
+              size="small"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Phone</label>
-            <input
+            <TextField
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              fullWidth
+              size="small"
             />
           </div>
         </div>
@@ -227,18 +229,20 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
                   />
                   {e.enabled ? (
                     <>
-                      <input
+                      <TextField
                         type="time"
                         value={e.start ?? '09:00'}
                         onChange={(ev) => setDay(d, { start: ev.target.value })}
-                        className="text-sm border border-border-brand rounded px-2 py-1"
+                        size="small"
+                        sx={{ width: 120 }}
                       />
                       <span className="text-xs text-ink4">to</span>
-                      <input
+                      <TextField
                         type="time"
                         value={e.end ?? '17:00'}
                         onChange={(ev) => setDay(d, { end: ev.target.value })}
-                        className="text-sm border border-border-brand rounded px-2 py-1"
+                        size="small"
+                        sx={{ width: 120 }}
                       />
                     </>
                   ) : (
@@ -256,11 +260,13 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
         {/* Notes */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
-          <textarea
+          <TextField
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            multiline
             rows={3}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            fullWidth
+            size="small"
           />
         </div>
 
@@ -271,19 +277,12 @@ export default function StaffSlideOver({ open, onClose, member, onSaved }: Props
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-          >
+          <Button onClick={onClose} variant="outlined" color="inherit">
             Cancel
-          </button>
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-          >
+          </Button>
+          <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
             {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
-          </button>
+          </Button>
         </div>
       </div>
     </SlideOver>

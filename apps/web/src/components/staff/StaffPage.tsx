@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import StaffRoster from './StaffRoster'
 import StaffCalendar from './StaffCalendar'
 
@@ -25,28 +27,14 @@ export default function StaffPage({ pageTitle }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border-brand mb-6">
-        <button
-          onClick={() => setTab('roster')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'roster'
-              ? 'border-teal-600 text-teal-700'
-              : 'border-transparent text-ink3 hover:text-ink'
-          }`}
-        >
-          Roster
-        </button>
-        <button
-          onClick={() => setTab('schedule')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'schedule'
-              ? 'border-teal-600 text-teal-700'
-              : 'border-transparent text-ink3 hover:text-ink'
-          }`}
-        >
-          Schedule
-        </button>
-      </div>
+      <Tabs
+        value={tab}
+        onChange={(_e, v: Tab) => setTab(v)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab value="roster" label="Roster" />
+        <Tab value="schedule" label="Schedule" />
+      </Tabs>
 
       {tab === 'roster' ? <StaffRoster /> : <StaffCalendar />}
     </div>

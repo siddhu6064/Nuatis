@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import StaffSlideOver from './StaffSlideOver'
 import { DAY_KEYS, DAY_LABEL, type Availability, type DayKey, type StaffMember } from './types'
 
@@ -103,31 +106,18 @@ export default function StaffRoster() {
     <div>
       {/* Filter + Add */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            onClick={() => setShowAll(false)}
-            className={`px-3 py-1.5 rounded-lg ${
-              !showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setShowAll(true)}
-            className={`px-3 py-1.5 rounded-lg ${
-              showAll ? 'bg-teal-50 text-teal-700 font-medium' : 'text-ink3 hover:bg-bg'
-            }`}
-          >
-            All
-          </button>
-        </div>
-        <button
-          onClick={() => setSlideOver({ open: true })}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+        <ToggleButtonGroup
+          value={showAll ? 'all' : 'active'}
+          exclusive
+          onChange={(_e, v: string | null) => v !== null && setShowAll(v === 'all')}
+          size="small"
         >
-          <span className="text-base leading-none">+</span>
-          Add Staff Member
-        </button>
+          <ToggleButton value="active">Active</ToggleButton>
+          <ToggleButton value="all">All</ToggleButton>
+        </ToggleButtonGroup>
+        <Button onClick={() => setSlideOver({ open: true })} variant="contained">
+          + Add Staff Member
+        </Button>
       </div>
 
       {loading ? (

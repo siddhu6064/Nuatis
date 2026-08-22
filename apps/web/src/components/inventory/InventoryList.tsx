@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import IconButton from '@mui/material/IconButton'
 import { Modal } from '@/components/ui/Modal'
 import InventorySlideOver, { type InventoryItem } from './InventorySlideOver'
 
@@ -114,23 +116,19 @@ export default function InventoryList({ pageTitle }: Props) {
             Track stock, unit costs, and reorder thresholds
           </p>
         </div>
-        <button
-          onClick={() => setSlideOver({ open: true })}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <span className="text-base leading-none">+</span>
-          Add Item
-        </button>
+        <Button onClick={() => setSlideOver({ open: true })} variant="contained">
+          + Add Item
+        </Button>
       </div>
 
       {/* Search */}
       <div className="mb-4">
-        <input
-          type="text"
+        <TextField
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name or SKU..."
-          className="w-full max-w-sm px-4 py-2.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+          size="small"
+          sx={{ width: '100%', maxWidth: 384 }}
         />
       </div>
 
@@ -192,20 +190,23 @@ export default function InventoryList({ pageTitle }: Props) {
                     </td>
                     <td className="px-6 py-4 text-sm text-ink3">{item.supplier ?? '—'}</td>
                     <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
-                      <button
+                      <IconButton
                         onClick={() => setSlideOver({ open: true, item })}
-                        className="text-teal-600 hover:text-teal-700 mr-3"
+                        size="small"
                         aria-label="Edit"
+                        color="primary"
+                        sx={{ mr: 0.5 }}
                       >
                         ✎
-                      </button>
-                      <button
+                      </IconButton>
+                      <IconButton
                         onClick={() => setConfirmDelete(item)}
-                        className="text-red-500 hover:text-red-700"
+                        size="small"
                         aria-label="Delete"
+                        color="error"
                       >
                         ✕
-                      </button>
+                      </IconButton>
                     </td>
                   </tr>
                 )
