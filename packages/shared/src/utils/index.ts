@@ -39,6 +39,26 @@ export function getFirstName(fullName: string | null | undefined, fallback = 'th
 }
 
 /**
+ * Extracts up to 2-letter initials from a full name string.
+ * Splits on spaces, takes the first letter of each of the first 2 words,
+ * joins them, and uppercases the result. Returns the fallback only when
+ * the computed initials string is empty (e.g. fullName is empty or
+ * whitespace-only); defaults to ''.
+ *
+ * @param fullName - The full name string (e.g. contact_name, visitor_name).
+ * @param fallback - Returned when the computed initials are empty. Defaults to ''.
+ */
+export function getInitials(fullName: string, fallback = ''): string {
+  const initials = fullName
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+  return initials || fallback
+}
+
+/**
  * Formats a numeric amount as a currency string with 2 decimal places.
  * Output: "$1,234.56" (comma thousands separator, standard sign placement).
  *

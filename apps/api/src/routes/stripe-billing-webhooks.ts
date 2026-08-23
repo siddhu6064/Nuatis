@@ -13,6 +13,11 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
 import { sendEmail } from '../lib/email-client.js'
+import {
+  buildSubscriptionCanceledEmail,
+  buildPaymentFailedEmail,
+  buildTrialEndingEmail,
+} from '../lib/email-templates/billing.js'
 import { PLANS, planKeyFromPriceId, modulesForPlan, type PlanKey } from '../config/stripe-plans.js'
 import { invalidateTrialCache } from '../lib/trial-cache.js'
 
@@ -308,10 +313,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           .eq('stripe_customer_id', customerId)
 
         if (tenant?.billing_email) {
+          const cancelEmail = buildSubscriptionCanceledEmail()
           void sendEmail({
             to: tenant.billing_email,
-            subject: 'Your Nuatis subscription has been canceled',
-            html: `<p>Hi,</p><p>Your Nuatis subscription has been canceled. Maya call handling will remain active for 7 days so any in-flight calls don't get cut off.</p><p>If this was a mistake, you can re-subscribe at any time: <a href="${process.env['WEB_URL'] ?? 'https://app.nuatis.com'}/pricing">View plans</a></p><p>— Nuatis</p>`,
+            subject: cancelEmail.subject,
+            html: cancelEmail.html,
             tenantId: tenant.id,
           })
         }
@@ -368,10 +374,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           .eq('stripe_customer_id', customerId)
 
         if (tenant?.billing_email) {
+          const paymentFailedEmail = buildPaymentFailedEmail()
           void sendEmail({
             to: tenant.billing_email,
-            subject: 'Action required — Nuatis payment failed',
-            html: `<p>Hi,</p><p>We weren't able to charge your card for the latest Nuatis invoice. Your account is now in a past-due state. Service will continue for 7 days while you update your payment details.</p><p><a href="${process.env['WEB_URL'] ?? 'https://app.nuatis.com'}/settings/billing">Update payment details</a></p><p>— Nuatis</p>`,
+            subject: paymentFailedEmail.subject,
+            html: paymentFailedEmail.html,
             tenantId: tenant.id,
           })
         }
@@ -390,10 +397,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           .maybeSingle<{ id: string; billing_email: string | null; name: string | null }>()
 
         if (tenant?.billing_email) {
+          const trialEndingEmail = buildTrialEndingEmail()
           void sendEmail({
             to: tenant.billing_email,
-            subject: 'Your Nuatis trial ends in 3 days',
-            html: `<p>Hi,</p><p>Just a heads-up — your 7-day free trial of Nuatis ends in 3 days. To keep Maya answering your calls without interruption, no action is needed and your card will be charged automatically.</p><p>Want to change plans first? <a href="${process.env['WEB_URL'] ?? 'https://app.nuatis.com'}/pricing">View plans</a></p><p>— Nuatis</p>`,
+            subject: trialEndingEmail.subject,
+            html: trialEndingEmail.html,
             tenantId: tenant.id,
           })
         }

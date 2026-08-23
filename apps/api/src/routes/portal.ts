@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { authLimiter } from '../middleware/rate-limit.js'
+import { buildPortalMagicLinkEmail, buildPortalInviteEmail } from '../lib/email-templates/portal.js'
 
 const router = Router()
 
@@ -208,14 +209,17 @@ router.post('/request-access', authLimiter, async (req: Request, res: Response):
   if (resendApiKey) {
     const { Resend } = await import('resend')
     const resend = new Resend(resendApiKey)
+    const magicLinkEmail = buildPortalMagicLinkEmail({
+      businessName: tenant.name,
+      portalUrl,
+      accessToken: access.access_token,
+    })
     await resend.emails
       .send({
         from: process.env['EMAIL_FROM'] ?? 'Maya <maya@nuatis.com>',
         to: email,
-        subject: `Access your ${tenant.name} portal`,
-        html: `<p>Here is your link to access the ${tenant.name} client portal:</p>
-<p><a href="${portalUrl}?token=${access.access_token}">${portalUrl}?token=${access.access_token}</a></p>
-<p>This link is personal to you — please don't share it.</p>`,
+        subject: magicLinkEmail.subject,
+        html: magicLinkEmail.html,
       })
       .catch(() => null)
   }
@@ -366,16 +370,18 @@ router.post(
     if (resendApiKey) {
       const { Resend } = await import('resend')
       const resend = new Resend(resendApiKey)
+      const inviteEmail = buildPortalInviteEmail({
+        contactName: contact.full_name,
+        businessName: tenant?.name,
+        portalUrl,
+        accessToken,
+      })
       await resend.emails
         .send({
           from: process.env['EMAIL_FROM'] ?? 'Maya <maya@nuatis.com>',
           to: contact.email,
-          subject: `Access your ${tenant?.name ?? 'business'} portal`,
-          html: `<p>Hi ${contact.full_name ?? 'there'},</p>
-<p>${tenant?.name ?? 'Your service provider'} has set up a client portal for you.</p>
-<p>View your appointments, documents, and invoices here:<br>
-<a href="${portalUrl}?token=${accessToken}">${portalUrl}?token=${accessToken}</a></p>
-<p>This link is personal to you — please don't share it.</p>`,
+          subject: inviteEmail.subject,
+          html: inviteEmail.html,
         })
         .catch(() => null) // don't fail if email fails
     }

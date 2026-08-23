@@ -24,7 +24,7 @@ export type VerticalType =
   | 'car_wash'
   | 'laundry'
 
-export type SubscriptionPlan = 'starter' | 'growth' | 'pro'
+export type SubscriptionPlan = 'core' | 'pro' | 'scale'
 
 export type SubscriptionStatus =
   | 'trialing'

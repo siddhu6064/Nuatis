@@ -4,6 +4,7 @@ import { Queue } from 'bullmq'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { smsSendLimiter } from '../middleware/rate-limit.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
@@ -68,21 +69,9 @@ router.post(
     }
 
     // Verify tenant has a telnyx_number
-    const { data: telnyxNum, error: telnyxNumError } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', authed.tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const fromNumber = await getTenantPhoneNumber(authed.tenantId)
 
-    if (telnyxNumError) {
-      res.status(500).json({ error: telnyxNumError.message })
-      return
-    }
-
-    if (!telnyxNum?.phone_number) {
+    if (!fromNumber) {
       res.status(400).json({ error: 'No Telnyx number configured for this account' })
       return
     }

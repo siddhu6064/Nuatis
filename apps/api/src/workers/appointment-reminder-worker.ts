@@ -4,6 +4,10 @@ import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendSms } from '../lib/sms.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
+import {
+  buildAppointmentReminder24hSms,
+  buildAppointmentReminder1hSms,
+} from '../lib/sms-templates.js'
 
 const QUEUE_NAME = 'appointment-reminder'
 
@@ -79,7 +83,11 @@ export async function scan(): Promise<void> {
         `[appointment-reminder] sending 24h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`
       )
 
-      const text = `Reminder: You have an appointment '${appt.title}' tomorrow at ${time}. Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
+      const text = buildAppointmentReminder24hSms({
+        appointmentTitle: appt.title,
+        time,
+        businessName,
+      })
       const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
         contactId: appt.contact_id,
         tenantId: appt.tenant_id,
@@ -107,7 +115,11 @@ export async function scan(): Promise<void> {
         `[appointment-reminder] sending 1h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`
       )
 
-      const text = `Your appointment '${appt.title}' is in 1 hour at ${time}. See you soon! Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
+      const text = buildAppointmentReminder1hSms({
+        appointmentTitle: appt.title,
+        time,
+        businessName,
+      })
       const { success: sent } = await sendSms(location.telnyx_number, contact.phone, text, {
         contactId: appt.contact_id,
         tenantId: appt.tenant_id,

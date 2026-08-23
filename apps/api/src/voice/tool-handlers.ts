@@ -13,7 +13,7 @@ import { callSessionState } from './post-call.js'
 import { maskPhone } from './pre-call-lookup.js'
 import { getMayaCircuitBreaker } from './maya-circuit-breaker.js'
 import { sendSms } from '../lib/sms.js'
-import { buildConfirmationSms } from '../lib/sms-templates.js'
+import { buildConfirmationSms, buildEscalationTransferSms } from '../lib/sms-templates.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 
 export interface ToolCallContext {
@@ -1031,7 +1031,7 @@ const handlers: Record<string, ToolHandler> = {
         // 2. Fire-and-forget SMS to the business owner before transferring
         // No contactId/tenantId — owner alert, intentional TCPA bypass
         if (fromNumber) {
-          const smsText = `Incoming call transfer from Maya AI. Caller: ${context.callerId || 'unknown'}. Reason: ${reason}. Connecting now.`
+          const smsText = buildEscalationTransferSms({ callerId: context.callerId, reason })
           void sendSms(fromNumber, escalationPhone, smsText).then(({ success }) => {
             if (success) {
               console.info('[tool-handlers] escalate_to_human: SMS sent to owner')

@@ -105,3 +105,12 @@ export const publicPaymentLimiter = rateLimit({
   legacyHeaders: false,
   skip: isTestEnv,
 })
+
+export const checkoutLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Checkout rate limit reached. Try again shortly.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+})

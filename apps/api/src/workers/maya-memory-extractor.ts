@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenAI } from '@google/genai'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { stripJsonFences } from '../lib/gemini.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
 import {
   EXTRACT_FACTS_PROMPT,
@@ -88,11 +89,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
     })
 
     const rawFacts = factsResult.text ?? ''
-    const stripped = rawFacts
-      .trim()
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/i, '')
-      .trim()
+    const stripped = stripJsonFences(rawFacts)
 
     extractedFacts = JSON.parse(stripped) as CallerFacts
     console.info(`[maya-memory-extractor] facts extracted successfully: session=${sessionId}`)

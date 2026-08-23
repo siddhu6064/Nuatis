@@ -6,6 +6,7 @@ import Button from '@mui/material/Button'
 import ButtonBase from '@mui/material/ButtonBase'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
+import { getInitials } from '@nuatis/shared'
 
 interface InboxThread {
   contact_id: string
@@ -186,12 +187,7 @@ export default function InboxList() {
             >
               <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                 <span className="text-teal-700 text-xs font-bold">
-                  {t.contact_name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map((w) => w[0])
-                    .join('')
-                    .toUpperCase()}
+                  {getInitials(t.contact_name)}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
@@ -222,12 +218,7 @@ export default function InboxList() {
           {/* Chat sessions */}
           {visibleChat.map((s) => {
             const visitorLabel = s.visitor_name ?? 'Website Visitor'
-            const initials = visitorLabel
-              .split(' ')
-              .slice(0, 2)
-              .map((w) => w[0])
-              .join('')
-              .toUpperCase()
+            const initials = getInitials(visitorLabel)
             return (
               <ButtonBase
                 key={`chat-${s.id}`}

@@ -61,6 +61,69 @@ export function buildConfirmationSms({
   return `Your appointment with ${biz} is confirmed for ${dt}. Reply CANCEL to cancel.`
 }
 
+// ── Appointment reminders ─────────────────────────────────────────────────────
+
+export interface AppointmentReminder24hSmsParams {
+  appointmentTitle: string
+  /** Pre-formatted time string e.g. "10:00 AM". */
+  time: string
+  businessName: string
+}
+
+export function buildAppointmentReminder24hSms({
+  appointmentTitle,
+  time,
+  businessName,
+}: AppointmentReminder24hSmsParams): string {
+  return `Reminder: You have an appointment '${appointmentTitle}' tomorrow at ${time}. Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
+}
+
+export interface AppointmentReminder1hSmsParams {
+  appointmentTitle: string
+  /** Pre-formatted time string e.g. "10:00 AM". */
+  time: string
+  businessName: string
+}
+
+export function buildAppointmentReminder1hSms({
+  appointmentTitle,
+  time,
+  businessName,
+}: AppointmentReminder1hSmsParams): string {
+  return `Your appointment '${appointmentTitle}' is in 1 hour at ${time}. See you soon! Reply CANCEL to cancel or STOP to opt out. - ${businessName}`
+}
+
+// ── No-show rebook ────────────────────────────────────────────────────────────
+
+export interface NoShowRebookSmsParams {
+  fromNumber: string
+}
+
+export function buildNoShowRebookSms({ fromNumber }: NoShowRebookSmsParams): string {
+  return `We missed you today! Would you like to rebook? Reply YES or call us at ${fromNumber}.`
+}
+
+// ── Escalation transfer (internal owner alert — not a contact-facing message) ──
+
+export interface EscalationTransferSmsParams {
+  callerId?: string | null
+  reason: string
+}
+
+export function buildEscalationTransferSms({
+  callerId,
+  reason,
+}: EscalationTransferSmsParams): string {
+  return `Incoming call transfer from Maya AI. Caller: ${callerId || 'unknown'}. Reason: ${reason}. Connecting now.`
+}
+
+// ── SMS webhook keyword replies ───────────────────────────────────────────────
+
+/** Reply sent when a contact texts HELP. Contains TCPA-required opt-out wording — preserve byte-for-byte. */
+export function buildSmsHelpReplySms(): string {
+  return 'Reply STOP to unsubscribe. For help call us directly.'
+}
+
 // ── Trigger Links in SMS ───────────────────────────────────────────────────────
 // Example: embed a trigger link in an appointment reminder template:
 // `Confirm your appointment: ${buildTriggerUrl(slug, contact.id)}`

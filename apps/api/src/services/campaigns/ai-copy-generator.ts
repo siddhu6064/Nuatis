@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { stripJsonFences } from '../../lib/gemini.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,10 +160,7 @@ async function generateForChannel(
   const raw = result.text?.trim() ?? ''
 
   // Strip markdown fences if model ignores responseMimeType hint
-  const stripped = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim()
+  const stripped = stripJsonFences(raw)
 
   if (channel === 'sms') {
     const parsed = JSON.parse(stripped) as { body: string }

@@ -5,6 +5,7 @@ import { sendSms } from '../lib/sms.js'
 import { grantTcpaOptIn } from '../lib/tcpa.js'
 import { smsSendLimiter } from '../middleware/rate-limit.js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
@@ -516,32 +517,20 @@ router.post(
     }
 
     // Get our phone number (from telnyx_numbers table)
-    const { data: telnyxNum, error: locationError } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (locationError) {
-      res.status(500).json({ error: locationError.message })
-      return
-    }
-    if (!telnyxNum?.phone_number) {
+    const fromNumber = await getTenantPhoneNumber(tenantId as string)
+    if (!fromNumber) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
       return
     }
 
-    const result = await sendSms(telnyxNum.phone_number, contact.phone, body, {
+    const result = await sendSms(fromNumber, contact.phone, body, {
       tenantId,
       contactId,
     })
 
     if (!result.success) {
       console.warn(
-        `[conversations] manual SMS send failed: tenant=${tenantId} contact=${contactId} to=${contact.phone} from=${telnyxNum.phone_number}`
+        `[conversations] manual SMS send failed: tenant=${tenantId} contact=${contactId} to=${contact.phone} from=${fromNumber}`
       )
       res.status(500).json({ error: 'Failed to send SMS' })
       return
@@ -554,7 +543,7 @@ router.post(
         id: result.messageId ?? crypto.randomUUID(),
         direction: 'outbound',
         body,
-        from_number: telnyxNum.phone_number,
+        from_number: fromNumber,
         to_number: contact.phone!,
         status: 'sent',
         ai_handled: false,

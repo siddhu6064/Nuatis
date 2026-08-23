@@ -6,6 +6,7 @@ import { requirePlan } from '../middleware/require-plan.js'
 import { aiGenerationLimiter } from '../middleware/rate-limit.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { buildBrandVoicePromptBlock } from '../lib/brand-voice.js'
+import { stripJsonFences } from '../lib/gemini.js'
 import {
   generateCampaignCopy,
   type CampaignChannel,
@@ -605,10 +606,7 @@ router.post(
         config: { maxOutputTokens: 800 },
       })
       const raw = result?.text?.trim() ?? ''
-      const stripped = raw
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/, '')
-        .trim()
+      const stripped = stripJsonFences(raw)
 
       let parsed: { subject: string; body_html: string; body_text: string }
       try {

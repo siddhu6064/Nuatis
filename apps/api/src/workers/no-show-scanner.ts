@@ -8,6 +8,7 @@ import { logActivity } from '../lib/activity.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 import { sendSms } from '../lib/sms.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
+import { buildNoShowRebookSms } from '../lib/sms-templates.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
@@ -130,7 +131,7 @@ export async function scan(): Promise<void> {
           const fromNumber = location?.telnyx_number
 
           if (toPhone && fromNumber) {
-            const smsText = `We missed you today! Would you like to rebook? Reply YES or call us at ${fromNumber}.`
+            const smsText = buildNoShowRebookSms({ fromNumber })
 
             // sendSms runs the TCPA opt-in check internally; success=false covers
             // both suppression and send failure (sendSms logs the reason itself)
