@@ -15,6 +15,12 @@ import { getMayaCircuitBreaker } from './maya-circuit-breaker.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms, buildEscalationTransferSms } from '../lib/sms-templates.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
+import { sanitizeMemoryText } from '../services/maya/memory-prompts.js'
+import {
+  mergeFactsWithEvidence,
+  type EvidenceLedger,
+  type HeldFact,
+} from '../services/maya/caller-memory-evidence.js'
 
 export interface ToolCallContext {
   tenantId: string
@@ -945,6 +951,135 @@ const handlers: Record<string, ToolHandler> = {
             }
           } catch (err) {
             console.error('[tool-handlers] book_appointment: confirmation SMS error:', err)
+          }
+        })()
+
+        // Fire-and-forget caller-memory update — booking.action is the strongest
+        // evidence kind (0.95, same tier as caller.confirmed): the system knows
+        // what was booked better than a transcript summary ever could, so this
+        // outranks anything the post-call extractor infers for these two fields.
+        // Must NEVER throw or block the tool response.
+        void (async () => {
+          try {
+            if (!callerPhone) return
+
+            const now = new Date().toISOString()
+
+            // Guarded SELECT: evidence/held may not exist yet (migration 0137
+            // unapplied) — Postgrest returns 42703 for that, not an empty
+            // row. Fall back to facts-only rather than treat a missing
+            // column as "no existing memory" and reset a real caller's facts.
+            type ExistingMemory = {
+              facts: Record<string, unknown> | null
+              evidence: EvidenceLedger | null
+              held: HeldFact[] | null
+            }
+            let existing: ExistingMemory | null = null
+            const { data: existingFull, error: memSelectErr } = await supabase
+              .from('caller_memory')
+              .select('facts, evidence, held')
+              .eq('tenant_id', context.tenantId)
+              .eq('phone', callerPhone)
+              .maybeSingle()
+
+            if (memSelectErr?.code === '42703') {
+              const { data: existingBase } = await supabase
+                .from('caller_memory')
+                .select('facts')
+                .eq('tenant_id', context.tenantId)
+                .eq('phone', callerPhone)
+                .maybeSingle()
+              existing = existingBase
+                ? {
+                    facts: (existingBase as { facts: Record<string, unknown> | null }).facts,
+                    evidence: null,
+                    held: null,
+                  }
+                : null
+            } else {
+              existing = existingFull as ExistingMemory | null
+            }
+
+            const merged = mergeFactsWithEvidence({
+              existingFacts: existing?.facts ?? {},
+              existingEvidence: existing?.evidence ?? {},
+              existingHeld: existing?.held ?? [],
+              incomingFacts: {
+                last_appointment_type: reason || 'appointment',
+                last_appointment_date: date,
+              },
+              incomingObservations: {
+                last_appointment_type: { kind: 'booking.action', detail: `booked: ${title}` },
+                last_appointment_date: { kind: 'booking.action', detail: `booked for ${date}` },
+              },
+              observedAt: now,
+              callSessionId: context.callControlId ?? undefined,
+            })
+
+            const sanitizedEvidence: Record<string, unknown> = {}
+            for (const [field, ev] of Object.entries(merged.evidence)) {
+              sanitizedEvidence[field] = { ...ev, detail: sanitizeMemoryText(ev.detail, 300) }
+            }
+            const sanitizedHeld = merged.held.map((h) => ({
+              ...h,
+              detail: sanitizeMemoryText(h.detail, 300),
+              value: typeof h.value === 'string' ? sanitizeMemoryText(h.value, 200) : h.value,
+            }))
+
+            // Select-then-branch, not upsert: `existing` (fetched above to
+            // build `merged`) already tells us whether a row is there — a
+            // separate "SELECT id" would just be a second round trip to
+            // learn the same thing this fire-and-forget path already knows.
+            // Existing row → UPDATE only facts/evidence/held/updated_at,
+            // never call_count/last_call_at (those belong to the extractor).
+            // No row → INSERT with call_count: 0 explicitly, overriding the
+            // table's DEFAULT 1 (0111_caller_memory.sql) — this write
+            // represents the mid-call booking, not a completed call; the
+            // post-call extractor's `(existing?.call_count ?? 0) + 1` is
+            // what turns a first-time caller into call_count 1. Leaving the
+            // DEFAULT in place here double-counts every first call as 2.
+            const rowExists = existing !== null
+            const evidenceHeldFields = { evidence: sanitizedEvidence, held: sanitizedHeld }
+
+            let memErr: { code?: string; message: string } | null = null
+            if (rowExists) {
+              ;({ error: memErr } = await supabase
+                .from('caller_memory')
+                .update({ facts: merged.facts, ...evidenceHeldFields, updated_at: now })
+                .eq('tenant_id', context.tenantId)
+                .eq('phone', callerPhone))
+            } else {
+              ;({ error: memErr } = await supabase.from('caller_memory').insert({
+                tenant_id: context.tenantId,
+                phone: callerPhone,
+                facts: merged.facts,
+                ...evidenceHeldFields,
+                updated_at: now,
+                call_count: 0,
+              }))
+            }
+
+            if (memErr) {
+              // Most likely evidence/held don't exist yet (migration 0137
+              // unapplied) — retry without them so facts still update.
+              if (rowExists) {
+                await supabase
+                  .from('caller_memory')
+                  .update({ facts: merged.facts, updated_at: now })
+                  .eq('tenant_id', context.tenantId)
+                  .eq('phone', callerPhone)
+              } else {
+                await supabase.from('caller_memory').insert({
+                  tenant_id: context.tenantId,
+                  phone: callerPhone,
+                  facts: merged.facts,
+                  updated_at: now,
+                  call_count: 0,
+                })
+              }
+            }
+          } catch (err) {
+            console.error('[tool-handlers] book_appointment: caller-memory update error:', err)
           }
         })()
 

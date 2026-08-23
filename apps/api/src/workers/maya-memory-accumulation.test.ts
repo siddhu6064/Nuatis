@@ -95,15 +95,21 @@ describe('caller memory accumulation across two calls', () => {
     store.tables['contacts'] = []
 
     const call1Facts = JSON.stringify({
-      name: 'Maria',
-      topics: ['appointment'],
-      preferences: ['mornings'],
-      sentiment: 'positive',
-      pending_needs: [],
-      language: 'en',
-      preferred_name: null,
-      last_appointment_type: null,
-      last_appointment_date: null,
+      facts: {
+        name: 'Maria',
+        topics: ['appointment'],
+        preferences: ['mornings'],
+        sentiment: 'positive',
+        pending_needs: [],
+        language: 'en',
+        preferred_name: null,
+        last_appointment_type: null,
+        last_appointment_date: null,
+        last_provider: null,
+      },
+      observations: {
+        name: { kind: 'caller.stated-directly', detail: "said 'this is Maria'" },
+      },
     })
 
     mockGenerateContent
@@ -134,15 +140,21 @@ describe('caller memory accumulation across two calls', () => {
     // caller_memory already has call1Memory — processor should find and merge it
     mockGenerateContent.mockReset()
     const call2Facts = JSON.stringify({
-      name: 'Maria',
-      topics: ['pricing', 'appointment'],
-      preferences: ['Dr. Lee'],
-      sentiment: 'neutral',
-      pending_needs: [],
-      language: 'en',
-      preferred_name: null,
-      last_appointment_type: null,
-      last_appointment_date: null,
+      facts: {
+        name: 'Maria',
+        topics: ['pricing', 'appointment'],
+        preferences: ['Dr. Lee'],
+        sentiment: 'neutral',
+        pending_needs: [],
+        language: 'en',
+        preferred_name: null,
+        last_appointment_type: null,
+        last_appointment_date: null,
+        last_provider: null,
+      },
+      observations: {
+        name: { kind: 'caller.stated-directly', detail: "said 'this is Maria'" },
+      },
     })
 
     mockGenerateContent.mockResolvedValueOnce({ text: call2Facts }).mockResolvedValueOnce({

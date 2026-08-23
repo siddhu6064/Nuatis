@@ -44,9 +44,17 @@ beforeEach(() => {
   store.tables['contacts'] = []
   store.tables['locations'] = []
   store.tables['appointments'] = []
+  store.tables['caller_memory'] = []
   calendarInsert.mockClear()
   getCalendarClient.mockClear()
 })
+
+/** Flushes the fire-and-forget caller-memory write, which isn't awaited by
+ *  book_appointment's own return — the mock's promise chain resolves on
+ *  microtasks, so a macrotask tick (setImmediate) is enough to let it settle. */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
 
 describe('lookup_contact — maya_only product', () => {
   it('returns found:false without querying contacts table when product is maya_only', async () => {
@@ -150,6 +158,82 @@ describe('book_appointment — maya_only product', () => {
     expect(result['contact_id']).toBeDefined()
     expect(result['contact_id']).not.toBeNull()
     expect((store.tables['appointments'] as Row[]).length).toBe(1)
+  })
+})
+
+describe('book_appointment — caller_memory booking-path write', () => {
+  beforeEach(() => {
+    ;(store.tables['locations'] as Row[]).push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      is_primary: true,
+      google_refresh_token: 'refresh-token-test',
+      google_calendar_id: 'primary',
+    })
+  })
+
+  it('fresh caller: inserts a caller_memory row with call_count 0, not the table DEFAULT 1', async () => {
+    const phone = '+15125553001'
+
+    await executeToolCall(
+      'book_appointment',
+      {
+        date: WEEKDAY_DATE,
+        start_time: '10:00',
+        duration_minutes: 60,
+        caller_name: 'Fresh Caller',
+        caller_phone: phone,
+        reason: 'cleaning',
+      },
+      baseContext('suite')
+    )
+    await flushMicrotasks()
+
+    const memories = (store.tables['caller_memory'] ?? []) as Row[]
+    expect(memories).toHaveLength(1)
+    expect(memories[0]!['call_count']).toBe(0)
+    expect(memories[0]!['phone']).toBe(phone)
+    const facts = memories[0]!['facts'] as Record<string, unknown>
+    expect(facts['last_appointment_type']).toBe('cleaning')
+    expect(facts['last_appointment_date']).toBe(WEEKDAY_DATE)
+  })
+
+  it('existing caller: updates facts/evidence/held but leaves call_count and last_call_at untouched', async () => {
+    const phone = '+15125553002'
+    store.tables['caller_memory'] = [
+      {
+        tenant_id: TENANT_ID,
+        phone,
+        facts: { name: 'Returning Caller' },
+        evidence: {},
+        held: [],
+        call_count: 3,
+        last_call_at: '2026-07-01T00:00:00.000Z',
+        updated_at: '2026-07-01T00:00:00.000Z',
+      },
+    ]
+
+    await executeToolCall(
+      'book_appointment',
+      {
+        date: WEEKDAY_DATE,
+        start_time: '11:00',
+        duration_minutes: 30,
+        caller_name: 'Returning Caller',
+        caller_phone: phone,
+        reason: 'follow-up',
+      },
+      baseContext('suite')
+    )
+    await flushMicrotasks()
+
+    const memories = (store.tables['caller_memory'] ?? []) as Row[]
+    expect(memories).toHaveLength(1) // update, not a second inserted row
+    expect(memories[0]!['call_count']).toBe(3) // untouched
+    expect(memories[0]!['last_call_at']).toBe('2026-07-01T00:00:00.000Z') // untouched
+    const facts = memories[0]!['facts'] as Record<string, unknown>
+    expect(facts['name']).toBe('Returning Caller') // preserved
+    expect(facts['last_appointment_type']).toBe('follow-up') // merged in
   })
 })
 

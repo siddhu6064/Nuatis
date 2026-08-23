@@ -7,11 +7,16 @@ import { maskPhone } from '../voice/pre-call-lookup.js'
 import {
   EXTRACT_FACTS_PROMPT,
   SUMMARISE_PROMPT,
-  mergeFacts,
   sanitizeFacts,
   sanitizeMemoryText,
-  type CallerFacts,
 } from '../services/maya/memory-prompts.js'
+import {
+  mergeFactsWithEvidence,
+  type CallerFacts,
+  type EvidenceLedger,
+  type HeldFact,
+  type Observation,
+} from '../services/maya/caller-memory-evidence.js'
 
 const QUEUE_NAME = 'voice-session-complete'
 
@@ -31,6 +36,26 @@ interface CallerMemoryRow {
   facts: CallerFacts | null
   call_count: number
   contact_id: string | null
+  evidence: EvidenceLedger | null
+  held: HeldFact[] | null
+}
+
+interface ExtractionResult {
+  facts: CallerFacts
+  observations: Record<string, Observation>
+}
+
+/**
+ * True when a Supabase/Postgrest error indicates a referenced column doesn't
+ * exist — i.e. migration 0137 hasn't been applied yet. Postgres SQLSTATE
+ * 42703 (undefined_column) is the authoritative signal; the message check is
+ * a fallback for any Postgrest wrapping that drops the code.
+ */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  if (error.code === '42703') return true
+  const msg = error.message ?? ''
+  return msg.includes('column') && msg.includes('does not exist')
 }
 
 async function processMemory(data: MayaMemoryJobData): Promise<void> {
@@ -71,9 +96,10 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   const genai = new GoogleGenAI({ apiKey })
 
-  // ── Step 2: Extract structured facts via Gemini ────────────────────────────
+  // ── Step 2: Extract structured facts + evidence observations via Gemini ───
 
   let extractedFacts: CallerFacts = {}
+  let observations: Record<string, Observation> = {}
   try {
     const factsResult = await genai.models.generateContent({
       model: 'gemini-2.0-flash',
@@ -84,7 +110,12 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
     const rawFacts = factsResult.text ?? ''
     const stripped = stripJsonFences(rawFacts)
 
-    extractedFacts = JSON.parse(stripped) as CallerFacts
+    const parsed = JSON.parse(stripped) as Partial<ExtractionResult>
+    extractedFacts = parsed.facts ?? {}
+    // Missing/malformed observations must not fail the job — every scalar
+    // field defaults to model.inference inside mergeFactsWithEvidence when
+    // no matching entry is present here.
+    observations = parsed.observations ?? {}
     console.info(`[maya-memory-extractor] facts extracted successfully: session=${sessionId}`)
   } catch (err) {
     console.error(
@@ -114,21 +145,74 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   // ── Step 4: Load existing memory for this phone number ────────────────────
 
-  const { data: existing } = await supabase
+  // Guarded SELECT: try the full evidence-ledger column set first; if
+  // migration 0137 hasn't been applied yet, evidence/held won't exist and
+  // Postgrest returns 42703 — fall back to the pre-0137 column set rather
+  // than let a missing-column error masquerade as "no existing row" (which
+  // would otherwise silently reset a real caller's facts on merge).
+  let existingRow: CallerMemoryRow | null = null
+  const { data: existingFull, error: selectErr } = await supabase
     .from('caller_memory')
-    .select('facts, call_count, contact_id')
+    .select('facts, call_count, contact_id, evidence, held')
     .eq('tenant_id', tenantId)
     .eq('phone', phone)
     .maybeSingle()
 
-  const existingRow = existing as CallerMemoryRow | null
+  if (selectErr && isMissingColumnError(selectErr)) {
+    console.warn(
+      `[maya-memory-extractor] evidence/held columns not present yet (migration 0137 unapplied) — falling back to base columns: session=${sessionId}`
+    )
+    const { data: existingBase } = await supabase
+      .from('caller_memory')
+      .select('facts, call_count, contact_id')
+      .eq('tenant_id', tenantId)
+      .eq('phone', phone)
+      .maybeSingle()
+    existingRow = existingBase
+      ? {
+          ...(existingBase as {
+            facts: CallerFacts | null
+            call_count: number
+            contact_id: string | null
+          }),
+          evidence: null,
+          held: null,
+        }
+      : null
+  } else {
+    existingRow = existingFull as CallerMemoryRow | null
+  }
 
-  // ── Step 5: Merge facts ───────────────────────────────────────────────────
+  // ── Step 5: Merge facts through the evidence ledger ────────────────────────
 
-  // PROMPT-01: sanitize merged facts + summary before they are stored and
-  // later injected into Maya's system prompt.
-  const mergedFacts = sanitizeFacts(mergeFacts(existingRow?.facts ?? null, extractedFacts))
+  const now = new Date().toISOString()
+
+  const merged = mergeFactsWithEvidence({
+    existingFacts: existingRow?.facts ?? {},
+    existingEvidence: existingRow?.evidence ?? {},
+    existingHeld: existingRow?.held ?? [],
+    incomingFacts: extractedFacts,
+    incomingObservations: observations,
+    observedAt: now,
+    callSessionId: sessionId,
+  })
+
+  // PROMPT-01: sanitize every model-derived free-text string before it is
+  // stored and later injected into Maya's system prompt (facts/summary) or
+  // shown to staff (evidence detail, held detail/value) — same discipline
+  // the pre-ledger code already applied to facts + summary.
+  const mergedFacts = sanitizeFacts(merged.facts as Record<string, unknown>)
   const sanitizedSummary = summary ? sanitizeMemoryText(summary, 500) : ''
+
+  const sanitizedEvidence: EvidenceLedger = {}
+  for (const [field, ev] of Object.entries(merged.evidence)) {
+    sanitizedEvidence[field] = { ...ev, detail: sanitizeMemoryText(ev.detail, 300) }
+  }
+  const sanitizedHeld: HeldFact[] = merged.held.map((h) => ({
+    ...h,
+    detail: sanitizeMemoryText(h.detail, 300),
+    value: typeof h.value === 'string' ? sanitizeMemoryText(h.value, 200) : h.value,
+  }))
 
   // ── Step 6: Best-effort contact_id lookup ─────────────────────────────────
 
@@ -152,9 +236,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   // ── Step 7: Upsert caller_memory ─────────────────────────────────────────
 
-  const now = new Date().toISOString()
-
-  const upsertPayload: Record<string, unknown> = {
+  const basePayload: Record<string, unknown> = {
     tenant_id: tenantId,
     phone,
     facts: mergedFacts,
@@ -165,12 +247,27 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
   }
 
   if (contactId) {
-    upsertPayload['contact_id'] = contactId
+    basePayload['contact_id'] = contactId
   }
 
-  const { error: upsertError } = await supabase
+  // Guarded UPSERT, mirroring the SELECT above: attempt the full payload
+  // first, and if the evidence/held columns don't exist yet, retry with the
+  // base payload only — facts must keep writing even before 0137 lands.
+  let { error: upsertError } = await supabase
     .from('caller_memory')
-    .upsert(upsertPayload, { onConflict: 'tenant_id,phone' })
+    .upsert(
+      { ...basePayload, evidence: sanitizedEvidence, held: sanitizedHeld },
+      { onConflict: 'tenant_id,phone' }
+    )
+
+  if (upsertError && isMissingColumnError(upsertError)) {
+    console.warn(
+      `[maya-memory-extractor] evidence/held columns not present yet (migration 0137 unapplied) — writing facts only: session=${sessionId}`
+    )
+    ;({ error: upsertError } = await supabase
+      .from('caller_memory')
+      .upsert(basePayload, { onConflict: 'tenant_id,phone' }))
+  }
 
   if (upsertError) {
     console.error(

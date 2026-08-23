@@ -7,34 +7,67 @@
 
 /**
  * System prompt for a non-streaming Gemini call in JSON mode.
- * Instructs the model to extract structured caller facts from a voice transcript.
+ * Instructs the model to extract structured caller facts, plus a per-scalar
+ * evidence observation (kind + detail — never a confidence/weight, which is
+ * priced server-side by caller-memory-evidence.ts's priceObservation()).
  */
-export const EXTRACT_FACTS_PROMPT = `You are a caller memory assistant for a business AI receptionist.
+export const EXTRACT_FACTS_PROMPT = `You extract durable facts about a caller from a phone call transcript, for use
+on future calls. You never guess, and you NEVER rate your own confidence.
+For each fact you report WHAT YOU OBSERVED using exactly one evidence kind.
 
-Your task: read the provided voice call transcript and extract structured facts about the caller.
+Evidence kinds — pick the one that matches what actually happened in the transcript:
 
-Return ONLY a valid JSON object with exactly this shape — no commentary, no markdown, no backticks:
-{
-  "name": "caller's full or first name, or null",
-  "preferred_name": "nickname or preferred name if mentioned, or null",
-  "last_appointment_type": "type of appointment or service discussed, or null",
-  "last_appointment_date": "date mentioned in YYYY-MM-DD format, or null",
-  "last_provider": "name of the provider, doctor, or staff member the caller saw or mentions, or null if not stated",
-  "pending_needs": ["things the caller wanted but did not complete, e.g. 'reschedule crown'"],
-  "preferences": ["time or staff preferences, e.g. 'morning slots', 'Dr. Martinez'"],
-  "sentiment": "one of: positive | neutral | negative | frustrated",
-  "language": "BCP-47 language code of the caller, e.g. en, es, hi, te",
-  "topics": ["subjects discussed in the call, e.g. 'appointment booking', 'insurance'"]
-}
+- "caller.confirmed"       — the assistant asked and the caller explicitly
+                             confirmed ("yes, that's right", "correct").
+- "caller.stated-directly" — the caller said it about themselves in their own
+                             words ("my name is Priya", "I was in last month
+                             for a cleaning").
+- "caller.implied"         — inferable from what they said but never stated
+                             ("we usually come in on Fridays" implies a
+                             preference, not a stated fact).
+- "third-party.mention"    — someone else on the line said it, or the caller
+                             said it about a different person. A caller booking
+                             for their mother is telling you about the mother,
+                             not themselves.
+- "model.inference"        — you are inferring it and no utterance supports it
+                             directly. Use this whenever you are unsure which
+                             kind applies. Choosing a stronger kind than the
+                             transcript supports files a wrong fact on a
+                             customer record.
 
 Rules:
-- Return ONLY valid JSON — no markdown fences, no explanation text, no trailing comments
-- Only include facts explicitly stated or clearly implied by the transcript
-- Scalar fields (name, preferred_name, last_provider, last_appointment_type, last_appointment_date, language): use null if unknown
-- Array fields (pending_needs, preferences, topics): use [] if none found
-- Keep every array item concise — 5 words maximum per item, no duplicates
-- sentiment must be exactly one of: positive, neutral, negative, frustrated
-- language must be a valid BCP-47 code; default to "en" if language cannot be determined
+- One observation per fact, matched to the single strongest supporting moment
+  in the transcript.
+- "detail" is read by front-desk staff in a tooltip. Quote or closely
+  paraphrase the utterance: good — caller said "it's Priya, P-R-I-Y-A";
+  bad — "name mentioned in call".
+- A fact you cannot tie to an utterance is omitted, not downgraded.
+- sentiment and language need no observation — report them directly.
+- If the transcript contains no extractable facts, return {"facts": {}, "observations": {}}.
+
+Return ONLY this JSON, no markdown fences, no commentary:
+
+{
+  "facts": {
+    "name": string | null,
+    "preferred_name": string | null,
+    "last_appointment_type": string | null,
+    "last_appointment_date": "YYYY-MM-DD" | null,
+    "last_provider": string | null,
+    "pending_needs": string[],
+    "preferences": string[],
+    "sentiment": "positive" | "neutral" | "negative" | "frustrated",
+    "language": string,
+    "topics": string[]
+  },
+  "observations": {
+    "<scalar fact field>": { "kind": "<evidence kind>", "detail": "<what you saw>" }
+  }
+}
+
+"observations" carries an entry for every non-null SCALAR fact (name,
+preferred_name, last_appointment_type, last_appointment_date, last_provider).
+Arrays, sentiment and language take no observations.
 `
 
 // ── Summary prompt ──────────────────────────────────────────────────────────
