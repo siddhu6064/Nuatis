@@ -59,15 +59,22 @@ const SESSION_ID = 'ssssssss-0000-0000-0000-mem0test0001'
 const PHONE = '+15125550042'
 
 const VALID_FACTS_JSON = JSON.stringify({
-  name: 'John',
-  topics: ['crown booking'],
-  sentiment: 'positive',
-  pending_needs: [],
-  preferences: [],
-  language: 'en',
-  preferred_name: null,
-  last_appointment_type: 'crown',
-  last_appointment_date: null,
+  facts: {
+    name: 'John',
+    topics: ['crown booking'],
+    sentiment: 'positive',
+    pending_needs: [],
+    preferences: [],
+    language: 'en',
+    preferred_name: null,
+    last_appointment_type: 'crown',
+    last_appointment_date: null,
+    last_provider: null,
+  },
+  observations: {
+    name: { kind: 'caller.stated-directly', detail: "said 'this is John'" },
+    last_appointment_type: { kind: 'caller.stated-directly', detail: 'asked to book a crown' },
+  },
 })
 
 const SUMMARY_TEXT = 'Returning caller John. Called about crown booking.'
