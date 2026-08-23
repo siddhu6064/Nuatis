@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 
 export interface CallerContext {
   matched: boolean
@@ -51,13 +51,6 @@ export function maskPhone(raw: string): string {
   return `****${last4}`
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 /**
  * Look up an existing contact by tenant + E.164 phone number.
  * Hard 400ms timeout — never delays the call flow. Returns matched:false on
@@ -83,7 +76,7 @@ export async function lookupCaller(tenantId: string, phoneE164: string): Promise
 
   const queryPromise = (async (): Promise<CallerContext> => {
     try {
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
       const { data, error } = await supabase
         .from('contacts')
         .select('id, full_name, last_contacted, vertical_data, lifecycle_stage')

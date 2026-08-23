@@ -1,17 +1,10 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { z } from 'zod'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { upsertKnowledgeEntry, searchKnowledgeBase } from '../services/embeddings.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const CreateKnowledgeSchema = z.object({
   title: z.string().min(1).max(500),
@@ -51,7 +44,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('knowledge_base')
@@ -75,7 +68,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('knowledge_base')

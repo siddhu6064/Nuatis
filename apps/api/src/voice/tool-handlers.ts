@@ -1,5 +1,5 @@
 import { Type, type FunctionDeclaration } from '@google/genai'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { VERTICALS, dateAtHour, formatHHMM } from '@nuatis/shared'
 import { normalizePhone } from '../lib/phone.js'
 import { getCalendarClient } from '../services/google.js'
@@ -190,20 +190,13 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
 ]
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
 async function getStaffContext(tenantId: string): Promise<CachedStaffMember[]> {
   const cached = getCachedStaff(tenantId)
   if (cached) return cached
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data } = await supabase
       .from('staff_members')
       .select('id, name, role, color_hex, availability')
@@ -256,7 +249,7 @@ async function fetchShiftsForStaffOnDate(
   isoDate: string
 ): Promise<Array<{ start_time: string; end_time: string }>> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data } = await supabase
       .from('shifts')
       .select('start_time, end_time')
@@ -350,7 +343,7 @@ const handlers: Record<string, ToolHandler> = {
       )
 
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
 
         // Try exact E.164 match first, fall back to digits-only match
         let { data, error } = await supabase
@@ -459,7 +452,7 @@ const handlers: Record<string, ToolHandler> = {
 
       // 1. Resolve calendar provider
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         const calendarCreds = await getCalendarCredentials(context.tenantId)
         const provider = calendarCreds?.provider ?? 'native'
 
@@ -687,7 +680,7 @@ const handlers: Record<string, ToolHandler> = {
       )
 
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
 
         // 1. Resolve calendar provider + primary location id (parallel)
         const [calendarCreds, locationResult] = await Promise.all([
@@ -995,7 +988,7 @@ const handlers: Record<string, ToolHandler> = {
 
     const resultStr = await getMayaCircuitBreaker().wrap('transfer_call', async () => {
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         const apiKey = process.env['TELNYX_API_KEY']
         if (!apiKey) {
           console.error('[tool-handlers] escalate_to_human: TELNYX_API_KEY not set')
@@ -1113,7 +1106,7 @@ const handlers: Record<string, ToolHandler> = {
 
     const resultStr = await getMayaCircuitBreaker().wrap('capture_referral_source', async () => {
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         await supabase
           .from('contacts')
           .update({ referral_source_detail: source.slice(0, 200) })
@@ -1149,7 +1142,7 @@ const handlers: Record<string, ToolHandler> = {
 
     const resultStr = await getMayaCircuitBreaker().wrap('get_appointments', async () => {
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         const now = new Date().toISOString()
         const { data, error } = await supabase
           .from('appointments')
@@ -1266,7 +1259,7 @@ const handlers: Record<string, ToolHandler> = {
 
     const resultStr = await getMayaCircuitBreaker().wrap('reschedule_appointment', async () => {
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         const digitsOnly = callerPhone.replace(/\+/, '')
 
         // Find contact by phone (E.164 then digits-only fallback)

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { Queue } from 'bullmq'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { prewarmGemini, rekeyPrewarmedSession } from '../voice/telnyx-handler.js'
@@ -21,13 +21,6 @@ interface OutboundWebhookMeta {
 }
 
 const outboundWebhookMeta = new Map<string, OutboundWebhookMeta>()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function getHeader(
   headers: Array<{ name: string; value: string }> | undefined,
@@ -137,7 +130,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // MASS-02: resolve the job's own tenant so every status update below is
     // tenant-scoped. The route is already Telnyx-signature-verified (mounted in

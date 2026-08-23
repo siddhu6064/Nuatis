@@ -1,17 +1,10 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { encryptToken } from '../lib/email-oauth.js'
 import { getOutlookCalendarAuthUrl, exchangeOutlookCalendarCode } from '../lib/outlook-calendar.js'
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Compliance field definitions ──────────────────────────────────────────────
 
@@ -135,7 +128,7 @@ const calendarSettingsRouter = Router()
 // GET / — return calendar connection status
 calendarSettingsRouter.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [tenantResult, locationResult] = await Promise.all([
     supabase
@@ -212,7 +205,7 @@ calendarSettingsRouter.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { error } = await supabase
       .from('tenants')
@@ -240,7 +233,7 @@ calendarSettingsRouter.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: tenant, error } = await supabase
       .from('tenants')
@@ -317,7 +310,7 @@ calendarCallbackRouter.get(
       const encryptedRefreshToken = encryptToken(tokens.refresh_token)
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
 
       const { error: updateError } = await supabase
         .from('tenants')

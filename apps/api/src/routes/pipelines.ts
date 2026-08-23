@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 
@@ -20,17 +20,10 @@ async function requirePipeline(req: Request, res: Response, next: NextFunction):
 
 router.use(requireAuth, requirePipeline)
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/pipelines ───────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   let query = supabase
     .from('pipelines')
@@ -78,7 +71,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/pipelines/:id ───────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: pipeline, error } = await supabase
@@ -139,7 +132,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/pipelines ──────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -221,7 +214,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/pipelines/:id ───────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -266,7 +259,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/pipelines/:id ────────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: pipeline } = await supabase
@@ -339,7 +332,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 // ── PUT /api/pipelines/:id/set-default ──────────────────────────────────────
 router.put('/:id/set-default', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: pipeline } = await supabase
@@ -384,7 +377,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { pipelineId } = req.params
 
     // Verify pipeline belongs to tenant
@@ -422,7 +415,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { pipelineId } = req.params
     const b = req.body as Record<string, unknown>
 
@@ -494,7 +487,7 @@ router.put(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { pipelineId } = req.params
     const b = req.body as Record<string, unknown>
 
@@ -536,7 +529,7 @@ router.put(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { pipelineId, stageId } = req.params
     const b = req.body as Record<string, unknown>
 
@@ -590,7 +583,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { pipelineId, stageId } = req.params
 
     // Verify stage belongs to this pipeline and tenant

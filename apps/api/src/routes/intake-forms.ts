@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
@@ -15,13 +15,6 @@ const VALID_FIELD_TYPES = [
   'number',
 ] as const
 type FieldType = (typeof VALID_FIELD_TYPES)[number]
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // The frontend's IntakeForm type (and the camelCase body it POSTs/PUTs) expects
 // isActive/linkedServiceIds, but a raw Supabase row is snake_case — without this,
@@ -62,7 +55,7 @@ function validateFields(fields: unknown[]): { valid: boolean; error?: string } {
 // ── GET / — list forms for tenant ────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: forms, error } = await supabase
     .from('intake_forms')
@@ -108,7 +101,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: form, error } = await supabase
     .from('intake_forms')
@@ -170,7 +163,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: form, error } = await supabase
     .from('intake_forms')
@@ -197,7 +190,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify form belongs to this tenant
   const { data: existing } = await supabase
@@ -266,7 +259,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify form belongs to this tenant
   const { data: existing } = await supabase
@@ -318,7 +311,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 router.get('/:id/submissions', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify form belongs to this tenant
   const { data: form } = await supabase

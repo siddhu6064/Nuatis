@@ -1,12 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { checkTcpaOptIn } from './tcpa.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface SendSmsOptions {
   tenantId?: string
@@ -66,7 +59,7 @@ export async function sendSms(
     // Log outbound SMS to sms_messages for thread view
     if (options?.tenantId) {
       try {
-        const supabase = getSupabase()
+        const supabase = getServiceClient()
         const { error: smsErr } = await supabase.from('sms_messages').insert({
           tenant_id: options.tenantId,
           contact_id: options.contactId ?? null,

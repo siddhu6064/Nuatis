@@ -28,18 +28,14 @@ jest.unstable_mockModule('../lib/auth.js', () => ({
   },
 }))
 
-// Dynamic imports AFTER mocks
-const [
-  { default: express },
-  { default: request },
-  { default: resourcesRouter },
-  { checkResourceAvailable },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/resources.js'),
-  import('../lib/resource-availability.js'),
-])
+// Dynamic imports AFTER mocks. Sequential, not Promise.all — concurrent
+// dynamic imports that share a newly-common dependency (lib/supabase.js,
+// since the getServiceClient() consolidation) race in Jest's experimental
+// VM-modules linker and throw "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: resourcesRouter } = await import('../routes/resources.js')
+const { checkResourceAvailable } = await import('../lib/resource-availability.js')
 
 function makeApp() {
   const app = express()

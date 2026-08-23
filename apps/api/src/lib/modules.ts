@@ -8,24 +8,62 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-export async function isModuleEnabled(tenantId: string, module: string): Promise<boolean> {
+/**
+ * Shared entitlement math for module gating.
+ *
+ * Used by both `isModuleEnabled()` (inline route-handler checks — entitlement
+ * only) and `requirePlan()` (router-level middleware — entitlement PLUS a
+ * separate subscription_status check). Reads tenants.modules /
+ * subscription_plan / product fresh from the DB on every call (no caching)
+ * and computes whether `moduleId` is enabled for `tenantId`:
+ *   - an explicitly stored boolean on tenants.modules[moduleId] wins (true OR
+ *     false — toggle / comp override), else
+ *   - defaultEntitlement(moduleId, plan, product) derives access from tier.
+ *
+ * Deliberately does NOT decide anything about subscription_status or HTTP
+ * status codes — that stays owned by each caller. Also deliberately does NOT
+ * decide what to do when tenants.modules itself is null/missing (unprovisioned
+ * tenant or query error) — callers differ here today (isModuleEnabled fails
+ * closed to maya-only in that case, requirePlan does not), so `modulesPresent`
+ * is surfaced for callers to apply their own policy.
+ */
+export interface EntitlementResolution {
+  /** Explicit boolean stored on tenants.modules[moduleId], if any. */
+  explicit: boolean | undefined
+  /** Whether tenants.modules itself was a non-null/undefined record. */
+  modulesPresent: boolean
+  /** defaultEntitlement(moduleId, plan, product) — used when no explicit override. */
+  defaultEnabled: boolean
+  /** explicit ?? defaultEnabled — the module-entitlement verdict. */
+  enabled: boolean
+}
+
+export async function resolveEntitlement(
+  tenantId: string,
+  moduleId: string
+): Promise<EntitlementResolution> {
   const supabase = getSupabase()
   const { data } = await supabase
     .from('tenants')
     .select('modules, subscription_plan, product')
     .eq('id', tenantId)
-    .single()
+    .maybeSingle()
 
   const modules = data?.modules as Record<string, boolean> | null | undefined
-  // Unprovisioned tenant or query error (data null) → fail closed to maya-only.
-  if (!modules) return module === 'maya'
+  const modulesPresent = !!modules
 
-  // An explicitly stored boolean wins — true OR false (toggle / comp override).
-  const v = modules[module]
-  if (typeof v === 'boolean') return v
-
-  // No explicit flag → derive entitlement from plan + product.
+  const explicit = modules ? modules[moduleId] : undefined
   const plan = (data?.subscription_plan as string | null) ?? null
   const product = (data?.product as string | null) ?? null
-  return defaultEntitlement(module, plan, product)
+  const defaultEnabled = defaultEntitlement(moduleId, plan, product)
+  const enabled = typeof explicit === 'boolean' ? explicit : defaultEnabled
+
+  return { explicit, modulesPresent, defaultEnabled, enabled }
+}
+
+export async function isModuleEnabled(tenantId: string, module: string): Promise<boolean> {
+  const { modulesPresent, enabled } = await resolveEntitlement(tenantId, module)
+  // Unprovisioned tenant or query error (modules null) → fail closed to maya-only.
+  if (!modulesPresent) return module === 'maya'
+  return enabled
 }

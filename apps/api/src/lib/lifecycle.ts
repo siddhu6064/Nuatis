@@ -1,12 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { logActivity } from './activity.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const STAGE_ORDER: string[] = [
   'subscriber',
@@ -30,7 +23,7 @@ export async function maybeAdvanceLifecycle(
   targetStage: string,
   actorId?: string
 ): Promise<string | null> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: contact, error } = await supabase
     .from('contacts')

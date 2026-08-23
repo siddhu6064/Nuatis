@@ -1,20 +1,13 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/settings/labs — returns current labs_config for tenant
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('tenants')
     .select('labs_config')
@@ -35,7 +28,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     res.status(400).json({ error: 'key and enabled required' })
     return
   }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   // Fetch current config first
   const { data, error: fetchErr } = await supabase
     .from('tenants')

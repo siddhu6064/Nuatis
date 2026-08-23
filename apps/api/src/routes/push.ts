@@ -1,16 +1,9 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendPushNotification } from '../lib/push-client.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── POST /api/push/subscribe ─────────────────────────────────────────────────
 router.post('/subscribe', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -28,7 +21,7 @@ router.post('/subscribe', requireAuth, async (req: Request, res: Response): Prom
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     await supabase.from('push_subscriptions').upsert(
       {
         tenant_id: authed.tenantId,
@@ -61,7 +54,7 @@ router.post('/unsubscribe', requireAuth, async (req: Request, res: Response): Pr
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     await supabase
       .from('push_subscriptions')
       .delete()

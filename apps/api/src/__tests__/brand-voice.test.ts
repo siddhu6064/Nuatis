@@ -42,17 +42,14 @@ process.env['GEMINI_API_KEY'] = 'test-key'
 
 // ── Dynamic imports (after all unstable_mockModule calls) ─────────────────────
 
-const [
-  { default: express },
-  { default: request },
-  { default: brandVoiceRouter },
-  { buildBrandVoicePromptBlock },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/brand-voice.js'),
-  import('../lib/brand-voice.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: brandVoiceRouter } = await import('../routes/brand-voice.js')
+const { buildBrandVoicePromptBlock } = await import('../lib/brand-voice.js')
 
 // ── App factory ───────────────────────────────────────────────────────────────
 

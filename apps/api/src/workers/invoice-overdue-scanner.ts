@@ -1,22 +1,15 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'invoice-overdue-scanner'
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function scan(): Promise<void> {
   console.info('[invoice-overdue-scanner] scanning for overdue invoices...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 

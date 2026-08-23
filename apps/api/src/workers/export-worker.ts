@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { gzipSync } from 'node:zlib'
@@ -13,13 +13,6 @@ export function getExportQueue(): Queue {
     _queue = new Queue(QUEUE_NAME, { connection: createBullMQConnection(), skipVersionCheck: true })
   }
   return _queue
-}
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
 }
 
 interface ExportJobData {
@@ -142,7 +135,7 @@ async function fetchTable(
 
 export async function processExport(data: ExportJobData): Promise<void> {
   const { tenantId, exportJobId, tables } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Mark as processing
   await supabase

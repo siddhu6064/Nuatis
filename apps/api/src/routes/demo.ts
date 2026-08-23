@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { VERTICALS } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
@@ -8,13 +8,6 @@ const DEMO_TENANT_IDS = [
   '0d9a00b9-ce40-4702-a99c-ed23f11fdb08', // old demo
   '018323e5-4866-486e-bc90-15cfeb910fc4', // new demo
 ]
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── PUT /api/demo/switch-vertical ────────────────────────────────────────────
 router.put('/switch-vertical', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -33,7 +26,7 @@ router.put('/switch-vertical', requireAuth, async (req: Request, res: Response):
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { error } = await supabase
       .from('tenants')
       .update({ vertical })

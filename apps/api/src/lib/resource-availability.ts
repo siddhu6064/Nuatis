@@ -1,12 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import type { ResourceAvailabilitySlot } from '@nuatis/shared'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 /**
  * Returns true if the resource has no confirmed bookings overlapping [startTime, endTime).
@@ -19,7 +12,7 @@ export async function checkResourceAvailable(params: {
   excludeBookingId?: string
 }): Promise<boolean> {
   const { resourceId, startTime, endTime, excludeBookingId } = params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   let query = supabase
     .from('resource_bookings')
@@ -60,7 +53,7 @@ export async function getResourceAvailability(params: {
   const dayEnd = new Date(dayStart)
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('resource_bookings')

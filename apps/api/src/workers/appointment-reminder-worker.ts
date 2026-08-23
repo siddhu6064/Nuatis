@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendSms } from '../lib/sms.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
@@ -10,13 +10,6 @@ import {
 } from '../lib/sms-templates.js'
 
 const QUEUE_NAME = 'appointment-reminder'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function formatTime(isoDate: string): string {
   return new Date(isoDate).toLocaleTimeString('en-US', {
@@ -31,7 +24,7 @@ export async function scan(): Promise<void> {
   console.info('[appointment-reminder] scanning for upcoming appointments...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
 
     if (!process.env['TELNYX_API_KEY']) {

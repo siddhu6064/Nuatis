@@ -1,18 +1,11 @@
 import { randomBytes } from 'crypto'
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { authLimiter } from '../middleware/rate-limit.js'
 import { buildPortalMagicLinkEmail, buildPortalInviteEmail } from '../lib/email-templates/portal.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── PUBLIC ROUTES (no auth) ──────────────────────────────────────────────────
 
@@ -24,7 +17,7 @@ router.get('/verify', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: access } = await supabase
     .from('portal_access')
@@ -74,7 +67,7 @@ router.get('/data', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify token
   const { data: access } = await supabase
@@ -151,7 +144,7 @@ router.get('/data', async (req: Request, res: Response): Promise<void> => {
 
 // GET /api/portal/by-slug/:slug
 router.get('/by-slug/:slug', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant } = await supabase
     .from('tenants')
@@ -175,7 +168,7 @@ router.post('/request-access', authLimiter, async (req: Request, res: Response):
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Find tenant by slug
   const { data: tenant } = await supabase
@@ -232,7 +225,7 @@ router.post('/request-access', authLimiter, async (req: Request, res: Response):
 // POST /api/portal/enable
 router.post('/enable', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch tenant name
   const { data: tenant } = await supabase
@@ -260,7 +253,7 @@ router.post('/enable', requireAuth, async (req: Request, res: Response): Promise
 // POST /api/portal/disable
 router.post('/disable', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   await supabase.from('tenants').update({ portal_enabled: false }).eq('id', authed.tenantId)
 
@@ -270,7 +263,7 @@ router.post('/disable', requireAuth, async (req: Request, res: Response): Promis
 // GET /api/portal/settings
 router.get('/settings', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant } = await supabase
     .from('tenants')
@@ -301,7 +294,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Fetch contact
     const { data: contact } = await supabase
@@ -393,7 +386,7 @@ router.post(
 // GET /api/portal/clients
 router.get('/clients', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('portal_access')
@@ -410,7 +403,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     await supabase
       .from('portal_access')

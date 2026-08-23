@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { phoneProvisionLimiter } from '../middleware/rate-limit.js'
 import { capture } from '../lib/posthog.js'
@@ -7,13 +7,6 @@ import { PLANS, PLAN_KEYS, SUITE_MODULE_KEYS, type PlanKey } from '../config/str
 // config/urls.js available for future phone configuration
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── POST /api/provisioning/provision-phone ────────────────────────────────────
 router.post(
@@ -89,7 +82,7 @@ router.post(
       }
 
       // 3. Update locations table
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
       const { error: updateErr } = await supabase
         .from('locations')
         .update({ telnyx_number: selectedNumber })
@@ -122,7 +115,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     try {
       const [tenantRes, locationRes, callRes] = await Promise.all([
@@ -176,7 +169,7 @@ router.post('/complete-step', requireAuth, async (req: Request, res: Response): 
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const updates: Record<string, unknown> = { onboarding_step: step + 1 }
     if (step >= 6) updates['onboarding_completed'] = true
 
@@ -211,7 +204,7 @@ router.post(
     }
 
     try {
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
       const { data: tenant } = await supabase
         .from('tenants')
         .select('subscription_plan, subscription_status')

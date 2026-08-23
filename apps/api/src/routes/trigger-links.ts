@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { generateTriggerToken } from '../lib/slugify.js'
 import { triggerLinkLimiter } from '../middleware/rate-limit.js'
@@ -23,19 +23,12 @@ const DEFAULT_EXPIRY_DAYS = 30
 
 const GONE_HTML = '<html><body><p>This link has expired or has already been used.</p></body></html>'
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 const API_BASE_URL = process.env['API_BASE_URL'] ?? 'http://localhost:3001'
 
 // ── GET /api/trigger-links ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('trigger_links')
     .select('id, name, slug, action, click_count, expires_at, max_uses, use_count, created_at')
@@ -51,7 +44,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── POST /api/trigger-links ───────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -139,7 +132,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/trigger-links/:id ────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params as { id: string }
   const b = req.body as Record<string, unknown>
 
@@ -181,7 +174,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/trigger-links/:id ─────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params as { id: string }
 
   const { data: existing } = await supabase
@@ -209,7 +202,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 // the catch branch is an optimistic compare-and-swap fallback for environments
 // without the RPC (the in-memory test mock).
 async function claimTriggerLinkUse(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   link: Record<string, unknown>
 ): Promise<boolean> {
   try {
@@ -245,7 +238,7 @@ publicRouter.get(
   triggerLinkLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const { slug } = req.params as { slug: string }
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: link } = await supabase
       .from('trigger_links')

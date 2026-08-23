@@ -1,21 +1,14 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { resolveTemplate } from '../lib/email-templates.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/email-templates ────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const vertical = req.query['vertical'] as string | undefined
 
   let query = supabase
@@ -41,7 +34,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/email-templates/:id ────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data, error } = await supabase
@@ -62,7 +55,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── GET /api/email-templates/:id/preview ────────────────────────────────────
 router.get('/:id/preview', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const contactId = req.query['contactId'] as string | undefined
 
@@ -111,7 +104,7 @@ router.get('/:id/preview', requireAuth, async (req: Request, res: Response): Pro
 // ── POST /api/email-templates ────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const { name, subject, body, vertical } = b as {
@@ -151,7 +144,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/email-templates/:id ─────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -202,7 +195,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/email-templates/:id ──────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: existing, error: fetchError } = await supabase

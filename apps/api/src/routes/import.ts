@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { parseCsv, suggestMapping } from '../lib/csv-parser.js'
 import { processImportRows } from '../lib/import-processor.js'
@@ -8,13 +8,6 @@ import { logBulkAction } from '../middleware/audit-logger.js'
 
 const router = Router()
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── POST /api/import/contacts/parse ──────────────────────────────────────────
 // Accepts raw CSV text in req.body.csv (string) since we don't have multer
@@ -108,7 +101,7 @@ router.post('/contacts', requireAuth, async (req: Request, res: Response): Promi
   }
 
   // Large import: create job and enqueue
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: job, error: jobErr } = await supabase
     .from('import_jobs')
     .insert({
@@ -152,7 +145,7 @@ router.post('/contacts', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/import/contacts/jobs ────────────────────────────────────────────
 router.get('/contacts/jobs', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('import_jobs')
@@ -175,7 +168,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: job, error } = await supabase
       .from('import_jobs')

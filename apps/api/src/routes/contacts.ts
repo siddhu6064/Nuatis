@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { getFirstName } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
@@ -29,17 +29,10 @@ async function requireCrm(req: Request, res: Response, next: NextFunction): Prom
 
 router.use(requireAuth, requireCrm)
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/contacts ────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '50'), 10) || 50))
@@ -249,7 +242,7 @@ const tagsCache = new Map<string, { tags: string[]; expiry: number }>()
 
 router.get('/tags', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const cacheKey = authed.tenantId
   const cached = tagsCache.get(cacheKey)
@@ -293,7 +286,7 @@ router.get('/tags', requireAuth, async (req: Request, res: Response): Promise<vo
 // ── GET /api/contacts/stages ─────────────────────────────────────────────────
 router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Determine the pipeline_id to filter by
   let filterPipelineId = req.query['pipeline_id'] as string | undefined
@@ -334,7 +327,7 @@ router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<
 
 // ── Helper: find possible duplicates ─────────────────────────────────────────
 async function findDuplicates(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string,
   phone: string | null,
   email: string | null,
@@ -369,7 +362,7 @@ async function findDuplicates(
 // ── POST /api/contacts ───────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const fullName = typeof b['full_name'] === 'string' ? b['full_name'].trim() : ''
@@ -450,7 +443,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT / PATCH /api/contacts/:id ────────────────────────────────────────────
 const handleContactUpdate = async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -680,7 +673,7 @@ router.patch('/:id', requireAuth, handleContactUpdate)
 // ── GET /api/contacts/duplicates ─────────────────────────────────────────────
 router.get('/duplicates', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Find contacts with matching phone or email
   const { data: contacts } = await supabase
@@ -788,7 +781,7 @@ router.get('/duplicates', requireAuth, async (req: Request, res: Response): Prom
 // ── POST /api/contacts/merge ─────────────────────────────────────────────────
 router.post('/merge', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const primaryId = typeof b['primary_id'] === 'string' ? b['primary_id'] : null
@@ -892,7 +885,7 @@ router.post('/merge', requireAuth, async (req: Request, res: Response): Promise<
 
 // ── Bulk helper: validate contact_ids belong to tenant ───────────────────────
 async function validateBulkIds(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string,
   contactIds: string[]
 ): Promise<{ valid: boolean; error?: string }> {
@@ -913,7 +906,7 @@ async function validateBulkIds(
 // ── POST /api/contacts/bulk-tag ──────────────────────────────────────────────
 router.post('/bulk-tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contactIds, tags } = req.body as { contactIds: string[]; tags: string[] }
 
   if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -967,7 +960,7 @@ router.post('/bulk-tag', requireAuth, async (req: Request, res: Response): Promi
 // ── POST /api/contacts/bulk-assign ──────────────────────────────────────────
 router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contactIds, assignedTo } = req.body as { contactIds: string[]; assignedTo: string }
 
   if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -1037,7 +1030,7 @@ router.post(
   smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactIds, message } = req.body as { contactIds: string[]; message: string }
 
     if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -1125,7 +1118,7 @@ router.post(
 // ── POST /api/contacts/bulk/stage ────────────────────────────────────────────
 router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids, pipeline_stage_id } = req.body as {
     contact_ids: string[]
     pipeline_stage_id: string
@@ -1172,7 +1165,7 @@ router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Pro
 // ── POST /api/contacts/bulk/tag ──────────────────────────────────────────────
 router.post('/bulk/tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids, tags_to_add, tags_to_remove } = req.body as {
     contact_ids: string[]
     tags_to_add?: string[]
@@ -1234,7 +1227,7 @@ router.post(
   smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contact_ids, message } = req.body as { contact_ids: string[]; message: string }
 
     const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
@@ -1322,7 +1315,7 @@ router.post(
 // ── POST /api/contacts/bulk/archive ──────────────────────────────────────────
 router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids } = req.body as { contact_ids: string[] }
 
   const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
@@ -1354,7 +1347,7 @@ router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): P
 // ── POST /api/contacts/bulk/export ───────────────────────────────────────────
 router.post('/bulk/export', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids } = req.body as { contact_ids?: string[] }
 
   let contacts: Array<Record<string, unknown>>
@@ -1425,7 +1418,7 @@ function csvEscape(val: string): string {
 // ── GET /api/contacts/referral-sources ────────────────────────────────────────
 router.get('/referral-sources', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('contacts')
@@ -1451,7 +1444,7 @@ const VALID_LIFECYCLE_STAGES = [
 // ── PATCH /api/contacts/:id/lifecycle ────────────────────────────────────────
 router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -1509,7 +1502,7 @@ router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response):
 // ── PATCH /api/contacts/bulk/lifecycle ───────────────────────────────────────
 router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const newStage = typeof b['lifecycle_stage'] === 'string' ? b['lifecycle_stage'] : null
@@ -1574,7 +1567,7 @@ router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response)
 // ── PATCH /api/contacts/bulk/assign ──────────────────────────────────────────
 router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const contactIds = Array.isArray(b['contactIds']) ? (b['contactIds'] as string[]) : []
@@ -1642,7 +1635,7 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
 // ── GET /api/contacts/source-report ─────────────────────────────────────────
 router.get('/source-report', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [{ data: contacts }, { data: deals }] = await Promise.all([
     supabase
@@ -1717,7 +1710,7 @@ router.get('/source-report', requireAuth, async (req: Request, res: Response): P
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: contact, error } = await supabase
     .from('contacts')

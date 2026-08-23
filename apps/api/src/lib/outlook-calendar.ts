@@ -1,14 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { encryptToken, decryptToken } from './email-oauth.js'
 
 // ── Supabase helper ───────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +97,7 @@ export async function refreshOutlookCalendarToken(tenantId: string): Promise<str
   const clientSecret = process.env['OUTLOOK_CLIENT_SECRET']
   if (!clientId || !clientSecret) throw new Error('Outlook OAuth env vars not set')
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant, error } = await supabase
     .from('tenants')
@@ -177,7 +170,7 @@ export async function refreshOutlookCalendarToken(tenantId: string): Promise<str
  * Auto-refreshes if the token is within 5 minutes of expiry.
  */
 export async function getValidOutlookCalendarToken(tenantId: string): Promise<string> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant, error } = await supabase
     .from('tenants')

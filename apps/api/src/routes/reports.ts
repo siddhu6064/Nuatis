@@ -1,16 +1,9 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { executeReport, clearReportCache } from '../lib/report-engine.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const VALID_OBJECTS = new Set([
   'contacts',
@@ -27,7 +20,7 @@ const MAX_REPORTS_PER_TENANT = 50
 // ── GET /api/reports ──────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   let query = supabase.from('reports').select('*').eq('tenant_id', authed.tenantId)
 
@@ -50,7 +43,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/reports/:id ──────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data, error } = await supabase
@@ -71,7 +64,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/reports ─────────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   // Validate required fields
@@ -159,7 +152,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/reports/:id ──────────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -245,7 +238,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/reports/:id ───────────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: existing } = await supabase
@@ -275,7 +268,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 // ── PUT /api/reports/:id/pin ──────────────────────────────────────────────────
 router.put('/:id/pin', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -322,7 +315,7 @@ router.put('/:id/pin', requireAuth, async (req: Request, res: Response): Promise
 // ── GET /api/reports/:id/data ─────────────────────────────────────────────────
 router.get('/:id/data', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: report, error } = await supabase
@@ -349,7 +342,7 @@ router.get('/:id/data', requireAuth, async (req: Request, res: Response): Promis
 // ── POST /api/reports/:id/refresh ─────────────────────────────────────────────
 router.post('/:id/refresh', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: report, error } = await supabase

@@ -1,16 +1,9 @@
 import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function getStripe(): Stripe | null {
   const key = process.env['STRIPE_SECRET_KEY']
@@ -36,7 +29,7 @@ interface LedgerEntry {
 // ── GET /api/payments/ledger ──────────────────────────────────────────────────
 router.get('/ledger', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const entries: LedgerEntry[] = []
 
@@ -125,7 +118,7 @@ router.get('/ledger', requireAuth, async (req: Request, res: Response): Promise<
 // ── GET /api/payments/summary ─────────────────────────────────────────────────
 router.get('/summary', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 

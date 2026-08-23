@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sendSms } from '../lib/sms.js'
@@ -9,20 +9,13 @@ import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/contacts/:contactId/sms ─────────────────────────────────────────
 router.get(
   '/contacts/:contactId/sms',
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact } = await supabase
@@ -68,7 +61,7 @@ router.post(
   smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
@@ -152,7 +145,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { count } = await supabase
@@ -170,7 +163,7 @@ router.post(
 // ── GET /api/sms/unread-count ────────────────────────────────────────────────
 router.get('/sms/unread-count', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { count } = await supabase
     .from('sms_messages')

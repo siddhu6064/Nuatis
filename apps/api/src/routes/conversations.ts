@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendSms } from '../lib/sms.js'
 import { grantTcpaOptIn } from '../lib/tcpa.js'
@@ -9,18 +9,11 @@ import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/conversations ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const statusFilter = (req.query['status'] as string) ?? 'open'
   if (!['open', 'resolved', 'all'].includes(statusFilter)) {
@@ -168,7 +161,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.get('/assignees', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('users')
@@ -190,7 +183,7 @@ router.get('/assignees', requireAuth, async (req: Request, res: Response): Promi
 router.get('/analytics', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const periodDays = 30
   const since30 = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
@@ -307,7 +300,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Verify contact belongs to tenant
@@ -362,7 +355,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact, error: contactErr } = await supabase
@@ -414,7 +407,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact, error: contactErr } = await supabase
@@ -467,7 +460,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Validate body
@@ -565,7 +558,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Validate body
@@ -648,7 +641,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Update inbound unread messages, returning updated rows to count them

@@ -1,15 +1,8 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const VALID_REPORT_TYPES = ['velocity', 'appointments', 'lead_source', 'pipeline_funnel']
 const VALID_FREQUENCIES = ['weekly', 'monthly']
@@ -17,7 +10,7 @@ const VALID_FREQUENCIES = ['weekly', 'monthly']
 // ── GET /api/scheduled-reports ───────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('scheduled_reports')
@@ -36,7 +29,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── POST /api/scheduled-reports ──────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const body = req.body as {
     report_type?: string
@@ -95,7 +88,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PATCH /api/scheduled-reports/:id ────────────────────────────────────────
 router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const body = req.body as {
@@ -139,7 +132,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
 // ── DELETE /api/scheduled-reports/:id ───────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { error } = await supabase

@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { GoogleGenAI } from '@google/genai'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { stripJsonFences } from '../lib/gemini.js'
@@ -33,13 +33,6 @@ interface CallerMemoryRow {
   contact_id: string | null
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 async function processMemory(data: MayaMemoryJobData): Promise<void> {
   const { tenantId, sessionId, phone } = data
   console.info(
@@ -48,7 +41,7 @@ async function processMemory(data: MayaMemoryJobData): Promise<void> {
 
   // ── Step 1: Fetch voice session transcript ─────────────────────────────────
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: session, error: sessionError } = await supabase
     .from('voice_sessions')
     .select('transcript, outcome, tool_calls_made')

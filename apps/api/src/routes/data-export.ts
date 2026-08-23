@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { getExportQueue } from '../workers/export-worker.js'
 
@@ -16,13 +16,6 @@ const VALID_TABLES = new Set([
 
 const DEFAULT_TABLES = ['contacts', 'activity_log', 'appointments', 'deals', 'quotes', 'tasks']
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── POST /api/data-export — start export ─────────────────────────────────────
 router.post(
   '/',
@@ -30,7 +23,7 @@ router.post(
   requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const b = req.body as Record<string, unknown>
     const requestedTables = Array.isArray(b['tables']) ? (b['tables'] as unknown[]) : DEFAULT_TABLES
@@ -121,7 +114,7 @@ router.post(
 // ── GET /api/data-export — list exports ──────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('export_jobs')
@@ -145,7 +138,7 @@ router.get(
   requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: job, error } = await supabase
       .from('export_jobs')

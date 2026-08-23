@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 
 type ActivityType =
   | 'call'
@@ -27,20 +27,13 @@ interface LogActivityParams {
   actorId?: string
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 /**
  * Fire-and-forget activity logger.
  * Never throws — safe to call without await.
  */
 export async function logActivity(params: LogActivityParams): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     await supabase.from('activity_log').insert({
       tenant_id: params.tenantId,
       contact_id: params.contactId ?? null,

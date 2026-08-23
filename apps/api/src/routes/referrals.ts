@@ -1,23 +1,16 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { generateReferralCode } from '../lib/referral.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── GET /api/referrals/my-code (authenticated) ───────────────────────────────
 router.get('/my-code', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Try to find existing referral code for tenant
     const { data: initialRow, error } = await supabase
@@ -89,7 +82,7 @@ router.get('/signups', requireAuth, async (req: Request, res: Response): Promise
   const authed = req as AuthenticatedRequest
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Fetch all signups for this tenant
     const { data: signups, error: signupsError } = await supabase
@@ -135,7 +128,7 @@ router.get('/track/:code', async (req: Request, res: Response): Promise<void> =>
   const { code } = req.params
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: row, error } = await supabase
       .from('referral_codes')
@@ -184,7 +177,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Validate referral code exists and is active
     const { data: row, error } = await supabase

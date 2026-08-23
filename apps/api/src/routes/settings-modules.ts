@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { PLANS, PLAN_KEYS, BASE_SUITE, type PlanKey } from '../config/stripe-plans.js'
 import { VALID_MODULE_IDS } from '../config/module-registry.js'
@@ -8,17 +8,10 @@ const router = Router()
 
 const VALID_MODULES = VALID_MODULE_IDS
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/settings/modules ───────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('tenants')
@@ -37,7 +30,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/settings/modules ───────────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   if (authed.role !== 'owner') {
     res.status(403).json({ error: 'Only workspace owners can change module settings' })

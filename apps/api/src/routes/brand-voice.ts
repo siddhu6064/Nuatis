@@ -1,22 +1,15 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { buildBrandVoicePromptBlock } from '../lib/brand-voice.js'
 import type { BrandVoice } from '@nuatis/shared'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/brand-voice ──────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase
@@ -41,7 +34,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/brand-voice ──────────────────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const body = req.body as Partial<BrandVoice>
 
   // Validate tone

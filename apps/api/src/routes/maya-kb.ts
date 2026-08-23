@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import multer from 'multer'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { extractPdfText } from '../voice/maya-kb-extractor.js'
 
@@ -18,15 +18,8 @@ const upload = multer({
   },
 })
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 async function ensureBucket(): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { error } = await supabase.storage.createBucket('maya-kb', { public: false })
   if (error && !error.message.toLowerCase().includes('already exists')) {
     console.warn('[maya-kb] bucket create warning:', error.message)
@@ -36,7 +29,7 @@ async function ensureBucket(): Promise<void> {
 // ── GET /api/maya-kb — list files for tenant ─────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase
@@ -83,7 +76,7 @@ router.post(
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     try {
       await ensureBucket()
@@ -138,7 +131,7 @@ router.post(
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: file } = await supabase
@@ -198,7 +191,7 @@ router.post('/urls', requireAuth, async (req: Request, res: Response): Promise<v
   // Strip trailing slash
   normalized = normalized.replace(/\/$/, '')
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Max 3 URLs per tenant
   const { count } = await supabase
@@ -239,7 +232,7 @@ router.post('/urls', requireAuth, async (req: Request, res: Response): Promise<v
 // ── GET /api/maya-kb/urls — list URLs for tenant ─────────────────────────────
 router.get('/urls', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('maya_kb_urls')
@@ -253,7 +246,7 @@ router.get('/urls', requireAuth, async (req: Request, res: Response): Promise<vo
 // ── DELETE /api/maya-kb/urls/:id — remove a URL ───────────────────────────────
 router.delete('/urls/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('maya_kb_urls')
@@ -274,7 +267,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Fetch the record first
     const { data: record } = await supabase

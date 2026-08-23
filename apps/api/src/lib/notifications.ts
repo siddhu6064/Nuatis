@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { sendPushNotification } from './push-client.js'
 import { sendExpoPushToTenant } from './expo-push.js'
 // sendSms import reserved for future: owner SMS requires personal phone field on users table
 // import { sendSms } from './sms.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface NotificationPrefs {
   [eventType: string]: {
@@ -35,7 +28,7 @@ export async function notifyOwner(
   }
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // 1. Fetch tenant notification prefs
     const { data: tenant, error: tenantError } = await supabase

@@ -1,3 +1,4 @@
+import { getServiceClient } from '../lib/supabase.js'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import type { ToolCallRecord } from './post-call.js'
@@ -28,13 +29,6 @@ export interface VoiceSessionParams {
   latencyBreakdown?: LatencyBreakdown | null
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 function determineOutcome(params: VoiceSessionParams): string {
   if (params.bookedAppointment) return 'booking_made'
   if (params.escalated) return 'escalated'
@@ -44,7 +38,7 @@ function determineOutcome(params: VoiceSessionParams): string {
 
 export async function persistVoiceSession(params: VoiceSessionParams): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const outcome = determineOutcome(params)
 
     const { data, error } = await supabase

@@ -1,18 +1,11 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendEmail } from '../lib/email-client.js'
 import { buildReportEmailWrapper } from '../lib/email-templates/report-wrapper.js'
 import { VERTICALS } from '@nuatis/shared'
 
 const QUEUE_NAME = 'scheduled-reports'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export interface ScheduledReportJobData {
   scheduledReportId: string
@@ -35,7 +28,7 @@ async function buildVelocityReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date()
   const startDate = new Date(now.getTime() - 90 * 86400000).toISOString()
 
@@ -95,7 +88,7 @@ async function buildAppointmentsReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date()
   const startDate = new Date(now.getTime() - 30 * 86400000).toISOString()
 
@@ -156,7 +149,7 @@ async function buildLeadSourceReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [{ data: contacts }, { data: deals }] = await Promise.all([
     supabase
@@ -244,7 +237,7 @@ async function buildPipelineFunnelReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
@@ -312,7 +305,7 @@ async function buildPipelineFunnelReport(
 
 export async function processScheduledReport(data: ScheduledReportJobData): Promise<void> {
   const { scheduledReportId, tenantId, reportType, recipients } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant } = await supabase
     .from('tenants')

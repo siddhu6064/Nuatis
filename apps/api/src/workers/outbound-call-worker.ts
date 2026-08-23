@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { isScannerPaused } from '../lib/scanner-pause.js'
@@ -28,17 +28,10 @@ interface ContactRow {
   is_archived: boolean | null
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function processOutboundCall(data: OutboundCallJobData): Promise<void> {
   const { jobId } = data
   console.info(`[outbound-call] picked up job=${jobId}`)
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Step 1: Fetch the job row
   const { data: job, error: jobErr } = await supabase

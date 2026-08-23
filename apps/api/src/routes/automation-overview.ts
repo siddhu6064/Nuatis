@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { Queue } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
@@ -27,13 +27,6 @@ const SCANNER_QUEUES: Array<{ key: string; name: string }> = [
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const SCANNER_KEY_SET = new Set(SCANNER_QUEUES.map((q) => q.key))
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 /** Return the Monday of the ISO week that contains `date`. */
 function getMondayOfWeek(date: Date): Date {
@@ -128,7 +121,7 @@ async function fetchScannerStatus(
 
 router.get('/overview', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Scanner health — all queues in parallel
   const scanners = await Promise.all(
@@ -281,7 +274,7 @@ router.post(
       res.status(400).json({ error: 'Pause range cannot exceed 90 days' })
       return
     }
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data, error } = await supabase
       .from('scanner_pauses')
       .insert({
@@ -315,7 +308,7 @@ router.delete(
       res.status(400).json({ error: 'Unknown scanner key' })
       return
     }
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const now = new Date().toISOString()
     const { data, error } = await supabase
       .from('scanner_pauses')

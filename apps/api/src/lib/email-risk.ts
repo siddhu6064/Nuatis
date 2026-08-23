@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 
 export type EmailEventType =
   | 'sent'
@@ -12,13 +12,6 @@ export type EmailEventType =
 
 const SUPPRESS_THRESHOLD = 90
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function updateEmailRiskScore(
   contactId: string,
   tenantId: string,
@@ -29,7 +22,7 @@ export async function updateEmailRiskScore(
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: contact, error: selectErr } = await supabase
     .from('contacts')

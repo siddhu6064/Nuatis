@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 const SAMPLE_CONTACTS: Array<{
   name: string
@@ -254,7 +247,7 @@ export async function seedSampleData(
   locationId: string | null,
   vertical: string
 ): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch pipeline stages
   const { data: stages } = await supabase

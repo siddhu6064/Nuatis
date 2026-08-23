@@ -1,18 +1,11 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 
 const QUEUE_NAME = 'low-stock-scanner'
 const NOTIFY_COOLDOWN_HOURS = 24
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface InventoryRow {
   id: string
@@ -26,7 +19,7 @@ export async function scan(): Promise<void> {
   console.info('[low-stock-scanner] scanning for low-stock items...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // 1. Active CRM tenants
     const { data: tenants, error: tenantErr } = await supabase.from('tenants').select('id, modules')

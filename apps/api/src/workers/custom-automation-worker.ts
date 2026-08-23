@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 
@@ -7,13 +7,6 @@ const QUEUE_NAME = 'custom-automation-scanner'
 const MAX_CONTACTS_PER_RUN = 50
 
 const SAFE_UPDATE_FIELDS = ['status', 'stage', 'priority']
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 type CustomAutomation = {
   id: string
@@ -35,7 +28,7 @@ type Contact = {
 }
 
 async function getContactsForTrigger(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   automation: CustomAutomation
 ): Promise<Contact[]> {
   const { tenant_id, trigger_type, trigger_config } = automation
@@ -189,7 +182,7 @@ async function getContactsForTrigger(
 }
 
 async function runAction(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   automation: CustomAutomation,
   contact: Contact
 ): Promise<void> {
@@ -351,7 +344,7 @@ export async function scan(): Promise<void> {
   console.info('[custom-automation-scanner] scanning active custom automations...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
 
     const { data: automations, error } = await supabase

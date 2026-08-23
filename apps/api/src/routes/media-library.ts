@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { randomUUID } from 'node:crypto'
 
@@ -7,18 +7,11 @@ const router = Router()
 const BUCKET = 'media-library'
 const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // Public bucket — media_files.public_url is rendered directly as an <img src>
 // (unlike maya-kb.ts's private bucket, which is only ever read server-side).
 // Same lazy-create-on-first-upload pattern as maya-kb.ts's ensureBucket().
 async function ensureBucket(): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { error } = await supabase.storage.createBucket(BUCKET, {
     public: true,
     fileSizeLimit: MAX_SIZE_BYTES,
@@ -48,7 +41,7 @@ router.post('/upload', requireAuth, async (req: Request, res: Response): Promise
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const ext = contentType.split('/')[1] ?? 'png'
     const fileName =
       (req.headers['x-file-name'] as string | undefined) ?? `upload-${Date.now()}.${ext}`
@@ -95,7 +88,7 @@ router.post('/upload', requireAuth, async (req: Request, res: Response): Promise
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { mime_type, page = '1', limit = '50' } = req.query as Record<string, string>
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const pageNum = Math.max(1, parseInt(page, 10))
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)))
   const from = (pageNum - 1) * limitNum
@@ -122,7 +115,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: file, error: fetchErr } = await supabase
     .from('media_files')

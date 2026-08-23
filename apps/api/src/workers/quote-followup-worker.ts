@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { API_BASE_URL } from '../config/urls.js'
@@ -19,13 +19,6 @@ export function getFollowupQueue(): Queue {
   return _queue
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 interface FollowupJobData {
   quoteId: string
   tenantId: string
@@ -37,7 +30,7 @@ interface FollowupJobData {
 
 export async function processFollowup(data: FollowupJobData): Promise<void> {
   const { quoteId, tenantId, contactPhone, contactName, quoteNumber, shareToken } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Check 1: has the quote been viewed?
   const { count: viewCount } = await supabase

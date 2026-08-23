@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID, createHash } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { sendReceiptEmail } from '../lib/receipt-email.js'
@@ -32,13 +32,6 @@ async function requireCpq(req: Request, res: Response, next: NextFunction): Prom
     return
   }
   next()
-}
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
 }
 
 async function nextReceiptNumber(
@@ -114,7 +107,7 @@ const DEFAULT_CPQ: CpqSettings = {
 }
 
 async function getCpqSettings(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string
 ): Promise<CpqSettings> {
   const { data } = await supabase.from('tenants').select('cpq_settings').eq('id', tenantId).single()
@@ -124,7 +117,7 @@ async function getCpqSettings(
 // ── GET /api/quotes ──────────────────────────────────────────────────────────
 router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
   const status = req.query['status'] ? String(req.query['status']) : null
@@ -157,7 +150,7 @@ router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Pr
 // ── GET /api/quotes/:id ──────────────────────────────────────────────────────
 router.get('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: quote, error } = await supabase
     .from('quotes')
@@ -183,7 +176,7 @@ router.get('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
 // ── POST /api/quotes ─────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
@@ -348,7 +341,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
 // ── PUT /api/quotes/:id ──────────────────────────────────────────────────────
 router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing } = await supabase
     .from('quotes')
@@ -472,7 +465,7 @@ router.delete(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { error } = await supabase
       .from('quotes')
@@ -496,7 +489,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -669,7 +662,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: original } = await supabase
       .from('quotes')
@@ -825,7 +818,7 @@ router.get(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Verify ownership
     const { data: check } = await supabase
@@ -854,7 +847,7 @@ router.get(
 
 // ── PUBLIC: GET /api/quotes/view/:token ──────────────────────────────────────
 router.get('/view/:token', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const token = req.params['token']
 
   const { data: quote } = await supabase
@@ -957,7 +950,7 @@ router.get('/view/:token', async (req: Request, res: Response): Promise<void> =>
 
 // ── PUBLIC: GET /api/quotes/view/:token/pdf ──────────────────────────────────
 router.get('/view/:token/pdf', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: quote } = await supabase
     .from('quotes')
     .select('id')
@@ -985,7 +978,7 @@ router.post(
   '/view/:token/pay-square',
   publicPaymentLimiter,
   async (req: Request, res: Response): Promise<void> => {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { sourceId, paymentType } = req.body as { sourceId?: unknown; paymentType?: unknown }
 
     if (typeof sourceId !== 'string' || !sourceId) {
@@ -1106,7 +1099,7 @@ router.post(
 
 // ── PUBLIC: POST /api/quotes/view/:token/accept ──────────────────────────────
 router.post('/view/:token/accept', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: quote } = await supabase
     .from('quotes')
@@ -1334,7 +1327,7 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
 
 // ── PUBLIC: POST /api/quotes/view/:token/decline ─────────────────────────────
 router.post('/view/:token/decline', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const reason = typeof req.body?.reason === 'string' ? req.body.reason : null
 
   const { data: quote } = await supabase
@@ -1429,7 +1422,7 @@ export async function processQuoteSignature(
   }
 
   // Lookup quote by share token
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: quote, error: selectErr } = await supabase
     .from('quotes')
     .select('id, requires_signature, signature_status, status')
@@ -1511,7 +1504,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1576,7 +1569,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1636,7 +1629,7 @@ router.get(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1680,7 +1673,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const amount = typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount']))
@@ -1792,7 +1785,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const packageId = typeof req.body?.package_id === 'string' ? req.body.package_id : null
 
     if (!packageId) {
@@ -1918,7 +1911,7 @@ router.delete(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Verify quote belongs to tenant
     const { data: quote } = await supabase

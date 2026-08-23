@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { Queue } from 'bullmq'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
@@ -7,13 +7,6 @@ import { smsSendLimiter } from '../middleware/rate-limit.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 let _queue: Queue | null = null
 function getOutboundQueue(): Queue {
@@ -43,7 +36,7 @@ router.post(
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Fetch contact
     const { data: contact, error: contactError } = await supabase
@@ -111,7 +104,7 @@ router.post(
 // ── GET /api/outbound-calls — list recent jobs for tenant ───────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const status = typeof req.query['status'] === 'string' ? req.query['status'] : undefined
   const limit = Math.max(
@@ -148,7 +141,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/outbound-calls/:id — single job detail ────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('outbound_call_jobs')
@@ -175,7 +168,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/outbound-calls/:id/cancel ────────────────────────────────────
 router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: job, error: fetchError } = await supabase
     .from('outbound_call_jobs')

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import {
   getTenantCalendarCredentials,
   getAvailableSlotsForDate,
@@ -16,17 +16,10 @@ import { bookingLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /:slug — booking page data ───────────────────────────────────────────
 router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
   const { slug } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Look up tenant by booking_page_slug
   const { data: tenant, error: tenantError } = await supabase
@@ -152,7 +145,7 @@ router.get('/:slug/availability', async (req: Request, res: Response): Promise<v
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Look up tenant by slug
   const { data: tenant, error: tenantError } = await supabase
@@ -265,7 +258,7 @@ router.post(
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Look up tenant by slug
     const { data: tenant, error: tenantError } = await supabase

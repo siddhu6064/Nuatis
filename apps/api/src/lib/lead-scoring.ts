@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -23,7 +16,7 @@ export async function computeLeadScore(
   tenantId: string,
   contactId: string
 ): Promise<{ score: number; grade: string; breakdown: Record<string, number> }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch contact profile fields
   const { data: contact } = await supabase

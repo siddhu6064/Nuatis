@@ -1,22 +1,15 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendPushNotification } from '../lib/push-client.js'
 
 const QUEUE_NAME = 'quote-expiry'
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function scan(): Promise<void> {
   console.info('[quote-expiry] scanning for expired quotes...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const now = new Date().toISOString()
 
     const { data: expired, error } = await supabase

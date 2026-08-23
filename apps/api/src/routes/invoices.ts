@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { generateInvoiceNumber } from '../lib/invoice-number.js'
@@ -8,13 +8,6 @@ import { buildInvoiceEmailHtml } from '../lib/email-templates/invoice.js'
 import PDFDocument from 'pdfkit'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface LineItemInput {
   description: string
@@ -32,7 +25,7 @@ export function calcInvoiceTotals(items: LineItemInput[], taxRate: number) {
 // ── GET /api/invoices ──────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
@@ -63,7 +56,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/invoices/:id/pdf ─────────────────────────────────────────────────
 router.get('/:id/pdf', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Fetch invoice with contact
   const { data: invoice, error } = await supabase
@@ -322,7 +315,7 @@ router.get('/:id/pdf', requireAuth, async (req: Request, res: Response): Promise
 // ── GET /api/invoices/:id ──────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice, error } = await supabase
     .from('invoices')
@@ -348,7 +341,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/invoices ─────────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const lineItems = Array.isArray(b['line_items']) ? (b['line_items'] as LineItemInput[]) : []
@@ -421,7 +414,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/invoices/:id ──────────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing } = await supabase
     .from('invoices')
@@ -499,7 +492,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/invoices/:id/send ────────────────────────────────────────────────
 router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -576,7 +569,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const amount =
@@ -644,7 +637,7 @@ router.post(
 // ── POST /api/invoices/:id/void ───────────────────────────────────────────────
 router.post('/:id/void', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -685,7 +678,7 @@ export async function processRecordPayment(
   amount: number,
   method: string
 ): Promise<{ status: number; data?: unknown; error?: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   if (isNaN(amount) || amount <= 0) {
     return { status: 400, error: 'amount must be a positive number' }
@@ -745,7 +738,7 @@ export async function processVoidInvoice(
   invoiceId: string,
   tenantId: string
 ): Promise<{ status: number; data?: unknown; error?: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -783,7 +776,7 @@ export async function processVoidInvoice(
 export const publicRouter = Router()
 
 publicRouter.get('/:token', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice, error } = await supabase
     .from('invoices')

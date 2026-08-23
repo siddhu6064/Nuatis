@@ -1,16 +1,10 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { type SupabaseClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import type { BusinessProfile } from '@nuatis/shared'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 async function resolveLocationId(
   supabase: SupabaseClient,
@@ -30,7 +24,7 @@ async function resolveLocationId(
 // ── GET /api/business-profile ─────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const locationId = await resolveLocationId(supabase, authed.tenantId)
@@ -61,7 +55,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/business-profile ─────────────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const body = req.body as { business_profile?: unknown }
 
   if (!body.business_profile || typeof body.business_profile !== 'object') {
@@ -150,7 +144,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/business-profile/catalog-services ───────────────────────────────
 router.get('/catalog-services', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase

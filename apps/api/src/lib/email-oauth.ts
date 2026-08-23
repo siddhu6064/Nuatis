@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,13 +17,6 @@ export interface ValidToken {
 }
 
 // ── DB helper ────────────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Encryption ───────────────────────────────────────────────────────────────
 
@@ -111,7 +104,7 @@ export async function refreshGmailToken(account: EmailAccount): Promise<string> 
   const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
   const encryptedAccessToken = encryptToken(data.access_token)
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { error } = await supabase
     .from('email_accounts')
     .update({ access_token: encryptedAccessToken, token_expires_at: expiresAt })
@@ -158,7 +151,7 @@ export async function refreshOutlookToken(account: EmailAccount): Promise<string
   const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
   const encryptedAccessToken = encryptToken(data.access_token)
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { error } = await supabase
     .from('email_accounts')
     .update({ access_token: encryptedAccessToken, token_expires_at: expiresAt })
@@ -179,7 +172,7 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000 // 5 minutes
  * 5 minutes of expiry, and return a valid decrypted access_token + provider.
  */
 export async function getValidToken(accountId: string): Promise<ValidToken> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: account, error } = await supabase
     .from('email_accounts')

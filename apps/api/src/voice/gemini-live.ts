@@ -7,11 +7,12 @@ import {
   type Blob as GBlob,
 } from '@google/genai'
 import { randomBytes } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { VERTICALS } from '@nuatis/shared'
 import { FUNCTION_DECLARATIONS, executeToolCall, type ToolCallContext } from './tool-handlers.js'
 import { Sentry } from '../lib/sentry.js'
 import { getAllKnowledgeEntries } from '../services/embeddings.js'
+import { withTimeoutOrNull, withTimeoutOrThrow } from '../lib/async.js'
 import {
   buildBusinessKnowledgeBlock,
   buildKbFilesBlock,
@@ -19,13 +20,6 @@ import {
 } from './business-knowledge.js'
 import type { BusinessProfile } from '@nuatis/shared'
 import { MayaLatencyTracker, type LatencyBreakdown } from './maya-latency-tracker.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export const BOOKING_CONTRACT = `
 
@@ -166,10 +160,11 @@ export async function createGeminiLiveSession(
 
   // ── Inject knowledge base entries into system prompt (2s timeout) ────────
   try {
-    const knowledgeEntries = await Promise.race([
+    const knowledgeEntries = await withTimeoutOrThrow(
       getAllKnowledgeEntries(tenantId),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
-    ])
+      2000,
+      'timeout'
+    )
 
     if (knowledgeEntries.length > 0) {
       // Group entries by category
@@ -231,15 +226,17 @@ export async function createGeminiLiveSession(
   let memoryBlock = ''
   if (callerPhone) {
     try {
-      const memResult = await Promise.race([
-        getSupabase()
-          .from('caller_memory')
-          .select('summary, call_count, facts')
-          .eq('tenant_id', tenantId)
-          .eq('phone', callerPhone)
-          .maybeSingle(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-      ])
+      const memResult = await withTimeoutOrNull(
+        Promise.resolve(
+          getServiceClient()
+            .from('caller_memory')
+            .select('summary, call_count, facts')
+            .eq('tenant_id', tenantId)
+            .eq('phone', callerPhone)
+            .maybeSingle()
+        ),
+        2000
+      )
       const mem = memResult && 'data' in memResult ? memResult.data : null
       if (mem?.summary) {
         // PROMPT-01: fence caller memory (user-supplied) with the per-session

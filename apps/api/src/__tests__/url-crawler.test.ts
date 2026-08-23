@@ -48,19 +48,15 @@ jest.unstable_mockModule('../voice/maya-kb-extractor.js', () => ({
 // Test 6 imports the REAL crawlUrl so it can verify the DB update.
 
 // ── Dynamic imports after all mocks ──────────────────────────────────────────
-const [
-  { default: express },
-  { default: request },
-  { default: mayaKbRouter },
-  { buildKbUrlsBlock },
-  { crawlUrl },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/maya-kb.js'),
-  import('../voice/business-knowledge.js'),
-  import('../lib/url-crawler.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: mayaKbRouter } = await import('../routes/maya-kb.js')
+const { buildKbUrlsBlock } = await import('../voice/business-knowledge.js')
+const { crawlUrl } = await import('../lib/url-crawler.js')
 
 function makeApp() {
   const app = express()

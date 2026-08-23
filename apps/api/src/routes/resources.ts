@@ -1,18 +1,11 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { checkResourceAvailable, getResourceAvailability } from '../lib/resource-availability.js'
 
 const router = Router()
 
 const VALID_RESOURCE_TYPES = ['room', 'station', 'equipment', 'vehicle', 'other'] as const
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── GET /api/resources/availability ─────────────────────────────────────────
 // MUST be registered before /:id to avoid route conflict
@@ -57,7 +50,7 @@ router.delete(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const { bookingId } = req.params
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: booking, error: fetchErr } = await supabase
       .from('resource_bookings')
@@ -92,7 +85,7 @@ router.delete(
 // ── GET /api/resources ───────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { status, resource_type } = req.query
 
@@ -123,7 +116,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── POST /api/resources ──────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { name, resource_type, capacity, color, notes, location_id } = req.body as {
     name?: string
@@ -173,7 +166,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Ownership check
   const { data: existing, error: fetchErr } = await supabase
@@ -230,7 +223,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Ownership check
   const { data: existing, error: fetchErr } = await supabase
@@ -266,7 +259,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 router.get('/:id/bookings', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { from, to } = req.query
 
@@ -314,7 +307,7 @@ router.get('/:id/bookings', requireAuth, async (req: Request, res: Response): Pr
 router.post('/:id/book', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const id = req.params['id'] as string
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { start_time, end_time, appointment_id, contact_id, notes } = req.body as {
     start_time?: string

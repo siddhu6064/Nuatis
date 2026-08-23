@@ -1,18 +1,11 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { invalidateStaffCache } from '../lib/staff-cache.js'
 import { DATE_RE, validateShiftBody } from './staff-logic.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 async function requireCrm(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authed = req as AuthenticatedRequest
@@ -42,7 +35,7 @@ async function checkShiftConflict(
   endTime: string,
   excludeShiftId?: string
 ): Promise<ConflictResult> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   let query = supabase
     .from('shifts')
     .select('id, date, start_time, end_time')
@@ -72,7 +65,7 @@ async function checkShiftConflict(
 // ── GET /api/staff ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const activeParam = typeof req.query['active'] === 'string' ? req.query['active'] : 'true'
   let query = supabase.from('staff_members').select('*').eq('tenant_id', authed.tenantId)
@@ -107,7 +100,7 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
 // ── POST /api/staff ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -152,7 +145,7 @@ router.get(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const start = typeof req.query['start_date'] === 'string' ? req.query['start_date'] : ''
     const end = typeof req.query['end_date'] === 'string' ? req.query['end_date'] : ''
@@ -198,7 +191,7 @@ router.get(
 // ── GET /api/staff/:id ───────────────────────────────────────────────────────
 router.get('/:id', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const includeInactive = req.query['include_inactive'] === 'true'
 
@@ -221,7 +214,7 @@ router.get('/:id', requireAuth, requireCrm, async (req: Request, res: Response):
 // ── PUT /api/staff/:id ───────────────────────────────────────────────────────
 router.put('/:id', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const updates: Record<string, unknown> = {}
@@ -281,7 +274,7 @@ router.delete(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data, error } = await supabase
       .from('staff_members')
@@ -309,7 +302,7 @@ router.get(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const start = typeof req.query['start_date'] === 'string' ? req.query['start_date'] : null
     const end = typeof req.query['end_date'] === 'string' ? req.query['end_date'] : null
@@ -341,7 +334,7 @@ router.post(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
     const staffId = req.params['id'] as string
 
@@ -408,7 +401,7 @@ router.put(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
     const staffId = req.params['id'] as string
     const shiftId = req.params['shiftId'] as string
@@ -499,7 +492,7 @@ router.delete(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const staffId = req.params['id'] as string
     const shiftId = req.params['shiftId'] as string
 

@@ -68,11 +68,13 @@ jest.unstable_mockModule('../lib/video-testimonial-processor.js', () => ({
 }))
 
 // ── Dynamic imports (after all mocks) ─────────────────────────────────────────
-const [{ default: express }, { default: request }, { default: videoRouter }] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/video-testimonials.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: videoRouter } = await import('../routes/video-testimonials.js')
 
 const { generateTranscriptAndSentiment } = await import('../lib/video-testimonial-processor.js')
 

@@ -1,19 +1,12 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { logActivity } from '../lib/activity.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { aiGenerationLimiter, sessionInitLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── POST /init — initialize chat session ─────────────────────────────────────
 router.post('/init', sessionInitLimiter, async (req: Request, res: Response): Promise<void> => {
@@ -24,7 +17,7 @@ router.post('/init', sessionInitLimiter, async (req: Request, res: Response): Pr
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
@@ -84,7 +77,7 @@ router.post('/message', aiGenerationLimiter, async (req: Request, res: Response)
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Validate session — `sessionId` from the client is the public share_token.
   const { data: session, error: sessionError } = await supabase
@@ -260,7 +253,7 @@ router.get('/messages/:sessionId', async (req: Request, res: Response): Promise<
   const { sessionId } = req.params
   const after = typeof req.query['after'] === 'string' ? req.query['after'] : null
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify session exists — `sessionId` from the client is the public share_token.
   const { data: session } = await supabase
@@ -303,7 +296,7 @@ router.post('/end', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // `sessionId` from the client is the public share_token.
   const { data: session } = await supabase

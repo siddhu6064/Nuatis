@@ -1,22 +1,15 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
 const E164_RE = /^\+[1-9]\d{0,13}$/
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/telnyx-numbers — list all numbers for tenant
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('telnyx_numbers')
@@ -61,7 +54,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Check if this tenant already has numbers (to auto-set primary)
   const { count } = await supabase
@@ -101,7 +94,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // PUT /api/telnyx-numbers/:id — update label/department/maya_enabled/forwarding/status
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify ownership
   const { data: existing } = await supabase
@@ -179,7 +172,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // POST /api/telnyx-numbers/:id/set-primary
 router.post('/:id/set-primary', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify ownership + get phone_number
   const { data: target } = await supabase
@@ -229,7 +222,7 @@ router.post('/:id/set-primary', requireAuth, async (req: Request, res: Response)
 // DELETE /api/telnyx-numbers/:id
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify ownership + check if primary
   const { data: existing } = await supabase

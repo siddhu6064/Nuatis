@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
@@ -48,13 +48,6 @@ const DEFAULT_PREFS: NotificationPrefs = {
   staff_shift_conflict: { push: true, sms: false, email: false },
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 function isChannelPrefs(val: unknown): val is ChannelPrefs {
   if (!val || typeof val !== 'object') return false
   const v = val as Record<string, unknown>
@@ -88,7 +81,7 @@ function withDefaults(raw: unknown): NotificationPrefs {
 // ── GET /api/settings/notifications ─────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant, error } = await supabase
     .from('tenants')
@@ -110,7 +103,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/settings/notifications ─────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const body = req.body as unknown
 
   if (!isValidPrefs(body)) {
