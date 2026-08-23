@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import TextField from '@mui/material/TextField'
 import Checkbox from '@mui/material/Checkbox'
 
@@ -178,7 +179,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
         ) : (
           <div className="space-y-0">
             {steps.map((step, i) => (
-              <button key={i} onClick={() => setSelectedStep(i)} className="w-full text-left">
+              <ButtonBase
+                key={i}
+                onClick={() => setSelectedStep(i)}
+                sx={{ width: '100%', display: 'block', textAlign: 'left' }}
+              >
                 <div className="flex items-start gap-3 relative">
                   {i < steps.length - 1 && (
                     <div className="absolute left-[7px] top-4 w-px h-full bg-bg2" />
@@ -225,7 +230,7 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
                     )}
                   </div>
                 </div>
-              </button>
+              </ButtonBase>
             ))}
           </div>
         )}

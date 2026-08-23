@@ -6,6 +6,8 @@ import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 
 interface Task {
   id: string
@@ -186,7 +188,11 @@ export default function ContactTasks({ contactId }: Props) {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-0 border-b border-border-brand mb-3 -mx-0">
+      <Tabs
+        value={subTab}
+        onChange={(_e, v: SubTab) => setSubTab(v)}
+        sx={{ minHeight: 32, borderBottom: 1, borderColor: 'divider', mb: 1.5 }}
+      >
         {(
           [
             { id: 'all', label: 'All' },
@@ -205,26 +211,25 @@ export default function ContactTasks({ contactId }: Props) {
             { id: 'upcoming', label: 'Upcoming' },
           ] as Array<{ id: SubTab; label: string; count?: number; badgeClass?: string }>
         ).map(({ id, label, count, badgeClass }) => (
-          <button
+          <Tab
             key={id}
-            onClick={() => setSubTab(id)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              subTab === id
-                ? 'border-teal-600 text-teal-700'
-                : 'border-transparent text-ink3 hover:text-ink2'
-            }`}
-          >
-            {label}
-            {count !== undefined && count > 0 && (
-              <span
-                className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold leading-none ${badgeClass ?? ''}`}
-              >
-                {count}
+            value={id}
+            sx={{ minHeight: 32, py: 0.75, px: 1.25, fontSize: 12, fontWeight: 500 }}
+            label={
+              <span className="flex items-center gap-1.5">
+                {label}
+                {count !== undefined && count > 0 && (
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold leading-none ${badgeClass ?? ''}`}
+                  >
+                    {count}
+                  </span>
+                )}
               </span>
-            )}
-          </button>
+            }
+          />
         ))}
-      </div>
+      </Tabs>
 
       {adding && (
         <div className="border border-border-brand rounded-lg p-3 mb-3">
@@ -326,12 +331,14 @@ export default function ContactTasks({ contactId }: Props) {
 
       {completedTasks.length > 0 && (
         <div className="mt-3">
-          <button
+          <Button
             onClick={() => setShowCompleted(!showCompleted)}
-            className="text-xs text-ink4 hover:text-ink3"
+            size="small"
+            color="inherit"
+            sx={{ fontSize: 12, minWidth: 0, p: 0, textTransform: 'none', color: 'text.disabled' }}
           >
             {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
-          </button>
+          </Button>
           {showCompleted && (
             <div className="mt-1 space-y-1 opacity-60">
               {completedTasks.map((task) => (

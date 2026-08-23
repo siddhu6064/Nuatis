@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import MenuList from '@mui/material/MenuList'
 
 interface LineItem {
   key: string
@@ -174,17 +176,18 @@ export default function InvoiceBuilder() {
             />
             {contactDropOpen && contactResults.length > 0 && (
               <div className="absolute z-10 w-full bg-white border border-border-brand rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
-                {contactResults.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onMouseDown={() => selectContact(c)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-bg text-sm"
-                  >
-                    <span className="font-medium text-ink">{c.full_name}</span>
-                    {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
-                  </button>
-                ))}
+                <MenuList disablePadding>
+                  {contactResults.map((c) => (
+                    <MenuItem
+                      key={c.id}
+                      onMouseDown={() => selectContact(c)}
+                      sx={{ fontSize: 14, py: 1.25, px: 1.5, whiteSpace: 'normal' }}
+                    >
+                      <span className="font-medium text-ink">{c.full_name}</span>
+                      {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
+                    </MenuItem>
+                  ))}
+                </MenuList>
               </div>
             )}
             {contactId && contactName && (

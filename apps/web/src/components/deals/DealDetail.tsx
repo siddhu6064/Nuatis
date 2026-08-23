@@ -8,6 +8,7 @@ import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
+import Slider from '@mui/material/Slider'
 
 const TAG_COLORS = [
   { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
@@ -314,13 +315,13 @@ export default function DealDetail({ dealId }: Props) {
           <div>
             <span className="text-ink4 text-xs">Probability</span>
             <div className="flex items-center gap-2 mt-0.5">
-              <input
-                type="range"
-                min="0"
-                max="100"
+              <Slider
                 value={deal.probability}
-                onChange={(e) => void updateDeal({ probability: parseInt(e.target.value) })}
-                className="flex-1 h-1.5 accent-teal-600"
+                onChange={(_e, value) => void updateDeal({ probability: value as number })}
+                min={0}
+                max={100}
+                size="small"
+                sx={{ flex: 1 }}
               />
               <span className="text-sm font-medium text-ink2 w-8">{deal.probability}%</span>
             </div>
@@ -401,13 +402,25 @@ export default function DealDetail({ dealId }: Props) {
                     {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                       <div className="absolute top-full left-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-20 min-w-[160px] max-h-36 overflow-y-auto">
                         {filteredTagSuggestions.slice(0, 6).map((s) => (
-                          <button
+                          <Button
                             key={s}
                             onMouseDown={() => addTag(s)}
-                            className="block w-full text-left text-xs px-3 py-1.5 hover:bg-bg text-ink2"
+                            fullWidth
+                            size="small"
+                            sx={{
+                              justifyContent: 'flex-start',
+                              textAlign: 'left',
+                              px: 1.5,
+                              py: 0.75,
+                              fontSize: 12,
+                              fontWeight: 400,
+                              color: 'text.secondary',
+                              textTransform: 'none',
+                              borderRadius: 0,
+                            }}
                           >
                             {s}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     )}

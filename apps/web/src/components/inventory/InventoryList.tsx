@@ -142,12 +142,14 @@ export default function InventoryList({ pageTitle }: Props) {
               No {pageTitle.toLowerCase()} yet. Add your first item to track stock levels and get
               low-stock alerts.
             </p>
-            <button
+            <Button
               onClick={() => setSlideOver({ open: true })}
-              className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
+              variant="contained"
+              size="small"
+              sx={{ mt: 1.5 }}
             >
-              Add your first item &rarr;
-            </button>
+              Add your first item
+            </Button>
           </div>
         ) : (
           <table className="w-full">

@@ -125,12 +125,14 @@ export default function StaffRoster() {
       ) : members.length === 0 ? (
         <div className="py-20 text-center">
           <p className="text-sm text-ink4">No team members yet.</p>
-          <button
+          <Button
             onClick={() => setSlideOver({ open: true })}
-            className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
+            variant="contained"
+            size="small"
+            sx={{ mt: 1.5 }}
           >
-            Add your first team member &rarr;
-          </button>
+            Add your first team member
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

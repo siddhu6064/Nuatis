@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import Button from '@mui/material/Button'
 import {
   BarChart,
   Bar,
@@ -567,25 +568,25 @@ export default function CampaignPerformancePage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-6 py-3.5 border-t border-border-brand flex items-center justify-between">
-            <button
-              type="button"
+            <Button
               onClick={() => loadSendsPage(sendsPage - 1)}
               disabled={sendsPage <= 1 || sendsLoading}
-              className="text-sm font-medium text-teal-700 hover:text-teal-800 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+              size="small"
+              color="inherit"
             >
               ← Prev
-            </button>
+            </Button>
             <span className="text-xs text-ink3">
               Page {sendsPage} of {totalPages}
             </span>
-            <button
-              type="button"
+            <Button
               onClick={() => loadSendsPage(sendsPage + 1)}
               disabled={sendsPage >= totalPages || sendsLoading}
-              className="text-sm font-medium text-teal-700 hover:text-teal-800 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+              size="small"
+              color="inherit"
             >
               Next →
-            </button>
+            </Button>
           </div>
         )}
       </div>

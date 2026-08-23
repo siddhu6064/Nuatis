@@ -292,20 +292,19 @@ export default function EmailTemplatesPage() {
             <div>
               <label className="block text-xs font-medium text-ink2 mb-1">Body</label>
 
-              {/* Merge tag buttons — plain Tailwind buttons kept as-is, not
-                  worth an MUI Button here: they're small inline chips, not
-                  a case the earlier button-collision checklist item flags
-                  (button has no globals.css rule to collide with). */}
+              {/* Merge tag buttons — MUI Button, matching the
+                  settings/automation page's merge-tag-chip pattern. */}
               <div className="flex flex-wrap gap-1 mb-2">
                 {MERGE_TAGS.map((tag) => (
-                  <button
+                  <Button
                     key={tag}
-                    type="button"
                     onClick={() => insertTag(tag)}
-                    className="rounded border border-border-brand bg-bg px-2 py-0.5 text-xs text-ink3 hover:bg-bg2 transition-colors font-mono"
+                    size="small"
+                    color="inherit"
+                    sx={{ fontFamily: 'monospace', fontSize: 12 }}
                   >
                     {tag}
-                  </button>
+                  </Button>
                 ))}
               </div>
 

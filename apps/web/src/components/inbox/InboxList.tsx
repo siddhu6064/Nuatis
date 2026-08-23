@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
 
@@ -168,10 +169,20 @@ export default function InboxList() {
         <div className="bg-white rounded-xl border border-border-brand divide-y divide-gray-50">
           {/* SMS threads */}
           {visibleSms.map((t) => (
-            <button
+            <ButtonBase
               key={`sms-${t.contact_id}`}
               onClick={() => router.push(`/contacts/${t.contact_id}?tab=messages`)}
-              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                width: '100%',
+                textAlign: 'left',
+                px: 2,
+                py: 1.5,
+                transition: 'background-color 150ms',
+                '&:hover': { bgcolor: '#f9f8f5' },
+              }}
             >
               <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                 <span className="text-teal-700 text-xs font-bold">
@@ -205,7 +216,7 @@ export default function InboxList() {
                   {t.unread_count}
                 </span>
               )}
-            </button>
+            </ButtonBase>
           ))}
 
           {/* Chat sessions */}
@@ -218,10 +229,20 @@ export default function InboxList() {
               .join('')
               .toUpperCase()
             return (
-              <button
+              <ButtonBase
                 key={`chat-${s.id}`}
                 onClick={() => router.push(`/inbox?chat=${s.id}`)}
-                className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  width: '100%',
+                  textAlign: 'left',
+                  px: 2,
+                  py: 1.5,
+                  transition: 'background-color 150ms',
+                  '&:hover': { bgcolor: '#f9f8f5' },
+                }}
               >
                 <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                   <span className="text-blue-700 text-xs font-bold">{initials || 'W'}</span>
@@ -250,7 +271,7 @@ export default function InboxList() {
                     {s.unread_count}
                   </span>
                 )}
-              </button>
+              </ButtonBase>
             )
           })}
         </div>

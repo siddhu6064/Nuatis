@@ -944,13 +944,21 @@ export default function CampaignDetailPage() {
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
               Legacy campaign — use the old editor flow.{' '}
-              <button
-                type="button"
-                onClick={() => router.push(`/campaigns/new?id=${campaign.id}`)}
-                className="underline font-medium"
+              <Button
+                component={Link}
+                href={`/campaigns/new?id=${campaign.id}`}
+                variant="text"
+                size="small"
+                sx={{
+                  p: 0,
+                  minWidth: 0,
+                  verticalAlign: 'baseline',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
               >
                 Open editor →
-              </button>
+              </Button>
             </div>
           )}
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Tabs from '@mui/material/Tabs'
@@ -413,10 +414,11 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((s) => (
-            <button
+            <ButtonBase
               key={s.id}
               onClick={() => void openSubmission(s)}
-              className="bg-white rounded-xl border border-border-brand overflow-hidden text-left hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl border border-border-brand overflow-hidden hover:shadow-md transition-shadow"
+              sx={{ display: 'block', width: '100%', textAlign: 'left' }}
             >
               {/* Thumbnail placeholder */}
               <div className="bg-gray-100 h-32 flex items-center justify-center">
@@ -450,7 +452,7 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
                   </span>
                 </div>
               </div>
-            </button>
+            </ButtonBase>
           ))}
         </div>
       )}
@@ -637,15 +639,22 @@ export default function VideoReviewsTab() {
                       {c.max_duration_seconds}s
                     </td>
                     <td className="px-4 py-3 text-ink">
-                      <button
+                      <Button
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedCollectorId(c.id)
                         }}
-                        className="text-teal-600 hover:underline font-medium"
+                        variant="text"
+                        size="small"
+                        sx={{
+                          p: 0,
+                          minWidth: 0,
+                          textDecoration: 'underline',
+                          fontWeight: 600,
+                        }}
                       >
                         {c.submission_count}
-                      </button>
+                      </Button>
                     </td>
                     <td className="px-4 py-3">
                       <span

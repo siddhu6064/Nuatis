@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
+import ButtonBase from '@mui/material/ButtonBase'
 
 interface VoiceSession {
   id: string
@@ -223,9 +224,19 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
 
                   return (
                     <div key={group.groupKey}>
-                      <button
+                      <ButtonBase
                         onClick={() => toggleGroup(expandKey)}
-                        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50/60 transition-colors"
+                        sx={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          px: 2.5,
+                          py: 2,
+                          textAlign: 'left',
+                          transition: 'background-color 150ms',
+                          '&:hover': { bgcolor: 'rgba(249, 250, 251, 0.6)' },
+                        }}
                       >
                         <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                           <span className="text-teal-700 text-xs font-bold">
@@ -275,7 +286,7 @@ export default function CallLogView({ calls, total, hasFilters }: Props) {
                         >
                           ›
                         </span>
-                      </button>
+                      </ButtonBase>
 
                       {isOpen && (
                         <div className="border-t border-border-brand bg-gray-50/40">

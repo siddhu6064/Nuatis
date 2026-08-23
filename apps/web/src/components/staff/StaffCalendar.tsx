@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import Checkbox from '@mui/material/Checkbox'
 import ShiftSlideOver from './ShiftSlideOver'
 import type { DayKey, Shift, StaffMember } from './types'
@@ -214,20 +215,30 @@ export default function StaffCalendar() {
                         className="px-2 py-2 border-b border-l border-gray-50 min-h-[64px] hover:bg-gray-50/50 cursor-pointer"
                       >
                         {dayShifts.map((s) => (
-                          <button
+                          <ButtonBase
                             key={s.id}
                             onClick={(e) => {
                               e.stopPropagation()
                               openEdit(s)
                             }}
-                            className="block w-full text-left text-xs rounded px-2 py-1 mb-1 truncate"
-                            style={{
+                            sx={{
+                              display: 'block',
+                              width: '100%',
+                              textAlign: 'left',
+                              fontSize: '0.75rem',
+                              borderRadius: 1,
+                              px: 1,
+                              py: 0.5,
+                              mb: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                               backgroundColor: `${m.color_hex}33`,
                               borderLeft: `3px solid ${m.color_hex}`,
                             }}
                           >
                             {formatTime(s.start_time)}–{formatTime(s.end_time)}
-                          </button>
+                          </ButtonBase>
                         ))}
                       </div>
                     )

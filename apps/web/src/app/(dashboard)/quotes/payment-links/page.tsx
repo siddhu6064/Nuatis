@@ -5,6 +5,8 @@ import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
+import MenuItem from '@mui/material/MenuItem'
+import MenuList from '@mui/material/MenuList'
 import { Modal } from '@/components/ui/Modal'
 
 interface Contact {
@@ -405,22 +407,23 @@ export default function PaymentLinksPage() {
                     />
                     {searchOpen && contactResults.length > 0 && (
                       <div className="absolute z-10 top-full mt-1 w-full bg-white border border-border-brand rounded-lg shadow-lg overflow-hidden">
-                        {contactResults.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedContact(c)
-                              setContactSearch('')
-                              setContactResults([])
-                              setSearchOpen(false)
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg"
-                          >
-                            {c.full_name}
-                            {c.phone && <span className="text-xs text-ink4 ml-2">{c.phone}</span>}
-                          </button>
-                        ))}
+                        <MenuList disablePadding>
+                          {contactResults.map((c) => (
+                            <MenuItem
+                              key={c.id}
+                              onClick={() => {
+                                setSelectedContact(c)
+                                setContactSearch('')
+                                setContactResults([])
+                                setSearchOpen(false)
+                              }}
+                              sx={{ fontSize: 14, py: 1, px: 1.5, whiteSpace: 'normal' }}
+                            >
+                              {c.full_name}
+                              {c.phone && <span className="text-xs text-ink4 ml-2">{c.phone}</span>}
+                            </MenuItem>
+                          ))}
+                        </MenuList>
                       </div>
                     )}
                   </div>

@@ -947,7 +947,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
     .from('campaign_sends')
     .select(
       `id, channel, status, sent_at, delivered_at, opened_at, clicked_at, error_msg, contact_id,
-       contacts!contact_id(first_name, last_name, phone, email)`,
+       contacts!contact_id(full_name, phone, email)`,
       { count: 'exact' }
     )
     .eq('campaign_id', id)
@@ -975,8 +975,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
     contact_id: string | null
     contacts:
       | {
-          first_name: string | null
-          last_name: string | null
+          full_name: string | null
           phone: string | null
           email: string | null
         }[]
@@ -986,9 +985,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
   const rows = (data ?? []) as unknown as SendRow[]
   const responseData = rows.map((row) => {
     const c = Array.isArray(row.contacts) ? (row.contacts[0] ?? null) : null
-    const firstName = c?.first_name ?? ''
-    const lastName = c?.last_name ?? ''
-    const contactName = [firstName, lastName].filter(Boolean).join(' ') || null
+    const contactName = c?.full_name || null
     const phoneMasked = c?.phone ? maskPhone(c.phone) : null
 
     return {
@@ -1034,7 +1031,7 @@ router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): 
     .from('campaign_recipients')
     .select(
       `id, campaign_id, contact_id, email, status, sent_at, delivered_at, opened_at, clicked_at, error_message,
-         contacts!inner(first_name, last_name)`,
+         contacts!inner(full_name)`,
       { count: 'exact' }
     )
     .eq('campaign_id', req.params['id'])

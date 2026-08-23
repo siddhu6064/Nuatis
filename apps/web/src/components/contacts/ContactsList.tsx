@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import Chip from '@mui/material/Chip'
 import Checkbox from '@mui/material/Checkbox'
 import ContactFilters, { type FilterState, EMPTY_FILTERS } from './ContactFilters'
 import SmartLists from './SmartLists'
@@ -475,15 +477,19 @@ export default function ContactsList() {
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             {chips.map((chip) => (
-              <span
+              <Chip
                 key={chip.label}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-bg2 text-ink3"
-              >
-                {chip.label}
-                <button onClick={chip.onRemove} className="text-ink4 hover:text-ink3">
-                  &times;
-                </button>
-              </span>
+                label={chip.label}
+                size="small"
+                onDelete={chip.onRemove}
+                sx={{
+                  height: 24,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  bgcolor: 'grey.100',
+                  color: 'text.secondary',
+                }}
+              />
             ))}
             <Button
               onClick={() => updateFilters(EMPTY_FILTERS)}
@@ -500,9 +506,21 @@ export default function ContactsList() {
         {allPageSelected && !allMatchingSelected && total > contacts.length && (
           <div className="mb-3 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
             All {contacts.length} on this page selected.{' '}
-            <button onClick={selectAllMatching} className="font-medium underline">
+            <Button
+              onClick={selectAllMatching}
+              size="small"
+              sx={{
+                fontSize: 12,
+                fontWeight: 500,
+                textTransform: 'none',
+                textDecoration: 'underline',
+                minWidth: 0,
+                p: 0,
+                verticalAlign: 'baseline',
+              }}
+            >
               Select all {total} contacts matching current filters &rarr;
-            </button>
+            </Button>
           </div>
         )}
 
@@ -520,12 +538,13 @@ export default function ContactsList() {
               {hasActiveFilters(filters) ? (
                 <>
                   <p className="text-sm font-medium text-ink4">No contacts match these filters</p>
-                  <button
+                  <Button
                     onClick={() => updateFilters(EMPTY_FILTERS)}
-                    className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    size="small"
+                    sx={{ mt: 1.5, fontSize: 12, fontWeight: 500, textTransform: 'none' }}
                   >
                     Clear filters
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
@@ -551,8 +570,7 @@ export default function ContactsList() {
                   </th>
                   {/* Sortable: Name */}
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
-                    <button
-                      type="button"
+                    <ButtonBase
                       onClick={() =>
                         updateFilters({
                           ...filters,
@@ -563,7 +581,13 @@ export default function ContactsList() {
                               : 'asc',
                         })
                       }
-                      className="flex items-center gap-1 hover:text-ink transition-colors"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        color: 'inherit',
+                        '&:hover': { color: 'text.primary' },
+                      }}
                     >
                       Name
                       <span className="text-[10px]">
@@ -573,7 +597,7 @@ export default function ContactsList() {
                             : '▼'
                           : '↕'}
                       </span>
-                    </button>
+                    </ButtonBase>
                   </th>
                   {colVisible['email'] !== false && (
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Email</th>
@@ -584,8 +608,7 @@ export default function ContactsList() {
                   {/* Sortable: Stage */}
                   {colVisible['stage'] !== false && (
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
-                      <button
-                        type="button"
+                      <ButtonBase
                         onClick={() =>
                           updateFilters({
                             ...filters,
@@ -596,7 +619,13 @@ export default function ContactsList() {
                                 : 'asc',
                           })
                         }
-                        className="flex items-center gap-1 hover:text-ink transition-colors"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          color: 'inherit',
+                          '&:hover': { color: 'text.primary' },
+                        }}
                       >
                         Stage
                         <span className="text-[10px]">
@@ -606,7 +635,7 @@ export default function ContactsList() {
                               : '▼'
                             : '↕'}
                         </span>
-                      </button>
+                      </ButtonBase>
                     </th>
                   )}
                   {colVisible['lifecycle'] !== false && (
@@ -624,8 +653,7 @@ export default function ContactsList() {
                   {/* Sortable: Added */}
                   {colVisible['added'] !== false && (
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">
-                      <button
-                        type="button"
+                      <ButtonBase
                         onClick={() =>
                           updateFilters({
                             ...filters,
@@ -636,7 +664,13 @@ export default function ContactsList() {
                                 : 'desc',
                           })
                         }
-                        className="flex items-center gap-1 hover:text-ink transition-colors"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          color: 'inherit',
+                          '&:hover': { color: 'text.primary' },
+                        }}
                       >
                         Added
                         <span className="text-[10px]">
@@ -646,7 +680,7 @@ export default function ContactsList() {
                               : '▲'
                             : '↕'}
                         </span>
-                      </button>
+                      </ButtonBase>
                     </th>
                   )}
                 </tr>
@@ -830,22 +864,26 @@ export default function ContactsList() {
                 Page {page} of {Math.ceil(total / 50)}
               </p>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <Button
                   disabled={page === 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  sx={{ fontSize: 12, textTransform: 'none' }}
                 >
                   ← Previous
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
                   disabled={page >= Math.ceil(total / 50)}
                   onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  sx={{ fontSize: 12, textTransform: 'none' }}
                 >
                   Next →
-                </button>
+                </Button>
               </div>
             </div>
           )}

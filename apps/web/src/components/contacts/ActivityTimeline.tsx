@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
 
 interface ActivityItem {
   id: string
@@ -158,14 +159,15 @@ export default function ActivityTimeline({ contactId, refreshKey }: Props) {
       {unpinned.map((item) => renderItem(item))}
       {hasMore && (
         <div className="px-4 py-3">
-          <button
+          <Button
             onClick={() => {
               if (nextCursor) void fetchActivity(nextCursor)
             }}
-            className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+            size="small"
+            sx={{ fontSize: 12, minWidth: 0, p: 0, textTransform: 'none' }}
           >
             Load more...
-          </button>
+          </Button>
         </div>
       )}
     </div>
