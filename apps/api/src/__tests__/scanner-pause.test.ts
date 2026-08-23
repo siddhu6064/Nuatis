@@ -44,17 +44,14 @@ jest.unstable_mockModule('../lib/auth.js', () => ({
 }))
 
 // ── Dynamic imports (after all mocks) ────────────────────────────────────────
-const [
-  { default: express },
-  { default: request },
-  { default: automationOverviewRouter },
-  { isScannerPaused },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/automation-overview.js'),
-  import('../lib/scanner-pause.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: automationOverviewRouter } = await import('../routes/automation-overview.js')
+const { isScannerPaused } = await import('../lib/scanner-pause.js')
 
 function makeApp() {
   const app = express()

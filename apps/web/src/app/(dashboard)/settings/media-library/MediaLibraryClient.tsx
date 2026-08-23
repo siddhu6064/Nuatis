@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 
 interface MediaFile {
   id: string
@@ -121,13 +123,9 @@ export default function MediaLibraryClient() {
             Upload and manage images for use in campaigns and proposals
           </p>
         </div>
-        <button
-          onClick={handleUploadClick}
-          disabled={uploading}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
+        <Button onClick={handleUploadClick} disabled={uploading} variant="contained">
           {uploading ? 'Uploading…' : '+ Upload Image'}
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -180,14 +178,27 @@ export default function MediaLibraryClient() {
               </button>
 
               {/* Delete button — visible on hover */}
-              <button
+              <IconButton
                 onClick={() => handleDelete(file.id)}
                 disabled={deletingId === file.id}
-                className="absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-red-600 text-xs font-bold shadow opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 disabled:opacity-50"
                 title="Delete image"
+                size="small"
+                sx={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  zIndex: 10,
+                  bgcolor: 'rgba(255,255,255,0.9)',
+                  color: 'error.main',
+                  boxShadow: 1,
+                  opacity: 0,
+                  transition: 'opacity 0.15s',
+                  '.group:hover &': { opacity: 1 },
+                  '&:hover': { bgcolor: '#fef2f2' },
+                }}
               >
                 {deletingId === file.id ? '…' : '×'}
-              </button>
+              </IconButton>
 
               {/* File info */}
               <div className="px-3 py-2">

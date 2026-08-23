@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
@@ -7,13 +7,6 @@ import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import { VALID_UNITS, type Unit } from './inventory-logic.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 async function requireCrm(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authed = req as AuthenticatedRequest
@@ -28,7 +21,7 @@ async function requireCrm(req: Request, res: Response, next: NextFunction): Prom
 // ── GET /api/inventory ───────────────────────────────────────────────────────
 router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const countOnly = req.query['count'] === 'true'
   const lowStock = req.query['low_stock'] === 'true'
@@ -106,7 +99,7 @@ router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Pr
 // ── POST /api/inventory ──────────────────────────────────────────────────────
 router.post('/', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -172,7 +165,7 @@ router.post('/', requireAuth, requireCrm, async (req: Request, res: Response): P
 // ── GET /api/inventory/:id ───────────────────────────────────────────────────
 router.get('/:id', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('inventory_items')
@@ -193,7 +186,7 @@ router.get('/:id', requireAuth, requireCrm, async (req: Request, res: Response):
 // ── PUT /api/inventory/:id ───────────────────────────────────────────────────
 router.put('/:id', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const updates: Record<string, unknown> = {}
@@ -282,7 +275,7 @@ router.delete(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data, error } = await supabase
       .from('inventory_items')
@@ -309,7 +302,7 @@ router.post(
   requireCrm,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const delta = typeof b['delta'] === 'number' ? b['delta'] : NaN

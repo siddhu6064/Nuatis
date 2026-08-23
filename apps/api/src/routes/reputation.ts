@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { google } from 'googleapis'
 import crypto from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
@@ -7,13 +7,6 @@ import { syncReviews, refreshTokenIfNeeded, fetchGbpInsights } from '../lib/gbp-
 import redis from '../lib/redis.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(
@@ -116,7 +109,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     const locationName = firstLocation?.locationName ?? firstLocation?.title ?? 'My Business'
     const placeId = firstLocation?.metadata?.placeId ?? null
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { error: upsertError } = await supabase.from('gbp_connections').upsert(
       {
         tenant_id: tenantId,
@@ -148,7 +141,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 // DELETE /api/reputation/disconnect
 router.delete('/disconnect', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   try {
     const { error: deleteError } = await supabase
       .from('gbp_connections')
@@ -170,7 +163,7 @@ router.delete('/disconnect', requireAuth, async (req: Request, res: Response): P
 // GET /api/reputation/status
 router.get('/status', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   try {
     const { data: conn } = await supabase
       .from('gbp_connections')
@@ -210,7 +203,7 @@ router.post('/sync', requireAuth, async (req: Request, res: Response): Promise<v
 // GET /api/reputation/reviews
 router.get('/reviews', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const status = (req.query['status'] as string | undefined) ?? undefined
   const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10))
@@ -247,7 +240,7 @@ router.get('/reviews', requireAuth, async (req: Request, res: Response): Promise
 // GET /api/reputation/stats
 router.get('/stats', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: allReviews } = await supabase
@@ -326,7 +319,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { id } = req.params as { id: string }
     const body = req.body as { reply_text?: string }
     const replyText = body.reply_text?.trim() ?? ''
@@ -403,7 +396,7 @@ router.put(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { id } = req.params as { id: string }
 
     try {

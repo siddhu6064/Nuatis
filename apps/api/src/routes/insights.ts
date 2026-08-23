@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 import { isModuleEnabled } from '../lib/modules.js'
@@ -8,13 +8,6 @@ const router = Router()
 
 // Phase 9: subscription + module gate. 'insights' is included in Pro + Scale.
 router.use(requireAuth, requirePlan('insights'))
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function getDateRange(req: Request): { from: string; to: string } {
   const now = new Date()
@@ -27,7 +20,7 @@ function getDateRange(req: Request): { from: string; to: string } {
 // ── GET /api/insights/calls ──────────────────────────────────────────────────
 router.get('/calls', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { from, to } = getDateRange(req)
 
   try {
@@ -117,7 +110,7 @@ router.get('/calls', requireAuth, async (req: Request, res: Response): Promise<v
 // ── GET /api/insights/pipeline ───────────────────────────────────────────────
 router.get('/pipeline', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { from } = getDateRange(req)
 
   try {
@@ -189,7 +182,7 @@ router.get('/pipeline', requireAuth, async (req: Request, res: Response): Promis
 // ── GET /api/insights/revenue ────────────────────────────────────────────────
 router.get('/revenue', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { from, to } = getDateRange(req)
 
   try {
@@ -267,7 +260,7 @@ router.get('/revenue', requireAuth, async (req: Request, res: Response): Promise
 // ── GET /api/insights/follow-ups ─────────────────────────────────────────────
 router.get('/follow-ups', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: contacts } = await supabase
@@ -328,7 +321,7 @@ router.get('/follow-ups', requireAuth, async (req: Request, res: Response): Prom
 // ── GET /api/insights/cpq ─────────────────────────────────────────────────────
 router.get('/cpq', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { from, to } = getDateRange(req)
 
   try {
@@ -593,7 +586,7 @@ router.get('/plg', requireAuth, async (req: Request, res: Response): Promise<voi
     res.status(403).json({ error: 'Forbidden' })
     return
   }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const [mayaRes, suiteRes, eventsRes] = await Promise.all([
@@ -642,7 +635,7 @@ router.get('/plg', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── GET /api/insights/referrals ───────────────────────────────────────────────
 router.get('/referrals', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Contacts with referral sources
@@ -730,7 +723,7 @@ router.get('/referrals', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/insights/deals ───────────────────────────────────────────────────
 router.get('/deals', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Safe to call even if deals module disabled — return zeros
@@ -812,7 +805,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const months = Math.max(1, parseInt((req.query['months'] as string) || '3', 10))
 
     try {
@@ -1016,7 +1009,7 @@ router.get(
 // ── GET /api/insights/pipeline-funnel ────────────────────────────────────────
 router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Resolve pipeline_id
@@ -1115,7 +1108,7 @@ router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response):
 router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const now = new Date()
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -1188,7 +1181,7 @@ router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/insights/territory ──────────────────────────────────────────────
 router.get('/territory', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // 1. Contacts grouped by territory
@@ -1285,7 +1278,7 @@ router.get('/territory', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/insights/inventory ──────────────────────────────────────────────
 router.get('/inventory', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase
@@ -1342,7 +1335,7 @@ router.get('/inventory', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/insights/staff ──────────────────────────────────────────────────
 router.get('/staff', requireAuth, async (_req: Request, res: Response): Promise<void> => {
   const authed = _req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Compute current week bounds (Monday 00:00 → Sunday 23:59 local-ish).
@@ -1428,7 +1421,7 @@ router.get('/staff', requireAuth, async (_req: Request, res: Response): Promise<
 // ── GET /api/insights/campaigns ──────────────────────────────────────────────
 router.get('/campaigns', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Campaigns module gate — soft: return null summary instead of 403
@@ -1571,7 +1564,7 @@ router.get('/campaigns', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/insights/maya-latency ─────────────────────────────────────────
 router.get('/maya-latency', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Fetch sessions with latency_breakdown from last 30 days

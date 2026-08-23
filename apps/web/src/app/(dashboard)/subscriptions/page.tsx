@@ -9,6 +9,7 @@ import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
+import MenuList from '@mui/material/MenuList'
 import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -321,21 +322,22 @@ function NewSubscriptionModal({ onClose, onCreated }: NewSubModalProps) {
               />
               {searchOpen && contactSuggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                  {contactSuggestions.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedContact(c)
-                        setContactQuery(c.full_name)
-                        setSearchOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg transition-colors"
-                    >
-                      <span className="font-medium">{c.full_name}</span>
-                      {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
-                    </button>
-                  ))}
+                  <MenuList disablePadding>
+                    {contactSuggestions.map((c) => (
+                      <MenuItem
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedContact(c)
+                          setContactQuery(c.full_name)
+                          setSearchOpen(false)
+                        }}
+                        sx={{ fontSize: 14, py: 1, px: 1.5, whiteSpace: 'normal' }}
+                      >
+                        <span className="font-medium">{c.full_name}</span>
+                        {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
+                      </MenuItem>
+                    ))}
+                  </MenuList>
                 </div>
               )}
             </>

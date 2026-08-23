@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
+import { buildSmsHelpReplySms } from '../lib/sms-templates.js'
 
 const router = Router()
 
@@ -163,7 +164,7 @@ async function handleMessageReceived(req: Request, res: Response): Promise<void>
       .eq('tenant_id', tenantId)
       .single()
     const fromNum = loc?.telnyx_number ?? toNumber
-    void send(fromNum, fromNumber, 'Reply STOP to unsubscribe. For help call us directly.', {
+    void send(fromNum, fromNumber, buildSmsHelpReplySms(), {
       tenantId,
       contactId: contactId ?? undefined,
     })

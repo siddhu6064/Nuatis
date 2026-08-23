@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { getExportQueue } from '../workers/export-worker.js'
 
@@ -16,13 +16,6 @@ const VALID_TABLES = new Set([
 
 const DEFAULT_TABLES = ['contacts', 'activity_log', 'appointments', 'deals', 'quotes', 'tasks']
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── POST /api/data-export — start export ─────────────────────────────────────
 router.post(
   '/',
@@ -30,7 +23,7 @@ router.post(
   requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const b = req.body as Record<string, unknown>
     const requestedTables = Array.isArray(b['tables']) ? (b['tables'] as unknown[]) : DEFAULT_TABLES
@@ -47,6 +40,14 @@ router.post(
     }
 
     const tables = requestedTables as string[]
+
+    // export_jobs.requested_by FKs public.users(id) — that is appUserId, not the
+    // Auth.js `sub` on authed.userId. Passing `sub` (empty for sessions without a
+    // resolved domain user) made Postgres reject it as a malformed uuid → 500.
+    if (!authed.appUserId) {
+      res.status(400).json({ error: 'No resolved user account for this session' })
+      return
+    }
 
     // Rate limit: check for pending/processing export for this tenant
     const { data: existing, error: checkErr } = await supabase
@@ -74,7 +75,7 @@ router.post(
       .from('export_jobs')
       .insert({
         tenant_id: authed.tenantId,
-        requested_by: authed.userId,
+        requested_by: authed.appUserId,
         status: 'pending',
         tables_included: tables,
       })
@@ -92,7 +93,7 @@ router.post(
       await queue.add('data-export', {
         tenantId: authed.tenantId,
         exportJobId: job.id,
-        requestedBy: authed.userId,
+        requestedBy: authed.appUserId,
         tables,
       })
     } catch (err) {
@@ -113,7 +114,7 @@ router.post(
 // ── GET /api/data-export — list exports ──────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('export_jobs')
@@ -137,7 +138,7 @@ router.get(
   requireRole('owner', 'admin'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: job, error } = await supabase
       .from('export_jobs')

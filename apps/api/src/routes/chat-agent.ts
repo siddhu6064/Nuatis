@@ -1,21 +1,14 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/chat/sessions ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { status } = req.query
 
@@ -62,7 +55,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/chat/sessions/:id ────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: session, error: sessionError } = await supabase
@@ -105,7 +98,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/chat/sessions/:id/reply ────────────────────────────────────────
 router.post('/:id/reply', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const body = typeof req.body?.body === 'string' ? req.body.body.trim() : ''
@@ -167,7 +160,7 @@ router.post('/:id/reply', requireAuth, async (req: Request, res: Response): Prom
 // ── POST /api/chat/sessions/:id/close ────────────────────────────────────────
 router.post('/:id/close', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { error } = await supabase
@@ -187,7 +180,7 @@ router.post('/:id/close', requireAuth, async (req: Request, res: Response): Prom
 // ── POST /api/chat/sessions/:id/archive ──────────────────────────────────────
 router.post('/:id/archive', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { error } = await supabase

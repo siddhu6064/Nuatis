@@ -1,18 +1,11 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 async function requireDeals(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authed = req as AuthenticatedRequest
@@ -27,7 +20,7 @@ async function requireDeals(req: Request, res: Response, next: NextFunction): Pr
 // ── GET /api/deals ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, requireDeals, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   let query = supabase
     .from('deals')
@@ -111,7 +104,7 @@ router.get(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: pipelines } = await supabase
       .from('pipelines')
@@ -189,7 +182,7 @@ router.get(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const now = new Date()
     const defaultStart = new Date(now.getTime() - 90 * 86400000).toISOString()
@@ -281,7 +274,7 @@ router.get(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const cacheKey = authed.tenantId
     const cached = dealTagsCache.get(cacheKey)
@@ -315,7 +308,7 @@ router.get(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: deal, error } = await supabase
       .from('deals')
@@ -361,7 +354,7 @@ router.get(
 // ── POST /api/deals ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireDeals, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
@@ -425,7 +418,7 @@ router.put(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const { data: existing } = await supabase
@@ -574,7 +567,7 @@ router.post(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const { data: deal } = await supabase
@@ -643,7 +636,7 @@ router.delete(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: deal } = await supabase
       .from('deals')
@@ -674,7 +667,7 @@ router.delete(
   requireDeals,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     await supabase
       .from('deals')

@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 const NEXT_PUBLIC_API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'https://api.nuatis.com'
 
@@ -51,12 +54,9 @@ function CopyButton({ url }: { url: string }) {
   }
 
   return (
-    <button
-      onClick={handleCopy}
-      className="ml-2 px-2 py-0.5 rounded border border-border-brand bg-white text-xs text-ink2 hover:bg-bg transition-colors shrink-0"
-    >
+    <Button onClick={handleCopy} size="small" color="inherit" sx={{ ml: 1, flexShrink: 0 }}>
       {copied ? 'Copied!' : 'Copy'}
-    </button>
+    </Button>
   )
 }
 
@@ -177,16 +177,16 @@ export default function TriggerLinksPage() {
       {/* New link button */}
       <div className="mb-4">
         {!showForm ? (
-          <button
+          <Button
             onClick={() => {
               setForm(DEFAULT_FORM)
               setError(null)
               setShowForm(true)
             }}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+            variant="contained"
           >
             + New Trigger Link
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -196,83 +196,74 @@ export default function TriggerLinksPage() {
           <h2 className="text-sm font-semibold text-ink">New Trigger Link</h2>
 
           {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Confirm your appointment"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-            />
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-          </div>
+          <TextField
+            label="Name"
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Confirm your appointment"
+            error={!!error}
+            helperText={error}
+            fullWidth
+            size="small"
+          />
 
           {/* Action */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">Action</label>
-            <select
-              value={form.action}
-              onChange={(e) => setForm({ ...form, action: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
-            >
-              {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <TextField
+            select
+            label="Action"
+            value={form.action}
+            onChange={(e) => setForm({ ...form, action: e.target.value })}
+            fullWidth
+            size="small"
+          >
+            {Object.entries(ACTION_LABELS).map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </TextField>
 
           {/* Redirect URL */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Redirect URL <span className="text-ink4 font-normal">(optional)</span>
-            </label>
-            <input
-              type="url"
-              value={form.redirect_url}
-              onChange={(e) => setForm({ ...form, redirect_url: e.target.value })}
-              placeholder="https://yourbusiness.com/thanks"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-            />
-          </div>
+          <TextField
+            label="Redirect URL (optional)"
+            type="url"
+            value={form.redirect_url}
+            onChange={(e) => setForm({ ...form, redirect_url: e.target.value })}
+            placeholder="https://yourbusiness.com/thanks"
+            fullWidth
+            size="small"
+          />
 
           {/* Webhook URL — only for custom_webhook */}
           {form.action === 'custom_webhook' && (
-            <div>
-              <label className="block text-xs font-medium text-ink2 mb-1">Webhook URL</label>
-              <input
-                type="url"
-                value={form.webhook_url}
-                onChange={(e) => setForm({ ...form, webhook_url: e.target.value })}
-                placeholder="https://hooks.example.com/..."
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-              />
-            </div>
+            <TextField
+              label="Webhook URL"
+              type="url"
+              value={form.webhook_url}
+              onChange={(e) => setForm({ ...form, webhook_url: e.target.value })}
+              placeholder="https://hooks.example.com/..."
+              fullWidth
+              size="small"
+            />
           )}
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-1">
-            <button
-              onClick={() => void handleCreate()}
-              disabled={saving}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+            <Button onClick={() => void handleCreate()} disabled={saving} variant="contained">
               {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setShowForm(false)
                 setError(null)
               }}
               disabled={saving}
-              className="px-4 py-2 bg-white text-sm font-medium text-ink2 rounded-lg border border-border-brand hover:bg-bg transition-colors disabled:opacity-50"
+              color="inherit"
+              variant="outlined"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -315,12 +306,13 @@ export default function TriggerLinksPage() {
                   <td className="py-2 px-4 text-ink">{link.click_count ?? 0}</td>
                   <td className="py-2 px-4 text-ink3">{formatDate(link.created_at)}</td>
                   <td className="py-2 px-4 text-right">
-                    <button
+                    <Button
                       onClick={() => void handleDelete(link.id, link.name)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                      size="small"
+                      color="error"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

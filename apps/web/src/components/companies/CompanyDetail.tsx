@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 
 interface Company {
   id: string
@@ -237,11 +238,21 @@ export default function CompanyDetail({ companyId }: Props) {
             {linkResults.length > 0 && (
               <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg max-h-56 overflow-y-auto">
                 {linkResults.map((r) => (
-                  <button
+                  <ButtonBase
                     key={r.id}
                     disabled={linkBusy}
                     onClick={() => void linkContact(r.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-bg text-left disabled:opacity-50"
+                    sx={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 1.5,
+                      py: 1,
+                      textAlign: 'left',
+                      '&:hover': { bgcolor: '#f9f8f5' },
+                      '&.Mui-disabled': { opacity: 0.5 },
+                    }}
                   >
                     <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                       <span className="text-teal-700 text-[10px] font-bold">
@@ -252,7 +263,7 @@ export default function CompanyDetail({ companyId }: Props) {
                       <p className="text-sm font-medium text-ink truncate">{r.full_name}</p>
                       <p className="text-xs text-ink4 truncate">{r.email ?? r.phone ?? ''}</p>
                     </div>
-                  </button>
+                  </ButtonBase>
                 ))}
               </div>
             )}

@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
@@ -8,18 +8,11 @@ const QUEUE_NAME = 'lead-stalled-scanner'
 const STALE_DAYS = 7
 const TERMINAL_STATUSES = ['won', 'lost']
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function scan(): Promise<void> {
   console.info('[lead-stalled-scanner] scanning for stalled leads...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const cutoff = new Date(Date.now() - STALE_DAYS * 86400000).toISOString()
 

@@ -1,15 +1,9 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { SignJWT } from 'jose'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // POST /api/auth/mobile/login — issue JWT for mobile clients
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
@@ -21,7 +15,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Fetch user profile by email
     const { data: user } = await supabase

@@ -39,19 +39,16 @@ process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 process.env['API_BASE_URL'] = 'http://localhost:3001'
 
-const [
-  { default: express },
-  { default: request },
-  { default: triggerLinksRouter, triggerLinkPublicRouter },
-  { generateTriggerToken },
-  { buildTriggerUrl },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/trigger-links.js'),
-  import('../lib/slugify.js'),
-  import('@nuatis/shared'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: triggerLinksRouter, triggerLinkPublicRouter } =
+  await import('../routes/trigger-links.js')
+const { generateTriggerToken } = await import('../lib/slugify.js')
+const { buildTriggerUrl } = await import('@nuatis/shared')
 
 function makePublicApp() {
   const app = express()

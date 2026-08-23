@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { encryptToken, getValidToken } from '../lib/email-oauth.js'
 import {
@@ -15,13 +15,6 @@ import redis from '../lib/redis.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET / — list connected email accounts ────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
@@ -34,7 +27,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('user_email_accounts')
@@ -63,7 +56,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify the account belongs to the current user before deleting
   const { data: existing, error: fetchError } = await supabase
@@ -224,7 +217,7 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
     const encryptedRefresh = encryptToken(tokens.refresh_token)
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Check if this user already has any accounts (to determine is_default)
     const { data: existingAccounts } = await supabase
@@ -393,7 +386,7 @@ router.get('/outlook/callback', async (req: Request, res: Response): Promise<voi
     const encryptedRefresh = encryptToken(tokens.refresh_token)
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Check if this user already has any accounts (to determine is_default)
     const { data: existingAccounts } = await supabase
@@ -445,7 +438,7 @@ router.post('/send/:contactId', requireAuth, async (req: Request, res: Response)
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Validate contact exists and has an email address
   const { data: contact, error: contactError } = await supabase

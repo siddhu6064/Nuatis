@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { normalizePhone } from '../lib/phone.js'
 import { maskPhone } from './pre-call-lookup.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
@@ -49,13 +49,6 @@ export interface PostCallParams {
   product: 'maya_only' | 'suite'
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function handlePostCall(params: PostCallParams): Promise<void> {
   const { tenantId, callerId, streamId, callControlId, duration, vertical, businessName, product } =
     params
@@ -85,7 +78,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
     console.info('[post-call] skipping contact upsert — maya_only mode')
   } else if (!contactId && callerId) {
     try {
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
       const phone = normalizePhone(callerId)
       const digitsOnly = phone.replace(/\+/, '')
 
@@ -164,7 +157,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
 
   if (bookedAppointment && callerId) {
     try {
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
 
       const [{ data: location }, { data: tenantRow }] = await Promise.all([
         supabase
@@ -240,7 +233,7 @@ export async function handlePostCall(params: PostCallParams): Promise<void> {
   // maya_only has no contact record and no email on file — skip entirely
   if (bookedAppointment && appointmentId && product !== 'maya_only' && contactId) {
     try {
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
 
       const { data: contactRow } = await supabase
         .from('contacts')
@@ -427,7 +420,7 @@ export async function generateAutoQuote(
   contactId: string,
   _vertical: string
 ): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Find the first active service for this tenant as a default line item
   const { data: services } = await supabase

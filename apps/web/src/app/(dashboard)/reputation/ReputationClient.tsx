@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import {
   ComposedChart,
   Bar,
@@ -48,13 +52,9 @@ function ConnectBanner() {
       <p className="text-sm text-ink3 text-center max-w-md">
         See your reviews, track your rating, and reply with AI — all from Nuatis.
       </p>
-      <button
-        onClick={() => void handleConnect()}
-        disabled={loading}
-        className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <Button onClick={() => void handleConnect()} disabled={loading} variant="contained">
         {loading ? 'Redirecting...' : 'Connect Google Business Profile'}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -266,29 +266,33 @@ function ReviewCard({
             </div>
           )}
 
-          <textarea
+          <TextField
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder="Write your reply..."
+            multiline
             rows={3}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 text-ink placeholder:text-ink4"
+            fullWidth
+            size="small"
           />
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => void handleSend()}
               disabled={submitting || !replyText.trim()}
-              className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              size="small"
+              variant="contained"
             >
               {submitting ? 'Sending...' : 'Send Reply'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void handleIgnore()}
               disabled={ignoring}
-              className="px-3 py-1.5 border border-border-brand text-ink3 rounded-lg text-xs font-medium hover:bg-bg transition-colors disabled:opacity-50"
+              size="small"
+              color="inherit"
             >
               {ignoring ? '...' : '✕ Ignore'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -367,19 +371,15 @@ function ReviewFeed() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 bg-bg rounded-lg p-1 w-fit">
+      <Tabs
+        value={tab}
+        onChange={(_e, v: Tab) => handleTabChange(v)}
+        sx={{ minHeight: 36, borderBottom: 1, borderColor: 'divider' }}
+      >
         {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => handleTabChange(t.id)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
-            }`}
-          >
-            {t.label}
-          </button>
+          <Tab key={t.id} value={t.id} label={t.label} sx={{ minHeight: 36, py: 0.5 }} />
         ))}
-      </div>
+      </Tabs>
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-ink4 text-sm">
@@ -408,28 +408,32 @@ function ReviewFeed() {
             {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={() => {
                 const prev = Math.max(1, page - 1)
                 setPage(prev)
                 void fetchReviews(tab, prev)
               }}
               disabled={page === 1}
-              className="px-3 py-1 border border-border-brand rounded-lg disabled:opacity-40 hover:bg-bg transition-colors"
+              size="small"
+              variant="outlined"
+              color="inherit"
             >
               ← Prev
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 const next = page + 1
                 setPage(next)
                 void fetchReviews(tab, next)
               }}
               disabled={page * 20 >= total}
-              className="px-3 py-1 border border-border-brand rounded-lg disabled:opacity-40 hover:bg-bg transition-colors"
+              size="small"
+              variant="outlined"
+              color="inherit"
             >
               Next →
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -602,26 +606,30 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
         </div>
 
         {connected && (
-          <button
+          <Button
             onClick={() => void handleSync()}
             disabled={syncing}
-            className="flex items-center gap-2 px-3 py-1.5 border border-border-brand rounded-lg text-sm text-ink3 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            variant="outlined"
+            color="inherit"
+            sx={{ flexShrink: 0 }}
+            startIcon={
+              <svg
+                className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0115.9-3M20 15a9 9 0 01-15.9 3"
+                />
+              </svg>
+            }
           >
-            <svg
-              className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0115.9-3M20 15a9 9 0 01-15.9 3"
-              />
-            </svg>
             {syncing ? 'Syncing...' : 'Sync Reviews'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -636,25 +644,15 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
       ) : (
         <div className="space-y-6">
           {/* Page-level tabs */}
-          <div className="flex gap-1 bg-bg rounded-lg p-1 w-fit">
-            {(
-              [
-                { id: 'reviews', label: 'Reviews' },
-                { id: 'requests', label: 'Requests' },
-                { id: 'video', label: 'Video Reviews' },
-              ] as Array<{ id: PageTab; label: string }>
-            ).map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setPageTab(t.id)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  pageTab === t.id ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            value={pageTab}
+            onChange={(_e, v: PageTab) => setPageTab(v)}
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab value="reviews" label="Reviews" />
+            <Tab value="requests" label="Requests" />
+            <Tab value="video" label="Video Reviews" />
+          </Tabs>
 
           {pageTab === 'reviews' && (
             <div className="space-y-8">

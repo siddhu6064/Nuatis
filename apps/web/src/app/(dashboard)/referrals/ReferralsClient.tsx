@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
 import { formatCurrency } from '@nuatis/shared'
+import Button from '@mui/material/Button'
 
 const API_URL = ''
 
@@ -121,14 +122,9 @@ export default function ReferralsClient() {
                 {loading ? 'Loading…' : referralUrl || '—'}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleCopy}
-              disabled={!referralUrl || loading}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button onClick={handleCopy} disabled={!referralUrl || loading} variant="contained">
               {copied ? 'Copied!' : 'Copy link'}
-            </button>
+            </Button>
           </div>
 
           {/* QR code */}

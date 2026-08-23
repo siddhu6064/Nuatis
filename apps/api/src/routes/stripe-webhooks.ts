@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { generateInvoiceNumber } from '../lib/invoice-number.js'
 
 // Stripe v22 removed current_period_start/end from Subscription and moved
@@ -39,13 +39,6 @@ function resolveInvoiceSubscriptionId(inv: StripeInvoicePayload): string | null 
 }
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function getStripe(): Stripe | null {
   const key = process.env['STRIPE_SECRET_KEY']
@@ -98,7 +91,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     switch (event.type) {

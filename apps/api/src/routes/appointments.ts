@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
 import { getFirstName } from '@nuatis/shared'
@@ -37,13 +37,6 @@ async function requireAppointments(req: Request, res: Response, next: NextFuncti
 
 router.use(requireAuth, requireAppointments)
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 const CreateAppointmentSchema = z.object({
   contact_id: z.string().uuid(),
   title: z.string().min(2).max(200),
@@ -71,7 +64,7 @@ const UpdateAppointmentSchema = z.object({
 // ── GET /api/appointments/report ─────────────────────────────
 router.get('/report', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const now = new Date()
   const defaultStart = new Date(now.getTime() - 30 * 86400000).toISOString()
@@ -167,7 +160,7 @@ router.post('/block', requireAuth, async (req: Request, res: Response): Promise<
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('appointments')
     .insert({
@@ -194,7 +187,7 @@ router.post('/block', requireAuth, async (req: Request, res: Response): Promise<
 // ── GET /api/appointments ─────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('appointments')
@@ -224,7 +217,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const {
     contact_id,
     title,
@@ -483,7 +476,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify appointment belongs to this tenant
   const { data: existing } = await supabase
@@ -646,7 +639,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing } = await supabase
     .from('appointments')

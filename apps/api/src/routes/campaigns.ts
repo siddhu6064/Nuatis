@@ -1,11 +1,12 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { Queue } from 'bullmq'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 import { aiGenerationLimiter } from '../middleware/rate-limit.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { buildBrandVoicePromptBlock } from '../lib/brand-voice.js'
+import { stripJsonFences } from '../lib/gemini.js'
 import {
   generateCampaignCopy,
   type CampaignChannel,
@@ -27,13 +28,6 @@ const VALID_OBJECTIVES: CampaignObjective[] = [
 const VALID_CHANNELS: CampaignChannel[] = ['sms', 'email', 'social']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // Format ('+1 512 ***-1234') is intentionally distinct from the canonical
 // pre-call-lookup maskPhone ('****1234') — settings UI display choice. Do not consolidate.
@@ -87,7 +81,7 @@ async function scheduleCampaignSend(
   tenantId: string,
   sendAt: Date | null
 ): Promise<ScheduleResult> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: campaign, error: campErr } = await supabase
     .from('campaigns')
@@ -183,7 +177,7 @@ router.use(requireAuth, requirePlan('campaigns'))
 // Accepts both old format { name, type } and new P13 format { name, objective, channels }.
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const body = req.body as Record<string, unknown>
   const name = typeof body['name'] === 'string' ? body['name'].trim() : ''
@@ -260,7 +254,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── GET /api/campaigns ────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const status = typeof req.query['status'] === 'string' ? req.query['status'] : undefined
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
@@ -322,7 +316,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/campaigns/:id ────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id']
 
   const [campaignResult, messagesResult, performanceResult] = await Promise.all([
@@ -361,7 +355,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── PATCH /api/campaigns/:id ──────────────────────────────────────────────────
 router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id']
 
   const { data: existing, error: fetchErr } = await supabase
@@ -407,7 +401,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
 // ── PUT /api/campaigns/:id — kept for backward compat ────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing, error: fetchErr } = await supabase
     .from('campaigns')
@@ -463,7 +457,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: campaign, error: campErr } = await supabase
       .from('campaigns')
@@ -605,10 +599,7 @@ router.post(
         config: { maxOutputTokens: 800 },
       })
       const raw = result?.text?.trim() ?? ''
-      const stripped = raw
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/, '')
-        .trim()
+      const stripped = stripJsonFences(raw)
 
       let parsed: { subject: string; body_html: string; body_text: string }
       try {
@@ -648,7 +639,7 @@ router.patch(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { id, msgId } = req.params as { id: string; msgId: string }
 
     // Verify campaign belongs to tenant
@@ -707,7 +698,7 @@ router.patch(
 // ── POST /api/campaigns/:id/approve ──────────────────────────────────────────
 router.post('/:id/approve', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id']
 
   // Verify campaign and fetch channels
@@ -777,7 +768,7 @@ router.post('/:id/schedule', requireAuth, async (req: Request, res: Response): P
 // ── POST /api/campaigns/:id/cancel ────────────────────────────────────────────
 router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id']
 
   const { data: existing, error: fetchErr } = await supabase
@@ -832,7 +823,7 @@ router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Pro
 // is now 'scheduled' (was 'sending' under the deleted legacy worker path).
 router.post('/:id/send-now', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id'] as string
 
   // Fail closed on segment-scoped sends at the edge — do not enqueue a job the
@@ -864,7 +855,7 @@ router.post('/:id/send-now', requireAuth, async (req: Request, res: Response): P
 // ── GET /api/campaigns/:id/stats — legacy, kept for compat ───────────────────
 router.get('/:id/stats', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: campaign, error: campErr } = await supabase
     .from('campaigns')
@@ -921,7 +912,7 @@ router.get('/:id/stats', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/campaigns/:id/sends — P13 per-contact delivery log ───────────────
 router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const id = req.params['id']
 
   // Verify campaign belongs to tenant
@@ -947,7 +938,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
     .from('campaign_sends')
     .select(
       `id, channel, status, sent_at, delivered_at, opened_at, clicked_at, error_msg, contact_id,
-       contacts!contact_id(first_name, last_name, phone, email)`,
+       contacts!contact_id(full_name, phone, email)`,
       { count: 'exact' }
     )
     .eq('campaign_id', id)
@@ -975,8 +966,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
     contact_id: string | null
     contacts:
       | {
-          first_name: string | null
-          last_name: string | null
+          full_name: string | null
           phone: string | null
           email: string | null
         }[]
@@ -986,9 +976,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
   const rows = (data ?? []) as unknown as SendRow[]
   const responseData = rows.map((row) => {
     const c = Array.isArray(row.contacts) ? (row.contacts[0] ?? null) : null
-    const firstName = c?.first_name ?? ''
-    const lastName = c?.last_name ?? ''
-    const contactName = [firstName, lastName].filter(Boolean).join(' ') || null
+    const contactName = c?.full_name || null
     const phoneMasked = c?.phone ? maskPhone(c.phone) : null
 
     return {
@@ -1011,7 +999,7 @@ router.get('/:id/sends', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/campaigns/:id/recipients — legacy, kept for compat ───────────────
 router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: campaign, error: campErr } = await supabase
     .from('campaigns')
@@ -1034,7 +1022,7 @@ router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): 
     .from('campaign_recipients')
     .select(
       `id, campaign_id, contact_id, email, status, sent_at, delivered_at, opened_at, clicked_at, error_message,
-         contacts!inner(first_name, last_name)`,
+         contacts!inner(full_name)`,
       { count: 'exact' }
     )
     .eq('campaign_id', req.params['id'])
@@ -1055,7 +1043,7 @@ router.get('/:id/recipients', requireAuth, async (req: Request, res: Response): 
 // ── DELETE /api/campaigns/:id — legacy soft-delete, kept for compat ───────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing, error: fetchErr } = await supabase
     .from('campaigns')
@@ -1094,7 +1082,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const id = req.params['id']
 
     // Verify campaign belongs to tenant

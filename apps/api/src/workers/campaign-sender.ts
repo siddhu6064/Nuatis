@@ -11,7 +11,7 @@
  */
 
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { getFirstName } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
@@ -55,13 +55,6 @@ interface ContactRow {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 function personalise(text: string, firstName: string, businessName: string): string {
   return text.replace(/\{first_name\}/g, firstName).replace(/\{business_name\}/g, businessName)
 }
@@ -87,7 +80,7 @@ function plainTextToHtml(text: string): string {
 
 async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   const { campaignId, tenantId } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   console.info(`[campaign-sender] job start: campaignId=${campaignId} tenant=${tenantId}`)
 

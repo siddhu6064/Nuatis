@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
 
 interface CpqSettings {
   max_discount_pct: number
@@ -103,9 +105,6 @@ export default function CpqSettingsForm() {
     return <p className="text-sm text-ink4">Loading settings...</p>
   }
 
-  const inputCls =
-    'w-32 px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-border-brand p-6 space-y-6">
@@ -114,7 +113,7 @@ export default function CpqSettingsForm() {
           <p className="text-xs text-ink4 mb-2">
             The highest discount percentage allowed on any quote
           </p>
-          <input
+          <TextField
             type="number"
             value={settings.max_discount_pct}
             onChange={(e) =>
@@ -123,10 +122,9 @@ export default function CpqSettingsForm() {
                 max_discount_pct: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
               }))
             }
-            className={inputCls}
-            min="0"
-            max="100"
-            step="1"
+            size="small"
+            sx={{ width: 128 }}
+            slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
           />
         </div>
 
@@ -138,7 +136,7 @@ export default function CpqSettingsForm() {
             Quotes with discounts above this threshold require owner approval before sending. Must
             be less than or equal to max discount.
           </p>
-          <input
+          <TextField
             type="number"
             value={settings.require_approval_above}
             onChange={(e) =>
@@ -147,10 +145,10 @@ export default function CpqSettingsForm() {
                 require_approval_above: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
               }))
             }
-            className={`${inputCls} ${validationError ? 'border-red-300 focus:ring-red-500' : ''}`}
-            min="0"
-            max="100"
-            step="1"
+            error={!!validationError}
+            size="small"
+            sx={{ width: 128 }}
+            slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
           />
           {validationError && <p className="text-xs text-red-600 mt-1">{validationError}</p>}
         </div>
@@ -162,7 +160,7 @@ export default function CpqSettingsForm() {
             on their quote. Payment collection coming soon.
           </p>
           <div className="flex items-center gap-2">
-            <input
+            <TextField
               type="number"
               value={settings.deposit_pct}
               onChange={(e) =>
@@ -171,10 +169,9 @@ export default function CpqSettingsForm() {
                   deposit_pct: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
                 }))
               }
-              className={inputCls}
-              min="0"
-              max="100"
-              step="1"
+              size="small"
+              sx={{ width: 128 }}
+              slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
             />
             <span className="text-sm text-ink3">%</span>
           </div>
@@ -195,13 +192,9 @@ export default function CpqSettingsForm() {
         </p>
       )}
 
-      <button
-        onClick={save}
-        disabled={saving || !!validationError}
-        className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-      >
+      <Button onClick={save} disabled={saving || !!validationError} variant="contained">
         {saving ? 'Saving...' : 'Save Settings'}
-      </button>
+      </Button>
 
       {/* ── Tax Settings ─────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-border-brand p-6 space-y-5 mt-8">
@@ -215,13 +208,13 @@ export default function CpqSettingsForm() {
         <div>
           <label className="block text-sm font-medium text-ink mb-1">Tax Label</label>
           <p className="text-xs text-ink4 mb-2">e.g. GST, VAT, Sales Tax</p>
-          <input
-            type="text"
+          <TextField
             value={taxSettings.tax_label}
             onChange={(e) => setTaxSettings((s) => ({ ...s, tax_label: e.target.value }))}
-            className={inputCls}
             placeholder="Tax"
-            maxLength={40}
+            size="small"
+            sx={{ width: 128 }}
+            slotProps={{ htmlInput: { maxLength: 40 } }}
           />
         </div>
 
@@ -233,7 +226,7 @@ export default function CpqSettingsForm() {
               : `${taxSettings.tax_label || 'Tax'} of ${taxSettings.tax_rate}% will be added to new quotes`}
           </p>
           <div className="flex items-center gap-2">
-            <input
+            <TextField
               type="number"
               value={taxSettings.tax_rate}
               onChange={(e) =>
@@ -242,10 +235,9 @@ export default function CpqSettingsForm() {
                   tax_rate: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
                 }))
               }
-              className={inputCls}
-              min="0"
-              max="100"
-              step="0.01"
+              size="small"
+              sx={{ width: 128 }}
+              slotProps={{ htmlInput: { min: 0, max: 100, step: 0.01 } }}
             />
             <span className="text-sm text-ink3">%</span>
           </div>
@@ -259,13 +251,9 @@ export default function CpqSettingsForm() {
           </p>
         )}
 
-        <button
-          onClick={() => void saveTax()}
-          disabled={savingTax}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-        >
+        <Button onClick={() => void saveTax()} disabled={savingTax} variant="contained">
           {savingTax ? 'Saving...' : 'Save Tax Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   )

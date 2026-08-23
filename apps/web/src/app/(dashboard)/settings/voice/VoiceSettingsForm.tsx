@@ -4,6 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
+import RadioGroup from '@mui/material/RadioGroup'
+import Radio from '@mui/material/Radio'
+import FormControlLabel from '@mui/material/FormControlLabel'
 
 interface BusinessHours {
   mon_fri: string
@@ -312,12 +319,12 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Custom Greeting</label>
-            <input
-              type="text"
+            <TextField
               value={form.maya_greeting}
               onChange={(e) => setForm({ ...form, maya_greeting: e.target.value })}
               placeholder="e.g. Welcome to Riverside Dental! How can I help you today?"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              fullWidth
+              size="small"
             />
             <p className="text-[11px] text-ink4 mt-1">
               Leave blank to use the default greeting for your business type
@@ -326,31 +333,34 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
 
           <div>
             <label className="block text-xs font-medium text-ink2 mb-2">Personality</label>
-            <div className="space-y-2">
+            <RadioGroup
+              value={form.maya_personality}
+              onChange={(e) => setForm({ ...form, maya_personality: e.target.value })}
+            >
               {PERSONALITIES.map((p) => (
-                <label
+                <FormControlLabel
                   key={p.value}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    form.maya_personality === p.value
-                      ? 'border-teal-500 bg-teal-50'
-                      : 'border-border-brand hover:bg-bg'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="personality"
-                    value={p.value}
-                    checked={form.maya_personality === p.value}
-                    onChange={() => setForm({ ...form, maya_personality: p.value })}
-                    className="text-teal-600 focus:ring-teal-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-ink">{p.label}</p>
-                    <p className="text-xs text-ink4">{p.desc}</p>
-                  </div>
-                </label>
+                  value={p.value}
+                  control={<Radio size="small" />}
+                  label={
+                    <div>
+                      <p className="text-sm font-medium text-ink">{p.label}</p>
+                      <p className="text-xs text-ink4">{p.desc}</p>
+                    </div>
+                  }
+                  sx={{
+                    m: 0,
+                    mb: 1,
+                    px: 1.5,
+                    py: 1,
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: form.maya_personality === p.value ? 'primary.light' : 'divider',
+                    bgcolor: form.maya_personality === p.value ? '#f0fdfa' : 'transparent',
+                  }}
+                />
               ))}
-            </div>
+            </RadioGroup>
             <p className="text-[11px] text-ink4 mt-2">
               Professional is recommended for medical and legal businesses
             </p>
@@ -395,29 +405,32 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
             <label className="block text-xs font-medium text-ink2 mb-1.5">
               Default Appointment Duration
             </label>
-            <select
+            <TextField
+              select
               value={form.appointment_duration_default}
               onChange={(e) =>
                 setForm({ ...form, appointment_duration_default: parseInt(e.target.value, 10) })
               }
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              fullWidth
+              size="small"
             >
               {DURATIONS.map((d) => (
-                <option key={d} value={d}>
+                <MenuItem key={d} value={d}>
                   {d} minutes
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Transfer calls to</label>
-            <input
+            <TextField
               type="tel"
               value={form.escalation_phone}
               onChange={(e) => setForm({ ...form, escalation_phone: e.target.value })}
               placeholder="+1 (555) 000-0000"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
+              fullWidth
+              size="small"
             />
             <p className="text-[11px] text-ink4 mt-1">
               When a caller asks to speak with someone, Maya transfers the call here. Must be in
@@ -440,11 +453,11 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
               key={lang.code}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg cursor-pointer"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={form.preferred_languages.includes(lang.code)}
                 onChange={() => toggleLanguage(lang.code)}
-                className="rounded text-teal-600 focus:ring-teal-500"
+                size="small"
+                sx={{ p: 0 }}
               />
               <span className="text-sm text-ink">{lang.label}</span>
             </label>
@@ -472,17 +485,19 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
             {/* Timezone */}
             <div>
               <label className="block text-xs font-medium text-ink2 mb-1.5">Timezone</label>
-              <select
+              <TextField
+                select
                 value={ahTimezone}
                 onChange={(e) => setAhTimezone(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                fullWidth
+                size="small"
               >
                 {TIMEZONES.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
+                  <MenuItem key={tz.value} value={tz.value}>
                     {tz.label}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
             </div>
 
             {/* Hours grid */}
@@ -502,29 +517,31 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
                       <span className="w-20 text-sm text-ink">{label}</span>
                       {day.enabled ? (
                         <>
-                          <select
+                          <TextField
+                            select
                             value={day.open}
                             onChange={(e) => updateDaySchedule(key, 'open', e.target.value)}
-                            className="text-xs border border-border-brand rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                            size="small"
                           >
                             {TIME_SLOTS.map((t) => (
-                              <option key={t} value={t}>
+                              <MenuItem key={t} value={t}>
                                 {t}
-                              </option>
+                              </MenuItem>
                             ))}
-                          </select>
+                          </TextField>
                           <span className="text-xs text-ink4">to</span>
-                          <select
+                          <TextField
+                            select
                             value={day.close}
                             onChange={(e) => updateDaySchedule(key, 'close', e.target.value)}
-                            className="text-xs border border-border-brand rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                            size="small"
                           >
                             {TIME_SLOTS.map((t) => (
-                              <option key={t} value={t}>
+                              <MenuItem key={t} value={t}>
                                 {t}
-                              </option>
+                              </MenuItem>
                             ))}
-                          </select>
+                          </TextField>
                         </>
                       ) : (
                         <span className="text-xs text-ink4">Closed</span>
@@ -540,12 +557,14 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
               <label className="block text-xs font-medium text-ink2 mb-1.5">
                 After-Hours Message
               </label>
-              <textarea
+              <TextField
                 value={ahMessage}
                 onChange={(e) => setAhMessage(e.target.value.slice(0, 300))}
+                multiline
                 rows={3}
                 placeholder="We are currently closed. Please leave your name and number..."
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
+                fullWidth
+                size="small"
               />
               <p className="text-[11px] text-ink4 mt-1 text-right">{ahMessage.length}/300</p>
             </div>
@@ -566,13 +585,13 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
 
             {/* Save after-hours */}
             <div className="flex items-center gap-3 pt-1">
-              <button
+              <Button
                 onClick={saveAfterHours}
                 disabled={savingAh || !hasAfterHoursChanges}
-                className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                variant="contained"
               >
                 {savingAh ? 'Saving…' : 'Save After-Hours Settings'}
-              </button>
+              </Button>
               {hasAfterHoursChanges && <p className="text-xs text-ink4">Unsaved changes</p>}
             </div>
           </div>
@@ -580,13 +599,13 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
 
         {!ahEnabled && (
           <div className="flex items-center gap-3 pt-1">
-            <button
+            <Button
               onClick={saveAfterHours}
               disabled={savingAh || !hasAfterHoursChanges}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="contained"
             >
               {savingAh ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
             {hasAfterHoursChanges && <p className="text-xs text-ink4">Unsaved changes</p>}
           </div>
         )}
@@ -611,13 +630,9 @@ export default function VoiceSettingsForm({ settings }: { settings: Settings }) 
 
       {/* 8. Save button */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={saveSettings}
-          disabled={saving || !hasChanges}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
+        <Button onClick={saveSettings} disabled={saving || !hasChanges} variant="contained">
           {saving ? 'Saving…' : 'Save Settings'}
-        </button>
+        </Button>
         {hasChanges && <p className="text-xs text-ink4">You have unsaved changes</p>}
       </div>
     </div>

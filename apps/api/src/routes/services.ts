@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 
@@ -20,17 +20,10 @@ async function requireCpq(req: Request, res: Response, next: NextFunction): Prom
 
 router.use(requireAuth, requireCpq)
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/services
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('services')
@@ -49,7 +42,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // POST /api/services
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -82,7 +75,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // PUT /api/services/:id
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -111,7 +104,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // DELETE /api/services/:id (soft delete)
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('services')

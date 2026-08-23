@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import type { BrandVoice, WeeklyDigestData } from '@nuatis/shared'
 import { buildBrandVoicePromptBlock } from './brand-voice.js'
+import { withTimeoutOrNull } from './async.js'
 
 // ── Month abbreviations ───────────────────────────────────────
 
@@ -10,19 +11,10 @@ function formatDateLabel(d: Date): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
 }
 
-// ── Supabase factory (no module-level singleton) ──────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── Main export ───────────────────────────────────────────────
 
 export async function buildDigestData(tenantId: string): Promise<WeeklyDigestData> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000)
@@ -314,9 +306,7 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
           return null
         })
 
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-
-      top_insight = await Promise.race([geminiCall, timeoutPromise])
+      top_insight = await withTimeoutOrNull(geminiCall, 2000)
 
       if (top_insight === null) {
         console.warn(

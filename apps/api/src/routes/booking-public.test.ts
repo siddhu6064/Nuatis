@@ -49,11 +49,13 @@ const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000bp00001'
 const SERVICE_ID = 'svc-bp-001'
 const LOCATION_ID = 'loc-bp-001'
 
-const [{ default: express }, { default: request }, { default: bookingRouter }] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('./booking-public.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: bookingRouter } = await import('./booking-public.js')
 
 function makeApp() {
   const app = express()

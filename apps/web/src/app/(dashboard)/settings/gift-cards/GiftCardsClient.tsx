@@ -247,40 +247,34 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
         <h2 className="text-sm font-semibold text-ink">Issue New Gift Card</h2>
       </div>
       <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-ink3 mb-1">
-            Amount ($) <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={amountDollars}
-            onChange={(e) => setAmountDollars(e.target.value)}
-            placeholder="0.00"
-            className="w-full rounded-lg border border-border-brand bg-white px-3 py-2 text-sm text-ink placeholder-ink4 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-ink3 mb-1">Recipient Name</label>
-          <input
-            type="text"
-            value={recipientName}
-            onChange={(e) => setRecipientName(e.target.value)}
-            placeholder="Jane Smith"
-            className="w-full rounded-lg border border-border-brand bg-white px-3 py-2 text-sm text-ink placeholder-ink4 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-ink3 mb-1">Recipient Email</label>
-          <input
-            type="email"
-            value={recipientEmail}
-            onChange={(e) => setRecipientEmail(e.target.value)}
-            placeholder="jane@example.com"
-            className="w-full rounded-lg border border-border-brand bg-white px-3 py-2 text-sm text-ink placeholder-ink4 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
+        <TextField
+          label="Amount ($)"
+          required
+          type="number"
+          value={amountDollars}
+          onChange={(e) => setAmountDollars(e.target.value)}
+          placeholder="0.00"
+          size="small"
+          fullWidth
+          slotProps={{ htmlInput: { min: '0.01', step: '0.01' } }}
+        />
+        <TextField
+          label="Recipient Name"
+          value={recipientName}
+          onChange={(e) => setRecipientName(e.target.value)}
+          placeholder="Jane Smith"
+          size="small"
+          fullWidth
+        />
+        <TextField
+          label="Recipient Email"
+          type="email"
+          value={recipientEmail}
+          onChange={(e) => setRecipientEmail(e.target.value)}
+          placeholder="jane@example.com"
+          size="small"
+          fullWidth
+        />
       </div>
       {error && (
         <div className="mx-5 mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -288,19 +282,12 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
         </div>
       )}
       <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-brand">
-        <button
-          onClick={onCancel}
-          className="rounded-lg border border-border-brand px-3 py-2 text-sm font-medium text-ink3 hover:text-ink"
-        >
+        <Button onClick={onCancel} color="inherit" variant="outlined">
           Cancel
-        </button>
-        <button
-          onClick={() => void handleSubmit()}
-          disabled={loading}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-        >
+        </Button>
+        <Button onClick={() => void handleSubmit()} disabled={loading} variant="contained">
           {loading ? 'Issuing…' : 'Issue Gift Card'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -361,21 +348,9 @@ export default function GiftCardsClient() {
           </p>
         </div>
         {!showIssueForm && (
-          <button
-            onClick={() => setShowIssueForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Issue Gift Card
-          </button>
+          <Button onClick={() => setShowIssueForm(true)} variant="contained">
+            + Issue Gift Card
+          </Button>
         )}
       </div>
 
@@ -470,12 +445,9 @@ export default function GiftCardsClient() {
                     <td className="px-4 py-3 text-sm text-ink3">{formatDate(card.expires_at)}</td>
                     <td className="px-4 py-3 text-right">
                       {card.status === 'active' && (
-                        <button
-                          onClick={() => setRedeemCode(card.code)}
-                          className="text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline"
-                        >
+                        <Button onClick={() => setRedeemCode(card.code)} size="small">
                           Redeem
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>

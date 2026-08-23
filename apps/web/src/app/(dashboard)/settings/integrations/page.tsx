@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Button from '@mui/material/Button'
 
 interface EmailAccount {
   id: string
@@ -79,8 +80,8 @@ function IntegrationsContent() {
     try {
       const res = await fetch(`/api/settings/bcc-logging`)
       if (res.ok) {
-        const data: { bcc_logging_address?: string } = await res.json()
-        setBccAddress(data.bcc_logging_address ?? null)
+        const data: { bccAddress?: string } = await res.json()
+        setBccAddress(data.bccAddress ?? null)
       }
     } catch {
       // silently fail on load
@@ -145,8 +146,8 @@ function IntegrationsContent() {
         method: 'POST',
       })
       if (res.ok) {
-        const data: { bcc_logging_address?: string } = await res.json()
-        setBccAddress(data.bcc_logging_address ?? null)
+        const data: { bccAddress?: string } = await res.json()
+        setBccAddress(data.bccAddress ?? null)
         showToast('success', 'BCC address generated')
       } else {
         showToast('error', 'Failed to generate BCC address')
@@ -189,23 +190,25 @@ function IntegrationsContent() {
         </div>
 
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={() => connectProvider('gmail')}
             disabled={connectingProvider === 'gmail'}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outlined"
+            color="inherit"
+            startIcon={<GmailIcon />}
           >
-            <GmailIcon />
             {connectingProvider === 'gmail' ? 'Redirecting…' : 'Connect Gmail'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => connectProvider('outlook')}
             disabled={connectingProvider === 'outlook'}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outlined"
+            color="inherit"
+            startIcon={<OutlookIcon />}
           >
-            <OutlookIcon />
             {connectingProvider === 'outlook' ? 'Redirecting…' : 'Connect Outlook'}
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-xl border border-border-brand">
@@ -233,13 +236,15 @@ function IntegrationsContent() {
                       </span>
                     )}
                   </div>
-                  <button
+                  <Button
                     onClick={() => disconnectAccount(account.id, account.email_address)}
                     disabled={disconnecting === account.id}
-                    className="shrink-0 text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    size="small"
+                    color="error"
+                    sx={{ flexShrink: 0 }}
                   >
                     {disconnecting === account.id ? 'Disconnecting…' : 'Disconnect'}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -264,12 +269,9 @@ function IntegrationsContent() {
               <code className="flex-1 min-w-0 px-4 py-2.5 bg-bg border border-border-brand rounded-lg text-sm font-mono text-ink truncate">
                 {bccAddress}
               </code>
-              <button
-                onClick={copyBcc}
-                className="shrink-0 px-3 py-2.5 rounded-lg border border-border-brand bg-white text-sm font-medium text-ink2 hover:bg-bg transition-colors"
-              >
+              <Button onClick={copyBcc} variant="outlined" color="inherit" sx={{ flexShrink: 0 }}>
                 {copied ? 'Copied!' : 'Copy'}
-              </button>
+              </Button>
             </div>
             <p className="text-xs text-ink4">
               Add this address to the BCC field of any email you send — it will automatically be
@@ -281,13 +283,15 @@ function IntegrationsContent() {
             <p className="text-sm text-ink3">
               Generate a unique BCC address to start logging emails automatically.
             </p>
-            <button
+            <Button
               onClick={generateBccAddress}
               disabled={generatingBcc}
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="contained"
+              color="inherit"
+              sx={{ bgcolor: 'grey.900', '&:hover': { bgcolor: 'grey.800' } }}
             >
               {generatingBcc ? 'Generating…' : 'Generate BCC Address'}
-            </button>
+            </Button>
           </div>
         )}
       </section>

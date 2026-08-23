@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import { SlideOver } from '@/components/ui/SlideOver'
 
 export interface InventoryItem {
@@ -170,57 +173,49 @@ export default function InventorySlideOver({ open, onClose, item, onSaved }: Pro
         {/* Name */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Name *</label>
-          <input
-            type="text"
+          <TextField
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            error={!!fieldErrors['name']}
+            helperText={fieldErrors['name']}
+            fullWidth
+            size="small"
           />
-          {fieldErrors['name'] && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors['name']}</p>
-          )}
         </div>
 
         {/* SKU */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">SKU</label>
-          <input
-            type="text"
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
-          />
+          <TextField value={sku} onChange={(e) => setSku(e.target.value)} fullWidth size="small" />
         </div>
 
         {/* Quantity + Reorder threshold */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Quantity *</label>
-            <input
+            <TextField
               type="number"
-              min={0}
-              step="any"
+              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              error={!!fieldErrors['quantity']}
+              helperText={fieldErrors['quantity']}
+              fullWidth
+              size="small"
             />
-            {fieldErrors['quantity'] && (
-              <p className="text-xs text-red-500 mt-1">{fieldErrors['quantity']}</p>
-            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Reorder threshold</label>
-            <input
+            <TextField
               type="number"
-              min={0}
-              step="any"
+              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
               value={reorderThreshold}
               onChange={(e) => setReorderThreshold(Number(e.target.value))}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              error={!!fieldErrors['reorder_threshold']}
+              helperText={fieldErrors['reorder_threshold']}
+              fullWidth
+              size="small"
             />
-            {fieldErrors['reorder_threshold'] && (
-              <p className="text-xs text-red-500 mt-1">{fieldErrors['reorder_threshold']}</p>
-            )}
           </div>
         </div>
 
@@ -228,53 +223,56 @@ export default function InventorySlideOver({ open, onClose, item, onSaved }: Pro
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Unit cost ($)</label>
-            <input
+            <TextField
               type="number"
-              min={0}
-              step="any"
+              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
               value={unitCost}
               onChange={(e) => setUnitCost(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              error={!!fieldErrors['unit_cost']}
+              helperText={fieldErrors['unit_cost']}
+              fullWidth
+              size="small"
             />
-            {fieldErrors['unit_cost'] && (
-              <p className="text-xs text-red-500 mt-1">{fieldErrors['unit_cost']}</p>
-            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Unit</label>
-            <select
+            <TextField
+              select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white"
+              fullWidth
+              size="small"
             >
               {UNITS.map((u) => (
-                <option key={u} value={u}>
+                <MenuItem key={u} value={u}>
                   {u}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           </div>
         </div>
 
         {/* Supplier */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Supplier</label>
-          <input
-            type="text"
+          <TextField
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            fullWidth
+            size="small"
           />
         </div>
 
         {/* Notes */}
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
-          <textarea
+          <TextField
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            multiline
             rows={3}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+            fullWidth
+            size="small"
           />
         </div>
 
@@ -285,19 +283,12 @@ export default function InventorySlideOver({ open, onClose, item, onSaved }: Pro
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-          >
+          <Button onClick={onClose} variant="outlined" color="inherit">
             Cancel
-          </button>
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-          >
+          </Button>
+          <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
             {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
-          </button>
+          </Button>
         </div>
 
         {/* Adjust quantity — edit mode only */}
@@ -309,29 +300,29 @@ export default function InventorySlideOver({ open, onClose, item, onSaved }: Pro
               delta (positive or negative) and a reason.
             </p>
             <div className="grid grid-cols-2 gap-3 mb-2">
-              <input
+              <TextField
                 type="number"
-                step="any"
+                slotProps={{ htmlInput: { step: 'any' } }}
                 value={adjustDelta}
                 onChange={(e) => setAdjustDelta(e.target.value)}
                 placeholder="Delta (e.g. -2 or 5)"
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+                size="small"
               />
-              <input
-                type="text"
+              <TextField
                 value={adjustReason}
                 onChange={(e) => setAdjustReason(e.target.value)}
                 placeholder="Reason"
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+                size="small"
               />
             </div>
-            <button
+            <Button
               onClick={() => void handleAdjust()}
               disabled={adjusting}
-              className="rounded-lg border border-border-brand px-3 py-1.5 text-xs font-medium text-ink2 hover:bg-bg disabled:opacity-60"
+              size="small"
+              color="inherit"
             >
               {adjusting ? 'Adjusting...' : 'Adjust'}
-            </button>
+            </Button>
             {adjustToast && <p className="text-xs text-ink3 mt-2">{adjustToast}</p>}
           </div>
         )}

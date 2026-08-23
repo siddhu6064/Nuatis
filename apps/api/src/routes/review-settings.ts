@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 
@@ -9,17 +9,10 @@ const router = Router()
 // ── Public tracking router (named export) ────────────────────────────────────
 export const reviewTrackingRouter = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/review-settings ──────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant, error } = await supabase
     .from('tenants')
@@ -47,7 +40,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/review-settings ──────────────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const updates: Record<string, unknown> = {}
@@ -116,7 +109,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/review-settings/stats ───────────────────────────────────────────
 router.get('/stats', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -166,7 +159,7 @@ router.get('/stats', requireAuth, async (req: Request, res: Response): Promise<v
 // ── GET /api/review-tracking/:id (PUBLIC, no auth) ───────────────────────────
 reviewTrackingRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: reviewRequest } = await supabase

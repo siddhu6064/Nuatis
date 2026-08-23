@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 interface AuditItem {
   id: string
@@ -182,47 +185,52 @@ export default function AuditLogPage() {
 
       {/* Filter bar */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <input
-          type="text"
+        <TextField
           value={search}
           onChange={(e) => handleFilterChange(e.target.value, actionFilter, resourceFilter)}
           placeholder="Search by resource or action…"
-          className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
+          size="small"
+          sx={{ flex: 1, minWidth: 200 }}
         />
-        <select
+        <TextField
+          select
           value={actionFilter}
           onChange={(e) => handleFilterChange(search, e.target.value, resourceFilter)}
-          className="px-3 py-2 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-ink2 bg-white"
+          size="small"
+          sx={{ minWidth: 140 }}
         >
-          <option value="">All Actions</option>
-          <option value="created">created</option>
-          <option value="updated">updated</option>
-          <option value="deleted">deleted</option>
-          <option value="exported">exported</option>
-          <option value="imported">imported</option>
-          <option value="login">login</option>
-        </select>
-        <select
+          <MenuItem value="">All Actions</MenuItem>
+          <MenuItem value="create">created</MenuItem>
+          <MenuItem value="update">updated</MenuItem>
+          <MenuItem value="delete">deleted</MenuItem>
+          <MenuItem value="exported">exported</MenuItem>
+          <MenuItem value="imported">imported</MenuItem>
+          <MenuItem value="login">login</MenuItem>
+        </TextField>
+        <TextField
+          select
           value={resourceFilter}
           onChange={(e) => handleFilterChange(search, actionFilter, e.target.value)}
-          className="px-3 py-2 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-ink2 bg-white"
+          size="small"
+          sx={{ minWidth: 140 }}
         >
-          <option value="">All Resources</option>
-          <option value="contact">contact</option>
-          <option value="deal">deal</option>
-          <option value="appointment">appointment</option>
-          <option value="quote">quote</option>
-          <option value="pipeline">pipeline</option>
-          <option value="user">user</option>
-          <option value="settings">settings</option>
-        </select>
-        <button
+          <MenuItem value="">All Resources</MenuItem>
+          <MenuItem value="contact">contact</MenuItem>
+          <MenuItem value="deal">deal</MenuItem>
+          <MenuItem value="appointment">appointment</MenuItem>
+          <MenuItem value="quote">quote</MenuItem>
+          <MenuItem value="pipeline">pipeline</MenuItem>
+          <MenuItem value="user">user</MenuItem>
+          <MenuItem value="settings">settings</MenuItem>
+        </TextField>
+        <Button
           onClick={() => exportCSV(items)}
           disabled={items.length === 0}
-          className="ml-auto px-3 py-2 text-sm font-medium border border-teal-600 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          variant="outlined"
+          sx={{ ml: 'auto', whiteSpace: 'nowrap' }}
         >
           Export CSV
-        </button>
+        </Button>
       </div>
 
       {/* Table */}
@@ -310,22 +318,24 @@ export default function AuditLogPage() {
               Showing {startRow}–{endRow} of {total}
             </p>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
+              <Button
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                size="small"
+                color="inherit"
+                variant="outlined"
               >
                 ← Previous
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border-brand text-ink3 hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                size="small"
+                color="inherit"
+                variant="outlined"
               >
                 Next →
-              </button>
+              </Button>
             </div>
           </div>
         )}

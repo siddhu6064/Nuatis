@@ -1,12 +1,5 @@
 import { createHmac } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 export async function dispatchWebhook(
   tenantId: string,
@@ -14,7 +7,7 @@ export async function dispatchWebhook(
   payload: Record<string, unknown>
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: subs, error } = await supabase
       .from('webhook_subscriptions')

@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendPushNotification } from '../lib/push-client.js'
@@ -8,13 +8,6 @@ import { getPausedTenants } from '../lib/scanner-pause.js'
 const QUEUE_NAME = 'follow-up-missed-scanner'
 const MIN_DAYS = 2
 const MAX_DAYS = 7
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface ContactFollowUp {
   contact_id: string
@@ -27,7 +20,7 @@ export async function scan(): Promise<void> {
   console.info('[follow-up-missed-scanner] scanning for missed follow-ups...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const minCutoff = new Date(now - MAX_DAYS * 86400000).toISOString()

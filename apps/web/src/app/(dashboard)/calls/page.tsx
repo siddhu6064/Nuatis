@@ -1,10 +1,10 @@
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
-import Link from 'next/link'
 import CallFilters from './CallFilters'
 import CallLogView from './CallLogView'
 import CallsTabBar from './CallsTabBar'
 import CallMetrics from './CallMetrics'
+import CallsPagination from './CallsPagination'
 
 interface VoiceSession {
   id: string
@@ -101,27 +101,12 @@ export default async function CallsPage({ searchParams }: Props) {
           <CallLogView calls={calls} total={total} hasFilters={hasFilters} />
 
           {pages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <Link
-                href={`/calls?page=${page - 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
-                className={`px-3 py-1.5 text-sm rounded-lg border border-border-brand ${
-                  page <= 1 ? 'text-gray-300 pointer-events-none' : 'text-ink3 hover:bg-bg'
-                }`}
-              >
-                Previous
-              </Link>
-              <span className="text-xs text-ink4">
-                Page {page} of {pages}
-              </span>
-              <Link
-                href={`/calls?page=${page + 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
-                className={`px-3 py-1.5 text-sm rounded-lg border border-border-brand ${
-                  page >= pages ? 'text-gray-300 pointer-events-none' : 'text-ink3 hover:bg-bg'
-                }`}
-              >
-                Next
-              </Link>
-            </div>
+            <CallsPagination
+              page={page}
+              pages={pages}
+              prevHref={`/calls?page=${page - 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
+              nextHref={`/calls?page=${page + 1}${outcome ? `&outcome=${outcome}` : ''}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`}
+            />
           )}
         </>
       ) : (

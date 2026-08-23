@@ -1,17 +1,10 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── GET /api/search?q=<query> ────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -23,7 +16,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const pattern = `%${q}%`
 
   const crmEnabled = await isModuleEnabled(authed.tenantId, 'crm')

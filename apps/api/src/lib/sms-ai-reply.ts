@@ -1,14 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import type { BrandVoice } from '@nuatis/shared'
 import { buildBrandVoicePromptBlock } from './brand-voice.js'
 import { sendSms } from './sms.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export async function handleAiSmsReply(
   tenantId: string,
@@ -18,7 +11,7 @@ export async function handleAiSmsReply(
   toNumber: string // our number (from)
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // a. Load context from Supabase
 

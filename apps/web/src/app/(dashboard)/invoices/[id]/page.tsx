@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { formatCurrency } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import MenuList from '@mui/material/MenuList'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -390,22 +395,24 @@ export default function InvoiceDetailPage() {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-ink4 mb-1">Issue Date</label>
-                <input
+                <TextField
                   type="date"
                   value={issueDate}
                   onChange={(e) => setIssueDate(e.target.value)}
                   disabled={!isDraft}
-                  className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-bg disabled:text-ink4"
+                  fullWidth
+                  size="small"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-ink4 mb-1">Due Date</label>
-                <input
+                <TextField
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   disabled={!isDraft}
-                  className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-bg disabled:text-ink4"
+                  fullWidth
+                  size="small"
                 />
               </div>
             </div>
@@ -413,8 +420,7 @@ export default function InvoiceDetailPage() {
             {/* Contact picker */}
             <div className="relative">
               <label className="block text-xs font-medium text-ink4 mb-1">Contact</label>
-              <input
-                type="text"
+              <TextField
                 value={contactSearch}
                 onChange={(e) => handleContactInput(e.target.value)}
                 onFocus={() => {
@@ -423,38 +429,40 @@ export default function InvoiceDetailPage() {
                 onBlur={() => setTimeout(() => setContactDropOpen(false), 150)}
                 disabled={!isDraft}
                 placeholder="Search contacts…"
-                className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-bg disabled:text-ink4"
+                fullWidth
+                size="small"
               />
               {contactDropOpen && contactResults.length > 0 && (
                 <div className="absolute z-10 w-full bg-white border border-border-brand rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
-                  {contactResults.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onMouseDown={() => selectContact(c)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-bg text-sm"
-                    >
-                      <span className="font-medium text-ink">{c.full_name}</span>
-                      {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
-                    </button>
-                  ))}
+                  <MenuList disablePadding>
+                    {contactResults.map((c) => (
+                      <MenuItem
+                        key={c.id}
+                        onMouseDown={() => selectContact(c)}
+                        sx={{ fontSize: 14, py: 1.25, px: 1.5, whiteSpace: 'normal' }}
+                      >
+                        <span className="font-medium text-ink">{c.full_name}</span>
+                        {c.email && <span className="text-ink4 ml-2 text-xs">{c.email}</span>}
+                      </MenuItem>
+                    ))}
+                  </MenuList>
                 </div>
               )}
               {contactId && contactName && (
                 <p className="text-xs text-ink4 mt-1">
                   Selected: <span className="text-ink3 font-medium">{contactName}</span>
                   {isDraft && (
-                    <button
-                      type="button"
+                    <IconButton
                       onClick={() => {
                         setContactId(null)
                         setContactName('')
                         setContactSearch('')
                       }}
-                      className="ml-2 text-red-400 hover:text-red-600"
+                      size="small"
+                      sx={{ color: '#f87171', '&:hover': { color: '#dc2626' } }}
                     >
                       ×
-                    </button>
+                    </IconButton>
                   )}
                 </p>
               )}
@@ -468,21 +476,24 @@ export default function InvoiceDetailPage() {
               {isDraft && (
                 <div className="flex gap-2">
                   {/* Import from Catalog — placeholder (services endpoint exists but requires CPQ module) */}
-                  <button
-                    type="button"
+                  <Button
                     disabled
                     title="Import from Catalog (CPQ module required)"
-                    className="text-xs text-ink4 border border-border-brand rounded-md px-2.5 py-1 opacity-50 cursor-not-allowed"
+                    size="small"
+                    color="inherit"
+                    variant="outlined"
+                    sx={{ fontSize: 12 }}
                   >
                     Import from Catalog
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
                     onClick={addLineItem}
-                    className="text-xs text-teal-600 hover:text-teal-700 border border-teal-200 rounded-md px-2.5 py-1 font-medium"
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: 12 }}
                   >
                     + Add Line Item
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -510,12 +521,12 @@ export default function InvoiceDetailPage() {
                     <tr key={index} className="border-b border-gray-50 last:border-0">
                       <td className="px-4 py-2">
                         {isDraft ? (
-                          <input
-                            type="text"
+                          <TextField
                             value={item.description}
                             onChange={(e) => updateLineItem(index, 'description', e.target.value)}
                             placeholder="Item description"
-                            className="w-full text-sm text-ink border border-transparent focus:border-border-brand focus:bg-white rounded px-2 py-1 focus:outline-none bg-transparent"
+                            fullWidth
+                            size="small"
                           />
                         ) : (
                           <span className="text-sm text-ink px-2">{item.description || '—'}</span>
@@ -523,15 +534,15 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         {isDraft ? (
-                          <input
+                          <TextField
                             type="number"
-                            min="0"
-                            step="0.01"
                             value={item.quantity}
                             onChange={(e) =>
                               updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full text-sm text-ink text-right border border-transparent focus:border-border-brand focus:bg-white rounded px-2 py-1 focus:outline-none bg-transparent"
+                            fullWidth
+                            size="small"
+                            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                           />
                         ) : (
                           <span className="text-sm text-ink3">{item.quantity}</span>
@@ -539,15 +550,15 @@ export default function InvoiceDetailPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         {isDraft ? (
-                          <input
+                          <TextField
                             type="number"
-                            min="0"
-                            step="0.01"
                             value={item.unit_price}
                             onChange={(e) =>
                               updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)
                             }
-                            className="w-full text-sm text-ink text-right border border-transparent focus:border-border-brand focus:bg-white rounded px-2 py-1 focus:outline-none bg-transparent"
+                            fullWidth
+                            size="small"
+                            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                           />
                         ) : (
                           <span className="text-sm text-ink3">
@@ -560,14 +571,14 @@ export default function InvoiceDetailPage() {
                       </td>
                       {isDraft && (
                         <td className="px-2 py-2 text-center">
-                          <button
-                            type="button"
+                          <IconButton
                             onClick={() => removeLineItem(index)}
-                            className="text-ink4 hover:text-red-500 text-base leading-none w-6 h-6 flex items-center justify-center rounded"
+                            size="small"
                             title="Remove line item"
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
                           >
                             ×
-                          </button>
+                          </IconButton>
                         </td>
                       )}
                     </tr>
@@ -588,14 +599,20 @@ export default function InvoiceDetailPage() {
                     <span className="text-ink3">
                       Tax
                       {isDraft ? (
-                        <input
+                        <TextField
                           type="number"
-                          min="0"
-                          max="100"
-                          step="0.5"
                           value={taxRate}
                           onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                          className="ml-1 w-12 text-right border border-border-brand rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          size="small"
+                          sx={{ ml: 0.5, width: 64 }}
+                          slotProps={{
+                            htmlInput: {
+                              min: 0,
+                              max: 100,
+                              step: 0.5,
+                              style: { textAlign: 'right', fontSize: 12 },
+                            },
+                          }}
                         />
                       ) : (
                         <span className="ml-1">({taxRate}%)</span>
@@ -624,27 +641,24 @@ export default function InvoiceDetailPage() {
           {/* Notes */}
           <div className="bg-white rounded-xl border border-border-brand p-6">
             <label className="block text-sm font-semibold text-ink mb-2">Notes</label>
-            <textarea
+            <TextField
+              multiline
               rows={4}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               disabled={!isDraft}
               placeholder="Additional notes for the invoice…"
-              className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-bg disabled:text-ink4"
+              fullWidth
+              size="small"
             />
           </div>
 
           {/* Save button */}
           {isDraft && (
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="px-5 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-              >
+              <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
                 {saving ? 'Saving…' : 'Save Changes'}
-              </button>
+              </Button>
               {error && <span className="text-sm text-red-600">{error}</span>}
             </div>
           )}
@@ -663,15 +677,15 @@ export default function InvoiceDetailPage() {
           {isDraft && (
             <div className="bg-white rounded-xl border border-border-brand p-4">
               <h3 className="text-sm font-semibold text-ink mb-3">Send Invoice</h3>
-              <button
-                type="button"
+              <Button
                 onClick={() => void handleSend()}
                 disabled={acting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                variant="contained"
+                fullWidth
+                sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
               >
-                <span>✉</span>
-                {acting ? 'Sending…' : 'Send Invoice'}
-              </button>
+                ✉&nbsp; {acting ? 'Sending…' : 'Send Invoice'}
+              </Button>
               <p className="text-xs text-ink4 mt-2">
                 Sends an email to the contact and marks the invoice as sent.
               </p>
@@ -685,48 +699,51 @@ export default function InvoiceDetailPage() {
               <div className="space-y-2">
                 <div>
                   <label className="block text-xs text-ink4 mb-1">Amount</label>
-                  <input
+                  <TextField
                     type="number"
-                    min="0.01"
-                    step="0.01"
                     value={payAmount}
                     onChange={(e) => setPayAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    fullWidth
+                    size="small"
+                    slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-ink4 mb-1">Method</label>
-                  <select
+                  <TextField
+                    select
                     value={payMethod}
                     onChange={(e) => setPayMethod(e.target.value)}
-                    className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                    fullWidth
+                    size="small"
                   >
                     {PAYMENT_METHODS.map((m) => (
-                      <option key={m} value={m}>
+                      <MenuItem key={m} value={m}>
                         {m.charAt(0).toUpperCase() + m.slice(1)}
-                      </option>
+                      </MenuItem>
                     ))}
-                  </select>
+                  </TextField>
                 </div>
                 <div>
                   <label className="block text-xs text-ink4 mb-1">Notes</label>
-                  <input
-                    type="text"
+                  <TextField
                     value={payNotes}
                     onChange={(e) => setPayNotes(e.target.value)}
                     placeholder="Optional note…"
-                    className="w-full border border-border-brand rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    fullWidth
+                    size="small"
                   />
                 </div>
-                <button
-                  type="button"
+                <Button
                   onClick={() => void handleRecordPayment()}
                   disabled={acting}
-                  className="w-full px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  variant="contained"
+                  color="success"
+                  fullWidth
                 >
                   {acting ? 'Recording…' : 'Record Payment'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -735,14 +752,15 @@ export default function InvoiceDetailPage() {
           {canVoid && (
             <div className="bg-white rounded-xl border border-border-brand p-4">
               <h3 className="text-sm font-semibold text-ink mb-3">Danger Zone</h3>
-              <button
-                type="button"
+              <Button
                 onClick={() => void handleVoid()}
                 disabled={acting}
-                className="w-full px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                variant="outlined"
+                color="error"
+                fullWidth
               >
                 {acting ? 'Voiding…' : 'Void Invoice'}
-              </button>
+              </Button>
               <p className="text-xs text-ink4 mt-2">This action cannot be undone.</p>
             </div>
           )}
@@ -750,15 +768,17 @@ export default function InvoiceDetailPage() {
           {/* Download PDF */}
           <div className="bg-white rounded-xl border border-border-brand p-4">
             <h3 className="text-sm font-semibold text-ink mb-3">Download</h3>
-            <a
+            <Button
+              component="a"
               href={`/api/invoices/${id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-ink2 border border-border-brand text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors"
+              variant="outlined"
+              color="inherit"
+              fullWidth
             >
-              <span>⬇</span>
-              Download PDF
-            </a>
+              ⬇&nbsp; Download PDF
+            </Button>
           </div>
 
           {/* Invoice info */}

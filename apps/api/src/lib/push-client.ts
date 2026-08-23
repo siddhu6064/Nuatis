@@ -1,12 +1,5 @@
 import webpush from 'web-push'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 let vapidConfigured = false
 
@@ -30,7 +23,7 @@ export async function sendPushNotification(
   if (!ensureVapid()) return
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('id, endpoint, p256dh, auth')

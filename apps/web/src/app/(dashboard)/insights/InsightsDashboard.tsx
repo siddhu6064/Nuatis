@@ -4,6 +4,10 @@ import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import {
   LineChart,
   Line,
@@ -701,10 +705,10 @@ export default function InsightsDashboard({
   useEffect(() => {
     fetch('/api/pipelines?type=deals')
       .then((r) => r.json())
-      .then((data: Pipeline[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setPipelines(data)
-          setSelectedPipelineId(data[0]!.id)
+      .then((data: { pipelines: Pipeline[] }) => {
+        if (Array.isArray(data.pipelines) && data.pipelines.length > 0) {
+          setPipelines(data.pipelines)
+          setSelectedPipelineId(data.pipelines[0]!.id)
         }
       })
       .catch(() => {})
@@ -722,10 +726,24 @@ export default function InsightsDashboard({
         r.json()
       ),
     ])
-      .then(([forecast, funnel]: [PipelineForecastData, FunnelStage[]]) => {
-        setForecastData(forecast)
-        setFunnelData(Array.isArray(funnel) ? funnel : [])
-      })
+      .then(
+        ([forecast, funnel]: [
+          PipelineForecastData,
+          { stage: { name: string }; count: number; total_value: number; drop_off_pct: number }[],
+        ]) => {
+          setForecastData(forecast)
+          setFunnelData(
+            Array.isArray(funnel)
+              ? funnel.map((f) => ({
+                  stage: f.stage.name,
+                  count: f.count,
+                  total_value: f.total_value,
+                  drop_off_pct: f.drop_off_pct,
+                }))
+              : []
+          )
+        }
+      )
       .catch(() => {})
       .finally(() => setForecastLoading(false))
   }, [selectedPipelineId])
@@ -1332,17 +1350,18 @@ export default function InsightsDashboard({
                 <h2 className="text-base font-semibold text-ink">Pipeline Forecast</h2>
                 <p className="text-xs text-ink4 mt-0.5">Deal pipeline revenue projections</p>
               </div>
-              <select
+              <TextField
+                select
                 value={selectedPipelineId}
                 onChange={(e) => setSelectedPipelineId(e.target.value)}
-                className="text-sm border border-border-brand rounded-lg px-3 py-1.5 text-ink2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                size="small"
               >
                 {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <MenuItem key={p.id} value={p.id}>
                     {p.name}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
             </div>
 
             {forecastLoading ? (
@@ -1508,22 +1527,24 @@ export default function InsightsDashboard({
                       className="absolute top-3 right-3 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
+                      <IconButton
                         disabled={idx === 0}
                         onClick={() => handleReorder(report.id, 'up')}
-                        className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        size="small"
                         title="Move up"
+                        aria-label="Move up"
                       >
-                        ↑
-                      </button>
-                      <button
+                        <span className="text-xs">↑</span>
+                      </IconButton>
+                      <IconButton
                         disabled={idx === pinnedReports.length - 1}
                         onClick={() => handleReorder(report.id, 'down')}
-                        className="w-6 h-6 flex items-center justify-center rounded text-ink4 hover:bg-bg2 hover:text-ink2 disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        size="small"
                         title="Move down"
+                        aria-label="Move down"
                       >
-                        ↓
-                      </button>
+                        <span className="text-xs">↓</span>
+                      </IconButton>
                     </div>
 
                     <p className="text-sm font-semibold text-ink mb-3 pr-8">{report.name}</p>
@@ -1909,13 +1930,9 @@ export default function InsightsDashboard({
             <h1 className="text-xl font-bold text-ink">Insights</h1>
             <p className="text-sm text-ink3 mt-0.5">Last 30 days performance</p>
           </div>
-          <button
-            type="button"
-            onClick={resetWidgetOrder}
-            className="text-xs text-ink4 hover:text-ink3 transition-colors px-3 py-1.5 rounded-lg border border-border-brand hover:bg-bg"
-          >
+          <Button onClick={resetWidgetOrder} size="small" color="inherit" variant="outlined">
             Reset layout
-          </button>
+          </Button>
         </div>
 
         {/* Draggable widget sections */}

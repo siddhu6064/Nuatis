@@ -11,6 +11,8 @@
  *   HALF_OPEN → one probe allowed; success resets to CLOSED, failure reopens
  */
 
+import { withTimeoutOrThrow } from '../lib/async.js'
+
 export type BreakerState = 'closed' | 'open' | 'half_open'
 
 interface PerToolState {
@@ -131,21 +133,15 @@ export class MayaCircuitBreaker {
       return getFallback(toolName)
     }
 
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(
-        () => reject(new Error(`Tool '${toolName}' timed out after ${this.timeoutMs}ms`)),
-        this.timeoutMs
-      )
-    })
-
     try {
-      const result = await Promise.race([fn(), timeoutPromise])
-      clearTimeout(timeoutHandle)
+      const result = await withTimeoutOrThrow(
+        fn(),
+        this.timeoutMs,
+        `Tool '${toolName}' timed out after ${this.timeoutMs}ms`
+      )
       this.recordSuccess(toolName)
       return result
     } catch (err) {
-      clearTimeout(timeoutHandle)
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[maya-breaker] ${toolName} error: ${msg}`)
       this.recordFailure(toolName)

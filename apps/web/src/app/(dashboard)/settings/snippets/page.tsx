@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
 
 interface Snippet {
   id: string
@@ -159,12 +161,9 @@ export default function SnippetsPage() {
       {/* New Snippet button */}
       <div className="mb-4">
         {!showForm ? (
-          <button
-            onClick={openNewForm}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          <Button onClick={openNewForm} variant="contained">
             + New Snippet
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -176,72 +175,52 @@ export default function SnippetsPage() {
           </h2>
 
           {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Appointment Reminder"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-            />
-          </div>
+          <TextField
+            label="Name"
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Appointment Reminder"
+            fullWidth
+            size="small"
+          />
 
           {/* Shortcut */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Shortcut (no spaces, letters/numbers/dashes only)
-              <span className="text-red-500"> *</span>
-            </label>
-            <input
-              type="text"
-              value={form.shortcut}
-              onChange={(e) => handleShortcutChange(e.target.value)}
-              placeholder="e.g. appt-reminder"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300"
-            />
-            {form.shortcut && (
-              <p className="text-xs text-teal-600 mt-1 font-mono">/{form.shortcut}</p>
-            )}
-          </div>
+          <TextField
+            label="Shortcut (no spaces, letters/numbers/dashes only)"
+            required
+            value={form.shortcut}
+            onChange={(e) => handleShortcutChange(e.target.value)}
+            placeholder="e.g. appt-reminder"
+            helperText={form.shortcut ? `/${form.shortcut}` : undefined}
+            fullWidth
+            size="small"
+          />
 
           {/* Body */}
-          <div>
-            <label className="block text-xs font-medium text-ink2 mb-1">
-              Body <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={form.body}
-              onChange={(e) => setForm({ ...form, body: e.target.value })}
-              rows={4}
-              placeholder="Type your message here..."
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-gray-300 resize-none"
-            />
-            <p className="text-xs text-ink3 mt-1">
-              Use {'{contact_name}'} and {'{date}'} as variables
-            </p>
-          </div>
+          <TextField
+            label="Body"
+            required
+            multiline
+            rows={4}
+            value={form.body}
+            onChange={(e) => setForm({ ...form, body: e.target.value })}
+            placeholder="Type your message here..."
+            helperText="Use {contact_name} and {date} as variables"
+            fullWidth
+            size="small"
+          />
 
           {error && <p className="text-xs text-red-500">{error}</p>}
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-1">
-            <button
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+            <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
               {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={cancelForm}
-              disabled={saving}
-              className="px-4 py-2 bg-white text-sm font-medium text-ink2 rounded-lg border border-border-brand hover:bg-bg transition-colors disabled:opacity-50"
-            >
+            </Button>
+            <Button onClick={cancelForm} disabled={saving} color="inherit" variant="outlined">
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -282,18 +261,16 @@ export default function SnippetsPage() {
                     {snippet.body.length > 60 ? snippet.body.slice(0, 60) + '…' : snippet.body}
                   </td>
                   <td className="py-2 px-4 text-right whitespace-nowrap">
-                    <button
-                      onClick={() => openEditForm(snippet)}
-                      className="text-xs text-ink3 hover:text-ink transition-colors px-2 py-1 rounded hover:bg-bg mr-1"
-                    >
+                    <Button onClick={() => openEditForm(snippet)} size="small" color="inherit">
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => void handleDelete(snippet.id, snippet.name)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                      size="small"
+                      color="error"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

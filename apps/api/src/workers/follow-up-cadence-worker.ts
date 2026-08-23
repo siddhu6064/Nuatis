@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { VERTICALS, type FollowUpStep } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendSms } from '../lib/sms.js'
@@ -13,13 +13,6 @@ import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 const QUEUE_NAME = 'follow-up-cadence'
 const MAX_LOOKBACK_DAYS = 14
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 function interpolate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '')
 }
@@ -28,7 +21,7 @@ export async function scan(): Promise<void> {
   console.info('[follow-up-cadence] scanning for contacts due for follow-up...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const lookbackCutoff = new Date(now - MAX_LOOKBACK_DAYS * 86400000).toISOString()

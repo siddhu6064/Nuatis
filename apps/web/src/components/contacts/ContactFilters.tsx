@@ -10,9 +10,11 @@ import TextField from '@mui/material/TextField'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import IconButton from '@mui/material/IconButton'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import Chip from '@mui/material/Chip'
 
 export interface FilterState {
   q: string
@@ -481,18 +483,20 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
             {filters.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-1.5">
                 {filters.tags.map((tag) => (
-                  <span
+                  <Chip
                     key={tag}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => toggleArrayItem('tags', tag)}
-                      className="text-teal-400 hover:text-teal-600"
-                    >
-                      &times;
-                    </button>
-                  </span>
+                    label={tag}
+                    size="small"
+                    onDelete={() => toggleArrayItem('tags', tag)}
+                    sx={{
+                      height: 18,
+                      fontSize: 10,
+                      fontWeight: 500,
+                      bgcolor: '#f0fdfa',
+                      color: '#0f766e',
+                      '& .MuiChip-label': { px: 0.75 },
+                    }}
+                  />
                 ))}
               </div>
             )}
@@ -506,16 +510,25 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
             {tagInput && tagSuggestions.length > 0 && (
               <div className="mt-1 border border-border-brand rounded bg-white max-h-24 overflow-y-auto">
                 {tagSuggestions.slice(0, 5).map((t) => (
-                  <button
+                  <ButtonBase
                     key={t}
                     onClick={() => {
                       toggleArrayItem('tags', t)
                       setTagInput('')
                     }}
-                    className="block w-full text-left text-xs px-2 py-1 hover:bg-bg text-ink3"
+                    sx={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      fontSize: 12,
+                      px: 1,
+                      py: 0.5,
+                      color: 'text.secondary',
+                      '&:hover': { bgcolor: '#f9f8f5' },
+                    }}
                   >
                     {t}
-                  </button>
+                  </ButtonBase>
                 ))}
               </div>
             )}
@@ -611,16 +624,25 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                     )
                     .slice(0, 5)
                     .map((s) => (
-                      <button
+                      <ButtonBase
                         key={s}
                         onClick={() => {
                           setReferralInput(s)
                           update({ referral_source: s })
                         }}
-                        className="block w-full text-left text-xs px-2 py-1 hover:bg-bg text-ink3"
+                        sx={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          fontSize: 12,
+                          px: 1,
+                          py: 0.5,
+                          color: 'text.secondary',
+                          '&:hover': { bgcolor: '#f9f8f5' },
+                        }}
                       >
                         {s}
-                      </button>
+                      </ButtonBase>
                     ))}
                 </div>
               )}
@@ -732,9 +754,16 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                               ⠿
                             </span>
                           )}
-                          <button
+                          <ButtonBase
                             onClick={() => toggleCollapsed(id)}
-                            className="flex-1 flex items-center gap-1 text-left min-w-0"
+                            sx={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              textAlign: 'left',
+                              minWidth: 0,
+                            }}
                           >
                             <span className="text-[10px] font-medium text-ink4 uppercase">
                               {SECTION_LABELS[id]}
@@ -750,14 +779,17 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                             >
                               <path d="M1 1l4 4 4-4" />
                             </svg>
-                          </button>
+                          </ButtonBase>
                           {customizeMode && (
-                            <button
+                            <IconButton
                               onClick={() => toggleHidden(id)}
                               title={isHiddenSection ? 'Show section' : 'Hide section'}
-                              className={`ml-1 shrink-0 transition-colors ${
-                                isHiddenSection ? 'text-ink4' : 'text-teal-500'
-                              }`}
+                              size="small"
+                              sx={{
+                                ml: 0.5,
+                                p: 0.25,
+                                color: isHiddenSection ? 'text.disabled' : '#14b8a6',
+                              }}
                             >
                               {isHiddenSection ? (
                                 // eye-off
@@ -788,7 +820,7 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
                                   />
                                 </svg>
                               )}
-                            </button>
+                            </IconButton>
                           )}
                         </div>
 

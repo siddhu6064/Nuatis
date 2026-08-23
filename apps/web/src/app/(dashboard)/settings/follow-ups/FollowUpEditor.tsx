@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
 
 interface MergedStep {
   step_index: number
@@ -10,6 +14,8 @@ interface MergedStep {
   subject?: string
   is_enabled: boolean
   is_customized: boolean
+  default_body: string
+  default_subject?: string
 }
 
 interface EditableStep extends MergedStep {
@@ -87,13 +93,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
   async function resetStep(index: number) {
     const step = steps[index]
     if (!step) return
-    // PUT with is_customized cleared by re-saving all steps with this step's body reset to default
-    // We fetch fresh to get default, then save only this step's override removed via re-fetch
-    // Simplest: delete the override by saving the default body back — backend upserts, no delete endpoint needed
-    // Actually just re-fetch after reverting locally so server sees the change on next PUT
     setSteps((prev) =>
       prev.map((s, i) =>
-        i === index ? { ...s, _body: s.body, _subject: s.subject ?? '', _dirty: true } : s
+        i === index
+          ? { ...s, _body: s.default_body, _subject: s.default_subject ?? '', _dirty: true }
+          : s
       )
     )
   }
@@ -175,7 +179,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
         ) : (
           <div className="space-y-0">
             {steps.map((step, i) => (
-              <button key={i} onClick={() => setSelectedStep(i)} className="w-full text-left">
+              <ButtonBase
+                key={i}
+                onClick={() => setSelectedStep(i)}
+                sx={{ width: '100%', display: 'block', textAlign: 'left' }}
+              >
                 <div className="flex items-start gap-3 relative">
                   {i < steps.length - 1 && (
                     <div className="absolute left-[7px] top-4 w-px h-full bg-bg2" />
@@ -222,7 +230,7 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
                     )}
                   </div>
                 </div>
-              </button>
+              </ButtonBase>
             ))}
           </div>
         )}
@@ -252,11 +260,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
             <div className="flex items-center gap-3">
               {/* Enabled toggle */}
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={current._is_enabled}
                   onChange={(e) => updateStep(selectedStep, { _is_enabled: e.target.checked })}
-                  className="rounded border-border-brand text-teal-600 focus:ring-teal-500"
+                  size="small"
+                  sx={{ p: 0 }}
                 />
                 <span className="text-xs text-ink3">Enabled</span>
               </label>
@@ -275,11 +283,11 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {current.channel === 'email' && (
             <div className="mb-3">
               <label className="block text-xs font-medium text-ink3 mb-1">Subject</label>
-              <input
-                type="text"
+              <TextField
                 value={current._subject}
                 onChange={(e) => updateStep(selectedStep, { _subject: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                fullWidth
+                size="small"
               />
             </div>
           )}
@@ -287,11 +295,13 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {/* Body textarea */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-ink3 mb-1">Body</label>
-            <textarea
+            <TextField
+              multiline
               rows={5}
               value={current._body}
               onChange={(e) => updateStep(selectedStep, { _body: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              fullWidth
+              size="small"
             />
             {current.channel === 'sms' && (
               <p className="text-[10px] text-ink4 mt-1">{current._body.length} characters</p>
@@ -330,13 +340,13 @@ export default function FollowUpEditor({ verticalLabel, businessName, telnyxNumb
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}
           {saveSuccess && <p className="text-sm text-teal-600">Changes saved.</p>}
         </div>
-        <button
+        <Button
           onClick={() => void handleSave()}
           disabled={saving || !anyDirty}
-          className="px-5 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          variant="contained"
         >
           {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </div>
     </div>
   )

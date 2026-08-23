@@ -1,5 +1,8 @@
 'use client'
 import { useState } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Slider from '@mui/material/Slider'
 
 const API_URL = ''
 
@@ -52,46 +55,41 @@ export default function QRCodesClient() {
         <p className="text-xs font-medium text-ink4 mb-2 uppercase tracking-wide">Quick presets</p>
         <div className="flex gap-2 flex-wrap mb-4">
           {PRESETS.map((p) => (
-            <button
+            <Button
               key={p.label}
-              type="button"
               onClick={() => setInputUrl(`https://app.nuatis.com${p.urlPath}`)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border-brand text-ink3 hover:text-teal-700 hover:border-teal-300 transition-colors"
+              size="small"
+              color="inherit"
+              variant="outlined"
             >
               {p.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* URL input */}
-        <label className="block text-sm font-medium text-ink mb-1">URL</label>
         <div className="flex gap-2 mb-4">
-          <input
-            type="url"
+          <TextField
+            label="URL"
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             placeholder="https://example.com"
-            className="flex-1 border border-border-brand rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal-500"
+            size="small"
+            sx={{ flex: 1 }}
           />
-          <button
-            type="button"
-            onClick={generate}
-            disabled={!inputUrl.trim()}
-            className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
-          >
+          <Button onClick={generate} disabled={!inputUrl.trim()} variant="contained">
             Generate QR
-          </button>
+          </Button>
         </div>
 
         {/* Size slider */}
         <label className="block text-sm font-medium text-ink mb-1">Size: {size}px</label>
-        <input
-          type="range"
+        <Slider
+          value={size}
+          onChange={(_e, value) => setSize(value as number)}
           min={100}
           max={400}
-          value={size}
-          onChange={(e) => setSize(Number(e.target.value))}
-          className="w-full mb-4 accent-teal-600"
+          sx={{ mb: 2 }}
         />
 
         {/* Preview */}
@@ -106,13 +104,7 @@ export default function QRCodesClient() {
               className={`rounded-lg border border-border-brand ${loading ? 'opacity-0' : 'opacity-100'}`}
               style={{ width: size, height: size }}
             />
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-            >
-              ↓ Download PNG
-            </button>
+            <Button onClick={handleDownload}>↓ Download PNG</Button>
           </div>
         )}
       </div>

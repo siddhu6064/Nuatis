@@ -136,12 +136,9 @@ export default function QuotePayments({
             {badgeLabel}
           </span>
         </div>
-        <button
-          onClick={openModal}
-          className="text-xs text-teal-600 border border-teal-300 hover:bg-teal-50 px-3 py-1.5 rounded-lg font-medium"
-        >
+        <Button onClick={openModal} variant="contained" size="small">
           Record Payment
-        </button>
+        </Button>
       </div>
 
       {/* Summary bar */}

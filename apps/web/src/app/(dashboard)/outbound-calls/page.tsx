@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Button from '@mui/material/Button'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 
 type JobStatus =
   | 'pending'
@@ -109,13 +112,9 @@ export default function OutboundCallsPage() {
           <h1 className="text-xl font-bold text-ink">Outbound Calls</h1>
           <p className="text-sm text-ink3 mt-0.5">Maya proactively dials leads and contacts</p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadJobs()}
-          className="px-4 py-2 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
-        >
+        <Button onClick={() => void loadJobs()} sx={{ bgcolor: '#f0fdfa' }}>
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Automation placeholder card */}
@@ -128,19 +127,19 @@ export default function OutboundCallsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 mb-4">
+      <ToggleButtonGroup
+        value={statusFilter}
+        exclusive
+        onChange={(_e, value: string | null) => value !== null && setStatusFilter(value)}
+        size="small"
+        sx={{ mb: 2 }}
+      >
         {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setStatusFilter(f.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              statusFilter === f.value ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
-            }`}
-          >
+          <ToggleButton key={f.value} value={f.value}>
             {f.label}
-          </button>
+          </ToggleButton>
         ))}
-      </div>
+      </ToggleButtonGroup>
 
       {/* Error */}
       {error && (
@@ -159,12 +158,9 @@ export default function OutboundCallsPage() {
         <div className="bg-white rounded-xl border border-border-brand px-8 py-16 text-center">
           <p className="text-sm text-ink3">No outbound calls yet.</p>
           <p className="text-xs text-ink4 mt-1">Initiate a call from a contact&apos;s profile.</p>
-          <Link
-            href="/contacts"
-            className="inline-block mt-5 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-[var(--teal)] hover:opacity-90 transition-opacity"
-          >
+          <Button component={Link} href="/contacts" variant="contained" sx={{ mt: 2.5 }}>
             Start a call
-          </Link>
+          </Button>
         </div>
       )}
 
@@ -218,14 +214,15 @@ export default function OutboundCallsPage() {
                   </td>
                   <td className="px-6 py-3.5 text-right">
                     {job.status === 'pending' && (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => void handleCancel(job.id)}
                         disabled={cancelling === job.id}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                        size="small"
+                        color="error"
+                        sx={{ minWidth: 0 }}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>

@@ -1,21 +1,14 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── GET /api/activity ─────────────────────────────────────────────────────────
 // Tenant-wide recent activity feed (dashboard widget)
 router.get('/activity', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const limit = Math.min(20, Math.max(1, parseInt(String(req.query['limit'] ?? '10'), 10) || 10))
 
   const { data: items, error } = await supabase
@@ -71,7 +64,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
     const limit = Math.min(50, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
     const before = typeof req.query['before'] === 'string' ? req.query['before'] : null
@@ -150,7 +143,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Verify contact belongs to tenant
@@ -207,7 +200,7 @@ router.patch(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId, activityId } = req.params
 
     // Verify note exists and belongs to tenant
@@ -278,7 +271,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId, activityId } = req.params
 
     // Verify note exists and belongs to tenant

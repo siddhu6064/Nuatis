@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Suspense } from 'react'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import DealsKanban from './DealsKanban'
 import DealsList from './DealsList'
 
@@ -58,26 +60,19 @@ export default function DealsContent() {
   }
 
   const toggle = (
-    <div className="flex items-center gap-0.5 border border-border-brand rounded-lg p-0.5">
-      <button
-        onClick={() => switchView('board')}
-        title="Board view"
-        className={`p-1.5 rounded transition-colors ${
-          view === 'board' ? 'bg-bg2 text-ink' : 'text-ink4 hover:text-ink3'
-        }`}
-      >
+    <ToggleButtonGroup
+      value={view}
+      exclusive
+      onChange={(_e, v: 'board' | 'list' | null) => v && switchView(v)}
+      size="small"
+    >
+      <ToggleButton value="board" title="Board view" aria-label="Board view">
         <GridIcon />
-      </button>
-      <button
-        onClick={() => switchView('list')}
-        title="List view"
-        className={`p-1.5 rounded transition-colors ${
-          view === 'list' ? 'bg-bg2 text-ink' : 'text-ink4 hover:text-ink3'
-        }`}
-      >
+      </ToggleButton>
+      <ToggleButton value="list" title="List view" aria-label="List view">
         <ListIcon />
-      </button>
-    </div>
+      </ToggleButton>
+    </ToggleButtonGroup>
   )
 
   if (!mounted) return null

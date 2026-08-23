@@ -5,7 +5,7 @@
  */
 import { Router, type Request, type Response } from 'express'
 import { randomUUID } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 
@@ -23,13 +23,6 @@ const ALLOWED_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100)
 }
@@ -40,7 +33,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Verify contact belongs to tenant
@@ -133,7 +126,7 @@ router.get(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact } = await supabase
@@ -180,7 +173,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId, attachmentId } = req.params
 
     const { data: attachment } = await supabase

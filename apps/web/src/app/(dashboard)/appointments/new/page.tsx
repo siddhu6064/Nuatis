@@ -15,7 +15,12 @@ interface StaffOption {
   color_hex: string
 }
 
-export default async function NewAppointmentPage() {
+interface Props {
+  searchParams: Promise<{ date?: string; start?: string }>
+}
+
+export default async function NewAppointmentPage({ searchParams }: Props) {
+  const params = await searchParams
   const session = await auth()
   if (!session?.user?.tenantId) redirect('/sign-in')
 
@@ -50,7 +55,12 @@ export default async function NewAppointmentPage() {
         <p className="text-sm text-ink3 mt-0.5">Schedule a new appointment</p>
       </div>
 
-      <AddAppointmentForm contacts={contactsRes.data ?? []} staff={staffRes.data ?? []} />
+      <AddAppointmentForm
+        contacts={contactsRes.data ?? []}
+        staff={staffRes.data ?? []}
+        initialDate={params.date}
+        initialStartTime={params.start}
+      />
     </div>
   )
 }

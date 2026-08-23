@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import Checkbox from '@mui/material/Checkbox'
 import ShiftSlideOver from './ShiftSlideOver'
 import type { DayKey, Shift, StaffMember } from './types'
 import { formatTime } from '@nuatis/shared'
@@ -129,32 +132,23 @@ export default function StaffCalendar() {
       {/* Nav */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <button
-            onClick={goPrev}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
-          >
+          <Button onClick={goPrev} variant="outlined" color="inherit" size="small">
             ‹ Prev
-          </button>
-          <button
-            onClick={goToday}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
-          >
+          </Button>
+          <Button onClick={goToday} variant="outlined" color="inherit" size="small">
             This Week
-          </button>
-          <button
-            onClick={goNext}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg"
-          >
+          </Button>
+          <Button onClick={goNext} variant="outlined" color="inherit" size="small">
             Next ›
-          </button>
+          </Button>
           <span className="ml-3 text-sm font-medium text-ink2">{headerLabel}</span>
         </div>
         <label className="flex items-center gap-2 text-sm text-ink3">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={showWeekends}
             onChange={(e) => setShowWeekends(e.target.checked)}
-            className="rounded border-border-brand"
+            size="small"
+            sx={{ p: 0 }}
           />
           Show weekends
         </label>
@@ -221,20 +215,30 @@ export default function StaffCalendar() {
                         className="px-2 py-2 border-b border-l border-gray-50 min-h-[64px] hover:bg-gray-50/50 cursor-pointer"
                       >
                         {dayShifts.map((s) => (
-                          <button
+                          <ButtonBase
                             key={s.id}
                             onClick={(e) => {
                               e.stopPropagation()
                               openEdit(s)
                             }}
-                            className="block w-full text-left text-xs rounded px-2 py-1 mb-1 truncate"
-                            style={{
+                            sx={{
+                              display: 'block',
+                              width: '100%',
+                              textAlign: 'left',
+                              fontSize: '0.75rem',
+                              borderRadius: 1,
+                              px: 1,
+                              py: 0.5,
+                              mb: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                               backgroundColor: `${m.color_hex}33`,
                               borderLeft: `3px solid ${m.color_hex}`,
                             }}
                           >
                             {formatTime(s.start_time)}–{formatTime(s.end_time)}
-                          </button>
+                          </ButtonBase>
                         ))}
                       </div>
                     )

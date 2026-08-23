@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,30 +167,33 @@ export default function ReviewAutomationPage() {
       {/* Delay */}
       <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
         <p className="text-sm font-semibold text-ink">Send review request after</p>
-        <select
+        <TextField
+          select
           value={settings.delayMinutes}
           onChange={(e) =>
             setSettings((prev) => ({ ...prev, delayMinutes: parseInt(e.target.value) }))
           }
-          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          fullWidth
+          size="small"
         >
           {DELAY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <MenuItem key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
+        </TextField>
       </div>
 
       {/* Google Review URL */}
       <div className="rounded-xl border border-border-brand bg-white p-5 space-y-3">
         <p className="text-sm font-semibold text-ink">Google Review URL</p>
-        <input
+        <TextField
           type="url"
           value={settings.googleReviewUrl ?? ''}
           onChange={(e) => setSettings((prev) => ({ ...prev, googleReviewUrl: e.target.value }))}
           placeholder="https://g.page/your-business/review"
-          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          fullWidth
+          size="small"
         />
         <p className="text-xs text-ink4">
           Find your Google review link in Google Business Profile → Share → Copy link
@@ -201,14 +207,15 @@ export default function ReviewAutomationPage() {
         {/* Merge tag buttons */}
         <div className="flex flex-wrap gap-2">
           {MERGE_TAGS.map((tag) => (
-            <button
+            <Button
               key={tag}
-              type="button"
               onClick={() => insertMergeTag(tag)}
-              className="px-2.5 py-1 text-xs font-mono bg-bg2 text-ink3 rounded-md hover:bg-bg3 transition-colors"
+              size="small"
+              color="inherit"
+              sx={{ fontFamily: 'monospace', fontSize: 12 }}
             >
               {tag}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -223,12 +230,14 @@ export default function ReviewAutomationPage() {
           </div>
         )}
 
-        <textarea
+        <TextField
+          multiline
+          rows={5}
           value={settings.messageTemplate ?? ''}
           onChange={(e) => setSettings((prev) => ({ ...prev, messageTemplate: e.target.value }))}
-          rows={5}
-          className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y font-normal"
           placeholder="Enter your review request message…"
+          fullWidth
+          size="small"
         />
       </div>
 
@@ -276,13 +285,9 @@ export default function ReviewAutomationPage() {
 
       {/* Save */}
       <div className="pb-8">
-        <button
-          onClick={() => void save()}
-          disabled={saving}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-        >
+        <Button onClick={() => void save()} disabled={saving} variant="contained">
           {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   )

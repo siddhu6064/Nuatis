@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 
@@ -7,13 +7,6 @@ const router = Router()
 
 // Phase 9: subscription + module gate. 'automation' is in Pro + Scale.
 router.use(requireAuth, requirePlan('automation'))
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const VALID_TRIGGER_TYPES = [
   'no_response',
@@ -65,7 +58,7 @@ router.post('/generate', requireAuth, async (req: Request, res: Response): Promi
 // ── GET /api/custom-automations ───────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase
@@ -138,7 +131,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data, error } = await supabase
@@ -174,7 +167,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: existing } = await supabase
@@ -231,7 +224,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: existing } = await supabase
@@ -269,7 +262,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 router.post('/:id/activate', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: existing } = await supabase
@@ -307,7 +300,7 @@ router.post('/:id/activate', requireAuth, async (req: Request, res: Response): P
 router.post('/:id/pause', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params as { id: string }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: existing } = await supabase

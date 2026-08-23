@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Button from '@mui/material/Button'
 
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? ''
 
@@ -163,23 +164,13 @@ export default function BillingClient(props: Props) {
           </div>
 
           <div className="flex gap-3 mt-4">
-            <button
-              type="button"
-              onClick={openPortal}
-              disabled={portalLoading}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
-              style={{ background: 'var(--teal)' }}
-            >
+            <Button onClick={openPortal} disabled={portalLoading} variant="contained">
               {portalLoading ? 'Opening…' : 'Manage billing'}
-            </button>
+            </Button>
             {props.plan !== 'scale' && (
-              <Link
-                href="/pricing"
-                className="px-4 py-2 rounded-lg text-sm font-medium border"
-                style={{ borderColor: 'var(--border)', color: 'var(--ink)' }}
-              >
+              <Button component={Link} href="/pricing" color="inherit" variant="outlined">
                 Upgrade plan
-              </Link>
+              </Button>
             )}
           </div>
 

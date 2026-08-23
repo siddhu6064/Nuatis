@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatDate, formatBytes } from '@nuatis/shared'
+import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
 
 type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -116,13 +118,12 @@ export default function DataExportPage() {
           {TABLES.map(({ key, label }) => (
             <label
               key={key}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg cursor-pointer"
+              className="flex items-center gap-2 px-1 py-0.5 rounded-lg hover:bg-bg cursor-pointer"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={selectedTables.includes(key)}
                 onChange={() => toggleTable(key)}
-                className="rounded text-teal-600 focus:ring-teal-500"
+                size="small"
               />
               <span className="text-sm text-ink">{label}</span>
             </label>
@@ -130,13 +131,13 @@ export default function DataExportPage() {
         </div>
 
         <div className="pt-2 space-y-3">
-          <button
+          <Button
             onClick={startExport}
             disabled={exporting || selectedTables.length === 0}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            variant="contained"
           >
             {exporting ? 'Export in progress...' : 'Export Data'}
-          </button>
+          </Button>
 
           <div className="space-y-1">
             <p className="text-xs text-ink4">Files expire after 48 hours.</p>
@@ -202,12 +203,9 @@ export default function DataExportPage() {
                         isExpired ? (
                           <span className="text-xs text-ink4 italic">Expired</span>
                         ) : (
-                          <button
-                            onClick={() => downloadExport(job.id)}
-                            className="text-xs font-medium text-teal-600 hover:text-teal-800 transition-colors"
-                          >
+                          <Button onClick={() => downloadExport(job.id)} size="small">
                             Download
-                          </button>
+                          </Button>
                         )
                       ) : (
                         <span className="text-xs text-gray-300">—</span>

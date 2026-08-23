@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 interface LedgerEntry {
   id: string
@@ -99,12 +102,9 @@ export default function LedgerPage() {
           <h1 className="text-xl font-bold text-ink">Payment Ledger</h1>
           <p className="text-sm text-ink4 mt-0.5">All collected payments across all channels</p>
         </div>
-        <button
-          onClick={load}
-          className="text-xs text-ink4 hover:text-ink3 border border-border-brand rounded-lg px-3 py-1.5 transition-colors"
-        >
+        <Button onClick={load} variant="outlined" color="inherit" size="small">
           ↻ Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Summary cards */}
@@ -138,34 +138,36 @@ export default function LedgerPage() {
 
       {/* Filter bar */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <input
-          type="text"
+        <TextField
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search customer or description..."
-          className="flex-1 min-w-48 text-sm border border-border-brand rounded-lg px-3 py-2 text-ink placeholder-ink4 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          size="small"
+          className="flex-1 min-w-48"
         />
-        <select
+        <TextField
+          select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
-          className="text-sm border border-border-brand rounded-lg px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-teal-500"
+          size="small"
         >
-          <option value="all">All sources</option>
-          <option value="stripe">Stripe</option>
-          <option value="cash">Cash</option>
-          <option value="check">Check</option>
-          <option value="other">Other</option>
-        </select>
-        <select
+          <MenuItem value="all">All sources</MenuItem>
+          <MenuItem value="stripe">Stripe</MenuItem>
+          <MenuItem value="cash">Cash</MenuItem>
+          <MenuItem value="check">Check</MenuItem>
+          <MenuItem value="other">Other</MenuItem>
+        </TextField>
+        <TextField
+          select
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="text-sm border border-border-brand rounded-lg px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-teal-500"
+          size="small"
         >
-          <option value="all">All time</option>
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-        </select>
+          <MenuItem value="all">All time</MenuItem>
+          <MenuItem value="7d">Last 7 days</MenuItem>
+          <MenuItem value="30d">Last 30 days</MenuItem>
+          <MenuItem value="90d">Last 90 days</MenuItem>
+        </TextField>
       </div>
 
       {/* Table */}

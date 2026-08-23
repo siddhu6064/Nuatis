@@ -2,6 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -134,15 +137,6 @@ const CHANNELS: {
     disabled: true,
   },
 ]
-
-// ── Shared styles ──────────────────────────────────────────────────────────────
-
-const inputCls =
-  'w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-const primaryBtnCls =
-  'px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
-const backBtnCls =
-  'px-4 py-2 text-sm text-ink2 border border-border-brand rounded-lg hover:bg-bg transition-colors'
 
 // ── Spinner ────────────────────────────────────────────────────────────────────
 
@@ -309,14 +303,9 @@ function NewCampaignContent() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              disabled={!canGoStep2}
-              className={primaryBtnCls}
-            >
+            <Button onClick={() => setStep(2)} disabled={!canGoStep2} variant="contained">
               Next →
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -331,12 +320,12 @@ function NewCampaignContent() {
             <label className="block text-xs font-medium text-ink2 mb-1.5">
               Campaign name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
+            <TextField
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. April lapsed patient win-back"
-              className={inputCls}
+              fullWidth
+              size="small"
             />
           </div>
 
@@ -360,33 +349,31 @@ function NewCampaignContent() {
                 to target a specific audience.
               </div>
             ) : (
-              <select
+              <TextField
+                select
                 value={segmentId}
                 onChange={(e) => setSegmentId(e.target.value)}
-                className={inputCls}
+                fullWidth
+                size="small"
+                slotProps={{ select: { displayEmpty: true } }}
               >
-                <option value="">Select a Smart List…</option>
+                <MenuItem value="">Select a Smart List…</MenuItem>
                 {smartLists.map((l) => (
-                  <option key={l.id} value={l.id}>
+                  <MenuItem key={l.id} value={l.id}>
                     {l.name}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
+              </TextField>
             )}
           </div>
 
           <div className="pt-2 flex items-center justify-between">
-            <button type="button" onClick={() => setStep(1)} className={backBtnCls}>
+            <Button onClick={() => setStep(1)} color="inherit" variant="outlined">
               ← Back
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              disabled={!canGoStep3}
-              className={primaryBtnCls}
-            >
+            </Button>
+            <Button onClick={() => setStep(3)} disabled={!canGoStep3} variant="contained">
               Next →
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -460,18 +447,17 @@ function NewCampaignContent() {
           </div>
 
           <div className="pt-2 flex items-center justify-between">
-            <button type="button" onClick={() => setStep(2)} className={backBtnCls}>
+            <Button onClick={() => setStep(2)} color="inherit" variant="outlined">
               ← Back
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={handleGenerate}
               disabled={!canGenerate || generating}
-              className={`${primaryBtnCls} flex items-center gap-2`}
+              variant="contained"
+              startIcon={generating ? <Spinner /> : undefined}
             >
-              {generating && <Spinner />}
               {generating ? 'Generating copy with AI…' : '✨ Generate campaign'}
-            </button>
+            </Button>
           </div>
         </div>
       )}

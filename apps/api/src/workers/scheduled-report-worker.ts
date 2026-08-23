@@ -1,17 +1,11 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendEmail } from '../lib/email-client.js'
+import { buildReportEmailWrapper } from '../lib/email-templates/report-wrapper.js'
 import { VERTICALS } from '@nuatis/shared'
 
 const QUEUE_NAME = 'scheduled-reports'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export interface ScheduledReportJobData {
   scheduledReportId: string
@@ -21,39 +15,6 @@ export interface ScheduledReportJobData {
 }
 
 // ── HTML helpers ─────────────────────────────────────────────────────────────
-
-function wrapReport(title: string, businessName: string, body: string): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:0;background:#f5f5f5}
-  .outer{max-width:600px;margin:0 auto;padding:24px 16px}
-  .header{background:#0d9488;padding:20px 24px;border-radius:10px 10px 0 0}
-  .header h1{color:#fff;margin:0;font-size:18px;font-weight:700}
-  .header p{color:#ccfbf1;margin:4px 0 0;font-size:13px}
-  .body{background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 10px 10px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-  th{text-align:left;padding:8px 10px;background:#f8fafc;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#334155}
-  tr:last-child td{border-bottom:none}
-  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
-  .stat{background:#f8fafc;border-radius:8px;padding:14px 16px;border:1px solid #e2e8f0}
-  .stat .val{font-size:22px;font-weight:700;color:#0f172a}
-  .stat .lbl{font-size:11px;color:#94a3b8;margin-top:2px}
-  .footer{text-align:center;padding:16px;font-size:11px;color:#94a3b8}
-</style>
-</head>
-<body>
-<div class="outer">
-  <div class="header">
-    <h1>${title}</h1>
-    <p>${businessName} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-  </div>
-  <div class="body">${body}</div>
-  <div class="footer">Sent by Nuatis · <a href="https://nuatis.com" style="color:#0d9488">nuatis.com</a></div>
-</div>
-</body></html>`
-}
 
 function fmtDollars(n: number): string {
   if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`
@@ -67,7 +28,7 @@ async function buildVelocityReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date()
   const startDate = new Date(now.getTime() - 90 * 86400000).toISOString()
 
@@ -119,7 +80,7 @@ async function buildVelocityReport(
 
   return {
     subject: `Sales Velocity Report — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-    html: wrapReport('Sales Velocity', businessName, body),
+    html: buildReportEmailWrapper('Sales Velocity', businessName, body),
   }
 }
 
@@ -127,7 +88,7 @@ async function buildAppointmentsReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date()
   const startDate = new Date(now.getTime() - 30 * 86400000).toISOString()
 
@@ -180,7 +141,7 @@ async function buildAppointmentsReport(
 
   return {
     subject: `Appointments Report — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-    html: wrapReport('Appointments Report', businessName, body),
+    html: buildReportEmailWrapper('Appointments Report', businessName, body),
   }
 }
 
@@ -188,7 +149,7 @@ async function buildLeadSourceReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [{ data: contacts }, { data: deals }] = await Promise.all([
     supabase
@@ -268,7 +229,7 @@ async function buildLeadSourceReport(
 
   return {
     subject: `Lead Source Report — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-    html: wrapReport('Lead Source Report', businessName, body),
+    html: buildReportEmailWrapper('Lead Source Report', businessName, body),
   }
 }
 
@@ -276,7 +237,7 @@ async function buildPipelineFunnelReport(
   tenantId: string,
   businessName: string
 ): Promise<{ subject: string; html: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: pipelines } = await supabase
     .from('pipelines')
@@ -336,7 +297,7 @@ async function buildPipelineFunnelReport(
 
   return {
     subject: `Pipeline Funnel Report — ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-    html: wrapReport('Pipeline Funnel', businessName, body),
+    html: buildReportEmailWrapper('Pipeline Funnel', businessName, body),
   }
 }
 
@@ -344,7 +305,7 @@ async function buildPipelineFunnelReport(
 
 export async function processScheduledReport(data: ScheduledReportJobData): Promise<void> {
   const { scheduledReportId, tenantId, reportType, recipients } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant } = await supabase
     .from('tenants')

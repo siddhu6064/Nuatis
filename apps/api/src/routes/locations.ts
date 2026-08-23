@@ -1,20 +1,13 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/locations
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('locations')
@@ -41,7 +34,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // POST /api/locations
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -78,7 +71,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // PUT /api/locations/:id
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -110,7 +103,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // PUT /api/locations/:id/set-primary
 router.put('/:id/set-primary', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Unset all primary flags
   await supabase.from('locations').update({ is_primary: false }).eq('tenant_id', authed.tenantId)
@@ -132,7 +125,7 @@ router.put('/:id/set-primary', requireAuth, async (req: Request, res: Response):
 // DELETE /api/locations/:id
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Check not primary
   const { data: loc } = await supabase

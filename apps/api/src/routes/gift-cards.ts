@@ -1,21 +1,14 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { giftCardBalanceLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/gift-cards — list for tenant
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('gift_cards')
     .select(
@@ -43,7 +36,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     res.status(400).json({ error: 'amount_cents required and must be > 0' })
     return
   }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('gift_cards')
     .insert({
@@ -78,7 +71,7 @@ router.post('/redeem', requireAuth, async (req: Request, res: Response): Promise
     res.status(400).json({ error: 'code and amount_cents required' })
     return
   }
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: card, error: fetchErr } = await supabase
     .from('gift_cards')
     .select('id, balance_cents, status')
@@ -126,7 +119,7 @@ router.get(
       res.status(400).json({ error: 'code param required' })
       return
     }
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data, error } = await supabase
       .from('gift_cards')
       .select('balance_cents, status, expires_at')

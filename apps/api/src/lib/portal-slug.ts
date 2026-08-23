@@ -1,12 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { randomBytes } from 'crypto'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function slugify(input: string): string {
   return input
@@ -25,7 +18,7 @@ function generateRandomHex(length: number): string {
 
 export async function generatePortalSlug(tenantId: string, businessName: string): Promise<string> {
   if (!tenantId) throw new Error('tenantId is required')
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Step 1: Slugify the business name
   let slug = slugify(businessName || '')

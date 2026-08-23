@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Button from '@mui/material/Button'
+import { getInitials } from '@nuatis/shared'
 import SnippetPicker from '../SnippetPicker'
 
 interface SmsMessage {
@@ -130,12 +131,7 @@ export default function SmsThread({ contactId, contactName, refreshKey }: Props)
     }
   }
 
-  const initials = contactName
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
+  const initials = getInitials(contactName)
 
   if (loading) return <div className="py-6 text-center text-sm text-ink4">Loading messages...</div>
 

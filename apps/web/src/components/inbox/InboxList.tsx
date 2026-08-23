@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
+import { getInitials } from '@nuatis/shared'
 
 interface InboxThread {
   contact_id: string
@@ -125,37 +130,33 @@ export default function InboxList() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex gap-1 mb-4 border-b border-border-brand">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-              activeTab === tab.key
-                ? 'text-teal-700 border-b-2 border-teal-600'
-                : 'text-ink3 hover:text-ink2'
-            }`}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span
-                className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-bg2 text-ink3'
-                }`}
-              >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 mb-4 border-b border-border-brand">
+        <ToggleButtonGroup
+          value={activeTab}
+          exclusive
+          onChange={(_e, value: InboxTab | null) => value && setActiveTab(value)}
+          size="small"
+        >
+          {tabs.map((tab) => (
+            <ToggleButton key={tab.key} value={tab.key} sx={{ border: 0, borderRadius: 0 }}>
+              {tab.label}
+              {tab.count > 0 && (
+                <span
+                  className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    activeTab === tab.key ? 'bg-teal-100 text-teal-700' : 'bg-bg2 text-ink3'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
 
         {activeTab !== 'chat' && threads.length > 0 && (
-          <button
-            onClick={() => void markAllRead()}
-            className="ml-auto text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-2"
-          >
+          <Button onClick={() => void markAllRead()} size="small" sx={{ ml: 'auto' }}>
             Mark all read
-          </button>
+          </Button>
         )}
       </div>
 
@@ -169,19 +170,24 @@ export default function InboxList() {
         <div className="bg-white rounded-xl border border-border-brand divide-y divide-gray-50">
           {/* SMS threads */}
           {visibleSms.map((t) => (
-            <button
+            <ButtonBase
               key={`sms-${t.contact_id}`}
               onClick={() => router.push(`/contacts/${t.contact_id}?tab=messages`)}
-              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                width: '100%',
+                textAlign: 'left',
+                px: 2,
+                py: 1.5,
+                transition: 'background-color 150ms',
+                '&:hover': { bgcolor: '#f9f8f5' },
+              }}
             >
               <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                 <span className="text-teal-700 text-xs font-bold">
-                  {t.contact_name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map((w) => w[0])
-                    .join('')
-                    .toUpperCase()}
+                  {getInitials(t.contact_name)}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
@@ -206,23 +212,28 @@ export default function InboxList() {
                   {t.unread_count}
                 </span>
               )}
-            </button>
+            </ButtonBase>
           ))}
 
           {/* Chat sessions */}
           {visibleChat.map((s) => {
             const visitorLabel = s.visitor_name ?? 'Website Visitor'
-            const initials = visitorLabel
-              .split(' ')
-              .slice(0, 2)
-              .map((w) => w[0])
-              .join('')
-              .toUpperCase()
+            const initials = getInitials(visitorLabel)
             return (
-              <button
+              <ButtonBase
                 key={`chat-${s.id}`}
                 onClick={() => router.push(`/inbox?chat=${s.id}`)}
-                className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-bg transition-colors"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  width: '100%',
+                  textAlign: 'left',
+                  px: 2,
+                  py: 1.5,
+                  transition: 'background-color 150ms',
+                  '&:hover': { bgcolor: '#f9f8f5' },
+                }}
               >
                 <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                   <span className="text-blue-700 text-xs font-bold">{initials || 'W'}</span>
@@ -251,7 +262,7 @@ export default function InboxList() {
                     {s.unread_count}
                   </span>
                 )}
-              </button>
+              </ButtonBase>
             )
           })}
         </div>

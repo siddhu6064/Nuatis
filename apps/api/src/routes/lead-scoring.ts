@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { getLeadScoreBulkQueue } from '../lib/lead-score-queue.js'
 
@@ -8,17 +8,10 @@ const router = Router()
 const VALID_CATEGORIES = ['engagement', 'profile', 'behavior', 'decay'] as const
 type RuleCategory = (typeof VALID_CATEGORIES)[number]
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/lead-scoring — list scoring rules grouped by category ────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('lead_scoring_rules')
@@ -52,7 +45,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/lead-scoring/rules/:id — update a rule ──────────────────────────
 router.put('/rules/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -93,7 +86,7 @@ router.put('/rules/:id', requireAuth, async (req: Request, res: Response): Promi
 // ── POST /api/lead-scoring/rules — add custom rule ───────────────────────────
 router.post('/rules', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const category = b['category'] as string
@@ -135,7 +128,7 @@ router.post('/rules', requireAuth, async (req: Request, res: Response): Promise<
 // ── DELETE /api/lead-scoring/rules/:id — delete a rule ───────────────────────
 router.delete('/rules/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   // Verify rule belongs to tenant
@@ -168,7 +161,7 @@ router.delete('/rules/:id', requireAuth, async (req: Request, res: Response): Pr
 // ── POST /api/lead-scoring/rescore-all — trigger bulk re-score ───────────────
 router.post('/rescore-all', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { count } = await supabase
     .from('contacts')
@@ -186,7 +179,7 @@ router.post('/rescore-all', requireAuth, async (req: Request, res: Response): Pr
 // ── GET /api/lead-scoring/distribution — score distribution ──────────────────
 router.get('/distribution', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch all non-archived contacts with score fields
   const { data, error } = await supabase

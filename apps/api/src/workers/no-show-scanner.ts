@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { sendPushNotification } from '../lib/push-client.js'
@@ -8,23 +8,17 @@ import { logActivity } from '../lib/activity.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 import { sendSms } from '../lib/sms.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
+import { buildNoShowRebookSms } from '../lib/sms-templates.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
 const MAX_AGE_HOURS = 24
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export async function scan(): Promise<void> {
   console.info('[no-show-scanner] scanning for no-shows...')
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const pausedTenants = await getPausedTenants(QUEUE_NAME)
     const now = Date.now()
     const graceEnd = new Date(now - GRACE_MINUTES * 60000).toISOString()
@@ -130,7 +124,7 @@ export async function scan(): Promise<void> {
           const fromNumber = location?.telnyx_number
 
           if (toPhone && fromNumber) {
-            const smsText = `We missed you today! Would you like to rebook? Reply YES or call us at ${fromNumber}.`
+            const smsText = buildNoShowRebookSms({ fromNumber })
 
             // sendSms runs the TCPA opt-in check internally; success=false covers
             // both suppression and send failure (sendSms logs the reason itself)

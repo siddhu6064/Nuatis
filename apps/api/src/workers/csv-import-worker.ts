@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { processImportRows } from '../lib/import-processor.js'
 import { sendPushNotification } from '../lib/push-client.js'
@@ -15,13 +15,6 @@ export function getCsvImportQueue(): Queue {
   return _queue
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 interface CsvImportJobData {
   jobId: string
   tenantId: string
@@ -33,7 +26,7 @@ interface CsvImportJobData {
 
 async function processImport(data: CsvImportJobData): Promise<void> {
   const { jobId, tenantId, rows, mapping, options } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Mark as processing
   await supabase

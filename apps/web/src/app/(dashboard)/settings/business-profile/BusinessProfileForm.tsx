@@ -1,6 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
+import Switch from '@mui/material/Switch'
+import IconButton from '@mui/material/IconButton'
 import type { BusinessProfile, DayHours, ServiceEntry, StaffEntry, FaqEntry } from '@nuatis/shared'
 
 // ── Local extended types with stable React keys ────────────────────────────
@@ -57,17 +63,6 @@ interface CatalogService {
   unit_price: number
   duration_minutes: number | null
 }
-
-// ── Module-level CSS class strings ─────────────────────────────────────────
-const inputCls =
-  'w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-const smallInputCls =
-  'px-3 py-1.5 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-const saveBtnCls =
-  'px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
-const addBtnCls =
-  'px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2'
-const removeBtnCls = 'text-red-400 hover:text-red-600 text-sm px-2'
 
 // ── Standalone SectionMessage component ────────────────────────────────────
 function SectionMessage({ message }: { message: SectionState['message'] }) {
@@ -219,47 +214,41 @@ export default function BusinessProfileForm({
             return (
               <div key={key} className="flex items-center gap-3">
                 <span className="w-24 text-sm text-ink2 shrink-0">{label}</span>
-                <button
-                  type="button"
-                  onClick={() => updateDayHours(key, 'closed', !day.closed)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 ${
-                    day.closed ? 'bg-bg3' : 'bg-teal-600'
-                  }`}
-                  title={day.closed ? 'Closed — click to open' : 'Open — click to close'}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      day.closed ? 'translate-x-1' : 'translate-x-4'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={!day.closed}
+                  onChange={(e) => updateDayHours(key, 'closed', !e.target.checked)}
+                  size="small"
+                  slotProps={{ input: { 'aria-label': `${label} open` } }}
+                />
                 {day.closed ? (
                   <span className="text-sm text-ink4">Closed</span>
                 ) : (
                   <>
-                    <select
+                    <TextField
+                      select
                       value={day.open}
                       onChange={(e) => updateDayHours(key, 'open', e.target.value)}
-                      className={smallInputCls + ' bg-white'}
+                      size="small"
                     >
                       {TIME_SLOTS.map((t) => (
-                        <option key={t} value={t}>
+                        <MenuItem key={t} value={t}>
                           {formatTimeLabel(t)}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
+                    </TextField>
                     <span className="text-ink4 text-xs">to</span>
-                    <select
+                    <TextField
+                      select
                       value={day.close}
                       onChange={(e) => updateDayHours(key, 'close', e.target.value)}
-                      className={smallInputCls + ' bg-white'}
+                      size="small"
                     >
                       {TIME_SLOTS.map((t) => (
-                        <option key={t} value={t}>
+                        <MenuItem key={t} value={t}>
                           {formatTimeLabel(t)}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
+                    </TextField>
                   </>
                 )}
               </div>
@@ -268,14 +257,13 @@ export default function BusinessProfileForm({
         </div>
 
         <div className="flex items-center gap-3 mt-5">
-          <button
-            type="button"
+          <Button
             onClick={() => saveSection('hours', { hours })}
             disabled={sectionState.hours.saving}
-            className={saveBtnCls}
+            variant="contained"
           >
             {sectionState.hours.saving ? 'Saving…' : 'Save Hours'}
-          </button>
+          </Button>
           <SectionMessage message={sectionState.hours.message} />
         </div>
       </div>
@@ -284,14 +272,9 @@ export default function BusinessProfileForm({
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-semibold text-ink">Services</h2>
-          <button
-            type="button"
-            onClick={loadCatalog}
-            disabled={loadingCatalog}
-            className={addBtnCls}
-          >
+          <Button onClick={loadCatalog} disabled={loadingCatalog} size="small" color="inherit">
             {loadingCatalog ? 'Loading…' : 'Import from Catalog'}
-          </button>
+          </Button>
         </div>
         <p className="text-xs text-ink4 mb-4">
           List your services so Maya can quote prices and durations
@@ -306,9 +289,7 @@ export default function BusinessProfileForm({
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {catalogServices.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="text-teal-600 focus:ring-teal-500"
+                    <Checkbox
                       checked={selectedCatalogIds.has(s.id)}
                       onChange={(e) => {
                         setSelectedCatalogIds((prev) => {
@@ -318,6 +299,8 @@ export default function BusinessProfileForm({
                           return next
                         })
                       }}
+                      size="small"
+                      sx={{ p: 0 }}
                     />
                     <span className="text-sm text-ink">{s.name}</span>
                     <span className="text-xs text-ink4">
@@ -329,21 +312,17 @@ export default function BusinessProfileForm({
               </div>
             )}
             <div className="flex gap-2 mt-3">
-              <button
-                type="button"
+              <Button
                 onClick={importSelected}
                 disabled={selectedCatalogIds.size === 0}
-                className={saveBtnCls}
+                variant="contained"
+                size="small"
               >
                 Import Selected
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCatalogPicker(false)}
-                className={addBtnCls}
-              >
+              </Button>
+              <Button onClick={() => setShowCatalogPicker(false)} size="small" color="inherit">
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -363,7 +342,7 @@ export default function BusinessProfileForm({
               key={s._key}
               className="grid grid-cols-[1fr_80px_80px_1fr_auto] gap-2 items-center"
             >
-              <input
+              <TextField
                 value={s.name}
                 onChange={(e) =>
                   setServices((prev) =>
@@ -373,9 +352,9 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Service name"
-                className={smallInputCls}
+                size="small"
               />
-              <input
+              <TextField
                 type="number"
                 value={s.duration_min || ''}
                 onChange={(e) =>
@@ -388,9 +367,9 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="60"
-                className={smallInputCls}
+                size="small"
               />
-              <input
+              <TextField
                 type="number"
                 value={s.price || ''}
                 onChange={(e) =>
@@ -401,9 +380,9 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="0"
-                className={smallInputCls}
+                size="small"
               />
-              <input
+              <TextField
                 value={s.description}
                 onChange={(e) =>
                   setServices((prev) =>
@@ -413,23 +392,22 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Optional description"
-                className={smallInputCls}
+                size="small"
               />
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setServices((prev) => prev.filter((row) => row._key !== s._key))}
-                className={removeBtnCls}
+                size="small"
+                color="error"
                 title="Remove"
               >
                 ✕
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
 
         <div className="flex items-center gap-3 mt-4">
-          <button
-            type="button"
+          <Button
             onClick={() =>
               setServices((prev) => [
                 ...prev,
@@ -442,23 +420,23 @@ export default function BusinessProfileForm({
                 },
               ])
             }
-            className={addBtnCls}
+            size="small"
+            color="inherit"
           >
             + Add Service
-          </button>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
-          <button
-            type="button"
+          <Button
             onClick={() =>
               saveSection('services', { services: services.map(({ _key: _, ...s }) => s) })
             }
             disabled={sectionState.services.saving}
-            className={saveBtnCls}
+            variant="contained"
           >
             {sectionState.services.saving ? 'Saving…' : 'Save Services'}
-          </button>
+          </Button>
           <SectionMessage message={sectionState.services.message} />
         </div>
       </div>
@@ -480,7 +458,7 @@ export default function BusinessProfileForm({
           )}
           {staff.map((s) => (
             <div key={s._key} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-              <input
+              <TextField
                 value={s.name}
                 onChange={(e) =>
                   setStaff((prev) =>
@@ -490,9 +468,9 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Full name"
-                className={smallInputCls}
+                size="small"
               />
-              <input
+              <TextField
                 value={s.role}
                 onChange={(e) =>
                   setStaff((prev) =>
@@ -502,44 +480,43 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Role (e.g. Stylist)"
-                className={smallInputCls}
+                size="small"
               />
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setStaff((prev) => prev.filter((row) => row._key !== s._key))}
-                className={removeBtnCls}
+                size="small"
+                color="error"
                 title="Remove"
               >
                 ✕
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
 
         <div className="flex items-center gap-3 mt-4">
-          <button
-            type="button"
+          <Button
             onClick={() =>
               setStaff((prev) => [
                 ...prev,
                 { name: '', role: '', _key: Math.random().toString(36).slice(2) },
               ])
             }
-            className={addBtnCls}
+            size="small"
+            color="inherit"
           >
             + Add Staff Member
-          </button>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
-          <button
-            type="button"
+          <Button
             onClick={() => saveSection('staff', { staff: staff.map(({ _key: _, ...s }) => s) })}
             disabled={sectionState.staff.saving}
-            className={saveBtnCls}
+            variant="contained"
           >
             {sectionState.staff.saving ? 'Saving…' : 'Save Staff'}
-          </button>
+          </Button>
           <SectionMessage message={sectionState.staff.message} />
         </div>
       </div>
@@ -556,16 +533,16 @@ export default function BusinessProfileForm({
             <div key={faq._key} className="space-y-1.5 p-3 bg-bg rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-ink4">FAQ {i + 1}</span>
-                <button
-                  type="button"
+                <IconButton
                   onClick={() => setFaqs((prev) => prev.filter((row) => row._key !== faq._key))}
-                  className={removeBtnCls}
+                  size="small"
+                  color="error"
                   title="Remove"
                 >
                   ✕
-                </button>
+                </IconButton>
               </div>
-              <input
+              <TextField
                 value={faq.question}
                 onChange={(e) =>
                   setFaqs((prev) =>
@@ -575,9 +552,10 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Question"
-                className={inputCls}
+                fullWidth
+                size="small"
               />
-              <textarea
+              <TextField
                 value={faq.answer}
                 onChange={(e) =>
                   setFaqs((prev) =>
@@ -587,24 +565,26 @@ export default function BusinessProfileForm({
                   )
                 }
                 placeholder="Answer"
+                multiline
                 rows={2}
-                className={inputCls + ' resize-none'}
+                fullWidth
+                size="small"
               />
             </div>
           ))}
           {faqs.length < 10 && (
-            <button
-              type="button"
+            <Button
               onClick={() =>
                 setFaqs((prev) => [
                   ...prev,
                   { question: '', answer: '', _key: Math.random().toString(36).slice(2) },
                 ])
               }
-              className={addBtnCls}
+              size="small"
+              color="inherit"
             >
               + Add FAQ
-            </button>
+            </Button>
           )}
         </div>
 
@@ -615,27 +595,28 @@ export default function BusinessProfileForm({
           >
             Additional Notes
           </label>
-          <textarea
+          <TextField
             id="business-profile-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any extra context Maya should know — parking info, special instructions, etc."
+            multiline
             rows={4}
-            maxLength={2000}
-            className={inputCls + ' resize-none'}
+            slotProps={{ htmlInput: { maxLength: 2000 } }}
+            fullWidth
+            size="small"
           />
           <p className="text-[11px] text-ink4 mt-1">{notes.length}/2000 characters</p>
         </div>
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-brand">
-          <button
-            type="button"
+          <Button
             onClick={() => saveSection('faqs', { faqs: faqs.map(({ _key: _, ...f }) => f), notes })}
             disabled={sectionState.faqs.saving}
-            className={saveBtnCls}
+            variant="contained"
           >
             {sectionState.faqs.saving ? 'Saving…' : 'Save FAQs & Notes'}
-          </button>
+          </Button>
           <SectionMessage message={sectionState.faqs.message} />
         </div>
       </div>

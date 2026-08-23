@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
 import type { CustomAutomation, GeneratedAutomation } from '@nuatis/shared'
 
 const API_URL = ''
@@ -177,28 +180,28 @@ export default function CustomAutomationBuilder() {
       <div className="bg-white rounded-xl border border-border-brand p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-semibold text-ink">Custom Automations</h2>
-          <button
+          <Button
             onClick={() => {
               setSaveError(null)
               setStep('input')
             }}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+            variant="contained"
           >
             + New Automation
-          </button>
+          </Button>
         </div>
 
         {loadError && <p className="text-sm text-red-600 mb-4">{loadError}</p>}
         {actionError && (
           <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5">
             <span className="text-sm text-red-700">{actionError}</span>
-            <button
-              type="button"
+            <IconButton
               onClick={() => setActionError(null)}
-              className="ml-auto text-red-400 hover:text-red-600 text-xs"
+              size="small"
+              sx={{ ml: 'auto', color: '#f87171', '&:hover': { color: '#dc2626' } }}
             >
               ✕
-            </button>
+            </IconButton>
           </div>
         )}
 
@@ -235,27 +238,33 @@ export default function CustomAutomationBuilder() {
                     </td>
                     <td className="py-3 flex gap-2 flex-wrap">
                       {a.status !== 'active' && (
-                        <button
+                        <Button
                           onClick={() => void handleActivate(a.id)}
-                          className="px-3 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-xs font-medium"
+                          size="small"
+                          variant="contained"
+                          sx={{ fontSize: 12 }}
                         >
                           Activate
-                        </button>
+                        </Button>
                       )}
                       {a.status === 'active' && (
-                        <button
+                        <Button
                           onClick={() => void handlePause(a.id)}
-                          className="px-3 py-1 bg-gray-100 text-ink3 rounded-lg hover:bg-gray-200 text-xs font-medium"
+                          size="small"
+                          color="inherit"
+                          sx={{ fontSize: 12 }}
                         >
                           Pause
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button
                         onClick={() => void handleDelete(a.id)}
-                        className="px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs font-medium"
+                        size="small"
+                        color="error"
+                        sx={{ fontSize: 12 }}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -271,39 +280,43 @@ export default function CustomAutomationBuilder() {
   if (step === 'input') {
     return (
       <div className="bg-white rounded-xl border border-border-brand p-6 max-w-2xl">
-        <button
+        <Button
           onClick={() => {
             setSaveError(null)
             setStep('list')
           }}
-          className="text-sm text-ink3 hover:text-ink mb-4 inline-flex items-center gap-1"
+          size="small"
+          color="inherit"
+          sx={{ mb: 2 }}
         >
           ← Back
-        </button>
+        </Button>
         <h2 className="text-base font-semibold text-ink mb-6">Create Custom Automation</h2>
 
         <div className="mb-4">
           <label className="block text-xs text-ink4 font-medium mb-1">
             Describe your automation
           </label>
-          <textarea
+          <TextField
+            multiline
+            rows={4}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g. Send a follow-up SMS to contacts who haven't responded in 3 days"
-            rows={4}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400 w-full resize-none"
+            fullWidth
+            size="small"
           />
         </div>
 
         {saveError && <p className="text-sm text-red-600 mb-4">{saveError}</p>}
 
-        <button
+        <Button
           onClick={() => void handleGenerate()}
           disabled={prompt.trim().length < 10 || generating}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          variant="contained"
         >
           {generating ? 'Generating…' : 'Generate with AI'}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -311,15 +324,17 @@ export default function CustomAutomationBuilder() {
   // ─── REVIEW ──────────────────────────────────────────────────────────────────
   return (
     <div className="bg-white rounded-xl border border-border-brand p-6 max-w-2xl">
-      <button
+      <Button
         onClick={() => {
           setSaveError(null)
           setStep('input')
         }}
-        className="text-sm text-ink3 hover:text-ink mb-4 inline-flex items-center gap-1"
+        size="small"
+        color="inherit"
+        sx={{ mb: 2 }}
       >
         ← Back
-      </button>
+      </Button>
       <div className="flex items-center gap-3 mb-6">
         <h2 className="text-base font-semibold text-ink">Review Automation</h2>
         {generated && <ConfidenceBadge score={generated.confidence ?? 0} />}
@@ -330,21 +345,24 @@ export default function CustomAutomationBuilder() {
           {/* Editable name */}
           <div>
             <label className="block text-xs text-ink4 font-medium mb-1">Name</label>
-            <input
+            <TextField
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400 w-full"
+              fullWidth
+              size="small"
             />
           </div>
 
           {/* Editable description */}
           <div>
             <label className="block text-xs text-ink4 font-medium mb-1">Description</label>
-            <textarea
+            <TextField
+              multiline
+              rows={2}
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
-              rows={2}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400 w-full resize-none"
+              fullWidth
+              size="small"
             />
           </div>
 
@@ -381,13 +399,13 @@ export default function CustomAutomationBuilder() {
       {saveError && <p className="text-sm text-red-600 mt-4">{saveError}</p>}
 
       <div className="mt-6">
-        <button
+        <Button
           onClick={() => void handleSaveDraft()}
           disabled={saving || !editName.trim()}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          variant="contained"
         >
           {saving ? 'Saving…' : 'Save as Draft'}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 
@@ -7,13 +7,6 @@ const router = Router()
 
 // Phase 9: subscription + module gate. 'cpq' is in Scale only.
 router.use(requireAuth, requirePlan('cpq'))
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface PackageItem {
   service_id: string
@@ -30,7 +23,7 @@ interface ServiceRow {
 // ── GET /api/packages ───────────────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const vertical = req.query['vertical'] ? String(req.query['vertical']) : null
 
   let query = supabase
@@ -53,7 +46,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // ── GET /api/packages/:id ───────────────────────────────────────────────────
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: pkg, error } = await supabase
     .from('service_packages')
@@ -105,7 +98,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 // ── POST /api/packages ──────────────────────────────────────────────────────
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const vertical = typeof b['vertical'] === 'string' ? b['vertical'].trim() : ''
@@ -170,7 +163,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 // Registered before /:id to avoid Express matching "reorder" as :id param
 router.put('/reorder', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const reorderItems = req.body as Array<{ id: string; sort_order: number }>
 
   if (!Array.isArray(reorderItems)) {
@@ -192,7 +185,7 @@ router.put('/reorder', async (req: Request, res: Response): Promise<void> => {
 // ── PUT /api/packages/:id ───────────────────────────────────────────────────
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const { data: existing } = await supabase
@@ -269,7 +262,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 // ── DELETE /api/packages/:id (soft delete) ──────────────────────────────────
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('service_packages')

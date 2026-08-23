@@ -51,11 +51,13 @@ jest.unstable_mockModule('../lib/portal-slug.js', () => ({
 }))
 
 // ── Dynamic imports (after all mocks) ─────────────────────────────────────────
-const [{ default: express }, { default: request }, { default: portalRouter }] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/portal.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: portalRouter } = await import('../routes/portal.js')
 
 const { generatePortalSlug } = await import('../lib/portal-slug.js')
 

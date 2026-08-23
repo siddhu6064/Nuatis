@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID, createHash } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { sendReceiptEmail } from '../lib/receipt-email.js'
@@ -13,6 +13,7 @@ import { getFollowupQueue } from '../workers/quote-followup-worker.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
+import { buildQuoteEmailHtml, buildQuoteApprovalEmailHtml } from '../lib/email-templates/quote.js'
 import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
 import { createSquarePayment } from '../lib/square-client.js'
 import { publicPaymentLimiter } from '../middleware/rate-limit.js'
@@ -31,13 +32,6 @@ async function requireCpq(req: Request, res: Response, next: NextFunction): Prom
     return
   }
   next()
-}
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
 }
 
 async function nextReceiptNumber(
@@ -113,7 +107,7 @@ const DEFAULT_CPQ: CpqSettings = {
 }
 
 async function getCpqSettings(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string
 ): Promise<CpqSettings> {
   const { data } = await supabase.from('tenants').select('cpq_settings').eq('id', tenantId).single()
@@ -123,7 +117,7 @@ async function getCpqSettings(
 // ── GET /api/quotes ──────────────────────────────────────────────────────────
 router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
   const status = req.query['status'] ? String(req.query['status']) : null
@@ -156,7 +150,7 @@ router.get('/', requireAuth, requireCpq, async (req: Request, res: Response): Pr
 // ── GET /api/quotes/:id ──────────────────────────────────────────────────────
 router.get('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: quote, error } = await supabase
     .from('quotes')
@@ -182,7 +176,7 @@ router.get('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
 // ── POST /api/quotes ─────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
@@ -322,7 +316,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
           await sendEmail({
             to: ownerUser.email,
             subject: `Quote Approval Required — ${quoteNumber}`,
-            html: quoteApprovalEmailHtml({
+            html: buildQuoteApprovalEmailHtml({
               quoteNumber,
               title,
               contactName: '',
@@ -347,7 +341,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
 // ── PUT /api/quotes/:id ──────────────────────────────────────────────────────
 router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing } = await supabase
     .from('quotes')
@@ -471,7 +465,7 @@ router.delete(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { error } = await supabase
       .from('quotes')
@@ -495,7 +489,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -588,7 +582,7 @@ router.post(
           await sendEmail({
             to: contact!.email!,
             subject: `Quote ${quote.quote_number} from ${businessName}`,
-            html: quoteEmailHtml({
+            html: buildQuoteEmailHtml({
               contactName,
               businessName,
               quoteNumber: quote.quote_number,
@@ -668,7 +662,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: original } = await supabase
       .from('quotes')
@@ -824,7 +818,7 @@ router.get(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Verify ownership
     const { data: check } = await supabase
@@ -853,7 +847,7 @@ router.get(
 
 // ── PUBLIC: GET /api/quotes/view/:token ──────────────────────────────────────
 router.get('/view/:token', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const token = req.params['token']
 
   const { data: quote } = await supabase
@@ -956,7 +950,7 @@ router.get('/view/:token', async (req: Request, res: Response): Promise<void> =>
 
 // ── PUBLIC: GET /api/quotes/view/:token/pdf ──────────────────────────────────
 router.get('/view/:token/pdf', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: quote } = await supabase
     .from('quotes')
     .select('id')
@@ -984,7 +978,7 @@ router.post(
   '/view/:token/pay-square',
   publicPaymentLimiter,
   async (req: Request, res: Response): Promise<void> => {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { sourceId, paymentType } = req.body as { sourceId?: unknown; paymentType?: unknown }
 
     if (typeof sourceId !== 'string' || !sourceId) {
@@ -1105,7 +1099,7 @@ router.post(
 
 // ── PUBLIC: POST /api/quotes/view/:token/accept ──────────────────────────────
 router.post('/view/:token/accept', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: quote } = await supabase
     .from('quotes')
@@ -1333,7 +1327,7 @@ router.post('/view/:token/accept', async (req: Request, res: Response): Promise<
 
 // ── PUBLIC: POST /api/quotes/view/:token/decline ─────────────────────────────
 router.post('/view/:token/decline', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const reason = typeof req.body?.reason === 'string' ? req.body.reason : null
 
   const { data: quote } = await supabase
@@ -1428,7 +1422,7 @@ export async function processQuoteSignature(
   }
 
   // Lookup quote by share token
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: quote, error: selectErr } = await supabase
     .from('quotes')
     .select('id, requires_signature, signature_status, status')
@@ -1510,7 +1504,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1575,7 +1569,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1635,7 +1629,7 @@ router.get(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -1679,7 +1673,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const amount = typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount']))
@@ -1791,7 +1785,7 @@ router.post(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const packageId = typeof req.body?.package_id === 'string' ? req.body.package_id : null
 
     if (!packageId) {
@@ -1917,7 +1911,7 @@ router.delete(
   requireCpq,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Verify quote belongs to tenant
     const { data: quote } = await supabase
@@ -1963,74 +1957,6 @@ router.delete(
     res.json({ deleted: true, ...(warning ? { warning } : {}) })
   }
 )
-
-// ── Quote email HTML helper ──────────────────────────────────────────────────
-function quoteEmailHtml(vars: {
-  contactName: string
-  businessName: string
-  quoteNumber: string
-  quoteTotal: string
-  quoteUrl: string
-  validUntil: string
-}): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;background:#f5f5f5}
-.c{max-width:560px;margin:0 auto;padding:32px 24px}.card{background:#fff;border-radius:12px;padding:32px;border:1px solid #e5e5e5}
-h1{font-size:20px;color:#111;margin:0 0 16px}p{font-size:15px;color:#444;line-height:1.6;margin:0 0 12px}
-.total{font-size:28px;font-weight:700;color:#0d9488;margin:16px 0}
-.btn{display:inline-block;padding:14px 28px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px}
-.footer{text-align:center;padding:16px;font-size:12px;color:#999}</style>
-</head><body><div class="c"><div class="card">
-<h1>Quote ${vars.quoteNumber}</h1>
-<p>Hi ${vars.contactName},</p>
-<p>You've received a quote from <strong>${vars.businessName}</strong>.</p>
-<div class="total">${vars.quoteTotal}</div>
-${vars.validUntil ? `<p style="font-size:13px;color:#999">Valid until ${vars.validUntil}</p>` : ''}
-<p style="margin-top:24px"><a class="btn" href="${vars.quoteUrl}">View Quote</a></p>
-</div><div class="footer">${vars.businessName}</div></div></body></html>`
-}
-
-// ── Quote approval email HTML helper ────────────────────────────────────────
-function quoteApprovalEmailHtml(vars: {
-  quoteNumber: string
-  title: string
-  contactName: string
-  subtotal: string
-  discountPct: string
-  discountAmount: string
-  total: string
-  quoteUrl: string
-  businessName: string
-}): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;background:#f5f5f5}
-.c{max-width:560px;margin:0 auto;padding:32px 24px}.card{background:#fff;border-radius:12px;padding:32px;border:1px solid #e5e5e5}
-h1{font-size:20px;color:#111;margin:0 0 16px}p{font-size:15px;color:#444;line-height:1.6;margin:0 0 12px}
-.discount{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin:16px 0}
-.discount strong{color:#d97706}
-.total{font-size:24px;font-weight:700;color:#0d9488;margin:12px 0}
-.btn{display:inline-block;padding:14px 28px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px}
-.footer{text-align:center;padding:16px;font-size:12px;color:#999}
-table{width:100%;border-collapse:collapse;margin:12px 0}td{padding:6px 0;font-size:14px;color:#444}
-td:last-child{text-align:right}</style>
-</head><body><div class="c"><div class="card">
-<h1>Quote Approval Required</h1>
-<p>A quote needs your approval before it can be sent.</p>
-<table>
-<tr><td style="color:#999">Quote</td><td><strong>${vars.quoteNumber}</strong></td></tr>
-<tr><td style="color:#999">Title</td><td>${vars.title}</td></tr>
-${vars.contactName ? `<tr><td style="color:#999">Contact</td><td>${vars.contactName}</td></tr>` : ''}
-<tr><td style="color:#999">Subtotal</td><td>${vars.subtotal}</td></tr>
-</table>
-<div class="discount">
-<strong>${vars.discountPct}% discount applied</strong> &mdash; ${vars.discountAmount} off
-</div>
-<div class="total">${vars.total}</div>
-<p style="margin-top:24px"><a class="btn" href="${vars.quoteUrl}">Review This Quote</a></p>
-</div><div class="footer">${vars.businessName}</div></div></body></html>`
-}
 
 export default router
 

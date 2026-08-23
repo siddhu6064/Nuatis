@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import { SlideOver } from '@/components/ui/SlideOver'
 import type { Shift, StaffMember } from './types'
 
@@ -157,58 +160,65 @@ export default function ShiftSlideOver({
         <div className="px-5 py-5 space-y-4">
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Staff member *</label>
-            <select
+            <TextField
+              select
               value={selectedStaffId}
               onChange={(e) => setSelectedStaffId(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 bg-white"
+              fullWidth
+              size="small"
             >
-              <option value="">— Select —</option>
+              <MenuItem value="">— Select —</MenuItem>
               {staffList.map((m) => (
-                <option key={m.id} value={m.id}>
+                <MenuItem key={m.id} value={m.id}>
                   {m.name}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </TextField>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Date *</label>
-            <input
+            <TextField
               type="date"
               value={shiftDate}
               onChange={(e) => setShiftDate(e.target.value)}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              fullWidth
+              size="small"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-ink3 mb-1.5">Start *</label>
-              <input
+              <TextField
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+                fullWidth
+                size="small"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink3 mb-1.5">End *</label>
-              <input
+              <TextField
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+                fullWidth
+                size="small"
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-ink3 mb-1.5">Notes</label>
-            <textarea
+            <TextField
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              multiline
               rows={3}
-              className="w-full text-sm border border-border-brand rounded-lg px-3 py-2"
+              fullWidth
+              size="small"
             />
           </div>
 
@@ -221,28 +231,18 @@ export default function ShiftSlideOver({
           <div className="flex justify-between items-center pt-2">
             <div>
               {isEdit && (
-                <button
-                  onClick={() => setConfirmDel(true)}
-                  className="text-sm text-red-600 hover:text-red-700"
-                >
+                <Button onClick={() => setConfirmDel(true)} size="small" color="error">
                   Delete
-                </button>
+                </Button>
               )}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={onClose}
-                className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-              >
+              <Button onClick={onClose} variant="outlined" color="inherit">
                 Cancel
-              </button>
-              <button
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-              >
+              </Button>
+              <Button onClick={() => void handleSave()} disabled={saving} variant="contained">
                 {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -253,19 +253,17 @@ export default function ShiftSlideOver({
               <h3 className="text-base font-semibold text-ink mb-1">Delete shift?</h3>
               <p className="text-sm text-ink3 mb-5">This cannot be undone.</p>
               <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setConfirmDel(false)}
-                  className="rounded-lg border border-border-brand px-4 py-2 text-sm font-medium text-ink2 hover:bg-bg"
-                >
+                <Button onClick={() => setConfirmDel(false)} variant="outlined" color="inherit">
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => void handleDelete()}
                   disabled={deleting}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                  variant="contained"
+                  color="error"
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

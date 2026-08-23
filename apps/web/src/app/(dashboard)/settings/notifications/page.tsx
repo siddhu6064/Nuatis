@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -297,21 +298,12 @@ export default function NotificationSettingsPage() {
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-        >
+        <Button onClick={save} disabled={saving} variant="contained">
           {saving ? 'Saving...' : 'Save Preferences'}
-        </button>
-        <button
-          type="button"
-          onClick={resetToDefaults}
-          disabled={saving}
-          className="px-4 py-2 bg-white text-ink3 text-sm font-medium rounded-lg border border-border-brand hover:bg-bg disabled:opacity-50 transition-colors"
-        >
+        </Button>
+        <Button onClick={resetToDefaults} disabled={saving} color="inherit" variant="outlined">
           Reset to Defaults
-        </button>
+        </Button>
       </div>
 
       {/* Weekly Digest card */}
@@ -334,14 +326,15 @@ export default function NotificationSettingsPage() {
 
         {/* Card body */}
         <div className="px-6 py-4 flex items-center gap-4">
-          <button
-            type="button"
+          <Button
             onClick={sendTestDigest}
             disabled={testSending}
-            className="px-3 py-1.5 bg-white text-ink3 text-sm font-medium rounded-lg border border-border-brand hover:bg-bg disabled:opacity-50 transition-colors whitespace-nowrap"
+            color="inherit"
+            variant="outlined"
+            sx={{ whiteSpace: 'nowrap' }}
           >
             {testSending ? 'Sending...' : 'Send test digest'}
-          </button>
+          </Button>
 
           {/* Inline feedback */}
           {testToast && <p className="text-sm text-ink3">{testToast}</p>}

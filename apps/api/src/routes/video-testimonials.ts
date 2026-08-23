@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import multer from 'multer'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
@@ -11,18 +11,11 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 })
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── PUBLIC ROUTES ──────────────────────────────────────────────────────────
 
 // GET /api/video-testimonials/collect/:slug
 router.get('/collect/:slug', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data: collector } = await supabase
     .from('video_collectors')
     .select('id, name, prompt, max_duration_seconds, status, tenant_id, tenants(name)')
@@ -52,7 +45,7 @@ router.post(
   '/collect/:slug',
   upload.single('video'),
   async (req: Request, res: Response): Promise<void> => {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // 1. Find collector
     const { data: collector } = await supabase
@@ -150,7 +143,7 @@ router.post(
 // GET /api/video-testimonials/collectors
 router.get('/collectors', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data } = await supabase
     .from('video_collectors')
     .select('*')
@@ -173,7 +166,7 @@ router.post('/collectors', requireAuth, async (req: Request, res: Response): Pro
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const slug = randomBytes(8).toString('hex')
 
   const { data, error } = await supabase
@@ -199,13 +192,13 @@ router.post('/collectors', requireAuth, async (req: Request, res: Response): Pro
 router.put('/collectors/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { name, prompt, max_duration_seconds, status } = req.body as Record<string, unknown>
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const updates: Record<string, unknown> = {}
   if (typeof name === 'string') updates['name'] = name.trim()
   if (typeof prompt === 'string') updates['prompt'] = prompt
   if (typeof max_duration_seconds === 'number')
     updates['max_duration_seconds'] = max_duration_seconds
-  if (typeof status === 'string' && ['active', 'paused'].includes(status))
+  if (typeof status === 'string' && ['active', 'paused', 'archived'].includes(status))
     updates['status'] = status
 
   const { data, error } = await supabase
@@ -229,7 +222,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     await supabase
       .from('video_collectors')
       .update({ status: 'archived' })
@@ -243,7 +236,7 @@ router.delete(
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { collector_id, status } = req.query
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   let query = supabase
     .from('video_testimonials')
@@ -265,7 +258,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // GET /api/video-testimonials/:id (single + signed URL)
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: testimonial } = await supabase
     .from('video_testimonials')
@@ -295,7 +288,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // Helper: update testimonial status
 async function updateStatus(req: Request, res: Response, status: string): Promise<void> {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('video_testimonials')
     .update({ status, reviewed_at: new Date().toISOString() })
@@ -318,7 +311,7 @@ router.post('/:id/feature', requireAuth, (req, res) => updateStatus(req, res, 'f
 // DELETE /api/video-testimonials/:id
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: testimonial } = await supabase
     .from('video_testimonials')

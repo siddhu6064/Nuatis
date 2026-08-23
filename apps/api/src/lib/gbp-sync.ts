@@ -1,16 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { google } from 'googleapis'
 import type { BrandVoice, GbpInsights } from '@nuatis/shared'
 import { buildBrandVoicePromptBlock } from './brand-voice.js'
-
-// ── Supabase factory ──────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Raw GBP API shape ─────────────────────────────────────────
 
@@ -69,7 +60,7 @@ export async function refreshTokenIfNeeded(conn: {
   oauth2Client.setCredentials({ refresh_token: conn.refresh_token })
   const { credentials } = await oauth2Client.refreshAccessToken()
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const updatePayload: Record<string, string> = {
     access_token: credentials.access_token!,
     token_expires_at: new Date(credentials.expiry_date!).toISOString(),
@@ -85,7 +76,7 @@ export async function refreshTokenIfNeeded(conn: {
 // ── syncReviews ───────────────────────────────────────────────
 
 export async function syncReviews(tenantId: string): Promise<number> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: conn } = await supabase
     .from('gbp_connections')
@@ -165,7 +156,7 @@ export async function generateAiReply(
   rating: number,
   comment: string
 ): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: tenant } = await supabase
     .from('tenants')
@@ -205,7 +196,7 @@ export async function generateAiReply(
 
 export async function fetchGbpInsights(tenantId: string): Promise<GbpInsights | null> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: conn } = await supabase
       .from('gbp_connections')

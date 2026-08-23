@@ -2,7 +2,27 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
 import type { AutomationOverview, CustomAutomation } from '@nuatis/shared'
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M6 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 function relativeTime(isoString: string | null): string {
   if (!isoString) return '—'
@@ -158,12 +178,9 @@ export default function AutomationOverviewClient() {
     return (
       <div className="bg-white rounded-xl border border-border-brand p-12 text-center">
         <p className="text-sm text-ink4">Failed to load automation overview.</p>
-        <button
-          onClick={refresh}
-          className="mt-3 text-xs text-teal-600 hover:text-teal-700 underline"
-        >
+        <Button onClick={refresh} size="small" sx={{ mt: 1 }}>
           Try again
-        </button>
+        </Button>
       </div>
     )
   }
@@ -178,12 +195,9 @@ export default function AutomationOverviewClient() {
     <div>
       {/* Refresh / last updated */}
       <div className="flex items-center justify-end mb-4">
-        <button
-          onClick={refresh}
-          className="text-xs text-ink3 hover:text-ink flex items-center gap-1"
-        >
+        <Button onClick={refresh} size="small" color="inherit" sx={{ fontSize: 12 }}>
           ↻ Refresh
-        </button>
+        </Button>
         {lastUpdated && (
           <span className="text-xs text-ink4 ml-2">Updated {lastUpdated.toLocaleTimeString()}</span>
         )}
@@ -343,22 +357,29 @@ export default function AutomationOverviewClient() {
                                   Paused until {new Date(s.pause_until ?? '').toLocaleString()}
                                 </span>
                               )}
-                              <button
+                              <Button
                                 onClick={() => void resumeScanner(s.key)}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                                size="small"
+                                color="inherit"
+                                sx={{ fontSize: 12 }}
                               >
                                 Resume
-                              </button>
+                              </Button>
                             </div>
                           ) : (
-                            <button
+                            <Button
                               onClick={() =>
                                 setOpenPauseForm(openPauseForm === s.key ? null : s.key)
                               }
-                              className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 font-medium transition-colors"
+                              size="small"
+                              sx={{
+                                fontSize: 12,
+                                color: '#d97706',
+                                '&:hover': { bgcolor: '#fffbeb' },
+                              }}
                             >
                               Pause
-                            </button>
+                            </Button>
                           )}
                         </td>
                       </tr>
@@ -369,42 +390,38 @@ export default function AutomationOverviewClient() {
                             className="px-6 py-4 bg-amber-50/50 border-b border-amber-100"
                           >
                             <div className="flex items-center gap-3 flex-wrap">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs text-ink4 font-medium">From</label>
-                                <input
-                                  type="datetime-local"
-                                  value={pauseForm.paused_from}
-                                  onChange={(e) =>
-                                    setPauseForm((f) => ({ ...f, paused_from: e.target.value }))
-                                  }
-                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs text-ink4 font-medium">Until</label>
-                                <input
-                                  type="datetime-local"
-                                  value={pauseForm.paused_until}
-                                  onChange={(e) =>
-                                    setPauseForm((f) => ({ ...f, paused_until: e.target.value }))
-                                  }
-                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs text-ink4 font-medium">Reason</label>
-                                <input
-                                  type="text"
-                                  placeholder="Optional reason"
-                                  value={pauseForm.reason}
-                                  onChange={(e) =>
-                                    setPauseForm((f) => ({ ...f, reason: e.target.value }))
-                                  }
-                                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 w-48"
-                                />
-                              </div>
-                              <div className="flex items-end gap-2 mt-4">
-                                <button
+                              <TextField
+                                label="From"
+                                type="datetime-local"
+                                value={pauseForm.paused_from}
+                                onChange={(e) =>
+                                  setPauseForm((f) => ({ ...f, paused_from: e.target.value }))
+                                }
+                                size="small"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                              />
+                              <TextField
+                                label="Until"
+                                type="datetime-local"
+                                value={pauseForm.paused_until}
+                                onChange={(e) =>
+                                  setPauseForm((f) => ({ ...f, paused_until: e.target.value }))
+                                }
+                                size="small"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                              />
+                              <TextField
+                                label="Reason"
+                                placeholder="Optional reason"
+                                value={pauseForm.reason}
+                                onChange={(e) =>
+                                  setPauseForm((f) => ({ ...f, reason: e.target.value }))
+                                }
+                                size="small"
+                                sx={{ width: 192 }}
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
                                   onClick={() => void pauseScanner(s.key)}
                                   disabled={
                                     !pauseForm.paused_from ||
@@ -412,19 +429,25 @@ export default function AutomationOverviewClient() {
                                     new Date(pauseForm.paused_until) <=
                                       new Date(pauseForm.paused_from)
                                   }
-                                  className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  size="small"
+                                  variant="contained"
+                                  sx={{
+                                    bgcolor: '#d97706',
+                                    '&:hover': { bgcolor: '#b45309' },
+                                  }}
                                 >
                                   Pause Scanner
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   onClick={() => {
                                     setOpenPauseForm(null)
                                     setPauseForm({ paused_from: '', paused_until: '', reason: '' })
                                   }}
-                                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                                  size="small"
+                                  color="inherit"
                                 >
                                   Cancel
-                                </button>
+                                </Button>
                               </div>
                             </div>
                           </td>
@@ -465,27 +488,30 @@ export default function AutomationOverviewClient() {
               .map((s) => {
                 const isOpen = openScanners.has(s.key)
                 return (
-                  <div
+                  <Accordion
                     key={s.key}
-                    className="bg-white rounded-xl border border-border-brand overflow-hidden"
+                    expanded={isOpen}
+                    onChange={() => toggleScanner(s.key)}
+                    disableGutters
+                    sx={{
+                      '&:before': { display: 'none' },
+                      borderRadius: '0.75rem !important',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      overflow: 'hidden',
+                    }}
                   >
-                    {/* Accordion header */}
-                    <button
-                      onClick={() => toggleScanner(s.key)}
-                      className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors"
-                    >
+                    <AccordionSummary expandIcon={<ChevronIcon />}>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-ink">{s.name}</span>
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700">
                           {s.failure_count} failed
                         </span>
                       </div>
-                      <span className="text-ink4 text-xs">{isOpen ? '▲' : '▼'}</span>
-                    </button>
+                    </AccordionSummary>
 
-                    {/* Accordion body */}
-                    {isOpen && (
-                      <div className="border-t border-border-brand">
+                    <AccordionDetails sx={{ p: 0, borderTop: 1, borderColor: 'divider' }}>
+                      <div>
                         {s.failed_jobs.length === 0 ? (
                           <p className="px-6 py-4 text-sm text-ink4">No job details available.</p>
                         ) : (
@@ -525,22 +551,25 @@ export default function AutomationOverviewClient() {
                           </table>
                         )}
                         <div className="px-6 py-3 flex gap-2 border-t border-gray-100">
-                          <button
+                          <Button
                             onClick={() => void retryFailed(s.key)}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium transition-colors"
+                            size="small"
+                            sx={{ fontSize: 12 }}
                           >
                             Retry All
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => void clearFailed(s.key)}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-ink3 hover:bg-gray-200 font-medium transition-colors"
+                            size="small"
+                            color="inherit"
+                            sx={{ fontSize: 12 }}
                           >
                             Clear Failed
-                          </button>
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </AccordionDetails>
+                  </Accordion>
                 )
               })}
           </div>

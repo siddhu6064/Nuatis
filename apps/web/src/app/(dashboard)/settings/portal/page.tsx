@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Switch from '@mui/material/Switch'
 
 interface PortalSettings {
   portal_enabled: boolean
@@ -169,20 +172,12 @@ export default function PortalSettingsPage() {
               Allow clients to view their data via a private link
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleToggle()}
+          <Switch
+            checked={settings?.portal_enabled ?? false}
+            onChange={() => void handleToggle()}
             disabled={toggling}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-              settings?.portal_enabled ? 'bg-teal-600' : 'bg-gray-200'
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 mt-0.5 ${
-                settings?.portal_enabled ? 'translate-x-5' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+            slotProps={{ input: { 'aria-label': 'Enable Client Portal' } }}
+          />
         </div>
 
         {settings?.portal_enabled && settings.portal_url && (
@@ -192,21 +187,18 @@ export default function PortalSettingsPage() {
               <code className="flex-1 text-xs bg-bg2 px-3 py-2 rounded-lg text-ink2 truncate">
                 {settings.portal_url}
               </code>
-              <button
-                type="button"
-                onClick={handleCopyUrl}
-                className="shrink-0 px-3 py-2 text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
+              <Button onClick={handleCopyUrl} size="small" color="inherit">
                 {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <a
+              </Button>
+              <Button
+                component="a"
                 href={settings.portal_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 px-3 py-2 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+                size="small"
               >
                 Preview →
-              </a>
+              </Button>
             </div>
           </div>
         )}
@@ -224,12 +216,12 @@ export default function PortalSettingsPage() {
           )}
 
           <div className="relative">
-            <input
-              type="text"
+            <TextField
               value={inviteSearch}
               onChange={(e) => setInviteSearch(e.target.value)}
               placeholder="Search contacts by name or email…"
-              className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              size="small"
+              fullWidth
             />
             {searching && (
               <div className="absolute right-3 top-2.5">
@@ -239,12 +231,22 @@ export default function PortalSettingsPage() {
             {searchResults.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-border-brand rounded-lg shadow-lg overflow-hidden">
                 {searchResults.map((contact) => (
-                  <button
+                  <Button
                     key={contact.id}
-                    type="button"
                     onClick={() => void handleInvite(contact.id)}
                     disabled={inviting === contact.id}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+                    fullWidth
+                    color="inherit"
+                    sx={{
+                      justifyContent: 'space-between',
+                      textAlign: 'left',
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: 0,
+                      borderBottom: '1px solid',
+                      borderColor: 'grey.50',
+                      '&:last-of-type': { borderBottom: 'none' },
+                    }}
                   >
                     <div>
                       <p className="text-sm font-medium text-ink">{contact.full_name ?? '—'}</p>
@@ -253,7 +255,7 @@ export default function PortalSettingsPage() {
                     <span className="text-xs text-teal-600 font-medium">
                       {inviting === contact.id ? 'Inviting…' : 'Invite →'}
                     </span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -317,13 +319,13 @@ export default function PortalSettingsPage() {
                         : 'Never'}
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => void handleRevoke(client.contact_id)}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        color="error"
+                        size="small"
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}

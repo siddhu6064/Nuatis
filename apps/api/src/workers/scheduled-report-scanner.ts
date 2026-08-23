@@ -1,17 +1,10 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import type { ScheduledReportJobData } from './scheduled-report-worker.js'
 
 const SCANNER_QUEUE = 'scheduled-report-scanner'
 const REPORT_QUEUE = 'scheduled-reports'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface ScheduledReport {
   id: string
@@ -48,7 +41,7 @@ function isDue(report: ScheduledReport): boolean {
 
 export async function scanScheduledReports(): Promise<void> {
   console.info('[scheduled-report-scanner] scanning...')
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: reports, error } = await supabase
     .from('scheduled_reports')

@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import IconButton from '@mui/material/IconButton'
 import type { MayaKbUrl } from '@nuatis/shared'
 
 const STATUS_CLASSES: Record<MayaKbUrl['status'], string> = {
@@ -165,7 +168,7 @@ export default function WebsiteKnowledgeCard({ initialUrls }: { initialUrls: May
 
       {!atMax && (
         <form onSubmit={handleAdd} className="flex gap-2 mb-4">
-          <input
+          <TextField
             type="url"
             aria-label="Website URL"
             value={inputUrl}
@@ -174,16 +177,13 @@ export default function WebsiteKnowledgeCard({ initialUrls }: { initialUrls: May
               setAddError(null)
             }}
             placeholder="https://yourbusiness.com"
-            className="flex-1 px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink placeholder:text-ink4"
             disabled={adding}
+            fullWidth
+            size="small"
           />
-          <button
-            type="submit"
-            disabled={adding || !inputUrl.trim()}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" disabled={adding || !inputUrl.trim()} color="inherit">
             {adding ? 'Adding…' : 'Crawl Website'}
-          </button>
+          </Button>
         </form>
       )}
 
@@ -236,12 +236,11 @@ export default function WebsiteKnowledgeCard({ initialUrls }: { initialUrls: May
               <div className="flex items-center gap-1 ml-3 shrink-0">
                 {/* Refresh button — shown for ready or error states */}
                 {(u.status === 'ready' || u.status === 'error') && (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={() => handleRefresh(u.id)}
                     disabled={refreshingId === u.id}
                     title="Re-crawl"
-                    className="text-ink4 hover:text-brand transition-colors disabled:opacity-40 p-0.5"
+                    size="small"
                   >
                     <svg
                       className="w-3.5 h-3.5"
@@ -256,15 +255,14 @@ export default function WebsiteKnowledgeCard({ initialUrls }: { initialUrls: May
                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                       />
                     </svg>
-                  </button>
+                  </IconButton>
                 )}
                 {/* Delete button */}
-                <button
-                  type="button"
+                <IconButton
                   onClick={() => handleDelete(u.id)}
                   disabled={deletingId === u.id}
                   title="Remove"
-                  className="text-ink4 hover:text-red-500 transition-colors disabled:opacity-40 p-0.5"
+                  size="small"
                 >
                   <svg
                     className="w-4 h-4"
@@ -279,7 +277,7 @@ export default function WebsiteKnowledgeCard({ initialUrls }: { initialUrls: May
                       d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                     />
                   </svg>
-                </button>
+                </IconButton>
               </div>
             </div>
           ))}

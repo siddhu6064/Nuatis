@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import SnippetPicker from '@/components/SnippetPicker'
@@ -482,20 +485,44 @@ export default function ConversationsClient() {
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 49px)' }}>
       {/* ── Main tab bar ── */}
       <div className="flex items-center gap-1 px-4 py-2 border-b border-border-brand bg-white shrink-0">
-        {(['inbox', 'analytics'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setMainTab(t)
-              if (t === 'analytics' && !analytics) void fetchAnalytics()
-            }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-              mainTab === t ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        <ToggleButtonGroup
+          value={mainTab}
+          exclusive
+          onChange={(_e, v: 'inbox' | 'analytics' | null) => {
+            if (!v) return
+            setMainTab(v)
+            if (v === 'analytics' && !analytics) void fetchAnalytics()
+          }}
+          size="small"
+          sx={{
+            gap: 1,
+            '& .MuiToggleButtonGroup-grouped': { border: 0, borderRadius: '6px !important' },
+          }}
+        >
+          {(['inbox', 'analytics'] as const).map((t) => (
+            <ToggleButton
+              key={t}
+              value={t}
+              sx={{
+                px: 1.5,
+                py: 0.75,
+                fontSize: 12,
+                fontWeight: 500,
+                textTransform: 'capitalize',
+                color: 'text.secondary',
+                bgcolor: '#f9f8f5',
+                '&:hover': { color: 'text.primary' },
+                '&.Mui-selected': {
+                  bgcolor: '#0d9488',
+                  color: '#fff',
+                  '&:hover': { bgcolor: '#0f766e' },
+                },
+              }}
+            >
+              {t}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
       </div>
 
       {mainTab === 'analytics' ? (
@@ -599,57 +626,129 @@ export default function ConversationsClient() {
               </div>
 
               {/* Channel selector */}
-              <div className="flex gap-1 mb-3">
+              <ToggleButtonGroup
+                value={channel}
+                exclusive
+                onChange={(_e, v: ChannelType | null) => {
+                  if (!v) return
+                  setChannel(v)
+                  setSelectedId(null)
+                  setSelectedSessionToken(null)
+                }}
+                fullWidth
+                size="small"
+                sx={{
+                  gap: 1,
+                  mb: 3,
+                  '& .MuiToggleButtonGroup-grouped': { border: 0, borderRadius: '6px !important' },
+                }}
+              >
                 {(['sms', 'webchat'] as ChannelType[]).map((ch) => (
-                  <button
+                  <ToggleButton
                     key={ch}
-                    onClick={() => {
-                      setChannel(ch)
-                      setSelectedId(null)
-                      setSelectedSessionToken(null)
+                    value={ch}
+                    sx={{
+                      py: 0.75,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      textTransform: 'uppercase',
+                      color: 'text.secondary',
+                      bgcolor: '#f9f8f5',
+                      '&:hover': { color: 'text.primary' },
+                      '&.Mui-selected': {
+                        bgcolor: '#0d9488',
+                        color: '#fff',
+                        '&:hover': { bgcolor: '#0f766e' },
+                      },
                     }}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors uppercase ${
-                      channel === ch ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
-                    }`}
                   >
                     {ch === 'sms' ? 'SMS' : 'Webchat'}
-                  </button>
+                  </ToggleButton>
                 ))}
-              </div>
+              </ToggleButtonGroup>
 
               {channel === 'sms' && (
                 <>
                   {/* Open / Resolved tabs */}
-                  <div className="flex gap-1 mb-2">
+                  <ToggleButtonGroup
+                    value={tab}
+                    exclusive
+                    onChange={(_e, v: TabType | null) => {
+                      if (!v) return
+                      setTab(v)
+                      setSelectedId(null)
+                      setInboxFilter('all')
+                    }}
+                    fullWidth
+                    size="small"
+                    sx={{
+                      gap: 1,
+                      mb: 2,
+                      '& .MuiToggleButtonGroup-grouped': {
+                        border: 0,
+                        borderRadius: '6px !important',
+                      },
+                    }}
+                  >
                     {(['open', 'resolved'] as TabType[]).map((t) => (
-                      <button
+                      <ToggleButton
                         key={t}
-                        onClick={() => {
-                          setTab(t)
-                          setSelectedId(null)
-                          setInboxFilter('all')
+                        value={t}
+                        sx={{
+                          py: 0.75,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          textTransform: 'capitalize',
+                          color: 'text.secondary',
+                          bgcolor: '#f9f8f5',
+                          '&:hover': { color: 'text.primary' },
+                          '&.Mui-selected': {
+                            bgcolor: '#0d9488',
+                            color: '#fff',
+                            '&:hover': { bgcolor: '#0f766e' },
+                          },
                         }}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
-                          tab === t ? 'bg-teal-600 text-white' : 'bg-bg text-ink3 hover:text-ink'
-                        }`}
                       >
                         {t}
-                      </button>
+                      </ToggleButton>
                     ))}
-                  </div>
+                  </ToggleButtonGroup>
 
                   {/* All / Mine sub-tabs (open only) */}
                   {tab === 'open' && (
-                    <div className="flex gap-1 mb-3">
+                    <ToggleButtonGroup
+                      value={inboxFilter}
+                      exclusive
+                      onChange={(_e, v: InboxFilter | null) => v && setInboxFilter(v)}
+                      fullWidth
+                      size="small"
+                      sx={{
+                        gap: 1,
+                        mb: 3,
+                        '& .MuiToggleButtonGroup-grouped': {
+                          border: '1px solid transparent',
+                          borderRadius: '4px !important',
+                        },
+                      }}
+                    >
                       {(['all', 'mine'] as InboxFilter[]).map((f) => (
-                        <button
+                        <ToggleButton
                           key={f}
-                          onClick={() => setInboxFilter(f)}
-                          className={`relative flex-1 py-1 text-[11px] font-medium rounded transition-colors capitalize ${
-                            inboxFilter === f
-                              ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                              : 'text-ink4 hover:text-ink'
-                          }`}
+                          value={f}
+                          sx={{
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            textTransform: 'capitalize',
+                            color: 'text.disabled',
+                            '&:hover': { color: 'text.primary' },
+                            '&.Mui-selected': {
+                              bgcolor: '#f0fdfa',
+                              color: '#0f766e',
+                              borderColor: '#99f6e4 !important',
+                              '&:hover': { bgcolor: '#f0fdfa' },
+                            },
+                          }}
                         >
                           {f}
                           {f === 'mine' && mineCount > 0 && (
@@ -657,9 +756,9 @@ export default function ConversationsClient() {
                               {mineCount > 9 ? '9+' : mineCount}
                             </span>
                           )}
-                        </button>
+                        </ToggleButton>
                       ))}
-                    </div>
+                    </ToggleButtonGroup>
                   )}
 
                   <TextField
@@ -687,12 +786,21 @@ export default function ConversationsClient() {
                   filtered.map((conv) => {
                     const active = conv.id === selectedId
                     return (
-                      <button
+                      <ButtonBase
                         key={conv.id}
                         onClick={() => setSelectedId(conv.id)}
-                        className={`w-full text-left px-4 py-3 border-b border-border-brand transition-colors ${
-                          active ? 'bg-teal-50' : 'hover:bg-bg'
-                        }`}
+                        sx={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          px: 2,
+                          py: 1.5,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          transition: 'background-color 150ms',
+                          bgcolor: active ? '#f0fdfa' : 'transparent',
+                          '&:hover': { bgcolor: active ? '#f0fdfa' : '#f9f8f5' },
+                        }}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -730,7 +838,7 @@ export default function ConversationsClient() {
                             </div>
                           </div>
                         </div>
-                      </button>
+                      </ButtonBase>
                     )
                   })
                 )}
@@ -747,12 +855,24 @@ export default function ConversationsClient() {
                   </div>
                 ) : (
                   webchatSessions.map((s) => (
-                    <button
+                    <ButtonBase
                       key={s.id}
                       onClick={() => setSelectedSessionToken(s.session_token)}
-                      className={`w-full text-left px-4 py-3 border-b border-border-brand transition-colors ${
-                        s.session_token === selectedSessionToken ? 'bg-teal-50' : 'hover:bg-bg'
-                      }`}
+                      sx={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        px: 2,
+                        py: 1.5,
+                        borderBottom: 1,
+                        borderColor: 'divider',
+                        transition: 'background-color 150ms',
+                        bgcolor:
+                          s.session_token === selectedSessionToken ? '#f0fdfa' : 'transparent',
+                        '&:hover': {
+                          bgcolor: s.session_token === selectedSessionToken ? '#f0fdfa' : '#f9f8f5',
+                        },
+                      }}
                     >
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0">
@@ -772,7 +892,7 @@ export default function ConversationsClient() {
                           </span>
                         </div>
                       </div>
-                    </button>
+                    </ButtonBase>
                   ))
                 )}
               </div>

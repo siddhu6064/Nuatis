@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { Redis } from 'ioredis'
 import crypto from 'crypto'
 
@@ -29,13 +29,6 @@ export interface ReportResult {
 }
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Redis (optional) ─────────────────────────────────────────────────────────
 
@@ -239,7 +232,7 @@ function getGroupKey(
 // ── Lookup map builders ───────────────────────────────────────────────────────
 
 async function buildStageLookup(tenantId: string): Promise<Map<string, string>> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data } = await supabase
     .from('pipeline_stages')
     .select('id, name')
@@ -252,7 +245,7 @@ async function buildStageLookup(tenantId: string): Promise<Map<string, string>> 
 }
 
 async function buildUserLookup(tenantId: string): Promise<Map<string, string>> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data } = await supabase.from('users').select('id, full_name').eq('tenant_id', tenantId)
   const map = new Map<string, string>()
   for (const row of data ?? []) {
@@ -267,7 +260,7 @@ async function executeReportInternal(
   tenantId: string,
   report: ReportConfig
 ): Promise<ReportResult> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Base query scoped to tenant
   let query = supabase.from(report.object).select('*').eq('tenant_id', tenantId)

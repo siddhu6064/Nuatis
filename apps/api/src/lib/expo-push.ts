@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 interface ExpoMessage {
   to: string
@@ -27,7 +20,7 @@ export async function sendExpoPushToTenant(
   data?: Record<string, string>
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data: tokens } = await supabase
       .from('mobile_push_tokens')
       .select('expo_token')

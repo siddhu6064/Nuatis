@@ -1,19 +1,13 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { generateInvoiceNumber } from '../lib/invoice-number.js'
+import { buildInvoiceEmailHtml } from '../lib/email-templates/invoice.js'
 import PDFDocument from 'pdfkit'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface LineItemInput {
   description: string
@@ -31,7 +25,7 @@ export function calcInvoiceTotals(items: LineItemInput[], taxRate: number) {
 // ── GET /api/invoices ──────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
@@ -62,7 +56,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/invoices/:id/pdf ─────────────────────────────────────────────────
 router.get('/:id/pdf', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Fetch invoice with contact
   const { data: invoice, error } = await supabase
@@ -321,7 +315,7 @@ router.get('/:id/pdf', requireAuth, async (req: Request, res: Response): Promise
 // ── GET /api/invoices/:id ──────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice, error } = await supabase
     .from('invoices')
@@ -347,7 +341,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/invoices ─────────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const lineItems = Array.isArray(b['line_items']) ? (b['line_items'] as LineItemInput[]) : []
@@ -397,14 +391,22 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
   const itemRows = lineItems.map((item, i) => ({
     invoice_id: invoice.id,
+    tenant_id: authed.tenantId,
     description: item.description,
     quantity: item.quantity,
     unit_price: item.unit_price,
-    total: Number((item.quantity * item.unit_price).toFixed(2)),
     sort_order: i,
   }))
 
-  const { data: items } = await supabase.from('invoice_line_items').insert(itemRows).select('*')
+  const { data: items, error: itemsErr } = await supabase
+    .from('invoice_line_items')
+    .insert(itemRows)
+    .select('*')
+
+  if (itemsErr) {
+    res.status(500).json({ error: `Failed to save line items: ${itemsErr.message}` })
+    return
+  }
 
   res.status(201).json({ ...invoice, line_items: items ?? [] })
 })
@@ -412,7 +414,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/invoices/:id ──────────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: existing } = await supabase
     .from('invoices')
@@ -490,7 +492,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── POST /api/invoices/:id/send ────────────────────────────────────────────────
 router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -546,7 +548,7 @@ router.post('/:id/send', requireAuth, async (req: Request, res: Response): Promi
     void sendEmail({
       to: contact.email,
       subject: `Invoice ${invoice.invoice_number} from ${businessName}`,
-      html: invoiceEmailHtml({
+      html: buildInvoiceEmailHtml({
         contactName: contact.full_name ?? 'Customer',
         businessName,
         invoiceNumber: invoice.invoice_number as string,
@@ -567,7 +569,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     const amount =
@@ -635,7 +637,7 @@ router.post(
 // ── POST /api/invoices/:id/void ───────────────────────────────────────────────
 router.post('/:id/void', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -676,7 +678,7 @@ export async function processRecordPayment(
   amount: number,
   method: string
 ): Promise<{ status: number; data?: unknown; error?: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   if (isNaN(amount) || amount <= 0) {
     return { status: 400, error: 'amount must be a positive number' }
@@ -736,7 +738,7 @@ export async function processVoidInvoice(
   invoiceId: string,
   tenantId: string
 ): Promise<{ status: number; data?: unknown; error?: string }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -774,7 +776,7 @@ export async function processVoidInvoice(
 export const publicRouter = Router()
 
 publicRouter.get('/:token', async (req: Request, res: Response): Promise<void> => {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: invoice, error } = await supabase
     .from('invoices')
@@ -830,32 +832,5 @@ publicRouter.get('/:token', async (req: Request, res: Response): Promise<void> =
     line_items: items ?? [],
   })
 })
-
-// ── Invoice email HTML helper ─────────────────────────────────────────────────
-function invoiceEmailHtml(vars: {
-  contactName: string
-  businessName: string
-  invoiceNumber: string
-  invoiceTotal: string
-  invoiceUrl: string
-  dueDate: string
-}): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;background:#f5f5f5}
-.c{max-width:560px;margin:0 auto;padding:32px 24px}.card{background:#fff;border-radius:12px;padding:32px;border:1px solid #e5e5e5}
-h1{font-size:20px;color:#111;margin:0 0 16px}p{font-size:15px;color:#444;line-height:1.6;margin:0 0 12px}
-.total{font-size:28px;font-weight:700;color:#0d9488;margin:16px 0}
-.btn{display:inline-block;padding:14px 28px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px}
-.footer{text-align:center;padding:16px;font-size:12px;color:#999}</style>
-</head><body><div class="c"><div class="card">
-<h1>Invoice ${vars.invoiceNumber}</h1>
-<p>Hi ${vars.contactName},</p>
-<p>You have received an invoice from <strong>${vars.businessName}</strong>.</p>
-<div class="total">${vars.invoiceTotal}</div>
-${vars.dueDate ? `<p style="font-size:13px;color:#999">Due by ${vars.dueDate}</p>` : ''}
-<p style="margin-top:24px"><a class="btn" href="${vars.invoiceUrl}">View Invoice</a></p>
-</div><div class="footer">${vars.businessName}</div></div></body></html>`
-}
 
 export default router

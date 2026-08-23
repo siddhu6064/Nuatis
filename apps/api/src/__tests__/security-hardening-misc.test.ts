@@ -24,19 +24,15 @@ process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 const ADMIN_KEY = 'test-admin-key-123'
 const TENANT_ID = 'tenant-misc-1'
 
-const [
-  { default: express },
-  { default: request },
-  { default: adminRouter },
-  { requireModule },
-  { smsSendTenantLimiter },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/admin.js'),
-  import('../lib/auth.js'),
-  import('../middleware/rate-limit.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: adminRouter } = await import('../routes/admin.js')
+const { requireModule } = await import('../lib/auth.js')
+const { smsSendTenantLimiter } = await import('../middleware/rate-limit.js')
 
 beforeEach(() => {
   store = createStore()

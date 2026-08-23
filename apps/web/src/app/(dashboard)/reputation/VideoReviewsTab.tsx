@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import type {
   VideoCollector,
   VideoTestimonial,
@@ -74,7 +79,7 @@ function CreateCollectorForm({ onCreated, onCancel }: CreateCollectorFormProps) 
         setError(j.error ?? 'Failed to create collector')
         return
       }
-      const collector = (await res.json()) as VideoCollector
+      const { collector } = (await res.json()) as { collector: VideoCollector }
       onCreated(collector)
     } catch {
       setError('Network error — please try again')
@@ -92,54 +97,52 @@ function CreateCollectorForm({ onCreated, onCancel }: CreateCollectorFormProps) 
       <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1">Name *</label>
-          <input
-            type="text"
+          <TextField
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Summer Campaign"
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 text-ink placeholder:text-ink4"
+            fullWidth
+            size="small"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1">Prompt</label>
-          <input
-            type="text"
+          <TextField
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="w-full text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 text-ink placeholder:text-ink4"
+            fullWidth
+            size="small"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-ink3 mb-1">Max Duration</label>
-          <select
+          <TextField
+            select
             value={maxDuration}
             onChange={(e) => setMaxDuration(Number(e.target.value) as 15 | 30 | 60)}
-            className="text-sm border border-border-brand rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 text-ink bg-white"
+            size="small"
           >
-            <option value={15}>15 seconds</option>
-            <option value={30}>30 seconds</option>
-            <option value={60}>60 seconds</option>
-          </select>
+            <MenuItem value={15}>15 seconds</MenuItem>
+            <MenuItem value={30}>30 seconds</MenuItem>
+            <MenuItem value={60}>60 seconds</MenuItem>
+          </TextField>
         </div>
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           onClick={() => void handleCreate()}
           disabled={saving}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          size="small"
+          variant="contained"
         >
           {saving ? 'Creating...' : 'Create'}
-        </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="px-4 py-2 border border-border-brand text-ink3 rounded-lg text-xs font-medium hover:bg-bg transition-colors disabled:opacity-40"
-        >
+        </Button>
+        <Button onClick={onCancel} disabled={saving} size="small" color="inherit">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -384,28 +387,21 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
     <div className="space-y-4">
       {/* Sub-header */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
-        >
+        <Button onClick={onBack} size="small" color="inherit">
           ← Back to collectors
-        </button>
+        </Button>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 bg-bg rounded-lg p-1 w-fit">
+      <Tabs
+        value={filter}
+        onChange={(_e, v: SubmissionFilter) => setFilter(v)}
+        sx={{ minHeight: 36, borderBottom: 1, borderColor: 'divider' }}
+      >
         {filterTabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setFilter(t.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filter === t.id ? 'bg-white text-ink shadow-sm' : 'text-ink3 hover:text-ink'
-            }`}
-          >
-            {t.label}
-          </button>
+          <Tab key={t.id} value={t.id} label={t.label} sx={{ minHeight: 36, py: 0.5 }} />
         ))}
-      </div>
+      </Tabs>
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-ink4 text-sm">
@@ -418,10 +414,11 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((s) => (
-            <button
+            <ButtonBase
               key={s.id}
               onClick={() => void openSubmission(s)}
-              className="bg-white rounded-xl border border-border-brand overflow-hidden text-left hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl border border-border-brand overflow-hidden hover:shadow-md transition-shadow"
+              sx={{ display: 'block', width: '100%', textAlign: 'left' }}
             >
               {/* Thumbnail placeholder */}
               <div className="bg-gray-100 h-32 flex items-center justify-center">
@@ -455,7 +452,7 @@ function SubmissionsGrid({ collectorId, onBack }: SubmissionsGridProps) {
                   </span>
                 </div>
               </div>
-            </button>
+            </ButtonBase>
           ))}
         </div>
       )}
@@ -522,7 +519,7 @@ export default function VideoReviewsTab() {
     setToggling(c.id)
     try {
       const res = await fetch(`/api/video-testimonials/collectors/${c.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
@@ -543,7 +540,7 @@ export default function VideoReviewsTab() {
     setArchiving(c.id)
     try {
       const res = await fetch(`/api/video-testimonials/collectors/${c.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'archived' }),
@@ -581,12 +578,9 @@ export default function VideoReviewsTab() {
           </p>
         </div>
         {!createOpen && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700 transition-colors"
-          >
-            <span className="text-base leading-none">+</span> Create Collector
-          </button>
+          <Button onClick={() => setCreateOpen(true)} size="small" variant="contained">
+            + Create Collector
+          </Button>
         )}
       </div>
 
@@ -645,15 +639,22 @@ export default function VideoReviewsTab() {
                       {c.max_duration_seconds}s
                     </td>
                     <td className="px-4 py-3 text-ink">
-                      <button
+                      <Button
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedCollectorId(c.id)
                         }}
-                        className="text-teal-600 hover:underline font-medium"
+                        variant="text"
+                        size="small"
+                        sx={{
+                          p: 0,
+                          minWidth: 0,
+                          textDecoration: 'underline',
+                          fontWeight: 600,
+                        }}
                       >
                         {c.submission_count}
-                      </button>
+                      </Button>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -668,37 +669,43 @@ export default function VideoReviewsTab() {
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-ink3 truncate max-w-[180px]">{link}</span>
-                        <button
+                        <Button
                           onClick={() => void copyLink(c)}
-                          className="text-[10px] px-2 py-0.5 border border-border-brand rounded font-medium text-ink3 hover:bg-bg transition-colors shrink-0"
+                          size="small"
+                          color="inherit"
+                          sx={{ fontSize: 10, minWidth: 0, flexShrink: 0 }}
                         >
                           {copied === c.id ? 'Copied!' : 'Copy'}
-                        </button>
+                        </Button>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         {c.status !== 'archived' && (
-                          <button
+                          <Button
                             onClick={() => void toggleStatus(c)}
                             disabled={toggling === c.id}
-                            className="text-[10px] px-2 py-0.5 border border-border-brand rounded font-medium text-ink3 hover:bg-bg transition-colors disabled:opacity-40"
+                            size="small"
+                            color="inherit"
+                            sx={{ fontSize: 10, minWidth: 0 }}
                           >
                             {toggling === c.id
                               ? '...'
                               : c.status === 'active'
                                 ? 'Pause'
                                 : 'Activate'}
-                          </button>
+                          </Button>
                         )}
                         {c.status !== 'archived' && (
-                          <button
+                          <Button
                             onClick={() => void archiveCollector(c)}
                             disabled={archiving === c.id}
-                            className="text-[10px] px-2 py-0.5 border border-red-200 text-red-500 rounded font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+                            size="small"
+                            color="error"
+                            sx={{ fontSize: 10, minWidth: 0 }}
                           >
                             {archiving === c.id ? '...' : 'Archive'}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>

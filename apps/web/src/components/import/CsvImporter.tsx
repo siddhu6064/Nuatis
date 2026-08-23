@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -268,17 +272,18 @@ export default function CsvImporter() {
               <div key={header} className="flex items-center gap-3">
                 <span className="text-sm text-ink3 w-40 truncate font-mono">{header}</span>
                 <span className="text-gray-300">{'\u2192'}</span>
-                <select
+                <TextField
+                  select
                   value={mapping[header] ?? 'skip'}
                   onChange={(e) => setMapping({ ...mapping, [header]: e.target.value })}
-                  className="text-sm border border-border-brand rounded px-2 py-1.5"
+                  size="small"
                 >
                   {FIELD_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
+                    <MenuItem key={opt.value} value={opt.value}>
                       {opt.label}
-                    </option>
+                    </MenuItem>
                   ))}
-                </select>
+                </TextField>
               </div>
             ))}
           </div>
@@ -320,26 +325,22 @@ export default function CsvImporter() {
           </div>
 
           <label className="flex items-center gap-2 text-xs text-ink3 mb-4 cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={skipDuplicates}
               onChange={(e) => setSkipDuplicates(e.target.checked)}
-              className="rounded border-border-brand text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+              size="small"
+              sx={{ p: 0 }}
             />
             Skip duplicate contacts (matched by phone or email)
           </label>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setStep(1)} className="px-4 py-2 text-sm text-ink3">
+            <Button onClick={() => setStep(1)} color="inherit">
               Back
-            </button>
-            <button
-              onClick={() => setStep(3)}
-              disabled={!hasRequired}
-              className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-            >
+            </Button>
+            <Button onClick={() => setStep(3)} disabled={!hasRequired} variant="contained">
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -372,16 +373,12 @@ export default function CsvImporter() {
           )}
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setStep(2)} className="px-4 py-2 text-sm text-ink3">
+            <Button onClick={() => setStep(2)} color="inherit">
               Back
-            </button>
-            <button
-              onClick={() => void handleImport()}
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-            >
+            </Button>
+            <Button onClick={() => void handleImport()} disabled={loading} variant="contained">
               {loading ? 'Importing...' : 'Import'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -425,12 +422,7 @@ export default function CsvImporter() {
           )}
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={reset}
-              className="px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
-            >
-              Import another file
-            </button>
+            <Button onClick={reset}>Import another file</Button>
           </div>
         </div>
       )}

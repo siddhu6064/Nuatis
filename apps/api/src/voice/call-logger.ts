@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 
 export interface CallLogEntry {
   tenant_id: string
@@ -8,13 +8,6 @@ export interface CallLogEntry {
   phone_number_from?: string
   phone_number_to?: string
   outcome?: string
-}
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -37,7 +30,7 @@ export function logCall(entry: CallLogEntry): void {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   void Promise.resolve(
     supabase.from('calls').insert({
       tenant_id: entry.tenant_id,

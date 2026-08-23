@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { getFirstName } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
@@ -10,6 +10,7 @@ import { isModuleEnabled } from '../lib/modules.js'
 import { logBulkAction } from '../middleware/audit-logger.js'
 import { smsSendLimiter, smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
 
@@ -28,17 +29,10 @@ async function requireCrm(req: Request, res: Response, next: NextFunction): Prom
 
 router.use(requireAuth, requireCrm)
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/contacts ────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '50'), 10) || 50))
@@ -248,7 +242,7 @@ const tagsCache = new Map<string, { tags: string[]; expiry: number }>()
 
 router.get('/tags', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const cacheKey = authed.tenantId
   const cached = tagsCache.get(cacheKey)
@@ -292,7 +286,7 @@ router.get('/tags', requireAuth, async (req: Request, res: Response): Promise<vo
 // ── GET /api/contacts/stages ─────────────────────────────────────────────────
 router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Determine the pipeline_id to filter by
   let filterPipelineId = req.query['pipeline_id'] as string | undefined
@@ -333,7 +327,7 @@ router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<
 
 // ── Helper: find possible duplicates ─────────────────────────────────────────
 async function findDuplicates(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string,
   phone: string | null,
   email: string | null,
@@ -368,7 +362,7 @@ async function findDuplicates(
 // ── POST /api/contacts ───────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const fullName = typeof b['full_name'] === 'string' ? b['full_name'].trim() : ''
@@ -430,9 +424,9 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
     if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
     if (enrichResult.suggestedCompany) {
-      const existingCustom = contact.custom_fields || {}
-      enrichUpdates['custom_fields'] = {
-        ...existingCustom,
+      const existingVerticalData = contact.vertical_data || {}
+      enrichUpdates['vertical_data'] = {
+        ...existingVerticalData,
         enrichment_suggested_company: enrichResult.suggestedCompany,
       }
     }
@@ -449,7 +443,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT / PATCH /api/contacts/:id ────────────────────────────────────────────
 const handleContactUpdate = async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -457,7 +451,7 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
 
   const { data: existing } = await supabase
     .from('contacts')
-    .select('id, assigned_to_user_id')
+    .select('id, assigned_to_user_id, vertical_data')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -502,6 +496,42 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   if (typeof b['company_id'] === 'string') updates['company_id'] = b['company_id'] || null
   if (b['company_id'] === null) updates['company_id'] = null
   if (typeof b['sms_opt_in'] === 'boolean') updates['sms_opt_in'] = b['sms_opt_in']
+
+  // ContactDetailClient.tsx's enrichment banner sends a plain company name (not
+  // a company_id) to link — find-or-create it by name within the tenant.
+  if (typeof b['company'] === 'string' && b['company'].trim()) {
+    const companyName = b['company'].trim()
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('tenant_id', authed.tenantId)
+      .ilike('name', companyName)
+      .maybeSingle()
+    if (existingCompany) {
+      updates['company_id'] = existingCompany.id as string
+    } else {
+      const { data: newCompany, error: companyErr } = await supabase
+        .from('companies')
+        .insert({ tenant_id: authed.tenantId, name: companyName })
+        .select('id')
+        .single()
+      if (companyErr) {
+        res.status(500).json({ error: companyErr.message })
+        return
+      }
+      updates['company_id'] = (newCompany as { id: string }).id
+    }
+  }
+
+  // Same banner's vertical_data patch — merge rather than overwrite, since
+  // vertical_data also holds unrelated keys (e.g. other enrichment data).
+  if (b['custom_fields'] && typeof b['custom_fields'] === 'object') {
+    const existingVerticalData = (existing.vertical_data as Record<string, unknown> | null) ?? {}
+    updates['vertical_data'] = {
+      ...existingVerticalData,
+      ...(b['custom_fields'] as Record<string, unknown>),
+    }
+  }
 
   // FK-01: body-supplied foreign keys must belong to the caller's tenant.
   if (typeof updates['assigned_to_user_id'] === 'string') {
@@ -621,9 +651,9 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
       if (enrichResult.updates.state) enrichUpdates['state'] = enrichResult.updates.state
       if (enrichResult.updates.timezone) enrichUpdates['timezone'] = enrichResult.updates.timezone
       if (enrichResult.suggestedCompany) {
-        const existingCustom = updated.custom_fields || {}
-        enrichUpdates['custom_fields'] = {
-          ...existingCustom,
+        const existingVerticalData = updated.vertical_data || {}
+        enrichUpdates['vertical_data'] = {
+          ...existingVerticalData,
           enrichment_suggested_company: enrichResult.suggestedCompany,
         }
       }
@@ -643,7 +673,7 @@ router.patch('/:id', requireAuth, handleContactUpdate)
 // ── GET /api/contacts/duplicates ─────────────────────────────────────────────
 router.get('/duplicates', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Find contacts with matching phone or email
   const { data: contacts } = await supabase
@@ -751,7 +781,7 @@ router.get('/duplicates', requireAuth, async (req: Request, res: Response): Prom
 // ── POST /api/contacts/merge ─────────────────────────────────────────────────
 router.post('/merge', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const primaryId = typeof b['primary_id'] === 'string' ? b['primary_id'] : null
@@ -855,7 +885,7 @@ router.post('/merge', requireAuth, async (req: Request, res: Response): Promise<
 
 // ── Bulk helper: validate contact_ids belong to tenant ───────────────────────
 async function validateBulkIds(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceClient>,
   tenantId: string,
   contactIds: string[]
 ): Promise<{ valid: boolean; error?: string }> {
@@ -876,7 +906,7 @@ async function validateBulkIds(
 // ── POST /api/contacts/bulk-tag ──────────────────────────────────────────────
 router.post('/bulk-tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contactIds, tags } = req.body as { contactIds: string[]; tags: string[] }
 
   if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -930,7 +960,7 @@ router.post('/bulk-tag', requireAuth, async (req: Request, res: Response): Promi
 // ── POST /api/contacts/bulk-assign ──────────────────────────────────────────
 router.post('/bulk-assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contactIds, assignedTo } = req.body as { contactIds: string[]; assignedTo: string }
 
   if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -1000,7 +1030,7 @@ router.post(
   smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactIds, message } = req.body as { contactIds: string[]; message: string }
 
     if (!Array.isArray(contactIds) || contactIds.length === 0) {
@@ -1026,17 +1056,10 @@ router.post(
       return
     }
 
-    const { data: telnyxNum } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', authed.tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const fromNumber = await getTenantPhoneNumber(authed.tenantId)
 
     const apiKey = process.env['TELNYX_API_KEY']
-    if (!telnyxNum?.phone_number || !apiKey) {
+    if (!fromNumber || !apiKey) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
       return
     }
@@ -1074,7 +1097,7 @@ router.post(
           await fetch('https://api.telnyx.com/v2/messages', {
             method: 'POST',
             headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: telnyxNum.phone_number, to: c.phone, text: substituted }),
+            body: JSON.stringify({ from: fromNumber, to: c.phone, text: substituted }),
           })
           void logActivity({
             tenantId: authed.tenantId,
@@ -1095,7 +1118,7 @@ router.post(
 // ── POST /api/contacts/bulk/stage ────────────────────────────────────────────
 router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids, pipeline_stage_id } = req.body as {
     contact_ids: string[]
     pipeline_stage_id: string
@@ -1142,7 +1165,7 @@ router.post('/bulk/stage', requireAuth, async (req: Request, res: Response): Pro
 // ── POST /api/contacts/bulk/tag ──────────────────────────────────────────────
 router.post('/bulk/tag', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids, tags_to_add, tags_to_remove } = req.body as {
     contact_ids: string[]
     tags_to_add?: string[]
@@ -1204,7 +1227,7 @@ router.post(
   smsSendTenantLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contact_ids, message } = req.body as { contact_ids: string[]; message: string }
 
     const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
@@ -1222,17 +1245,10 @@ router.post(
       return
     }
 
-    const { data: telnyxNum } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', authed.tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const fromNumber = await getTenantPhoneNumber(authed.tenantId)
 
     const apiKey = process.env['TELNYX_API_KEY']
-    if (!telnyxNum?.phone_number || !apiKey) {
+    if (!fromNumber || !apiKey) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number found' })
       return
     }
@@ -1266,7 +1282,7 @@ router.post(
           method: 'POST',
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: telnyxNum.phone_number,
+            from: fromNumber,
             to: c.phone,
             text: substituted,
           }),
@@ -1299,7 +1315,7 @@ router.post(
 // ── POST /api/contacts/bulk/archive ──────────────────────────────────────────
 router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids } = req.body as { contact_ids: string[] }
 
   const check = await validateBulkIds(supabase, authed.tenantId, contact_ids)
@@ -1331,7 +1347,7 @@ router.post('/bulk/archive', requireAuth, async (req: Request, res: Response): P
 // ── POST /api/contacts/bulk/export ───────────────────────────────────────────
 router.post('/bulk/export', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { contact_ids } = req.body as { contact_ids?: string[] }
 
   let contacts: Array<Record<string, unknown>>
@@ -1402,7 +1418,7 @@ function csvEscape(val: string): string {
 // ── GET /api/contacts/referral-sources ────────────────────────────────────────
 router.get('/referral-sources', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('contacts')
@@ -1428,7 +1444,7 @@ const VALID_LIFECYCLE_STAGES = [
 // ── PATCH /api/contacts/:id/lifecycle ────────────────────────────────────────
 router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -1486,7 +1502,7 @@ router.patch('/:id/lifecycle', requireAuth, async (req: Request, res: Response):
 // ── PATCH /api/contacts/bulk/lifecycle ───────────────────────────────────────
 router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const newStage = typeof b['lifecycle_stage'] === 'string' ? b['lifecycle_stage'] : null
@@ -1551,7 +1567,7 @@ router.patch('/bulk/lifecycle', requireAuth, async (req: Request, res: Response)
 // ── PATCH /api/contacts/bulk/assign ──────────────────────────────────────────
 router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const contactIds = Array.isArray(b['contactIds']) ? (b['contactIds'] as string[]) : []
@@ -1619,7 +1635,7 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
 // ── GET /api/contacts/source-report ─────────────────────────────────────────
 router.get('/source-report', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [{ data: contacts }, { data: deals }] = await Promise.all([
     supabase
@@ -1694,7 +1710,7 @@ router.get('/source-report', requireAuth, async (req: Request, res: Response): P
 // ── GET /api/contacts/:id (must be after /duplicates, /tags, /stages) ────────
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: contact, error } = await supabase
     .from('contacts')

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 const VERTICAL_LABELS: Record<string, string> = {
   sales_crm: 'Sales CRM',
@@ -172,12 +175,9 @@ export default function OnboardingWizard({
                   <p className="text-xs text-ink3">{VERTICAL_LABELS[vertical] ?? vertical}</p>
                 </div>
               </div>
-              <button
-                onClick={goNext}
-                className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-              >
+              <Button onClick={goNext} variant="contained" fullWidth>
                 Continue
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -198,42 +198,35 @@ export default function OnboardingWizard({
                     <p className="text-xs text-green-600">Number provisioned</p>
                   </div>
                 </div>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   Continue
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-ink2 mb-1.5">Area code</label>
-                  <select
-                    value={areaCode}
-                    onChange={(e) => setAreaCode(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-border-brand rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {AREA_CODES.map((ac) => (
-                      <option key={ac.code} value={ac.code}>
-                        {ac.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <TextField
+                  select
+                  label="Area code"
+                  value={areaCode}
+                  onChange={(e) => setAreaCode(e.target.value)}
+                  fullWidth
+                  size="small"
+                >
+                  {AREA_CODES.map((ac) => (
+                    <MenuItem key={ac.code} value={ac.code}>
+                      {ac.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
                 {error && (
                   <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
                 )}
-                <button
-                  onClick={provisionPhone}
-                  disabled={loading}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                >
+                <Button onClick={provisionPhone} disabled={loading} variant="contained" fullWidth>
                   {loading ? 'Provisioning...' : 'Get My Number'}
-                </button>
-                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
+                </Button>
+                <Button onClick={goNext} fullWidth color="inherit">
                   Skip for now
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -252,27 +245,27 @@ export default function OnboardingWizard({
                   <span className="text-green-600 text-lg">✓</span>
                   <p className="text-sm font-semibold text-ink">Google Calendar connected</p>
                 </div>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   Continue
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <button
+                <Button
                   onClick={connectCalendar}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                  variant="contained"
+                  fullWidth
+                  startIcon={
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm6.28 7.18L12 13.46 5.72 7.18A.5.5 0 0 1 6 6.5h12a.5.5 0 0 1 .28.68z" />
+                    </svg>
+                  }
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm6.28 7.18L12 13.46 5.72 7.18A.5.5 0 0 1 6 6.5h12a.5.5 0 0 1 .28.68z" />
-                  </svg>
                   Connect Google Calendar
-                </button>
-                <button onClick={goNext} className="w-full text-sm text-ink4 hover:text-ink3">
+                </Button>
+                <Button onClick={goNext} fullWidth color="inherit">
                   Skip for now
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -291,12 +284,9 @@ export default function OnboardingWizard({
                 Default hours for {VERTICAL_LABELS[vertical]}. Contact support to customize.
               </p>
             </div>
-            <button
-              onClick={goNext}
-              className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-            >
+            <Button onClick={goNext} variant="contained" fullWidth>
               These look right
-            </button>
+            </Button>
           </div>
         )}
 
@@ -317,12 +307,9 @@ export default function OnboardingWizard({
                     book an appointment for Thursday&quot;
                   </p>
                 </div>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   I&apos;ve tested Maya
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -330,12 +317,9 @@ export default function OnboardingWizard({
                   You&apos;ll need a phone number to test Maya. You can set one up from Settings
                   later.
                 </p>
-                <button
-                  onClick={goNext}
-                  className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-                >
+                <Button onClick={goNext} variant="contained" fullWidth>
                   Skip
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -371,12 +355,9 @@ export default function OnboardingWizard({
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="w-full py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
-            >
+            <Button onClick={() => router.push('/dashboard')} variant="contained" fullWidth>
               Go to Dashboard
-            </button>
+            </Button>
             <p className="text-xs text-ink4 mt-3">
               You&apos;re on the Starter plan. Upgrade anytime from Settings.
             </p>
@@ -385,12 +366,9 @@ export default function OnboardingWizard({
 
         {/* Back button (steps 2-5) */}
         {step > 1 && step < 6 && (
-          <button
-            onClick={() => setStep((s) => Math.max(s - 1, 1))}
-            className="mt-4 text-sm text-ink4 hover:text-ink3"
-          >
+          <Button onClick={() => setStep((s) => Math.max(s - 1, 1))} color="inherit" sx={{ mt: 1 }}>
             &larr; Back
-          </button>
+          </Button>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { getFirstName } from '@nuatis/shared'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
@@ -11,13 +11,6 @@ const QUEUE_NAME = 'review-request'
 
 const API_URL = process.env['API_BASE_URL'] || 'http://localhost:3001'
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 interface ReviewRequestJobData {
   tenantId: string
   contactId: string
@@ -26,7 +19,7 @@ interface ReviewRequestJobData {
 
 export async function processReviewRequest(data: ReviewRequestJobData): Promise<void> {
   const { tenantId, contactId, appointmentId } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // 1. Fetch tenant settings
   const { data: tenant, error: tenantError } = await supabase

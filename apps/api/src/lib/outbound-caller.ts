@@ -1,13 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { API_BASE_URL } from '../config/urls.js'
 import { registerOutboundCall } from '../voice/telnyx-handler.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export interface OutboundCallParams {
   tenantId: string
@@ -118,7 +111,7 @@ export async function initiateOutboundCall(
   })
 
   // Update outbound_call_jobs to 'dialing'
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   await supabase
     .from('outbound_call_jobs')
     .update({ status: 'dialing', started_at: new Date().toISOString() })

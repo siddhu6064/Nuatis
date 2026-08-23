@@ -1,16 +1,9 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { VERTICALS } from '@nuatis/shared'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface MergedStep {
   step_index: number
@@ -20,6 +13,8 @@ interface MergedStep {
   subject?: string
   is_enabled: boolean
   is_customized: boolean
+  default_body: string
+  default_subject?: string
 }
 
 function getDefaultCadence(vertical: string) {
@@ -48,6 +43,11 @@ function mergeSteps(
   return defaults.map((step, i) => {
     const key = `${i}:${step.channel}`
     const override = overrideMap.get(key)
+    const isCustomized =
+      !!override &&
+      (override.body !== step.template ||
+        (override.subject ?? undefined) !== step.subject ||
+        override.is_enabled !== true)
     return {
       step_index: i,
       days_after: step.days_after,
@@ -55,7 +55,9 @@ function mergeSteps(
       body: override?.body ?? step.template,
       subject: override?.subject ?? step.subject,
       is_enabled: override?.is_enabled ?? true,
-      is_customized: !!override,
+      is_customized: isCustomized,
+      default_body: step.template,
+      default_subject: step.subject,
     }
   })
 }
@@ -63,7 +65,7 @@ function mergeSteps(
 // GET /api/follow-up-templates
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const defaults = getDefaultCadence(authed.vertical)
 
@@ -83,7 +85,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // PUT /api/follow-up-templates
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { steps } = req.body as {
     steps: Array<{

@@ -46,17 +46,14 @@ jest.unstable_mockModule('@google/genai', () => ({
 }))
 
 // ── Dynamic imports (after mocks) ─────────────────────────────────────────────
-const [
-  { default: express },
-  { default: request },
-  { default: webchatRouter },
-  { webchatSettingsRouter },
-] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('../routes/webchat.js'),
-  import('../routes/webchat.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: webchatRouter } = await import('../routes/webchat.js')
+const { webchatSettingsRouter } = await import('../routes/webchat.js')
 
 function makeApp() {
   const app = express()

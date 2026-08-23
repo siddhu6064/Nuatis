@@ -16,6 +16,9 @@
     "typecheck": "tsc --noEmit",
     "seed:packages": "tsx supabase/seeds/service_packages_seed.ts"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.0"
+  },
   "devDependencies": {
     "typescript": "*"
   }

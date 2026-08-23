@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { stripJsonFences } from './gemini.js'
 import type {
   GeneratedAutomation,
   CustomAutomationTrigger,
@@ -111,11 +112,7 @@ Respond with ONLY valid JSON — no markdown, no code blocks, no explanation. Th
     }
 
     // Strip markdown code fences if present
-    const stripped = rawText
-      .trim()
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim()
+    const stripped = stripJsonFences(rawText)
 
     let parsed: Record<string, unknown>
     try {

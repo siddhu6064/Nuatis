@@ -1,25 +1,19 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendSms } from '../lib/sms.js'
 import { grantTcpaOptIn } from '../lib/tcpa.js'
 import { smsSendLimiter } from '../middleware/rate-limit.js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
+import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── GET /api/conversations ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const statusFilter = (req.query['status'] as string) ?? 'open'
   if (!['open', 'resolved', 'all'].includes(statusFilter)) {
@@ -167,7 +161,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.get('/assignees', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data, error } = await supabase
     .from('users')
@@ -189,7 +183,7 @@ router.get('/assignees', requireAuth, async (req: Request, res: Response): Promi
 router.get('/analytics', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const tenantId = authed.tenantId
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const periodDays = 30
   const since30 = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString()
@@ -306,7 +300,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Verify contact belongs to tenant
@@ -361,7 +355,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact, error: contactErr } = await supabase
@@ -413,7 +407,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     const { data: contact, error: contactErr } = await supabase
@@ -466,7 +460,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Validate body
@@ -516,32 +510,20 @@ router.post(
     }
 
     // Get our phone number (from telnyx_numbers table)
-    const { data: telnyxNum, error: locationError } = await supabase
-      .from('telnyx_numbers')
-      .select('phone_number')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (locationError) {
-      res.status(500).json({ error: locationError.message })
-      return
-    }
-    if (!telnyxNum?.phone_number) {
+    const fromNumber = await getTenantPhoneNumber(tenantId as string)
+    if (!fromNumber) {
       res.status(400).json({ error: 'SMS not configured — no Telnyx number' })
       return
     }
 
-    const result = await sendSms(telnyxNum.phone_number, contact.phone, body, {
+    const result = await sendSms(fromNumber, contact.phone, body, {
       tenantId,
       contactId,
     })
 
     if (!result.success) {
       console.warn(
-        `[conversations] manual SMS send failed: tenant=${tenantId} contact=${contactId} to=${contact.phone} from=${telnyxNum.phone_number}`
+        `[conversations] manual SMS send failed: tenant=${tenantId} contact=${contactId} to=${contact.phone} from=${fromNumber}`
       )
       res.status(500).json({ error: 'Failed to send SMS' })
       return
@@ -554,7 +536,7 @@ router.post(
         id: result.messageId ?? crypto.randomUUID(),
         direction: 'outbound',
         body,
-        from_number: telnyxNum.phone_number,
+        from_number: fromNumber,
         to_number: contact.phone!,
         status: 'sent',
         ai_handled: false,
@@ -576,7 +558,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Validate body
@@ -659,7 +641,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const tenantId = authed.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { contactId } = req.params
 
     // Update inbound unread messages, returning updated rows to count them

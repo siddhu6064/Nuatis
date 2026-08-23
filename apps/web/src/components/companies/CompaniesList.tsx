@@ -142,12 +142,13 @@ export default function CompaniesList() {
         ) : companies.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-sm text-ink4">No companies yet</p>
-            <button
+            <Button
               onClick={() => setShowCreate(true)}
-              className="mt-3 text-xs text-teal-600 hover:text-teal-700 font-medium"
+              size="small"
+              sx={{ mt: 1.5, fontSize: 12, fontWeight: 500, textTransform: 'none' }}
             >
               Create your first company &rarr;
-            </button>
+            </Button>
           </div>
         ) : (
           <table className="w-full">

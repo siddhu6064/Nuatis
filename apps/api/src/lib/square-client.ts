@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { randomUUID } from 'crypto'
 
 // ---------------------------------------------------------------------------
@@ -15,13 +15,6 @@ function squareBaseUrl(): string {
     : 'https://connect.squareupsandbox.com'
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ---------------------------------------------------------------------------
 // Token refresh
 // ---------------------------------------------------------------------------
@@ -32,7 +25,7 @@ async function maybeRefreshToken(connection: {
   refresh_token: string
   token_expires_at: string | null
 }): Promise<string> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Refresh proactively if token expires within 7 days
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -91,7 +84,7 @@ export async function createSquarePayment(params: {
   referenceId?: string
   idempotencyKey?: string
 }): Promise<{ paymentId: string; status: string; receiptUrl: string | null }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: connection, error } = await supabase
     .from('square_connections')
@@ -161,7 +154,7 @@ export async function getSquarePayment(
   amountCents: number
   currency: string
 }> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: connection, error } = await supabase
     .from('square_connections')

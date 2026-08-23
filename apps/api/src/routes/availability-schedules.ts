@@ -1,15 +1,8 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const DEFAULT_HOURS = {
   mon: { open: '09:00', close: '17:00', enabled: true },
@@ -26,7 +19,7 @@ router.use(requireAuth)
 // ── GET /api/availability-schedules ──────────────────────────────────────────
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const [{ data: schedules }, { data: locs }] = await Promise.all([
     supabase
@@ -73,7 +66,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('availability_schedules')
     .insert({ tenant_id: authed.tenantId, name, timezone, hours })
@@ -99,7 +92,7 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   if (typeof b['timezone'] === 'string') updates['timezone'] = b['timezone']
   if (b['hours'] && typeof b['hours'] === 'object') updates['hours'] = b['hours']
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('availability_schedules')
     .update(updates)
@@ -124,7 +117,7 @@ router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const { id } = req.params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('availability_schedules')
@@ -149,7 +142,7 @@ router.post('/:id/apply', async (req: Request, res: Response): Promise<void> => 
     ? (b['calendarIds'] as unknown[]).filter((x): x is string => typeof x === 'string')
     : []
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Verify schedule belongs to tenant
   const { data: schedule } = await supabase

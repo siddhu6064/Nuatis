@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import {
   BarChart,
   Bar,
@@ -146,16 +148,17 @@ export default function VelocityPage() {
           <h1 className="text-xl font-bold text-ink">Sales Velocity</h1>
           <p className="text-sm text-ink3 mt-0.5">How fast deals move through your pipeline</p>
         </div>
-        <select
+        <TextField
+          select
           value={preset}
           onChange={(e) => setPreset(e.target.value as Preset)}
-          className="px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:ring-1 focus:ring-teal-500 bg-white text-ink2"
+          size="small"
         >
-          <option value="30">Last 30 days</option>
-          <option value="60">Last 60 days</option>
-          <option value="90">Last 90 days</option>
-          <option value="180">Last 180 days</option>
-        </select>
+          <MenuItem value="30">Last 30 days</MenuItem>
+          <MenuItem value="60">Last 60 days</MenuItem>
+          <MenuItem value="90">Last 90 days</MenuItem>
+          <MenuItem value="180">Last 180 days</MenuItem>
+        </TextField>
       </div>
 
       {/* Row 1 — Stat cards */}

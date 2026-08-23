@@ -1,16 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 export async function checkTcpaOptIn(contactId: string, tenantId: string): Promise<boolean> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data, error } = await supabase
       .from('contacts')
       .select('sms_opt_in')
@@ -44,7 +37,7 @@ export async function grantTcpaOptIn(
   actorSub?: string | null
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { error } = await supabase
       .from('contacts')
       .update({ sms_opt_in: true })

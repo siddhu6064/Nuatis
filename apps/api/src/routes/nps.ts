@@ -1,20 +1,13 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // GET /api/nps/status — check if NPS should be shown
 router.get('/status', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data } = await supabase
     .from('tenants')
@@ -38,7 +31,7 @@ router.get('/status', requireAuth, async (req: Request, res: Response): Promise<
 // POST /api/nps/submit
 router.post('/submit', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const score = typeof req.body?.score === 'number' ? req.body.score : null
   const feedback = typeof req.body?.feedback === 'string' ? req.body.feedback : null
 
@@ -66,7 +59,7 @@ router.post('/submit', requireAuth, async (req: Request, res: Response): Promise
 // POST /api/nps/dismiss
 router.post('/dismiss', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   await supabase.from('tenants').update({ nps_dismissed: true }).eq('id', authed.tenantId)
 

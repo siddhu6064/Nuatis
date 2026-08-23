@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 function generateRandomLetters(count: number): string {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -20,7 +13,7 @@ export async function generateReferralCode(
   tenantId: string,
   businessName: string
 ): Promise<string> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const businessPrefix = (businessName.split(' ')[0] ?? 'REF').toUpperCase()
   const maxRetries = 10
 

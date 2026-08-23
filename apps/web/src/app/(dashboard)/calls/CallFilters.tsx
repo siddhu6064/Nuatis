@@ -2,6 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback } from 'react'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 
 const OUTCOMES = [
   { value: '', label: 'All outcomes' },
@@ -41,41 +44,40 @@ export default function CallFilters({ outcome, fromDate, toDate, hasFilters }: P
 
   return (
     <div className="flex flex-wrap items-center gap-3 mb-4">
-      <select
+      <TextField
+        select
         value={outcome ?? ''}
         onChange={(e) => router.push(buildUrl({ outcome: e.target.value || null }))}
-        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        size="small"
+        slotProps={{ select: { displayEmpty: true } }}
       >
         {OUTCOMES.map((o) => (
-          <option key={o.value} value={o.value}>
+          <MenuItem key={o.value} value={o.value}>
             {o.label}
-          </option>
+          </MenuItem>
         ))}
-      </select>
+      </TextField>
 
-      <input
+      <TextField
         type="date"
         value={fromDate ?? ''}
         onChange={(e) => router.push(buildUrl({ from_date: e.target.value || null }))}
         placeholder="From date"
-        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        size="small"
       />
 
-      <input
+      <TextField
         type="date"
         value={toDate ?? ''}
         onChange={(e) => router.push(buildUrl({ to_date: e.target.value || null }))}
         placeholder="To date"
-        className="text-sm border border-border-brand rounded-lg px-3 py-1.5 bg-white text-ink3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        size="small"
       />
 
       {hasFilters && (
-        <button
-          onClick={() => router.push('/calls')}
-          className="text-xs text-teal-600 font-medium hover:text-teal-700 transition-colors"
-        >
+        <Button onClick={() => router.push('/calls')} size="small">
           Clear filters
-        </button>
+        </Button>
       )}
     </div>
   )

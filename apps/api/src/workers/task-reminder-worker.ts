@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { logActivity } from '../lib/activity.js'
@@ -16,13 +16,6 @@ export function getTaskReminderQueue(): Queue {
   return _queue
 }
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 export interface TaskReminderJob {
   taskId: string
   tenantId: string
@@ -33,7 +26,7 @@ export interface TaskReminderJob {
 
 export async function processReminder(data: TaskReminderJob): Promise<void> {
   const { taskId, tenantId, contactId, title } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Check if task still exists and is not completed
   const { data: task } = await supabase

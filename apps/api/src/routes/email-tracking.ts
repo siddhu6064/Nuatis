@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 
@@ -9,13 +9,6 @@ const TRACKING_GIF = Buffer.from(
   'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
   'base64'
 )
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 function sendGif(res: Response): void {
   res.set({
@@ -36,7 +29,7 @@ router.get('/:token', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: message, error } = await supabase
       .from('email_messages')

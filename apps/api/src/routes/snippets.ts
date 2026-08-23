@@ -1,23 +1,16 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const SHORTCUT_RE = /^[a-z0-9-]+$/i
 
 // ── GET /api/snippets ─────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { data, error } = await supabase
     .from('snippets')
     .select('id, name, shortcut, body, created_at')
@@ -33,7 +26,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── GET /api/snippets/search?q= ───────────────────────────────────────────────
 router.get('/search', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   let query = supabase
@@ -58,7 +51,7 @@ router.get('/search', requireAuth, async (req: Request, res: Response): Promise<
 // ── POST /api/snippets ────────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -108,7 +101,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/snippets/:id ─────────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params as { id: string }
   const b = req.body as Record<string, unknown>
 
@@ -155,7 +148,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/snippets/:id ──────────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params as { id: string }
 
   const { data: existing } = await supabase

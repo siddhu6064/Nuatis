@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { dateAtHour, formatHHMM } from '@nuatis/shared'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from './calendar-provider.js'
@@ -7,13 +7,6 @@ import {
   checkOutlookAvailability,
   createOutlookEvent,
 } from './outlook-calendar.js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── Exported interfaces ───────────────────────────────────────────────────────
 
@@ -117,7 +110,7 @@ export async function getAvailableSlotsForDate(
 
   if (provider === 'native') {
     if (!creds.tenantId) throw new Error('tenantId required for native calendar access')
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: tenantSettings } = await supabase
       .from('tenants')
@@ -222,7 +215,7 @@ export async function isSlotAvailable(
 
   if (provider === 'native') {
     if (!creds.tenantId) throw new Error('tenantId required for native calendar access')
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const { data: conflicts } = await supabase
       .from('appointments')
       .select('id')

@@ -30,11 +30,13 @@ async function makeToken(): Promise<string> {
   )
 }
 
-const [{ default: express }, { default: request }, { default: dealsRouter }] = await Promise.all([
-  import('express'),
-  import('supertest'),
-  import('./deals.js'),
-])
+// Sequential, not Promise.all — concurrent dynamic imports that share a
+// newly-common dependency (lib/supabase.js, since the getServiceClient()
+// consolidation) race in Jest's experimental VM-modules linker and throw
+// "module ... is not linked".
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: dealsRouter } = await import('./deals.js')
 
 function makeApp() {
   const app = express()

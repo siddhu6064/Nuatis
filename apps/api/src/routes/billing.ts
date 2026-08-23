@@ -1,22 +1,11 @@
 import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
-import rateLimit from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { PLANS, PLAN_KEYS, type PlanKey } from '../config/stripe-plans.js'
+import { checkoutLimiter } from '../middleware/rate-limit.js'
 
 const router = Router()
-
-const isTestEnv = (): boolean => process.env['NODE_ENV'] === 'test'
-
-const checkoutLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  message: { error: 'Checkout rate limit reached. Try again shortly.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: isTestEnv,
-})
 
 function getSupabase() {
   const url = process.env['SUPABASE_URL']

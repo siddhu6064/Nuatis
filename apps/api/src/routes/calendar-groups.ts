@@ -1,15 +1,8 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const VALID_MODES = ['round_robin', 'load_balanced']
 
@@ -33,7 +26,7 @@ function locName(locations: LocationRef | LocationRef[] | null | undefined): str
 // GET /api/calendar-groups
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: groups, error } = await supabase
     .from('calendar_groups')
@@ -74,7 +67,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // POST /api/calendar-groups
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const name = typeof b['name'] === 'string' ? b['name'].trim() : ''
@@ -111,7 +104,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // PATCH /api/calendar-groups/:id
 router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
   const updates: Record<string, unknown> = {}
 
@@ -148,7 +141,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
 // DELETE /api/calendar-groups/:id
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { error } = await supabase
     .from('calendar_groups')
@@ -166,7 +159,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 // POST /api/calendar-groups/:id/members
 router.post('/:id/members', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const locationId = typeof b['locationId'] === 'string' ? b['locationId'] : ''
@@ -234,7 +227,7 @@ router.put(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
     const b = req.body as Record<string, unknown>
 
     if (!Array.isArray(b['order'])) {
@@ -293,7 +286,7 @@ router.delete(
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: group } = await supabase
       .from('calendar_groups')
@@ -324,7 +317,7 @@ router.delete(
 // POST /api/calendar-groups/:id/assign — get next assignee
 router.post('/:id/assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const { data: group, error: groupError } = await supabase
     .from('calendar_groups')

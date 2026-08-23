@@ -11,6 +11,9 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
+import Chip from '@mui/material/Chip'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import AddNoteForm from '@/components/contacts/AddNoteForm'
 import ContactTasks from '@/components/contacts/ContactTasks'
 import ActivityTimeline from '@/components/contacts/ActivityTimeline'
@@ -31,19 +34,20 @@ type RightPanel =
   | 'payments'
 
 const TAG_COLORS = [
-  'bg-teal-50 text-teal-700 border-teal-200',
-  'bg-blue-50 text-blue-700 border-blue-200',
-  'bg-purple-50 text-purple-700 border-purple-200',
-  'bg-amber-50 text-amber-700 border-amber-200',
-  'bg-green-50 text-green-700 border-green-200',
+  { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
+  { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  { bg: '#faf5ff', text: '#7e22ce', border: '#e9d5ff' },
+  { bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
+  { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
 ]
 
-function tagColorClass(tag: string): string {
+function tagColorSx(tag: string) {
   let hash = 0
   for (let i = 0; i < tag.length; i++) {
     hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
   }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
+  const c = TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]!
+  return { bgcolor: c.bg, color: c.text, border: `1px solid ${c.border}` }
 }
 
 interface Appt {
@@ -70,6 +74,26 @@ interface InitialContact {
 
 interface Props {
   contact: InitialContact
+}
+
+// Small close ("x") icon — matches this app's existing inline-SVG icon
+// convention (no @mui/icons-material dependency in this repo)
+function IconClose() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
 }
 
 // SVG icon components for the right rail
@@ -331,7 +355,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           lead_grade?: string
           lead_score_updated_at?: string
           assigned_to_user_id?: string | null
-          custom_fields?: Record<string, unknown>
+          vertical_data?: Record<string, unknown>
           enrichment_suggested_company?: string | null
           compliance_fields?: Record<string, unknown>
           source?: string | null
@@ -362,7 +386,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           setAssignedUserId(c.assigned_to_user_id ?? null)
           const suggestion =
             c.enrichment_suggested_company ??
-            (c.custom_fields?.enrichment_suggested_company as string | undefined) ??
+            (c.vertical_data?.enrichment_suggested_company as string | undefined) ??
             null
           setEnrichmentSuggestion(suggestion || null)
           if (c.referred_by_contact_id) {
@@ -854,21 +878,24 @@ export default function ContactDetailClient({ contact: initial }: Props) {
       {/* ── LEFT PANEL — tabbed (320px) ── */}
       <div className="w-80 flex-shrink-0 border-r border-border-brand bg-white flex flex-col">
         {/* Tab bar */}
-        <div className="flex border-b border-border-brand shrink-0">
-          {(['fields', 'dnd'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setLeftTab(tab)}
-              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-                leftTab === tab
-                  ? 'text-teal-700 border-b-2 border-teal-600 -mb-px'
-                  : 'text-ink3 hover:text-ink2'
-              }`}
-            >
-              {tab === 'fields' ? 'Fields' : 'DND & Actions'}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={leftTab}
+          onChange={(_e, v: 'fields' | 'dnd') => setLeftTab(v)}
+          variant="fullWidth"
+          className="shrink-0"
+          sx={{ minHeight: 40, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab
+            value="fields"
+            label="Fields"
+            sx={{ minHeight: 40, py: 1.25, fontSize: 12, fontWeight: 500 }}
+          />
+          <Tab
+            value="dnd"
+            label="DND & Actions"
+            sx={{ minHeight: 40, py: 1.25, fontSize: 12, fontWeight: 500 }}
+          />
+        </Tabs>
 
         {/* Fields tab */}
         {leftTab === 'fields' && (
@@ -906,13 +933,24 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                         {showReferralSuggestions && filteredSuggestions.length > 0 && (
                           <div className="absolute top-full left-0 w-full mt-1 bg-white border border-border-brand rounded shadow-lg z-10 max-h-32 overflow-y-auto">
                             {filteredSuggestions.slice(0, 5).map((s) => (
-                              <button
+                              <Button
                                 key={s}
                                 onMouseDown={() => void saveReferralSource(s)}
-                                className="block w-full text-left text-xs px-2 py-1.5 hover:bg-bg text-ink3"
+                                fullWidth
+                                size="small"
+                                sx={{
+                                  justifyContent: 'flex-start',
+                                  textAlign: 'left',
+                                  px: 1,
+                                  py: 0.75,
+                                  fontSize: 12,
+                                  fontWeight: 400,
+                                  color: 'text.secondary',
+                                  borderRadius: 0,
+                                }}
                               >
                                 {s}
-                              </button>
+                              </Button>
                             ))}
                           </div>
                         )}
@@ -936,12 +974,18 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                         >
                           {referredByName}
                         </a>
-                        <button
+                        <IconButton
                           onClick={() => void removeReferredBy()}
-                          className="text-ink4 hover:text-red-500 text-xs"
+                          size="small"
+                          aria-label="Remove referral"
+                          sx={{
+                            p: 0.25,
+                            color: 'text.disabled',
+                            '&:hover': { color: 'error.main' },
+                          }}
                         >
-                          &times;
-                        </button>
+                          <IconClose />
+                        </IconButton>
                       </div>
                     ) : (
                       <p className="text-ink2">—</p>
@@ -1012,13 +1056,19 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                           {u.full_name.charAt(0).toUpperCase()}
                         </span>
                         {u.full_name}
-                        <button
+                        <IconButton
                           onClick={() => removeFollower(uid)}
-                          className="ml-0.5 text-ink4 hover:text-red-500 leading-none"
+                          size="small"
                           aria-label={`Remove ${u.full_name}`}
+                          sx={{
+                            p: 0.25,
+                            ml: 0.25,
+                            color: 'text.disabled',
+                            '&:hover': { color: 'error.main' },
+                          }}
                         >
-                          &times;
-                        </button>
+                          <IconClose />
+                        </IconButton>
                       </span>
                     )
                   })}
@@ -1047,12 +1097,14 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                         ))}
                     </Select>
                   ) : (
-                    <button
+                    <Button
                       onClick={() => setShowFollowerPicker(true)}
-                      className="text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-0.5 rounded-full border border-dashed border-teal-300 hover:border-teal-400 transition-colors"
+                      size="small"
+                      variant="outlined"
+                      sx={{ borderRadius: 999, borderStyle: 'dashed', fontSize: 12 }}
                     >
                       + Follow
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1324,25 +1376,29 @@ export default function ContactDetailClient({ contact: initial }: Props) {
               ← Contacts
             </Link>
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 disabled={!prevId}
                 onClick={() => prevId && router.push(`/contacts/${prevId}`)}
-                className={`text-xs transition-opacity ${!prevId ? 'text-ink4 opacity-40 cursor-not-allowed' : 'text-ink3 hover:text-ink2'}`}
+                size="small"
+                color="inherit"
+                sx={{ fontSize: 12, minWidth: 0, px: 1, color: 'text.secondary' }}
               >
                 ← Prev
-              </button>
+              </Button>
               {displayIndex !== null && totalCount > 0 && (
                 <span className="text-xs text-ink4">
                   {displayIndex} of {totalCount}
                 </span>
               )}
-              <button
+              <Button
                 disabled={!nextId}
                 onClick={() => nextId && router.push(`/contacts/${nextId}`)}
-                className={`text-xs transition-opacity ${!nextId ? 'text-ink4 opacity-40 cursor-not-allowed' : 'text-ink3 hover:text-ink2'}`}
+                size="small"
+                color="inherit"
+                sx={{ fontSize: 12, minWidth: 0, px: 1, color: 'text.secondary' }}
               >
                 Next →
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1352,19 +1408,21 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           {/* Tags chips — G25c */}
           <div className="flex flex-wrap gap-1.5 mt-3 items-center">
             {tags.map((tag) => (
-              <span
+              <Chip
                 key={tag}
-                className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-full border ${tagColorClass(tag)}`}
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="ml-0.5 hover:opacity-60 leading-none"
-                  aria-label={`Remove ${tag}`}
-                >
-                  &times;
-                </button>
-              </span>
+                label={tag}
+                size="small"
+                onDelete={() => removeTag(tag)}
+                deleteIcon={<IconClose />}
+                sx={{
+                  ...tagColorSx(tag),
+                  fontSize: 11,
+                  fontWeight: 500,
+                  height: 22,
+                  '& .MuiChip-deleteIcon': { color: 'inherit', opacity: 0.6, ml: 0.25 },
+                  '& .MuiChip-deleteIcon:hover': { opacity: 1 },
+                }}
+              />
             ))}
             {tags.length < 10 &&
               (addingTag ? (
@@ -1404,24 +1462,38 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                   {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-border-brand rounded-lg shadow-lg z-20 min-w-[160px] max-h-36 overflow-y-auto">
                       {filteredTagSuggestions.slice(0, 6).map((s) => (
-                        <button
+                        <Button
                           key={s}
                           onMouseDown={() => addTag(s)}
-                          className="block w-full text-left text-xs px-3 py-1.5 hover:bg-bg text-ink2"
+                          fullWidth
+                          size="small"
+                          sx={{
+                            justifyContent: 'flex-start',
+                            textAlign: 'left',
+                            px: 1.5,
+                            py: 0.75,
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: 'text.secondary',
+                            textTransform: 'none',
+                            borderRadius: 0,
+                          }}
                         >
                           {s}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   )}
                 </div>
               ) : (
-                <button
+                <Button
                   onClick={() => setAddingTag(true)}
-                  className="text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-0.5 rounded-full border border-dashed border-teal-300 hover:border-teal-400 transition-colors"
+                  size="small"
+                  variant="outlined"
+                  sx={{ borderRadius: 5, borderStyle: 'dashed' }}
                 >
                   + tag
-                </button>
+                </Button>
               ))}
           </div>
 
@@ -1480,33 +1552,36 @@ export default function ContactDetailClient({ contact: initial }: Props) {
 
           {/* Activity tabs */}
           <div className="bg-white rounded-xl border border-border-brand">
-            <div className="flex border-b border-border-brand">
+            <Tabs
+              value={activeTab}
+              onChange={(_e, v: Tab) => {
+                setActiveTab(v)
+                if (v === 'messages') setSmsUnread(0)
+              }}
+              sx={{ minHeight: 44, borderBottom: 1, borderColor: 'divider' }}
+            >
               {tabs.map((tab) => (
-                <button
+                <Tab
                   key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key)
-                    if (tab.key === 'messages') setSmsUnread(0)
-                  }}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === tab.key
-                      ? 'text-teal-700 border-b-2 border-teal-600'
-                      : 'text-ink3 hover:text-ink2'
-                  }`}
-                >
-                  {tab.label}
-                  {tab.badge !== undefined && tab.badge > 0 && (
-                    <span
-                      className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        tab.key === 'messages' ? 'bg-red-500 text-white' : 'bg-bg3 text-ink3'
-                      }`}
-                    >
-                      {tab.badge > 99 ? '99+' : tab.badge}
+                  value={tab.key}
+                  sx={{ minHeight: 44, py: 1.5, px: 2, fontSize: 14, fontWeight: 500 }}
+                  label={
+                    <span className="flex items-center">
+                      {tab.label}
+                      {tab.badge !== undefined && tab.badge > 0 && (
+                        <span
+                          className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            tab.key === 'messages' ? 'bg-red-500 text-white' : 'bg-bg3 text-ink3'
+                          }`}
+                        >
+                          {tab.badge > 99 ? '99+' : tab.badge}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </button>
+                  }
+                />
               ))}
-            </div>
+            </Tabs>
             <div>
               {activeTab === 'activity' && (
                 <ActivityTimeline contactId={contactId} refreshKey={refreshKey} />
@@ -1526,21 +1601,22 @@ export default function ContactDetailClient({ contact: initial }: Props) {
         {/* ── G25e — Compose bar (sticky bottom) ── */}
         <div className="shrink-0 bg-white border-t border-border-brand px-4 py-3">
           {/* Tabs */}
-          <div className="flex gap-4 mb-2">
-            {(['sms', 'note'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setComposeTab(t)}
-                className={`text-xs font-medium pb-1 transition-colors ${
-                  composeTab === t
-                    ? 'text-teal-700 border-b-2 border-teal-600'
-                    : 'text-ink4 hover:text-ink3'
-                }`}
-              >
-                {t === 'sms' ? 'SMS' : 'Internal Note'}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            value={composeTab}
+            onChange={(_e, v: 'sms' | 'note') => setComposeTab(v)}
+            sx={{ minHeight: 28, mb: 1 }}
+          >
+            <Tab
+              value="sms"
+              label="SMS"
+              sx={{ minHeight: 28, py: 0.5, px: 0, mr: 3, fontSize: 12, fontWeight: 500 }}
+            />
+            <Tab
+              value="note"
+              label="Internal Note"
+              sx={{ minHeight: 28, py: 0.5, px: 0, fontSize: 12, fontWeight: 500 }}
+            />
+          </Tabs>
 
           {composeTab === 'sms' && (
             <div>

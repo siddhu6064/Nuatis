@@ -1,17 +1,10 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { randomUUID } from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { aiGenerationLimiter, sessionInitLimiter } from '../middleware/rate-limit.js'
 
 // ── Supabase factory ──────────────────────────────────────────────────────────
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── Public webchat router ─────────────────────────────────────────────────────
 const router = Router()
 
@@ -33,7 +26,7 @@ router.post(
         return
       }
 
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
 
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
@@ -107,7 +100,7 @@ router.post(
       // MASS-03: this is a public (unauthenticated) endpoint — the message role
       // must never come from the request body, or a visitor could post as staff.
       const role = 'user'
-      const supabase = getSupabase()
+      const supabase = getServiceClient()
 
       // Lookup session
       const { data: session, error: sessionError } = await supabase
@@ -224,7 +217,7 @@ Assistant:`
 router.get('/session/:token', async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.params
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: session, error: sessionError } = await supabase
       .from('webchat_sessions')
@@ -260,7 +253,7 @@ router.get('/session/:token', async (req: Request, res: Response): Promise<void>
 router.post('/session/:token/close', async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.params
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: session, error: sessionError } = await supabase
       .from('webchat_sessions')
@@ -296,7 +289,7 @@ router.get('/sessions', requireAuth, async (req: Request, res: Response): Promis
   try {
     const authedReq = req as AuthenticatedRequest
     const tenantId = authedReq.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: sessions, error } = await supabase
       .from('webchat_sessions')
@@ -329,7 +322,7 @@ webchatSettingsRouter.get('/', requireAuth, async (req: Request, res: Response):
   try {
     const authedReq = req as AuthenticatedRequest
     const tenantId = authedReq.tenantId
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data: tenant, error } = await supabase
       .from('tenants')
@@ -410,7 +403,7 @@ webchatSettingsRouter.put('/', requireAuth, async (req: Request, res: Response):
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { error } = await supabase.from('tenants').update(updates).eq('id', tenantId)
 

@@ -1,22 +1,15 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logAuditEvent } from '../middleware/audit-logger.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/caller-memory ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const page = Math.max(1, parseInt(String(req.query['page'] ?? '1'), 10) || 1)
   const limit = Math.min(50, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
@@ -72,7 +65,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── DELETE /api/caller-memory/:phone ─────────────────────────────────────────
 router.delete('/:phone', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const phone = decodeURIComponent(req.params['phone'] ?? '')
   if (!phone) {

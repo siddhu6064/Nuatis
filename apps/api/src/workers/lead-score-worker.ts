@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { computeLeadScore } from '../lib/lead-scoring.js'
 import { logActivity } from '../lib/activity.js'
@@ -8,13 +8,6 @@ import { getLeadScoreQueue } from '../lib/lead-score-queue.js'
 const COMPUTE_QUEUE_NAME = 'lead-score-compute'
 const BULK_QUEUE_NAME = 'lead-score-bulk'
 const DECAY_QUEUE_NAME = 'lead-score-decay'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 interface ComputeJobData {
   tenantId: string
@@ -28,7 +21,7 @@ interface BulkJobData {
 
 export async function processCompute(data: ComputeJobData): Promise<void> {
   const { tenantId, contactId, trigger } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch current score before update
   const { data: current } = await supabase
@@ -75,7 +68,7 @@ export async function processCompute(data: ComputeJobData): Promise<void> {
 
 async function processBulk(data: BulkJobData): Promise<void> {
   const { tenantId } = data
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Fetch all non-archived contacts for the tenant
   const { data: contacts, error } = await supabase
@@ -115,7 +108,7 @@ async function processBulk(data: BulkJobData): Promise<void> {
 }
 
 export async function processDecay(): Promise<void> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Find all distinct tenants with contacts that have a positive lead_score
   const { data: rows, error } = await supabase

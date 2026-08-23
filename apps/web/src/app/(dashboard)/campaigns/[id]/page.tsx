@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import { Modal } from '@/components/ui/Modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -280,18 +283,14 @@ function ChannelEditor({
               {subjectLen}/{subjectLimit}
             </span>
           </div>
-          <input
-            type="text"
+          <TextField
             value={localSubject}
             onChange={(e) => onSubjectChange(e.target.value)}
             onBlur={onBlurSubject}
             disabled={isApproved || saving}
             placeholder="Email subject…"
-            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
-              isApproved
-                ? 'bg-gray-50 text-ink3 border-border-brand cursor-not-allowed'
-                : 'bg-white text-ink border-border-brand'
-            }`}
+            fullWidth
+            size="small"
           />
         </div>
       )}
@@ -313,11 +312,12 @@ function ChannelEditor({
             )}
           </div>
         </div>
-        <textarea
+        <TextField
           value={localBody}
           onChange={(e) => onBodyChange(e.target.value)}
           onBlur={onBlurBody}
           disabled={isApproved || saving}
+          multiline
           rows={channel === 'email' ? 10 : 5}
           placeholder={
             channel === 'sms'
@@ -326,11 +326,9 @@ function ChannelEditor({
                 ? 'Email body…'
                 : 'Social post…'
           }
-          className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y transition-colors ${
-            isApproved
-              ? 'bg-gray-50 text-ink3 border-border-brand cursor-not-allowed'
-              : 'bg-white text-ink border-border-brand'
-          } ${bodyLimit > 0 && bodyLen > bodyLimit ? 'border-red-300 focus:ring-red-400' : ''}`}
+          error={bodyLimit > 0 && bodyLen > bodyLimit}
+          fullWidth
+          size="small"
         />
       </div>
 
@@ -364,25 +362,27 @@ function ChannelEditor({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
             onClick={onRegenerate}
             disabled={isApproved || regenerating}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ink2 border border-border-brand rounded-lg hover:bg-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            size="small"
+            color="inherit"
+            startIcon={regenerating ? <Spinner small /> : undefined}
+            sx={{ fontSize: 12 }}
           >
-            {regenerating && <Spinner small />}
             Regenerate
-          </button>
+          </Button>
           {!isApproved && (
-            <button
-              type="button"
+            <Button
               onClick={onApprove}
               disabled={approving}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              size="small"
+              variant="contained"
+              startIcon={approving ? <Spinner small /> : undefined}
+              sx={{ fontSize: 12 }}
             >
-              {approving && <Spinner small />}
               Approve {CHANNEL_LABEL[channel] ?? channel}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -488,27 +488,28 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
   return (
     <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-border-brand">
+      <Tabs
+        value={activeChannel}
+        onChange={(_e, v: string) => setActiveChannel(v)}
+        sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+      >
         {channels.map((ch) => {
           const msg = messages.find((m) => m.channel === ch)
           const approved = msg?.approved ?? false
           return (
-            <button
+            <Tab
               key={ch}
-              type="button"
-              onClick={() => setActiveChannel(ch)}
-              className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
-                activeChannel === ch
-                  ? 'border-teal-600 text-teal-700'
-                  : 'border-transparent text-ink3 hover:text-ink2'
-              }`}
-            >
-              {CHANNEL_LABEL[ch] ?? ch}
-              {approved && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
-            </button>
+              value={ch}
+              label={
+                <span className="flex items-center gap-2">
+                  {CHANNEL_LABEL[ch] ?? ch}
+                  {approved && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+                </span>
+              }
+            />
           )
         })}
-      </div>
+      </Tabs>
 
       {/* Channel content */}
       <div className="p-6">
@@ -545,38 +546,30 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
 
       {/* Approve all */}
       <div className="px-6 pb-5 flex justify-end">
-        <button
-          type="button"
+        <Button
           onClick={handleApprove}
           disabled={allApproved || approving}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            allApproved
-              ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
-              : 'bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50'
-          }`}
-        >
-          {allApproved ? (
-            <>
+          variant="contained"
+          color={allApproved ? 'success' : 'primary'}
+          startIcon={
+            allApproved ? (
               <svg
-                className="w-4 h-4"
-                fill="none"
                 viewBox="0 0 24 24"
+                width={16}
+                height={16}
+                fill="none"
                 stroke="currentColor"
                 strokeWidth={2.5}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              All approved
-            </>
-          ) : approving ? (
-            <>
+            ) : approving ? (
               <Spinner />
-              Approving…
-            </>
-          ) : (
-            'Approve all'
-          )}
-        </button>
+            ) : undefined
+          }
+        >
+          {allApproved ? 'All approved' : approving ? 'Approving…' : 'Approve all'}
+        </Button>
       </div>
 
       {/* Regenerate confirm */}
@@ -690,35 +683,35 @@ function ScheduleSection({ campaign, messages, onReload, onCancelled }: Schedule
 
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Change schedule</label>
-            <input
+            <TextField
               type="datetime-local"
               value={scheduleAt}
-              min={minLocalDatetime()}
+              slotProps={{ htmlInput: { min: minLocalDatetime() } }}
               onChange={(e) => setScheduleAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              fullWidth
+              size="small"
             />
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
+            <Button
               onClick={() => setShowCancelConfirm(true)}
               disabled={cancelling}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+              variant="outlined"
+              color="error"
+              startIcon={cancelling ? <Spinner small /> : undefined}
             >
-              {cancelling && <Spinner small />}
               Cancel campaign
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button
               onClick={() => isFuture && setShowConfirm(true)}
               disabled={!isFuture || scheduling}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="contained"
+              startIcon={scheduling ? <Spinner /> : undefined}
             >
-              {scheduling && <Spinner />}
               Update schedule
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -726,12 +719,13 @@ function ScheduleSection({ campaign, messages, onReload, onCancelled }: Schedule
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-ink2 mb-1.5">Send date and time</label>
-            <input
+            <TextField
               type="datetime-local"
               value={scheduleAt}
-              min={minLocalDatetime()}
+              slotProps={{ htmlInput: { min: minLocalDatetime() } }}
               onChange={(e) => setScheduleAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm text-ink border border-border-brand rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              fullWidth
+              size="small"
             />
           </div>
 
@@ -743,15 +737,14 @@ function ScheduleSection({ campaign, messages, onReload, onCancelled }: Schedule
           )}
 
           <div className="flex justify-end">
-            <button
-              type="button"
+            <Button
               onClick={() => setShowConfirm(true)}
               disabled={!canSchedule || scheduling}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="contained"
+              startIcon={scheduling ? <Spinner /> : undefined}
             >
-              {scheduling && <Spinner />}
               Schedule campaign
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -906,15 +899,15 @@ export default function CampaignDetailPage() {
             <>
               <CopyPreview messages={messages} channels={channels} />
               <div className="flex justify-end">
-                <button
-                  type="button"
+                <Button
                   onClick={handleCancelRunning}
                   disabled={cancelling}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                  variant="outlined"
+                  color="error"
+                  startIcon={cancelling ? <Spinner /> : undefined}
                 >
-                  {cancelling && <Spinner />}
                   Cancel campaign
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -926,12 +919,13 @@ export default function CampaignDetailPage() {
         <>
           <StatusBanner campaign={campaign} />
           <div className="flex gap-3">
-            <Link
+            <Button
+              component={Link}
               href={`/campaigns/${campaign.id}/performance`}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+              variant="contained"
             >
               View performance →
-            </Link>
+            </Button>
           </div>
           {isP13 && <CopyPreview messages={messages} channels={channels} />}
         </>
@@ -950,13 +944,21 @@ export default function CampaignDetailPage() {
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
               Legacy campaign — use the old editor flow.{' '}
-              <button
-                type="button"
-                onClick={() => router.push(`/campaigns/new?id=${campaign.id}`)}
-                className="underline font-medium"
+              <Button
+                component={Link}
+                href={`/campaigns/new?id=${campaign.id}`}
+                variant="text"
+                size="small"
+                sx={{
+                  p: 0,
+                  minWidth: 0,
+                  verticalAlign: 'baseline',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
               >
                 Open editor →
-              </button>
+              </Button>
             </div>
           )}
 

@@ -16,7 +16,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import type { AuthenticatedRequest } from '../lib/auth.js'
-import { defaultEntitlement } from '../config/stripe-plans.js'
+import { resolveEntitlement } from '../lib/modules.js'
 
 interface TenantPlanRow {
   subscription_status: string | null
@@ -62,14 +62,16 @@ export function requirePlan(...requiredModules: string[]) {
     }
 
     // Module gate: explicit boolean override wins, else derive from the tier.
-    const modules = data?.modules ?? {}
-    const plan = data?.subscription_plan ?? null
-    const product = data?.product ?? null
-    const missing = requiredModules.filter((m) => {
-      const v = modules[m]
-      const allowed = typeof v === 'boolean' ? v : defaultEntitlement(m, plan, product)
-      return !allowed
-    })
+    // Delegates the shared entitlement math to resolveEntitlement() — this is
+    // a separate DB read from the subscription_status fetch above (fresh
+    // snapshot per call, same as before extraction).
+    const results = await Promise.all(
+      requiredModules.map(async (m) => ({
+        module: m,
+        enabled: (await resolveEntitlement(authed.tenantId, m)).enabled,
+      }))
+    )
+    const missing = results.filter((r) => !r.enabled).map((r) => r.module)
     if (missing.length > 0) {
       res.status(402).json({
         error: 'Plan upgrade required',

@@ -1,22 +1,15 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueTaskReminder, cancelTaskReminder } from '../workers/task-reminder-worker.js'
 
 const router = Router()
 
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
-
 // ── GET /api/tasks ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const contactId = typeof req.query['contact_id'] === 'string' ? req.query['contact_id'] : null
   const completed = req.query['completed'] === 'true'
@@ -56,7 +49,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── POST /api/tasks ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
@@ -172,7 +165,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 // ── PUT /api/tasks/:id ───────────────────────────────────────────────────────
 router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
   const b = req.body as Record<string, unknown>
 
@@ -285,7 +278,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
 // ── DELETE /api/tasks/:id ────────────────────────────────────────────────────
 router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const { id } = req.params
 
   const { data: existing } = await supabase

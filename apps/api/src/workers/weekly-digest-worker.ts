@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { buildDigestData } from '../lib/digest-builder.js'
 import { renderWeeklyDigest } from '../lib/email-templates/weekly-digest.js'
@@ -7,13 +7,6 @@ import { sendEmail } from '../lib/email-client.js'
 import { signDigestToken } from '../routes/digest.js'
 
 const QUEUE_NAME = 'weekly-digest'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 /** First char + domain only — owner emails must not land in logs verbatim. */
 function maskEmail(email: string): string {
@@ -24,7 +17,7 @@ function maskEmail(email: string): string {
 async function processWeeklyDigest(): Promise<void> {
   console.info('[weekly-digest] starting weekly digest scan...')
 
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   const sixDaysAgoIso = new Date(Date.now() - 6 * 86400000).toISOString()
 

@@ -1,16 +1,9 @@
 import dns from 'node:dns'
 import net from 'node:net'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 import { GoogleGenAI } from '@google/genai'
 import { load } from 'cheerio'
 import type { Element } from 'domhandler'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // ── SSRF guard (SSRF-01) ────────────────────────────────────────────────────
 const MAX_REDIRECTS = 3
@@ -93,7 +86,7 @@ export async function crawlUrl(params: {
   rootUrl: string
 }): Promise<void> {
   const { tenantId, urlRecordId, rootUrl } = params
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     // Step 1: UPDATE status='crawling'

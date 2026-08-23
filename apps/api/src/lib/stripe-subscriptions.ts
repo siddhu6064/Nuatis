@@ -1,17 +1,10 @@
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from './supabase.js'
 
 function getStripe(): Stripe {
   const key = process.env['STRIPE_SECRET_KEY']
   if (!key) throw new Error('Stripe not configured')
   return new Stripe(key)
-}
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
 }
 
 function mapInterval(interval: string): {
@@ -36,7 +29,7 @@ export async function getOrCreateStripeCustomer(params: {
   email: string
   name: string
 }): Promise<string> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Check if we already have a customer for this contact
   const { data } = await supabase

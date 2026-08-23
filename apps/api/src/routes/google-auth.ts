@@ -1,18 +1,11 @@
 import { Router, type Request, type Response } from 'express'
 import { randomBytes } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { getAuthUrl, exchangeCodeForTokens } from '../services/google.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import redis from '../lib/redis.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 // GET /api/auth/google — redirect business owner to Google consent screen
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -52,7 +45,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // Store refresh token on the primary location for this tenant
     // If no location exists yet, store directly on tenant record

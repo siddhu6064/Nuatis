@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 /** Returns true if the tenant has an active pause for this scanner right now. */
 export async function isScannerPaused(tenantId: string, scannerKey: string): Promise<boolean> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('scanner_pauses')
@@ -29,7 +22,7 @@ export async function isScannerPaused(tenantId: string, scannerKey: string): Pro
 
 /** Returns the active pause row for this tenant+scanner, or null if none. */
 export async function getActivePause(tenantId: string, scannerKey: string) {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date().toISOString()
   const { data } = await supabase
     .from('scanner_pauses')
@@ -49,7 +42,7 @@ export async function getActivePause(tenantId: string, scannerKey: string) {
  * Used by batch scanners that process all tenants in a single scan().
  */
 export async function getPausedTenants(scannerKey: string): Promise<Set<string>> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('scanner_pauses')

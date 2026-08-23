@@ -1,17 +1,10 @@
 import crypto from 'node:crypto'
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 /**
  * Extract plain email address from a string like "Name <email@example.com>"
@@ -30,7 +23,7 @@ const router = Router()
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const { data, error } = await supabase
       .from('tenants')
@@ -54,7 +47,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.post('/enable', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const authed = req as AuthenticatedRequest
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     const bccAddress = `log-${crypto.randomBytes(5).toString('hex')}@mail.nuatis.com`
 
@@ -180,7 +173,7 @@ emailInboundWebhookRouter.post('/', async (req: Request, res: Response): Promise
       return
     }
 
-    const supabase = getSupabase()
+    const supabase = getServiceClient()
 
     // ── Find tenant by matching any to[] address against bcc_logging_address ─
     const { data: tenants, error: tenantError } = await supabase

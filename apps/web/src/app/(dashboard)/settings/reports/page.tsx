@@ -7,6 +7,8 @@ import Radio from '@mui/material/Radio'
 import RadioGroup from '@mui/material/RadioGroup'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Button from '@mui/material/Button'
+import Switch from '@mui/material/Switch'
+import IconButton from '@mui/material/IconButton'
 import { Modal } from '@/components/ui/Modal'
 
 const REPORT_LABELS: Record<string, string> = {
@@ -154,17 +156,16 @@ export default function ScheduledReportsPage() {
             Receive email digests of your Insights reports on a recurring schedule
           </p>
         </div>
-        <button
+        <Button
           onClick={() => {
             setForm(EMPTY_FORM)
             setFormError(null)
             setModalOpen(true)
           }}
-          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors"
+          variant="contained"
         >
-          <span className="text-base leading-none">+</span>
-          Schedule Report
-        </button>
+          + Schedule Report
+        </Button>
       </div>
 
       {/* Table */}
@@ -218,24 +219,21 @@ export default function ScheduledReportsPage() {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3 justify-end">
                       {/* Enabled toggle */}
-                      <button
-                        onClick={() => void toggleEnabled(r.id, !r.enabled)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                          r.enabled ? 'bg-teal-600' : 'bg-bg3'
-                        }`}
-                        title={r.enabled ? 'Disable' : 'Enable'}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                            r.enabled ? 'translate-x-4' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
+                      <Switch
+                        size="small"
+                        checked={r.enabled}
+                        onChange={() => void toggleEnabled(r.id, !r.enabled)}
+                        slotProps={{
+                          input: {
+                            'aria-label': r.enabled ? 'Disable report' : 'Enable report',
+                          },
+                        }}
+                      />
                       {/* Delete */}
-                      <button
+                      <IconButton
                         onClick={() => void deleteReport(r.id)}
-                        className="text-ink4 hover:text-red-500 transition-colors"
                         title="Delete"
+                        size="small"
                       >
                         <svg
                           className="w-4 h-4"
@@ -250,7 +248,7 @@ export default function ScheduledReportsPage() {
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                           />
                         </svg>
-                      </button>
+                      </IconButton>
                     </div>
                   </td>
                 </tr>

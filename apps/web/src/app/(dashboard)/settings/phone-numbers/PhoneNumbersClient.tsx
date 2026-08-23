@@ -2,6 +2,10 @@
 
 import { useState } from 'react'
 import Switch from '@mui/material/Switch'
+import Button from '@mui/material/Button'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Checkbox from '@mui/material/Checkbox'
 
 type Department = 'general' | 'scheduling' | 'billing' | 'sales' | 'support' | 'maya'
 type NumberStatus = 'active' | 'inactive'
@@ -225,16 +229,16 @@ export default function PhoneNumbersClient({
       <div className="bg-white rounded-xl border border-border-brand">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-brand">
           <h2 className="text-sm font-semibold text-ink">Telnyx Numbers</h2>
-          <button
-            type="button"
+          <Button
             onClick={() => {
               setShowAddForm((v) => !v)
               setAddError(null)
             }}
-            className="px-3 py-1.5 text-sm border border-border-brand rounded-lg hover:bg-bg transition-colors text-ink2"
+            size="small"
+            color="inherit"
           >
             {showAddForm ? 'Cancel' : 'Add Number'}
-          </button>
+          </Button>
         </div>
 
         {actionError && (
@@ -250,89 +254,67 @@ export default function PhoneNumbersClient({
             className="px-6 py-4 border-b border-border-brand bg-bg space-y-3"
           >
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="add-phone" className="block text-xs text-ink3 mb-1">
-                  Phone Number (E.164)
-                </label>
-                <input
-                  id="add-phone"
-                  type="text"
-                  placeholder="+15125551234"
-                  value={addForm.phone_number}
-                  onChange={(e) => setAddForm((f) => ({ ...f, phone_number: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
-                />
-              </div>
-              <div>
-                <label htmlFor="add-label" className="block text-xs text-ink3 mb-1">
-                  Label
-                </label>
-                <input
-                  id="add-label"
-                  type="text"
-                  placeholder="Front Desk"
-                  maxLength={50}
-                  value={addForm.label}
-                  onChange={(e) => setAddForm((f) => ({ ...f, label: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
-                />
-              </div>
+              <TextField
+                label="Phone Number (E.164)"
+                placeholder="+15125551234"
+                value={addForm.phone_number}
+                onChange={(e) => setAddForm((f) => ({ ...f, phone_number: e.target.value }))}
+                size="small"
+                fullWidth
+              />
+              <TextField
+                label="Label"
+                placeholder="Front Desk"
+                value={addForm.label}
+                onChange={(e) => setAddForm((f) => ({ ...f, label: e.target.value }))}
+                size="small"
+                fullWidth
+                slotProps={{ htmlInput: { maxLength: 50 } }}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="add-department" className="block text-xs text-ink3 mb-1">
-                  Department
-                </label>
-                <select
-                  id="add-department"
-                  value={addForm.department}
-                  onChange={(e) =>
-                    setAddForm((f) => ({ ...f, department: e.target.value as Department }))
-                  }
-                  className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none bg-white text-ink"
-                >
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d} value={d}>
-                      {DEPT_LABELS[d]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="add-forwarding" className="block text-xs text-ink3 mb-1">
-                  Forwarding Number <span className="text-ink4">(optional)</span>
-                </label>
-                <input
-                  id="add-forwarding"
-                  type="text"
-                  placeholder="+15125559999"
-                  value={addForm.forwarding_number}
-                  onChange={(e) => setAddForm((f) => ({ ...f, forwarding_number: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-border-brand rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-white text-ink"
-                />
-              </div>
+              <TextField
+                select
+                label="Department"
+                value={addForm.department}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, department: e.target.value as Department }))
+                }
+                size="small"
+                fullWidth
+              >
+                {DEPARTMENTS.map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {DEPT_LABELS[d]}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                label="Forwarding Number (optional)"
+                placeholder="+15125559999"
+                value={addForm.forwarding_number}
+                onChange={(e) => setAddForm((f) => ({ ...f, forwarding_number: e.target.value }))}
+                size="small"
+                fullWidth
+              />
             </div>
             <div className="flex items-center gap-3">
               <label htmlFor="add-maya" className="flex items-center gap-2 cursor-pointer">
-                <input
+                <Checkbox
                   id="add-maya"
-                  type="checkbox"
                   checked={addForm.maya_enabled}
                   onChange={(e) => setAddForm((f) => ({ ...f, maya_enabled: e.target.checked }))}
-                  className="w-4 h-4 rounded border-border-brand"
+                  size="small"
+                  sx={{ p: 0 }}
                 />
                 <span className="text-sm text-ink2">Maya answers this number</span>
               </label>
             </div>
             {addError && <p className="text-sm text-red-600">{addError}</p>}
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={adding}
-                className="px-4 py-1.5 text-sm bg-brand text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
+              <Button type="submit" disabled={adding} variant="contained" size="small">
                 {adding ? 'Adding…' : 'Add Number'}
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -347,48 +329,47 @@ export default function PhoneNumbersClient({
                 {editingId === num.id && editForm ? (
                   /* Inline edit row */
                   <div className="flex items-center gap-3 flex-wrap">
-                    <input
-                      type="text"
+                    <TextField
                       value={editForm.label}
                       onChange={(e) =>
                         setEditForm((f) => (f ? { ...f, label: e.target.value } : f))
                       }
-                      maxLength={50}
-                      className="px-2 py-1 text-sm border border-border-brand rounded focus:outline-none focus:ring-1 focus:ring-brand"
+                      size="small"
+                      slotProps={{ htmlInput: { maxLength: 50 } }}
                     />
-                    <select
+                    <TextField
+                      select
                       value={editForm.department}
                       onChange={(e) =>
                         setEditForm((f) =>
                           f ? { ...f, department: e.target.value as Department } : f
                         )
                       }
-                      className="px-2 py-1 text-sm border border-border-brand rounded focus:outline-none"
+                      size="small"
                     >
                       {DEPARTMENTS.map((d) => (
-                        <option key={d} value={d}>
+                        <MenuItem key={d} value={d}>
                           {DEPT_LABELS[d]}
-                        </option>
+                        </MenuItem>
                       ))}
-                    </select>
-                    <button
-                      type="button"
+                    </TextField>
+                    <Button
                       onClick={() => void handleSaveEdit(num.id)}
                       disabled={savingId === num.id}
-                      className="text-sm text-brand hover:underline disabled:opacity-50"
+                      size="small"
                     >
                       {savingId === num.id ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={() => {
                         setEditingId(null)
                         setEditForm(null)
                       }}
-                      className="text-sm text-ink4 hover:underline"
+                      size="small"
+                      color="inherit"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   /* Normal display row */
@@ -433,40 +414,40 @@ export default function PhoneNumbersClient({
                         />
                       </div>
                       {/* Edit */}
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => {
                           setEditingId(num.id)
                           setEditForm({ label: num.label, department: num.department })
                         }}
-                        className="text-xs text-ink4 hover:text-ink transition-colors"
+                        size="small"
+                        color="inherit"
                         title="Edit"
                       >
                         Edit
-                      </button>
+                      </Button>
                       {/* Set Primary */}
                       {!num.is_primary && (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => void handleSetPrimary(num.id)}
                           disabled={settingPrimaryId === num.id}
-                          className="text-xs text-ink4 hover:text-ink transition-colors disabled:opacity-50"
+                          size="small"
+                          color="inherit"
                           title="Set as primary"
                         >
                           Set Primary
-                        </button>
+                        </Button>
                       )}
                       {/* Delete */}
                       {!num.is_primary && (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => void handleDelete(num.id, num.phone_number)}
                           disabled={deletingId === num.id}
-                          className="text-xs text-ink4 hover:text-red-500 transition-colors disabled:opacity-40"
+                          size="small"
+                          color="error"
                           title="Remove"
                         >
                           Remove
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>

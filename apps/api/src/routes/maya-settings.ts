@@ -1,16 +1,9 @@
 import { Router, type Request, type Response } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '../lib/supabase.js'
 import { VERTICALS } from '@nuatis/shared'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 
 const router = Router()
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
 
 const E164_REGEX = /^\+[1-9]\d{6,14}$/
 
@@ -34,7 +27,7 @@ interface LocationSettings {
 // ── GET /api/maya-settings ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   try {
     const { data: location, error } = await supabase
@@ -99,7 +92,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── PUT /api/maya-settings ────────────────────────────────────────────────────
 router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
   const body = req.body as Record<string, unknown>
 
   // Build update object from allowed fields

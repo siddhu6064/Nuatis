@@ -60,7 +60,6 @@ export default async function AppointmentsPage() {
 
   return (
     <AppointmentsCalendar
-      tenantId={tenantId}
       initialAppointments={appointments ?? []}
       staff={staff ?? []}
       userRole={userRole}

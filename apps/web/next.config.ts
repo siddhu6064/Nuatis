@@ -24,6 +24,19 @@ const config: NextConfig = {
   // Transpile shared package from monorepo
   transpilePackages: ['@nuatis/shared'],
 
+  // Media Library renders public Supabase Storage URLs via next/image
+  // (settings/media-library/MediaLibraryClient.tsx) — next/image refuses any
+  // host not explicitly allowlisted here, regardless of the img-src CSP above.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+
   // Turbopack: resolve .js imports to .ts source in shared package
   turbopack: {
     resolveExtensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],

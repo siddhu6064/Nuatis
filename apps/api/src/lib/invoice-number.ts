@@ -1,16 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env['SUPABASE_URL']
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!url || !key) throw new Error('Supabase env vars not set')
-  return createClient(url, key)
-}
+import { getServiceClient } from './supabase.js'
 
 // NOTE: Uses select-then-update which has a theoretical race condition at very
 // high concurrency. Acceptable for invoice generation rates in this codebase.
 export async function generateInvoiceNumber(tenantId: string): Promise<string> {
-  const supabase = getSupabase()
+  const supabase = getServiceClient()
 
   // Read current counter
   const { data: tenant, error: selectErr } = await supabase
