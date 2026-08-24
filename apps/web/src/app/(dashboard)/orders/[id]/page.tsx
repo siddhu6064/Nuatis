@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation'
 import OrderStatusControl from './OrderStatusControl'
 import OrderPayments from './OrderPayments'
 import OrderStaffControl from './OrderStaffControl'
+import OrderErrorBanner from './OrderErrorBanner'
+import OrderTrackingControl from './OrderTrackingControl'
 
 interface LineItem {
   id: string
@@ -52,6 +54,9 @@ interface OrderRecord {
   deals: { title: string } | null
   source_quote_id: string | null
   quotes: { quote_number: string } | null
+  error: string | null
+  tracking_number: string | null
+  tracking_carrier: string | null
 }
 
 interface StaffOption {
@@ -152,6 +157,16 @@ export default async function OrderDetailPage({ params }: Props) {
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
           <p className="text-sm font-medium text-red-800">Cancelled: {order.cancel_reason}</p>
         </div>
+      )}
+
+      <OrderErrorBanner orderId={order.id} initialError={order.error} />
+
+      {order.fulfillment_type === 'delivery' && (
+        <OrderTrackingControl
+          orderId={order.id}
+          initialTrackingNumber={order.tracking_number}
+          initialTrackingCarrier={order.tracking_carrier}
+        />
       )}
 
       {order.fulfillment_type && (

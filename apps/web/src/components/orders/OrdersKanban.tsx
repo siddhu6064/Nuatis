@@ -131,6 +131,15 @@ export default function OrdersKanban({ orders, setOrders, showToast }: Props) {
                                       MAYA
                                     </span>
                                   )}
+                                  {order.error && (
+                                    <span
+                                      className="text-[11px] shrink-0"
+                                      title={order.error}
+                                      aria-label="Order has an error"
+                                    >
+                                      ⚠
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-[12px] text-ink2 mb-1 truncate pl-5">
                                   {order.contacts?.full_name ?? order.customer_name ?? 'Walk-in'}

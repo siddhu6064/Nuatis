@@ -167,6 +167,27 @@ export function buildOrderCompletedSms({
   return `Thanks for your order ${orderNumber} with ${biz}! See you again soon.`
 }
 
+export interface OrderTrackingSmsParams {
+  contactName?: string | null
+  businessName: string
+  orderNumber: string
+  trackingCarrier: string
+  trackingNumber: string
+}
+
+export function buildOrderTrackingSms({
+  contactName,
+  businessName: biz,
+  orderNumber,
+  trackingCarrier,
+  trackingNumber,
+}: OrderTrackingSmsParams): string {
+  const name = contactName?.trim() || null
+  const tail = `${trackingCarrier} tracking # ${trackingNumber}.`
+  if (name) return `Hi ${name}, your order ${orderNumber} from ${biz} is on its way! ${tail}`
+  return `Your order ${orderNumber} from ${biz} is on its way! ${tail}`
+}
+
 // ── Trigger Links in SMS ───────────────────────────────────────────────────────
 // Example: embed a trigger link in an appointment reminder template:
 // `Confirm your appointment: ${buildTriggerUrl(slug, contact.id)}`

@@ -47,6 +47,15 @@ export default function OrdersList({ orders }: Props) {
                     MAYA
                   </span>
                 )}
+                {order.error && (
+                  <span
+                    className="ml-2 text-xs"
+                    title={order.error}
+                    aria-label="Order has an error"
+                  >
+                    ⚠
+                  </span>
+                )}
               </td>
               <td className="px-6 py-4 text-sm text-ink3">
                 {order.contacts?.full_name ?? order.customer_name ?? 'Walk-in'}
