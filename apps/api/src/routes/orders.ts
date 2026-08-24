@@ -10,6 +10,7 @@ import {
   buildOrderConfirmationSms,
   buildOrderReadySms,
   buildOrderCompletedSms,
+  buildOrderTrackingSms,
 } from '../lib/sms-templates.js'
 
 const router = Router()
@@ -86,6 +87,31 @@ function validateLineItems(raw: unknown): LineItemInput[] | null {
     })
   }
   return items
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** Persists a staff-visible error flag on an order after a best-effort side
+ *  effect (SMS, inventory deduction, deal rollup) fails. Never throws —
+ *  called from within a catch block that must not itself blow up the
+ *  response. Cleared by staff via PUT /:id { error: null }. */
+async function setOrderError(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string,
+  orderId: string,
+  message: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('orders')
+      .update({ error: message })
+      .eq('id', orderId)
+      .eq('tenant_id', tenantId)
+  } catch (err) {
+    console.error('[orders] failed to persist error flag:', err)
+  }
 }
 
 async function getOrderSettings(
@@ -209,6 +235,7 @@ router.post('/', requireAuth, requireOrders, async (req: Request, res: Response)
       notes: (b['notes'] as string) || null,
       assigned_staff_id: (b['assigned_staff_id'] as string) || null,
       deal_id: (b['deal_id'] as string) || null,
+      metadata: isPlainObject(b['metadata']) ? b['metadata'] : {},
     })
     .select('*')
     .single()
@@ -352,9 +379,47 @@ router.put(
       updates['total'] = total
     }
 
+    // Staff-dismissible error flag (auto-set by the status endpoint when a
+    // side effect fails). Only clearing is exposed here — the route never
+    // lets a client set an arbitrary error string.
+    if (b['error'] === null) updates['error'] = null
+
+    if (typeof b['tracking_number'] === 'string') updates['tracking_number'] = b['tracking_number']
+    if (b['tracking_number'] === null) updates['tracking_number'] = null
+    if (typeof b['tracking_carrier'] === 'string')
+      updates['tracking_carrier'] = b['tracking_carrier']
+    if (b['tracking_carrier'] === null) updates['tracking_carrier'] = null
+
+    if (isPlainObject(b['metadata'])) {
+      const { data: current } = await supabase
+        .from('orders')
+        .select('metadata')
+        .eq('id', req.params['id'])
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle()
+      updates['metadata'] = {
+        ...((current?.metadata as Record<string, unknown>) ?? {}),
+        ...b['metadata'],
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No valid fields to update' })
       return
+    }
+
+    // Snapshot pre-update state only when we need to detect a tracking-number
+    // transition (fresh fetch, not reused from the metadata block above,
+    // since that one only runs conditionally).
+    let previousTrackingNumber: string | null = null
+    if (typeof updates['tracking_number'] === 'string') {
+      const { data: before } = await supabase
+        .from('orders')
+        .select('tracking_number')
+        .eq('id', req.params['id'])
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle()
+      previousTrackingNumber = (before?.tracking_number as string | null) ?? null
     }
 
     const { data, error } = await supabase
@@ -369,6 +434,53 @@ router.put(
     if (error || !data) {
       res.status(404).json({ error: 'Not found' })
       return
+    }
+
+    // Tracking-added SMS — fires once, only on the null/empty → set transition.
+    if (
+      typeof updates['tracking_number'] === 'string' &&
+      updates['tracking_number'] &&
+      !previousTrackingNumber &&
+      data.customer_phone
+    ) {
+      void (async () => {
+        try {
+          const { data: location } = await supabase
+            .from('locations')
+            .select('telnyx_number')
+            .eq('tenant_id', authed.tenantId)
+            .eq('is_primary', true)
+            .maybeSingle()
+          const fromNumber = location?.telnyx_number as string | null
+          if (!fromNumber) return
+
+          const { data: tenantRow } = await supabase
+            .from('tenants')
+            .select('name')
+            .eq('id', authed.tenantId)
+            .maybeSingle()
+
+          const text = buildOrderTrackingSms({
+            contactName: (data.customer_name as string) || null,
+            businessName: (tenantRow?.name as string) || 'the business',
+            orderNumber: data.order_number as string,
+            trackingCarrier: (data.tracking_carrier as string) || 'the carrier',
+            trackingNumber: data.tracking_number as string,
+          })
+          await sendSms(fromNumber, data.customer_phone as string, text, {
+            tenantId: authed.tenantId,
+            contactId: (data.contact_id as string) ?? undefined,
+          })
+        } catch (err) {
+          console.error('[orders] tracking SMS failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            data.id as string,
+            'Tracking SMS failed to send to the customer.'
+          )
+        }
+      })()
     }
 
     res.json(data)
@@ -567,6 +679,12 @@ router.put(
         }
       } catch (err) {
         console.error('[orders] inventory auto-deduct failed:', err)
+        void setOrderError(
+          supabase,
+          authed.tenantId,
+          order.id,
+          'Inventory deduction failed on completion — check stock levels manually.'
+        )
       }
 
       // Deal value rollup — additive only, never overwrites a rep-set value:
@@ -625,6 +743,12 @@ router.put(
           }
         } catch (err) {
           console.error('[orders] deal value rollup failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            order.id,
+            'Failed to update linked deal value/status.'
+          )
         }
       }
     }
@@ -672,6 +796,12 @@ router.put(
           })
         } catch (err) {
           console.error('[orders] status-change SMS failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            order.id,
+            `Customer SMS failed to send for the "${nextStatus}" update.`
+          )
         }
       })()
     }

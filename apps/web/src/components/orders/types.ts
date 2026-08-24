@@ -27,6 +27,10 @@ export interface Order {
   amount_paid: number
   notes: string | null
   created_at: string
+  error: string | null
+  tracking_number: string | null
+  tracking_carrier: string | null
+  metadata: Record<string, unknown>
 }
 
 export interface OrderLineItem {
