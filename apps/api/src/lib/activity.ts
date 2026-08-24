@@ -16,6 +16,7 @@ type ActivityType =
   | 'low_stock_alert'
   | 'order'
   | 'order_status_change'
+  | 'expense'
 
 type ActorType = 'ai' | 'user' | 'system' | 'contact'
 

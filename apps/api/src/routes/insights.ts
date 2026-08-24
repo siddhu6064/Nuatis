@@ -1618,4 +1618,157 @@ router.get('/maya-latency', requireAuth, async (req: Request, res: Response): Pr
   }
 })
 
+// ── GET /api/insights/expenses ────────────────────────────────────────────────
+router.get('/expenses', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  try {
+    // Expenses module gate — soft: return an empty/zeroed shape instead of
+    // 403, since a tenant can have Insights without Expenses.
+    const expensesEnabled = await isModuleEnabled(authed.tenantId, 'expenses')
+    if (!expensesEnabled) {
+      res.json({ summary: null, by_category: [], by_month: [], pnl: [], recent_expenses: [] })
+      return
+    }
+
+    const { from, to } = getDateRange(req)
+
+    const { data: expensesData } = await supabase
+      .from('expenses')
+      .select(
+        'id, expense_number, amount, expense_date, vendor, category_id, recurring_expense_id, expense_categories(name)'
+      )
+      .eq('tenant_id', authed.tenantId)
+      .is('deleted_at', null)
+      .gte('expense_date', from.slice(0, 10))
+      .lte('expense_date', to.slice(0, 10))
+      .order('expense_date', { ascending: false })
+
+    const expenses = expensesData ?? []
+
+    // Supabase infers a nested to-one relation as an array without generated
+    // types configured — normalize to a single name here.
+    function categoryName(e: { expense_categories: unknown }): string {
+      const rel = e.expense_categories
+      const row = Array.isArray(rel) ? (rel[0] as { name?: string } | undefined) : rel
+      return (row as { name?: string } | null)?.name ?? 'Uncategorized'
+    }
+
+    const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0)
+    const monthStart = new Date()
+    monthStart.setUTCDate(1)
+    monthStart.setUTCHours(0, 0, 0, 0)
+    const monthStartStr = monthStart.toISOString().slice(0, 10)
+    const recurringAmountThisMonth = expenses
+      .filter((e) => e.recurring_expense_id != null && (e.expense_date as string) >= monthStartStr)
+      .reduce((sum, e) => sum + Number(e.amount ?? 0), 0)
+
+    // by_category
+    const categoryMap = new Map<string, { name: string; total: number; count: number }>()
+    for (const e of expenses) {
+      const cid = (e.category_id as string | null) ?? 'uncategorized'
+      const cname = categoryName(e)
+      const entry = categoryMap.get(cid) ?? { name: cname, total: 0, count: 0 }
+      entry.total += Number(e.amount ?? 0)
+      entry.count += 1
+      categoryMap.set(cid, entry)
+    }
+    const by_category = [...categoryMap.entries()]
+      .map(([category_id, v]) => ({
+        category_id,
+        category_name: v.name,
+        total_amount: Math.round(v.total * 100) / 100,
+        count: v.count,
+        pct: totalAmount > 0 ? Math.round((v.total / totalAmount) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.total_amount - a.total_amount)
+
+    // by_month
+    const monthMap = new Map<string, { total: number; count: number }>()
+    for (const e of expenses) {
+      const month = (e.expense_date as string).slice(0, 7)
+      const entry = monthMap.get(month) ?? { total: 0, count: 0 }
+      entry.total += Number(e.amount ?? 0)
+      entry.count += 1
+      monthMap.set(month, entry)
+    }
+    const by_month = [...monthMap.entries()]
+      .map(([month, v]) => ({
+        month,
+        total_amount: Math.round(v.total * 100) / 100,
+        count: v.count,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+
+    // Revenue side (cash-basis: completed orders + received invoices),
+    // grouped by month, for the pnl array.
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('total, completed_at')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'completed')
+      .gte('completed_at', from)
+      .lte('completed_at', to)
+
+    const { data: invoicesData } = await supabase
+      .from('invoices')
+      .select('total, paid_at')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'received')
+      .gte('paid_at', from)
+      .lte('paid_at', to)
+
+    const revenueMonthMap = new Map<string, number>()
+    for (const o of ordersData ?? []) {
+      if (!o.completed_at) continue
+      const month = (o.completed_at as string).slice(0, 7)
+      revenueMonthMap.set(month, (revenueMonthMap.get(month) ?? 0) + Number(o.total ?? 0))
+    }
+    for (const inv of invoicesData ?? []) {
+      if (!inv.paid_at) continue
+      const month = (inv.paid_at as string).slice(0, 7)
+      revenueMonthMap.set(month, (revenueMonthMap.get(month) ?? 0) + Number(inv.total ?? 0))
+    }
+
+    const allMonths = new Set([...monthMap.keys(), ...revenueMonthMap.keys()])
+    const pnl = [...allMonths].sort().map((month) => {
+      const revenue = Math.round((revenueMonthMap.get(month) ?? 0) * 100) / 100
+      const monthExpenses = Math.round((monthMap.get(month)?.total ?? 0) * 100) / 100
+      return {
+        month,
+        revenue,
+        expenses: monthExpenses,
+        net: Math.round((revenue - monthExpenses) * 100) / 100,
+      }
+    })
+
+    const recent_expenses = expenses.slice(0, 10).map((e) => ({
+      id: e.id,
+      expense_number: e.expense_number,
+      vendor: e.vendor,
+      category_name: categoryName(e),
+      amount: Number(e.amount ?? 0),
+      expense_date: e.expense_date,
+    }))
+
+    res.json({
+      summary: {
+        total_expenses: expenses.length,
+        total_amount: Math.round(totalAmount * 100) / 100,
+        avg_expense_amount:
+          expenses.length > 0 ? Math.round((totalAmount / expenses.length) * 100) / 100 : 0,
+        recurring_amount_this_month: Math.round(recurringAmountThisMonth * 100) / 100,
+      },
+      by_category,
+      by_month,
+      pnl,
+      recent_expenses,
+    })
+  } catch (err) {
+    console.error('[insights] expenses error:', err)
+    res.status(500).json({ error: 'Failed to fetch expense insights' })
+  }
+})
+
 export default router

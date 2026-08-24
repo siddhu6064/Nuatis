@@ -26,6 +26,7 @@ import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
 import { createCampaignSenderWorker } from './campaign-sender.js'
+import { createRecurringExpenseScanner } from './recurring-expense-scanner.js'
 
 interface ManagedWorker {
   name: string
@@ -243,6 +244,16 @@ export async function startWorkers(): Promise<void> {
   const campaignSender = createCampaignSenderWorker()
   managed.push({ name: 'campaign-sender', ...campaignSender })
   console.info('[workers] campaign-sender (P13) worker started')
+
+  // 27. Recurring expense scanner — daily at 06:00 UTC
+  const recurringExpenseScanner = createRecurringExpenseScanner()
+  await recurringExpenseScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 6 * * *' }, jobId: 'recurring-expense-scanner-daily' }
+  )
+  managed.push({ name: 'recurring-expense-scanner', ...recurringExpenseScanner })
+  console.info('[workers] recurring-expense-scanner started, cron 0 6 * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

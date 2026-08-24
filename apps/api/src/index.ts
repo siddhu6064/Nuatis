@@ -45,6 +45,9 @@ import inventoryRouter from './routes/inventory.js'
 import inventorySettingsRouter from './routes/inventory-settings.js'
 import ordersRouter from './routes/orders.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
+import expensesRouter from './routes/expenses.js'
+import expenseCategoriesRouter from './routes/expense-categories.js'
+import recurringExpensesRouter from './routes/recurring-expenses.js'
 import staffRouter from './routes/staff.js'
 import usersRouter from './routes/users.js'
 import emailIntegrationsRouter from './routes/email-integrations.js'
@@ -241,6 +244,9 @@ app.use('/api/inventory', inventoryRouter)
 app.use('/api/settings/inventory', inventorySettingsRouter)
 app.use('/api/orders', ordersRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
+app.use('/api/expenses', expensesRouter)
+app.use('/api/expense-categories', expenseCategoriesRouter)
+app.use('/api/recurring-expenses', recurringExpensesRouter)
 app.use('/api/staff', staffRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/email-integrations', emailIntegrationsRouter)
