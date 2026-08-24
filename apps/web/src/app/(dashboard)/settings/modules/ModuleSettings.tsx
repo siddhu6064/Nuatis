@@ -72,6 +72,12 @@ const MODULE_DISPLAY: ModuleDisplay[] = [
       'Service catalog, quote builder, PDF proposals, payment links, and transaction ledger.',
     minPlan: 'scale',
   },
+  {
+    key: 'orders',
+    label: 'Orders',
+    description: 'Order intake, kanban fulfillment tracking, payments, and inventory deduction.',
+    minPlan: 'pro',
+  },
   // Hidden — valid keys, no toggle row.
   { key: 'companies', label: 'Companies', description: '', minPlan: 'core', hidden: true },
   { key: 'deals', label: 'Deals', description: '', minPlan: 'core', hidden: true },

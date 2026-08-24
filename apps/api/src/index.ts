@@ -43,6 +43,8 @@ import companiesRouter from './routes/companies.js'
 import dealsRouter from './routes/deals.js'
 import inventoryRouter from './routes/inventory.js'
 import inventorySettingsRouter from './routes/inventory-settings.js'
+import ordersRouter from './routes/orders.js'
+import ordersSettingsRouter from './routes/orders-settings.js'
 import staffRouter from './routes/staff.js'
 import usersRouter from './routes/users.js'
 import emailIntegrationsRouter from './routes/email-integrations.js'
@@ -237,6 +239,8 @@ app.use('/api/companies', companiesRouter)
 app.use('/api/deals', dealsRouter)
 app.use('/api/inventory', inventoryRouter)
 app.use('/api/settings/inventory', inventorySettingsRouter)
+app.use('/api/orders', ordersRouter)
+app.use('/api/settings/orders', ordersSettingsRouter)
 app.use('/api/staff', staffRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/email-integrations', emailIntegrationsRouter)

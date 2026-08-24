@@ -124,6 +124,49 @@ export function buildSmsHelpReplySms(): string {
   return 'Reply STOP to unsubscribe. For help call us directly.'
 }
 
+// ── Orders ─────────────────────────────────────────────────────────────────────
+
+export interface OrderSmsParams {
+  contactName?: string | null
+  businessName: string
+  orderNumber: string
+  vertical: string
+}
+
+export function buildOrderConfirmationSms({
+  contactName,
+  businessName: biz,
+  orderNumber,
+}: OrderSmsParams): string {
+  const name = contactName?.trim() || null
+  if (name)
+    return `Hi ${name}, your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
+  return `Your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
+}
+
+export function buildOrderReadySms({
+  contactName,
+  businessName: biz,
+  orderNumber,
+  vertical,
+}: OrderSmsParams): string {
+  const name = contactName?.trim() || null
+  const verb = HOSPITALITY.has(vertical) ? 'ready for pickup' : 'ready'
+  if (name) return `Hi ${name}, your order ${orderNumber} at ${biz} is ${verb}!`
+  return `Your order ${orderNumber} at ${biz} is ${verb}!`
+}
+
+export function buildOrderCompletedSms({
+  contactName,
+  businessName: biz,
+  orderNumber,
+}: OrderSmsParams): string {
+  const name = contactName?.trim() || null
+  if (name)
+    return `Hi ${name}, thanks for your order ${orderNumber} with ${biz}! See you again soon.`
+  return `Thanks for your order ${orderNumber} with ${biz}! See you again soon.`
+}
+
 // ── Trigger Links in SMS ───────────────────────────────────────────────────────
 // Example: embed a trigger link in an appointment reminder template:
 // `Confirm your appointment: ${buildTriggerUrl(slug, contact.id)}`

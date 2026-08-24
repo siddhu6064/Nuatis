@@ -402,3 +402,132 @@ describe('POST /api/quotes/view/:token/decline', () => {
     expect(stored?.['status']).toBe('declined')
   })
 })
+
+// ── POST /api/quotes/:id/convert-to-order ────────────────────────────────────
+
+describe('POST /api/quotes/:id/convert-to-order', () => {
+  function seedAcceptedQuote(quoteId: string) {
+    store.tables['quotes']!.push({
+      id: quoteId,
+      tenant_id: TENANT_ID,
+      contact_id: CONTACT_ID,
+      quote_number: 'Q-2026-0099',
+      title: 'Catering order',
+      status: 'accepted',
+      subtotal: 100,
+      tax_rate: 0,
+      tax_amount: 0,
+      total: 100,
+    })
+    store.tables['quote_line_items']!.push({
+      id: randomUUID(),
+      quote_id: quoteId,
+      service_id: null,
+      description: 'Sandwich platter',
+      quantity: 2,
+      unit_price: 50,
+      sort_order: 0,
+    })
+  }
+
+  it('returns 403 when the orders module is not enabled', async () => {
+    store.tables['tenants'] = [
+      { id: TENANT_ID, modules: { crm: true, cpq: true, orders: false }, settings: {} },
+    ]
+    seedContact()
+    const quoteId = randomUUID()
+    seedAcceptedQuote(quoteId)
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post(`/api/quotes/${quoteId}/convert-to-order`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when the quote is not accepted', async () => {
+    store.tables['tenants'] = [
+      { id: TENANT_ID, modules: { crm: true, cpq: true, orders: true }, settings: {} },
+    ]
+    seedContact()
+    const quoteId = randomUUID()
+    store.tables['quotes']!.push({
+      id: quoteId,
+      tenant_id: TENANT_ID,
+      quote_number: 'Q-2026-0098',
+      title: 'Still draft',
+      status: 'draft',
+      total: 50,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post(`/api/quotes/${quoteId}/convert-to-order`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(400)
+  })
+
+  it('creates an order with copied line items and links source_quote_id', async () => {
+    store.tables['tenants'] = [
+      {
+        id: TENANT_ID,
+        modules: { crm: true, cpq: true, orders: true },
+        settings: {},
+        order_counter: 1000,
+      },
+    ]
+    seedContact()
+    const quoteId = randomUUID()
+    seedAcceptedQuote(quoteId)
+    store.tables['orders'] = []
+    store.tables['order_line_items'] = []
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post(`/api/quotes/${quoteId}/convert-to-order`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(201)
+    expect(res.body.source_quote_id).toBe(quoteId)
+    expect(res.body.total).toBe(100)
+    expect(res.body.status).toBe('pending')
+
+    const items = (store.tables['order_line_items'] as Row[]).filter(
+      (li) => li['order_id'] === res.body.id
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0]?.['description']).toBe('Sandwich platter')
+  })
+
+  it('is idempotent — converting the same quote twice returns the same order', async () => {
+    store.tables['tenants'] = [
+      {
+        id: TENANT_ID,
+        modules: { crm: true, cpq: true, orders: true },
+        settings: {},
+        order_counter: 1000,
+      },
+    ]
+    seedContact()
+    const quoteId = randomUUID()
+    seedAcceptedQuote(quoteId)
+    store.tables['orders'] = []
+    store.tables['order_line_items'] = []
+
+    const token = await makeToken()
+    const app = makeApp()
+    const first = await request(app)
+      .post(`/api/quotes/${quoteId}/convert-to-order`)
+      .set('Authorization', `Bearer ${token}`)
+    const second = await request(app)
+      .post(`/api/quotes/${quoteId}/convert-to-order`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(200)
+    expect(second.body.id).toBe(first.body.id)
+    expect((store.tables['orders'] as Row[]).length).toBe(1)
+  })
+})
