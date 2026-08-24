@@ -14,6 +14,8 @@ type ActivityType =
   | 'lifecycle_change'
   | 'inventory_adjust'
   | 'low_stock_alert'
+  | 'order'
+  | 'order_status_change'
 
 type ActorType = 'ai' | 'user' | 'system' | 'contact'
 

@@ -23,6 +23,7 @@ export type ModuleId =
   | 'insights'
   | 'campaigns'
   | 'cpq'
+  | 'orders'
   | 'companies'
   | 'deals'
   | 'appointments'
@@ -99,6 +100,13 @@ export const MODULES: ModuleDef[] = [
     description:
       'Service catalog, quote builder, PDF proposals, payment links, and transaction ledger.',
     minPlan: 'scale',
+    defaultOn: false,
+  },
+  {
+    id: 'orders',
+    label: 'Orders',
+    description: 'Order intake, kanban fulfillment tracking, payments, and inventory deduction.',
+    minPlan: 'pro',
     defaultOn: false,
   },
   // ── Hidden modules — valid keys, no settings-UI toggle row ──────────────

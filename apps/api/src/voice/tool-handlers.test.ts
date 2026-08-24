@@ -447,3 +447,102 @@ describe('book_appointment — early-morning slot resolves to the correct UTC ca
     expect(result['start']).toBe('2026-06-15T10:30:00.000Z')
   })
 })
+
+describe('place_order', () => {
+  it('declines when trialExpired is set, without touching the orders table', async () => {
+    const result = await executeToolCall(
+      'place_order',
+      { items: [{ description: 'Latte', quantity: 1 }], caller_name: 'Trial Tina' },
+      { ...baseContext('suite'), trialExpired: true }
+    )
+
+    expect(result['placed']).toBe(false)
+    expect((store.tables['orders'] as Row[] | undefined)?.length ?? 0).toBe(0)
+  })
+
+  it('declines when the orders module is disabled for the tenant', async () => {
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { orders: false } }]
+
+    const result = await executeToolCall(
+      'place_order',
+      { items: [{ description: 'Latte', quantity: 1 }], caller_name: 'Disabled Dana' },
+      baseContext('suite')
+    )
+
+    expect(result['placed']).toBe(false)
+    expect((store.tables['orders'] as Row[] | undefined)?.length ?? 0).toBe(0)
+  })
+
+  it('creates an order with computed totals when the module is enabled', async () => {
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { orders: true }, order_counter: 1000 }]
+
+    const result = await executeToolCall(
+      'place_order',
+      {
+        items: [
+          { description: 'Latte', quantity: 2, unit_price: 4.5 },
+          { description: 'Muffin', quantity: 1, unit_price: 3.5 },
+        ],
+        caller_name: 'Phone Pete',
+        caller_phone: '+15125559999',
+      },
+      baseContext('suite')
+    )
+
+    expect(result['placed']).toBe(true)
+    expect(result['order_number']).toBe('ORD-1001')
+    expect(result['total']).toBe(12.5)
+    const orders = store.tables['orders'] as Row[]
+    expect(orders).toHaveLength(1)
+    expect(orders[0]?.['source']).toBe('maya')
+    expect(orders[0]?.['status']).toBe('pending')
+  })
+
+  it('declines when no item has a description', async () => {
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { orders: true } }]
+
+    const result = await executeToolCall(
+      'place_order',
+      { items: [{ quantity: 1 }], caller_name: 'No Item Nina' },
+      baseContext('suite')
+    )
+
+    expect(result['placed']).toBe(false)
+  })
+})
+
+describe('get_order_status', () => {
+  const CONTACT_ID = randomUUID()
+
+  it('returns found:false when context has no callerContactId', async () => {
+    const result = await executeToolCall('get_order_status', {}, baseContext('suite'))
+
+    expect(result['found']).toBe(false)
+  })
+
+  it('returns the most recent order, tenant-local formatted', async () => {
+    store.tables['orders'] = [
+      {
+        id: randomUUID(),
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        order_number: 'ORD-1002',
+        status: 'ready',
+        total: 12.5,
+        deleted_at: null,
+        created_at: '2026-08-24T17:00:00Z',
+      },
+    ]
+
+    const result = await executeToolCall(
+      'get_order_status',
+      {},
+      { ...baseContext('suite'), callerContactId: CONTACT_ID, timezone: 'America/Chicago' }
+    )
+
+    expect(result['found']).toBe(true)
+    expect(result['order_number']).toBe('ORD-1002')
+    expect(result['status']).toBe('ready')
+    expect(result['placed_at']).toBe('12:00 PM')
+  })
+})

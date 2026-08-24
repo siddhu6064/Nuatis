@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import QuoteActions from './QuoteActions'
 import QuotePayments from './QuotePayments'
 import QuoteSignatureToggle from './QuoteSignatureToggle'
+import ConvertToOrderButton from './ConvertToOrderButton'
 
 interface LineItem {
   id: string
@@ -73,6 +74,21 @@ export default async function QuoteDetailPage({ params }: Props) {
     .single<Quote>()
 
   if (!quote) notFound()
+
+  const modules = (session?.user?.modules as Record<string, boolean> | undefined) ?? {}
+  const ordersEnabled = modules['orders'] === true
+
+  let existingOrderId: string | null = null
+  if (ordersEnabled && quote.status === 'accepted') {
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('source_quote_id', quote.id)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    existingOrderId = existingOrder?.id ?? null
+  }
 
   const { data: items } = await supabase
     .from('quote_line_items')
@@ -186,13 +202,18 @@ export default async function QuoteDetailPage({ params }: Props) {
             </p>
           )}
         </div>
-        <QuoteActions
-          quoteId={quote.id}
-          status={quote.status}
-          shareToken={quote.share_token}
-          approvalStatus={quote.approval_status}
-          discountPct={Number(quote.discount_pct ?? 0)}
-        />
+        <div className="flex flex-col items-end gap-2">
+          <QuoteActions
+            quoteId={quote.id}
+            status={quote.status}
+            shareToken={quote.share_token}
+            approvalStatus={quote.approval_status}
+            discountPct={Number(quote.discount_pct ?? 0)}
+          />
+          {ordersEnabled && quote.status === 'accepted' && (
+            <ConvertToOrderButton quoteId={quote.id} existingOrderId={existingOrderId} />
+          )}
+        </div>
       </div>
 
       {/* Approval banners */}

@@ -157,6 +157,13 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Operations',
     items: [
       { href: '/inventory', label: 'Inventory', icon: '◨', suiteOnly: true, requireModule: 'crm' },
+      {
+        href: '/orders',
+        label: 'Orders',
+        icon: '🧾',
+        suiteOnly: true,
+        requireModule: 'orders',
+      },
       { href: '/staff', label: 'Staff', icon: '👥', suiteOnly: true, requireModule: 'crm' },
       { href: '/tasks', label: 'Tasks', icon: '☑', suiteOnly: true },
     ],
@@ -199,6 +206,13 @@ const NAV_GROUPS: NavGroup[] = [
         icon: '⚙',
         suiteOnly: true,
         requireModule: 'crm',
+      },
+      {
+        href: '/settings/orders',
+        label: 'Orders Settings',
+        icon: '⚙',
+        suiteOnly: true,
+        requireModule: 'orders',
       },
       { href: '/settings/sms-health', label: 'Delivery Health', icon: '📊', suiteOnly: true },
       { href: '/settings/audit-log', label: 'Audit Log', icon: '🛡', suiteOnly: true },

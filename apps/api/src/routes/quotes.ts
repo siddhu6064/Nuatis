@@ -12,6 +12,7 @@ import { API_BASE_URL } from '../config/urls.js'
 import { getFollowupQueue } from '../workers/quote-followup-worker.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
+import { generateOrderNumber } from '../lib/order-number.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { buildQuoteEmailHtml, buildQuoteApprovalEmailHtml } from '../lib/email-templates/quote.js'
 import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
@@ -479,6 +480,123 @@ router.delete(
       return
     }
     res.json({ deleted: true })
+  }
+)
+
+// ── POST /api/quotes/:id/convert-to-order ────────────────────────────────────
+// Converts an accepted quote into a fulfillment-tracked order (Orders module).
+// Idempotent: re-calling on an already-converted quote returns the existing
+// order rather than creating a duplicate.
+router.post(
+  '/:id/convert-to-order',
+  requireAuth,
+  requireCpq,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const ordersEnabled = await isModuleEnabled(authed.tenantId, 'orders')
+    if (!ordersEnabled) {
+      res.status(403).json({ error: 'Orders module is not enabled' })
+      return
+    }
+
+    const { data: quote, error: quoteErr } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (quoteErr || !quote) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+
+    if (quote.status !== 'accepted') {
+      res.status(400).json({ error: 'Only accepted quotes can be converted to an order' })
+      return
+    }
+
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('source_quote_id', quote.id)
+      .eq('tenant_id', authed.tenantId)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (existingOrder) {
+      res.json(existingOrder)
+      return
+    }
+
+    const { data: quoteItems } = await supabase
+      .from('quote_line_items')
+      .select('service_id, description, quantity, unit_price')
+      .eq('quote_id', quote.id)
+      .order('sort_order', { ascending: true })
+
+    const orderNumber = await generateOrderNumber(authed.tenantId)
+
+    let customerName: string | null = null
+    if (quote.contact_id) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('full_name')
+        .eq('id', quote.contact_id)
+        .maybeSingle()
+      customerName = (contact?.full_name as string) ?? null
+    }
+
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .insert({
+        tenant_id: authed.tenantId,
+        contact_id: quote.contact_id,
+        source_quote_id: quote.id,
+        order_number: orderNumber,
+        status: 'pending',
+        source: 'staff',
+        customer_name: customerName,
+        subtotal: quote.subtotal,
+        tax_rate: quote.tax_rate,
+        tax_amount: quote.tax_amount,
+        total: quote.total,
+        notes: `Converted from quote ${quote.quote_number}`,
+      })
+      .select('*')
+      .single()
+
+    if (orderErr || !order) {
+      res.status(500).json({ error: orderErr?.message ?? 'Failed to create order' })
+      return
+    }
+
+    const itemRows = (quoteItems ?? []).map((item, i) => ({
+      order_id: order.id,
+      tenant_id: authed.tenantId,
+      service_id: item.service_id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      sort_order: i,
+    }))
+    if (itemRows.length > 0) {
+      await supabase.from('order_line_items').insert(itemRows)
+    }
+
+    void logActivity({
+      tenantId: authed.tenantId,
+      contactId: quote.contact_id ?? undefined,
+      type: 'order',
+      body: `Order ${orderNumber} created from quote ${quote.quote_number}`,
+      metadata: { order_id: order.id, quote_id: quote.id },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+
+    res.status(201).json(order)
   }
 )
 

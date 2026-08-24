@@ -13,7 +13,13 @@ import { callSessionState } from './post-call.js'
 import { maskPhone } from './pre-call-lookup.js'
 import { getMayaCircuitBreaker } from './maya-circuit-breaker.js'
 import { sendSms } from '../lib/sms.js'
-import { buildConfirmationSms, buildEscalationTransferSms } from '../lib/sms-templates.js'
+import {
+  buildConfirmationSms,
+  buildEscalationTransferSms,
+  buildOrderConfirmationSms,
+} from '../lib/sms-templates.js'
+import { isModuleEnabled } from '../lib/modules.js'
+import { generateOrderNumber } from '../lib/order-number.js'
 import { getCachedStaff, setCachedStaff, type CachedStaffMember } from '../lib/staff-cache.js'
 import { sanitizeMemoryText } from '../services/maya/memory-prompts.js'
 import {
@@ -196,6 +202,61 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     name: 'get_appointments',
     description:
       'Look up upcoming appointments for the current caller. Returns appointments scheduled for today or in the future with status scheduled or confirmed. Call this when a caller asks "what are my appointments", "when is my appointment", or "do I have anything booked".',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] },
+  },
+  {
+    name: 'place_order',
+    description:
+      "Place an order for the caller — for pickup, delivery, or dine-in style businesses only. Confirm every item and its quantity with the caller before calling this. If this tool returns placed:false because ordering isn't available for this business, apologize and offer to take a message instead — do not keep trying.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        items: {
+          type: Type.ARRAY,
+          description: 'The items being ordered',
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              description: {
+                type: Type.STRING,
+                description: 'What the item is, e.g. "large pepperoni pizza"',
+              },
+              quantity: {
+                type: Type.NUMBER,
+                description: 'How many of this item. Default 1.',
+              },
+              unit_price: {
+                type: Type.NUMBER,
+                description: 'Price per unit in dollars, if known from the menu/catalog.',
+              },
+            },
+            required: ['description'],
+          },
+        },
+        fulfillment_type: {
+          type: Type.STRING,
+          description: 'One of: pickup, delivery, dine_in',
+        },
+        caller_name: {
+          type: Type.STRING,
+          description: 'Full name of the caller placing the order',
+        },
+        caller_phone: {
+          type: Type.STRING,
+          description: "Caller's phone number in E.164 format",
+        },
+        notes: {
+          type: Type.STRING,
+          description: 'Special instructions, e.g. "no onions", "leave at door"',
+        },
+      },
+      required: ['items', 'caller_name'],
+    },
+  },
+  {
+    name: 'get_order_status',
+    description:
+      'Look up the status of the caller\'s most recent order. Call this when a caller asks about their order status, e.g. "is my order ready" or "where\'s my order".',
     parameters: { type: Type.OBJECT, properties: {}, required: [] },
   },
 ]
@@ -1326,6 +1387,222 @@ const handlers: Record<string, ToolHandler> = {
       } catch (err) {
         console.error('[tool-handlers] get_appointments error:', err)
         return JSON.stringify({ found: false, error: 'Unable to look up appointments' })
+      }
+    })
+    return JSON.parse(resultStr) as Record<string, unknown>
+  },
+
+  place_order: async (args, context) => {
+    // Trial past its grace window → read-only, same as book_appointment.
+    if (context.trialExpired) {
+      return {
+        placed: false,
+        message: "I've made a note of that and someone will call you back to confirm.",
+      }
+    }
+
+    const resultStr = await getMayaCircuitBreaker().wrap('place_order', async () => {
+      try {
+        const enabled = await isModuleEnabled(context.tenantId, 'orders')
+        if (!enabled) {
+          console.info(
+            `[tool-handlers] place_order: orders module disabled tenant=${context.tenantId}`
+          )
+          return JSON.stringify({
+            placed: false,
+            message: 'Ordering is not available for this business right now.',
+          })
+        }
+
+        const rawItems = Array.isArray(args['items'])
+          ? (args['items'] as Array<Record<string, unknown>>)
+          : []
+        const lineItems = rawItems
+          .map((it) => ({
+            description: String(it['description'] ?? '').trim(),
+            quantity: typeof it['quantity'] === 'number' && it['quantity'] > 0 ? it['quantity'] : 1,
+            unit_price:
+              typeof it['unit_price'] === 'number' && it['unit_price'] >= 0 ? it['unit_price'] : 0,
+          }))
+          .filter((it) => it.description)
+
+        if (lineItems.length === 0) {
+          return JSON.stringify({
+            placed: false,
+            message: 'I need at least one item to place the order.',
+          })
+        }
+
+        const fulfillmentTypeRaw = String(args['fulfillment_type'] ?? '')
+        const fulfillmentType = ['pickup', 'delivery', 'dine_in'].includes(fulfillmentTypeRaw)
+          ? fulfillmentTypeRaw
+          : null
+        const callerName = String(args['caller_name'] ?? '')
+        const callerPhone = args['caller_phone']
+          ? normalizePhone(String(args['caller_phone']))
+          : context.callerId
+            ? normalizePhone(context.callerId)
+            : ''
+        const notes = args['notes'] ? String(args['notes']) : null
+
+        const supabase = getServiceClient()
+        const subtotal = lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
+        const orderNumber = await generateOrderNumber(context.tenantId)
+
+        // Best-effort contact resolution — Suite only, mirrors book_appointment.
+        let contactId: string | null = null
+        if (context.product !== 'maya_only' && callerPhone) {
+          const digitsOnly = callerPhone.replace(/\+/, '')
+          let { data: existing } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('tenant_id', context.tenantId)
+            .eq('phone', callerPhone)
+            .eq('is_archived', false)
+            .limit(1)
+            .maybeSingle()
+
+          if (!existing) {
+            ;({ data: existing } = await supabase
+              .from('contacts')
+              .select('id')
+              .eq('tenant_id', context.tenantId)
+              .eq('phone', digitsOnly)
+              .eq('is_archived', false)
+              .limit(1)
+              .maybeSingle())
+          }
+
+          if (existing) {
+            contactId = existing.id
+          } else {
+            const { data: newContact } = await supabase
+              .from('contacts')
+              .insert({
+                tenant_id: context.tenantId,
+                full_name: callerName,
+                phone: callerPhone,
+                source: 'inbound_call',
+              })
+              .select('id')
+              .single()
+            contactId = newContact?.id ?? null
+          }
+        }
+
+        const { data: order, error: orderErr } = await supabase
+          .from('orders')
+          .insert({
+            tenant_id: context.tenantId,
+            contact_id: contactId,
+            order_number: orderNumber,
+            status: 'pending',
+            source: 'maya',
+            customer_name: callerName || null,
+            customer_phone: callerPhone || null,
+            fulfillment_type: fulfillmentType,
+            subtotal,
+            total: subtotal,
+            notes,
+          })
+          .select('*')
+          .single()
+
+        if (orderErr || !order) {
+          console.error(`[tool-handlers] place_order insert error: ${orderErr?.message}`)
+          return JSON.stringify({ placed: false, error: 'Unable to place the order right now' })
+        }
+
+        const itemRows = lineItems.map((item, i) => ({
+          order_id: order.id,
+          tenant_id: context.tenantId,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          sort_order: i,
+        }))
+        await supabase.from('order_line_items').insert(itemRows)
+
+        console.info(`[tool-handlers] place_order: order=${orderNumber} tenant=${context.tenantId}`)
+
+        // Confirmation SMS — fire-and-forget, never blocks the response.
+        if (callerPhone) {
+          void (async () => {
+            try {
+              const { data: location } = await supabase
+                .from('locations')
+                .select('telnyx_number')
+                .eq('tenant_id', context.tenantId)
+                .eq('is_primary', true)
+                .maybeSingle()
+              const fromNumber = location?.telnyx_number as string | null
+              if (!fromNumber) return
+
+              const { data: tenantRow } = await supabase
+                .from('tenants')
+                .select('name, vertical')
+                .eq('id', context.tenantId)
+                .maybeSingle()
+
+              const text = buildOrderConfirmationSms({
+                contactName: callerName || null,
+                businessName: (tenantRow?.name as string) || 'the business',
+                orderNumber,
+                vertical: (tenantRow?.vertical as string) || '',
+              })
+              await sendSms(fromNumber, callerPhone, text, {
+                tenantId: context.tenantId,
+                contactId: contactId ?? undefined,
+              })
+            } catch (err) {
+              console.error('[tool-handlers] place_order SMS failed:', err)
+            }
+          })()
+        }
+
+        return JSON.stringify({ placed: true, order_number: orderNumber, total: subtotal })
+      } catch (err) {
+        console.error('[tool-handlers] place_order error:', err)
+        return JSON.stringify({ placed: false, error: 'Unable to place the order right now' })
+      }
+    })
+    return JSON.parse(resultStr) as Record<string, unknown>
+  },
+
+  get_order_status: async (_args, context) => {
+    const contactId = context.callerContactId
+    if (!contactId) {
+      return { found: false, message: 'No order history found for this caller' }
+    }
+
+    const resultStr = await getMayaCircuitBreaker().wrap('get_order_status', async () => {
+      try {
+        const supabase = getServiceClient()
+        const { data, error } = await supabase
+          .from('orders')
+          .select('order_number, status, total, created_at')
+          .eq('tenant_id', context.tenantId)
+          .eq('contact_id', contactId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (error || !data || data.length === 0) {
+          return JSON.stringify({ found: false, message: 'No recent orders found for this caller' })
+        }
+
+        const order = data[0]!
+        const timezone = context.timezone ?? 'America/Chicago'
+        return JSON.stringify({
+          found: true,
+          order_number: order.order_number,
+          status: order.status,
+          total: order.total,
+          placed_at: toTenantLocal(order.created_at as string, timezone),
+        })
+      } catch (err) {
+        console.error('[tool-handlers] get_order_status error:', err)
+        return JSON.stringify({ found: false, error: 'Unable to look up order status' })
       }
     })
     return JSON.parse(resultStr) as Record<string, unknown>
