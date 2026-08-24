@@ -1,4 +1,4 @@
-import { getFirstName } from '@nuatis/shared'
+import { getFirstName, resolveTenantTimezone, tenantDayBoundsUTC } from '@nuatis/shared'
 import { auth } from '@/lib/auth/authjs'
 import { createAdminClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
@@ -9,10 +9,8 @@ export default async function DashboardPage() {
 
   const supabase = createAdminClient()
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  const timezone = tenantId ? await resolveTenantTimezone(supabase, tenantId) : 'America/Chicago'
+  const { startUTC: today, endUTC: tomorrow } = tenantDayBoundsUTC(timezone)
 
   const [
     { count: totalContacts },
@@ -38,15 +36,21 @@ export default async function DashboardPage() {
       .from('appointments')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
-      .gte('start_time', today.toISOString())
-      .lt('start_time', tomorrow.toISOString()),
+      .gte('start_time', today)
+      .lt('start_time', tomorrow),
 
+    // 'calls' table is dead — its only writer (call-logger.ts) never
+    // populates started_at/status, so a query against it always returns 0.
+    // voice_sessions is the real, fully-populated table (same one Call Log
+    // reads from). 'abandoned' (<5s, no real interaction) is excluded so
+    // "Handled" doesn't count calls Maya never actually engaged with.
     supabase
-      .from('calls')
+      .from('voice_sessions')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
-      .gte('started_at', today.toISOString())
-      .lt('started_at', tomorrow.toISOString()),
+      .neq('outcome', 'abandoned')
+      .gte('started_at', today)
+      .lt('started_at', tomorrow),
   ])
 
   const userName = getFirstName(session?.user?.name)

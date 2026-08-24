@@ -321,6 +321,7 @@ export async function createGeminiLiveSession(
     product: product ?? 'suite',
     trialExpired: trialExpired ?? false,
     callerContactId: callerContactId ?? null,
+    timezone: tz,
   }
 
   function armSilenceFallback(): void {

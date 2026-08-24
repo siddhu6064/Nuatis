@@ -134,4 +134,44 @@ describe('appointment-reminder processor', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('formats the reminder time in the tenant location timezone, not a hardcoded one', async () => {
+    store.tables['locations'] = [
+      {
+        id: randomUUID(),
+        tenant_id: TENANT_ID,
+        telnyx_number: '+15550000000',
+        is_primary: true,
+        timezone: 'America/Los_Angeles',
+      },
+    ]
+    const apptId = randomUUID()
+    // 2026-08-24T17:00:00Z = 10:00 AM PDT, 12:00 PM Chicago — pick a
+    // start_time inside the 1h reminder window and assert on the PDT text.
+    const startTime = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    store.tables['appointments'] = [
+      {
+        id: apptId,
+        tenant_id: TENANT_ID,
+        contact_id: CONTACT_ID,
+        title: 'Consult',
+        status: 'scheduled',
+        start_time: startTime,
+        reminder_24h_sent: false,
+        reminder_1h_sent: false,
+      },
+    ]
+
+    await scan()
+
+    const expectedTime = new Date(startTime).toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(requestInit.body as string) as { text: string }
+    expect(body.text).toContain(expectedTime)
+  })
 })

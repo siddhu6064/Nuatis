@@ -53,6 +53,11 @@ describe('dateAtHour', () => {
   it('applies the timezone offset (9am CDT → 14:00 UTC)', () => {
     expect(dateAtHour('2026-06-15', 9, 0, 'America/Chicago')).toBe('2026-06-15T14:00:00.000Z')
   })
+  it('resolves midnight in a negative-offset timezone without landing a day early (regression)', () => {
+    // Local midnight CST (UTC-6) is the previous UTC calendar day — a bug here
+    // previously diffed only hour:minute and ignored the date crossing.
+    expect(dateAtHour('2026-01-15', 0, 0, 'America/Chicago')).toBe('2026-01-15T06:00:00.000Z')
+  })
 })
 
 describe('formatHHMM', () => {
