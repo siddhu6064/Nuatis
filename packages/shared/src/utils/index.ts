@@ -120,11 +120,21 @@ export function dateAtHour(dateStr: string, hour: number, minute: number, tz: st
   })
   const parts = formatter.formatToParts(utcGuess)
   const getPart = (t: string) => parts.find((p) => p.type === t)?.value ?? '0'
-  const localHour = parseInt(getPart('hour'), 10)
-  const localMinute = parseInt(getPart('minute'), 10)
+  // Rebuild the full local date+time (not just hour:minute) as if it were UTC,
+  // so the offset solve below accounts for a calendar-day crossing — e.g. local
+  // midnight in a negative-offset timezone renders as the previous UTC day.
+  // (A previous hour/minute-only diff here silently landed a day off whenever
+  // wall-clock hour minus the tz offset crossed a date boundary.)
+  const localAsUtc = Date.UTC(
+    parseInt(getPart('year'), 10),
+    parseInt(getPart('month'), 10) - 1,
+    parseInt(getPart('day'), 10),
+    parseInt(getPart('hour'), 10) % 24,
+    parseInt(getPart('minute'), 10),
+    parseInt(getPart('second'), 10)
+  )
   // offsetMinutes = local - utc (so we can back-solve for the correct UTC instant)
-  const offsetMinutes =
-    localHour * 60 + localMinute - (utcGuess.getUTCHours() * 60 + utcGuess.getUTCMinutes())
+  const offsetMinutes = (localAsUtc - utcGuess.getTime()) / 60_000
   return new Date(utcGuess.getTime() - offsetMinutes * 60_000).toISOString()
 }
 

@@ -337,3 +337,113 @@ describe('reschedule_appointment', () => {
     expect(String(result['message'])).toContain('No upcoming appointment')
   })
 })
+
+describe('get_appointments — timezone conversion', () => {
+  const CONTACT_ID = randomUUID()
+  const APPT_ID = randomUUID()
+
+  it('converts start_time/end_time to context.timezone, not raw UTC (regression: 17:00 UTC read as "5 PM")', async () => {
+    ;(store.tables['appointments'] as Row[]).push({
+      id: APPT_ID,
+      tenant_id: TENANT_ID,
+      contact_id: CONTACT_ID,
+      title: 'Cleaning',
+      status: 'scheduled',
+      notes: null,
+      start_time: '2026-08-24T17:00:00Z',
+      end_time: '2026-08-24T18:00:00Z',
+    })
+
+    const result = await executeToolCall(
+      'get_appointments',
+      {},
+      { ...baseContext('suite'), callerContactId: CONTACT_ID, timezone: 'America/Chicago' }
+    )
+
+    expect(result['found']).toBe(true)
+    const appointments = result['appointments'] as Array<{ start_time: string; end_time: string }>
+    expect(appointments[0]?.start_time).toBe('12:00 PM')
+    expect(appointments[0]?.end_time).toBe('1:00 PM')
+  })
+
+  it('falls back to America/Chicago when context has no timezone', async () => {
+    ;(store.tables['appointments'] as Row[]).push({
+      id: APPT_ID,
+      tenant_id: TENANT_ID,
+      contact_id: CONTACT_ID,
+      title: 'Cleaning',
+      status: 'scheduled',
+      notes: null,
+      start_time: '2026-08-24T17:00:00Z',
+      end_time: '2026-08-24T18:00:00Z',
+    })
+
+    const result = await executeToolCall(
+      'get_appointments',
+      {},
+      { ...baseContext('suite'), callerContactId: CONTACT_ID }
+    )
+
+    const appointments = result['appointments'] as Array<{ start_time: string }>
+    expect(appointments[0]?.start_time).toBe('12:00 PM')
+  })
+})
+
+// dateAtHour regression, exercised at its live production call site (book_appointment's
+// slot-resolution line, not just the packages/shared unit tests). 'gym' is the only
+// vertical whose business hours (5am-10pm) open early enough in America/Chicago for a
+// CST (winter) slot to fall inside dateAtHour's old buggy window — no vertical opens at
+// literal midnight, so that specific boundary isn't reachable from here; it stays covered
+// by tenantDayBoundsUTC's own midnight-anchored DST/non-DST cases in timezone.test.ts.
+describe('book_appointment — early-morning slot resolves to the correct UTC calendar date', () => {
+  beforeEach(() => {
+    ;(store.tables['locations'] as Row[]).push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      is_primary: true,
+      google_refresh_token: 'refresh-token-test',
+      google_calendar_id: 'primary',
+    })
+  })
+
+  it('5:30 AM CST (winter, non-DST) — regression: previously resolved to the prior UTC day', async () => {
+    // 2026-01-19 is a Monday; gym hours 5am-10pm mon-fri. America/Chicago is CST
+    // (UTC-6) in January, so 5:30 AM local renders as 23:30 the PREVIOUS day when
+    // read back through the tz formatter — exactly the day-crossing case the old
+    // dateAtHour hour/minute-only diff got wrong.
+    const result = await executeToolCall(
+      'book_appointment',
+      {
+        date: '2026-01-19',
+        start_time: '05:30',
+        duration_minutes: 60,
+        caller_name: 'Early Bird',
+        caller_phone: '+15125559001',
+      },
+      { ...baseContext('maya_only'), vertical: 'gym' }
+    )
+
+    expect(result['booked']).toBe(true)
+    expect(result['start']).toBe('2026-01-19T11:30:00.000Z')
+  })
+
+  it('5:30 AM CDT (summer, DST) — same slot resolves correctly across the DST offset change', async () => {
+    // 2026-06-15 is a Monday; same gym hours. America/Chicago is CDT (UTC-5) in
+    // June, so this proves the fix holds on both sides of a DST transition, not
+    // just in winter.
+    const result = await executeToolCall(
+      'book_appointment',
+      {
+        date: '2026-06-15',
+        start_time: '05:30',
+        duration_minutes: 60,
+        caller_name: 'Early Bird Summer',
+        caller_phone: '+15125559002',
+      },
+      { ...baseContext('maya_only'), vertical: 'gym' }
+    )
+
+    expect(result['booked']).toBe(true)
+    expect(result['start']).toBe('2026-06-15T10:30:00.000Z')
+  })
+})

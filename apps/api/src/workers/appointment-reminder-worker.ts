@@ -8,17 +8,9 @@ import {
   buildAppointmentReminder24hSms,
   buildAppointmentReminder1hSms,
 } from '../lib/sms-templates.js'
+import { toTenantLocal, resolveTenantTimezone } from '@nuatis/shared'
 
 const QUEUE_NAME = 'appointment-reminder'
-
-function formatTime(isoDate: string): string {
-  return new Date(isoDate).toLocaleTimeString('en-US', {
-    timeZone: 'America/Chicago',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
 
 export async function scan(): Promise<void> {
   console.info('[appointment-reminder] scanning for upcoming appointments...')
@@ -70,7 +62,8 @@ export async function scan(): Promise<void> {
       if (!location) continue
 
       const businessName = await getBusinessName(supabase, appt.tenant_id)
-      const time = formatTime(appt.start_time)
+      const timezone = await resolveTenantTimezone(supabase, appt.tenant_id)
+      const time = toTenantLocal(appt.start_time, timezone)
 
       console.info(
         `[appointment-reminder] sending 24h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`
@@ -102,7 +95,8 @@ export async function scan(): Promise<void> {
       if (!location) continue
 
       const businessName = await getBusinessName(supabase, appt.tenant_id)
-      const time = formatTime(appt.start_time)
+      const timezone = await resolveTenantTimezone(supabase, appt.tenant_id)
+      const time = toTenantLocal(appt.start_time, timezone)
 
       console.info(
         `[appointment-reminder] sending 1h reminder: appointment=${appt.id} contact=${maskPhone(contact.phone)} at=${appt.start_time}`

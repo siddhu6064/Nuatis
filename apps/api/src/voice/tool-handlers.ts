@@ -1,6 +1,6 @@
 import { Type, type FunctionDeclaration } from '@google/genai'
 import { getServiceClient } from '../lib/supabase.js'
-import { VERTICALS, dateAtHour, formatHHMM } from '@nuatis/shared'
+import { VERTICALS, dateAtHour, formatHHMM, toTenantLocal } from '@nuatis/shared'
 import { normalizePhone } from '../lib/phone.js'
 import { getCalendarClient } from '../services/google.js'
 import { getCalendarCredentials } from '../lib/calendar-provider.js'
@@ -33,6 +33,10 @@ export interface ToolCallContext {
    *  Optional so existing context builders fail open when it's absent. */
   trialExpired?: boolean
   callerContactId?: string | null
+  /** Tenant's IANA timezone, e.g. "America/Chicago". Optional so existing
+   *  context builders (tests, older call sites) fail open to the default
+   *  applied at each read site rather than needing an update here. */
+  timezone?: string
 }
 
 export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
@@ -1307,13 +1311,14 @@ const handlers: Record<string, ToolHandler> = {
         console.info(
           `[tool-handlers] get_appointments: found ${data.length} appointments for contact=${contactId}`
         )
+        const timezone = context.timezone ?? 'America/Chicago'
         return JSON.stringify({
           found: true,
           appointments: data.map((a) => ({
             id: a.id,
             title: a.title,
-            start_time: a.start_time,
-            end_time: a.end_time,
+            start_time: toTenantLocal(a.start_time, timezone),
+            end_time: toTenantLocal(a.end_time, timezone),
             status: a.status,
             notes: a.notes,
           })),
