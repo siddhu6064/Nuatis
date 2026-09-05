@@ -16,35 +16,40 @@ Nuatis is a vertical-aware CRM + Voice AI platform built for small and mid-sized
 
 ## Modules
 
-| Module          | Description                                                                                              |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| **Maya**        | Voice AI receptionist — Gemini 2.0 Flash Live, Telnyx PSTN, <1.5s latency, 8 tool calls, multilingual    |
-| **CRM**         | Contacts, companies, deals, notes, tasks, activity timeline, CSV import, lead scoring, tags, smart lists |
-| **Scheduling**  | Native calendar + Google/Microsoft 365 sync, public booking page, round-robin groups, video links        |
-| **Pipeline**    | Lead Kanban + list view, multi-pipeline, stage probability, revenue forecasting, funnel chart            |
-| **Automation**  | BullMQ scanners — stalled leads, no-shows, lapsed clients, follow-up cadences, review requests           |
-| **CPQ**         | Service catalog, quote builder, PDF proposals, tax + discounts, auto-receipts, payment recording         |
-| **Insights**    | Recharts analytics, ROI dashboard, Maya metrics, appointment report, sales velocity, lead source report  |
-| **Ops-Copilot** | Revenue ops alerts + webhook sidecar, detects missed follow-ups and escalates                            |
+| Module           | Description                                                                                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Maya**         | Voice AI receptionist — Gemini 2.0 Flash Live, Telnyx PSTN, <1.5s latency, tool calls, multilingual, cross-call caller memory                                                                            |
+| **CRM**          | Contacts, companies, deals, notes, tasks, activity timeline, CSV import, lead scoring, tags, smart lists, custom fields                                                                                  |
+| **Scheduling**   | Native calendar + Google/Microsoft 365 sync, public booking page + self-service reschedule/cancel, round-robin groups                                                                                    |
+| **Pipeline**     | Lead Kanban + list view, multi-pipeline, stage probability, revenue forecasting, weighted funnel + sales quotas                                                                                          |
+| **Automation**   | BullMQ scanners — stalled leads, no-shows, lapsed clients, follow-up cadences, review requests, invoice/expense/time-off reminders, tenant-editable outreach sequences, multi-step branching automations |
+| **AI Campaigns** | Segment-driven AI-generated copy across SMS/email/social, human approval gate, A/B variant testing, performance analytics                                                                                |
+| **Orders**       | Order intake, kanban fulfillment, Maya voice ordering, quote conversion, inventory deduction                                                                                                             |
+| **Expenses**     | Categories, receipts, recurring rules, approval thresholds, P&L insights, accounting-software export                                                                                                     |
+| **CPQ**          | Service catalog, quote builder, PDF proposals, tax + discounts, promo codes, payment links, refunds, ledger                                                                                              |
+| **Insights**     | Recharts analytics, ROI dashboard, Maya metrics, cohort retention, Product Health, trial→paid funnel                                                                                                     |
+| **Staff Portal** | Self-service logins for staff — own schedule, appointments, time clock, pay rate, time-off requests                                                                                                      |
+
+Vendors/purchase orders, inventory (variants/kits, barcode, multi-location), customer portal (self-service booking, documents, referrals), SSO (WorkOS), Stripe Connect, and an outbound-webhooks/API-key integration layer ship alongside the modules above.
 
 ---
 
 ## Tech Stack
 
-| Layer     | Technology                                                         |
-| --------- | ------------------------------------------------------------------ |
-| Frontend  | Next.js 14 App Router · Tailwind v3 · Recharts · @hello-pangea/dnd |
-| API       | Express ESM TypeScript · NodeNext · BullMQ                         |
-| Mobile    | React Native + Expo (iOS/Android)                                  |
-| Voice AI  | Gemini 2.0 Flash Live (STT + LLM + TTS unified, ~$0.008/call)      |
-| Telephony | Telnyx (PSTN, SIP, SMS, 10DLC approved)                            |
-| Database  | Supabase PostgreSQL + RLS (82+ migrations)                         |
-| Auth      | Auth.js v5 (credentials)                                           |
-| Queue     | BullMQ + Azure Cache for Redis                                     |
-| Email     | Resend (transactional)                                             |
-| Calendar  | Native (default) · Google Calendar · Microsoft 365                 |
-| Deploy    | Azure Container Apps (API) · Next.js standalone (Web)              |
-| CI/CD     | GitHub Actions · Node 24 · 475 tests · 68 suites                   |
+| Layer     | Technology                                                             |
+| --------- | ---------------------------------------------------------------------- |
+| Frontend  | Next.js 14 App Router · Tailwind v3 · Recharts · @hello-pangea/dnd     |
+| API       | Express ESM TypeScript · NodeNext · BullMQ                             |
+| Mobile    | React Native + Expo (iOS/Android)                                      |
+| Voice AI  | Gemini 2.0 Flash Live (STT + LLM + TTS unified, ~$0.008/call)          |
+| Telephony | Telnyx (PSTN, SIP, SMS, 10DLC approved)                                |
+| Database  | Supabase PostgreSQL + RLS (194+ migrations)                            |
+| Auth      | Auth.js v5 (credentials) · SSO via WorkOS (SAML/OIDC)                  |
+| Queue     | BullMQ + Azure Cache for Redis                                         |
+| Email     | Resend (transactional)                                                 |
+| Calendar  | Native (default) · Google Calendar · Microsoft 365                     |
+| Deploy    | Azure Container Apps (API) · Next.js standalone (Web)                  |
+| CI/CD     | GitHub Actions · Node 24 · 1,626 API tests / 211 suites · 16 web tests |
 
 ---
 
@@ -60,7 +65,7 @@ packages/
 infra/
   azure/        Container Apps deployment scripts
 supabase/
-  migrations/   82+ migration files (sequential, 0001–0082)
+  migrations/   194+ migration files (sequential, 0001–0194)
 ```
 
 ---
@@ -98,7 +103,11 @@ cd apps/mobile && npx expo start
 ```bash
 cd apps/api
 NODE_OPTIONS=--experimental-vm-modules npx jest
-# 475 tests · 68 suites · CI green
+# 1,626 tests · 211 suites · CI green
+
+cd apps/web
+npx jest
+# 16 tests · 3 suites
 ```
 
 ---
