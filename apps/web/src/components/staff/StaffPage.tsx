@@ -5,8 +5,9 @@ import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import StaffRoster from './StaffRoster'
 import StaffCalendar from './StaffCalendar'
+import TimeOffManager from './TimeOffManager'
 
-type Tab = 'roster' | 'schedule'
+type Tab = 'roster' | 'schedule' | 'time-off'
 
 interface Props {
   pageTitle: string
@@ -34,9 +35,12 @@ export default function StaffPage({ pageTitle }: Props) {
       >
         <Tab value="roster" label="Roster" />
         <Tab value="schedule" label="Schedule" />
+        <Tab value="time-off" label="Time Off" />
       </Tabs>
 
-      {tab === 'roster' ? <StaffRoster /> : <StaffCalendar />}
+      {tab === 'roster' && <StaffRoster />}
+      {tab === 'schedule' && <StaffCalendar />}
+      {tab === 'time-off' && <TimeOffManager />}
     </div>
   )
 }

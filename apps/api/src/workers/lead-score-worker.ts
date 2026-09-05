@@ -52,9 +52,15 @@ export async function processCompute(data: ComputeJobData): Promise<void> {
     `[lead-score-compute] contact=${contactId} tenant=${tenantId} trigger=${trigger} score=${oldScore}->${score} grade=${oldGrade}->${grade}`
   )
 
-  // Log activity if score changed by >=10 or grade changed
+  // Log activity if score changed by >=10, or grade changed from a REAL prior
+  // grade. Without the hadPriorGrade guard, a contact's very first-ever score
+  // compute always counted as a "grade change" (current?.lead_grade is null,
+  // so '' !== grade is always true) — flooding the activity feed with
+  // "Lead score updated: 0 → 0 (F)" noise for every contact that scored 0 on
+  // first computation, even though nothing meaningful happened.
+  const hadPriorGrade = current?.lead_grade != null
   const scoreDelta = Math.abs(score - oldScore)
-  if (scoreDelta >= 10 || grade !== oldGrade) {
+  if (scoreDelta >= 10 || (hadPriorGrade && grade !== oldGrade)) {
     await logActivity({
       tenantId,
       contactId,

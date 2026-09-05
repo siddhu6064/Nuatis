@@ -17,7 +17,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     supabase
       .from('tenants')
       .select(
-        'vertical, booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
+        'vertical, booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color, no_show_fee_cents, cancellation_fee_notice_hours'
       )
       .eq('id', authed.tenantId)
       .single(),
@@ -60,6 +60,8 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       'Your appointment has been booked! We look forward to seeing you.',
     googleReviewUrl: t.booking_google_review_url ?? null,
     accentColor: t.booking_accent_color ?? '#2563eb',
+    noShowFeeCents: t.no_show_fee_cents ?? null,
+    cancellationFeeNoticeHours: t.cancellation_fee_notice_hours ?? null,
     availableServices,
   })
 })
@@ -136,6 +138,34 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     updates['booking_accent_color'] = b['accentColor'].trim() || null
   }
 
+  // noShowFeeCents — null/0 disables the fee
+  if (b['noShowFeeCents'] !== undefined) {
+    if (b['noShowFeeCents'] === null) {
+      updates['no_show_fee_cents'] = null
+    } else if (typeof b['noShowFeeCents'] === 'number' && b['noShowFeeCents'] >= 0) {
+      updates['no_show_fee_cents'] = Math.round(b['noShowFeeCents'])
+    } else {
+      res.status(400).json({ error: 'noShowFeeCents must be null or a number >= 0' })
+      return
+    }
+  }
+
+  // cancellationFeeNoticeHours — a late cancellation within this many hours
+  // of the appointment is charged the same fee. null disables it.
+  if (b['cancellationFeeNoticeHours'] !== undefined) {
+    if (b['cancellationFeeNoticeHours'] === null) {
+      updates['cancellation_fee_notice_hours'] = null
+    } else if (
+      typeof b['cancellationFeeNoticeHours'] === 'number' &&
+      b['cancellationFeeNoticeHours'] >= 0
+    ) {
+      updates['cancellation_fee_notice_hours'] = Math.round(b['cancellationFeeNoticeHours'])
+    } else {
+      res.status(400).json({ error: 'cancellationFeeNoticeHours must be null or a number >= 0' })
+      return
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: 'No valid fields provided' })
     return
@@ -154,7 +184,7 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
+      'booking_page_enabled, booking_page_slug, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color, no_show_fee_cents, cancellation_fee_notice_hours'
     )
     .eq('id', authed.tenantId)
     .single()
@@ -175,6 +205,8 @@ router.put('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       'Your appointment has been booked! We look forward to seeing you.',
     googleReviewUrl: tenant.booking_google_review_url ?? null,
     accentColor: tenant.booking_accent_color ?? '#2563eb',
+    noShowFeeCents: tenant.no_show_fee_cents ?? null,
+    cancellationFeeNoticeHours: tenant.cancellation_fee_notice_hours ?? null,
   })
 })
 

@@ -4,10 +4,38 @@ import { Fragment, useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import Accordion from '@mui/material/Accordion'
 import AccordionSummary from '@mui/material/AccordionSummary'
 import AccordionDetails from '@mui/material/AccordionDetails'
+import { Modal } from '@/components/ui/Modal'
 import type { AutomationOverview, CustomAutomation } from '@nuatis/shared'
+
+const STEP_ACTION_TYPES = [
+  'send_sms',
+  'send_email',
+  'create_task',
+  'add_tag',
+  'update_field',
+  'send_to_campaign',
+  'send_webhook',
+] as const
+
+interface AutomationStep {
+  id?: string
+  action_type: (typeof STEP_ACTION_TYPES)[number]
+  action_config: Record<string, unknown>
+  delay_days: number
+  condition_field?: string | null
+  condition_op?: 'eq' | 'neq' | 'contains' | 'exists' | null
+  condition_value?: string | null
+}
+
+const EMPTY_AUTOMATION_STEP: AutomationStep = {
+  action_type: 'add_tag',
+  action_config: {},
+  delay_days: 1,
+}
 
 function ChevronIcon() {
   return (
@@ -42,6 +70,52 @@ export default function AutomationOverviewClient() {
   const [openScanners, setOpenScanners] = useState<Set<string>>(new Set())
   const [openPauseForm, setOpenPauseForm] = useState<string | null>(null)
   const [pauseForm, setPauseForm] = useState({ paused_from: '', paused_until: '', reason: '' })
+  const [stepsAutomationId, setStepsAutomationId] = useState<string | null>(null)
+  const [steps, setSteps] = useState<AutomationStep[]>([])
+  const [stepsLoading, setStepsLoading] = useState(false)
+  const [stepsSaving, setStepsSaving] = useState(false)
+  const [stepsError, setStepsError] = useState('')
+
+  async function openSteps(automationId: string) {
+    setStepsAutomationId(automationId)
+    setStepsError('')
+    setStepsLoading(true)
+    try {
+      const res = await fetch(`/api/custom-automations/${automationId}/steps`)
+      if (res.ok) {
+        const d = (await res.json()) as { steps: AutomationStep[] }
+        setSteps(d.steps)
+      }
+    } finally {
+      setStepsLoading(false)
+    }
+  }
+
+  function updateStep(i: number, patch: Partial<AutomationStep>) {
+    setSteps((rows) => rows.map((s, idx) => (idx === i ? { ...s, ...patch } : s)))
+  }
+
+  async function saveSteps() {
+    if (!stepsAutomationId) return
+    setStepsError('')
+    setStepsSaving(true)
+    try {
+      const res = await fetch(`/api/custom-automations/${stepsAutomationId}/steps`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error((d as { error?: string }).error ?? 'Failed to save steps')
+      }
+      setStepsAutomationId(null)
+    } catch (err) {
+      setStepsError(err instanceof Error ? err.message : 'Failed to save steps')
+    } finally {
+      setStepsSaving(false)
+    }
+  }
 
   function toggleScanner(key: string) {
     setOpenScanners((prev) => {
@@ -320,7 +394,7 @@ export default function AutomationOverviewClient() {
                   {scanners.map((s) => (
                     <Fragment key={s.key}>
                       <tr
-                        className={`border-b border-gray-50 last:border-0 ${
+                        className={`border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50/50 ${
                           s.failure_count > 0 ? 'bg-red-50/40' : ''
                         }`}
                       >
@@ -532,7 +606,10 @@ export default function AutomationOverviewClient() {
                             </thead>
                             <tbody>
                               {s.failed_jobs.map((job) => (
-                                <tr key={job.id} className="border-b border-gray-50 last:border-0">
+                                <tr
+                                  key={job.id}
+                                  className="border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50/50"
+                                >
                                   <td className="px-6 py-3 font-mono text-ink3">
                                     {job.id.slice(0, 12)}
                                   </td>
@@ -595,11 +672,15 @@ export default function AutomationOverviewClient() {
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Status</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Runs</th>
                   <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Last Run</th>
+                  <th className="text-left text-xs font-medium text-ink4 px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {customAutomations.map((a) => (
-                  <tr key={a.id} className="border-b border-gray-50 last:border-0">
+                  <tr
+                    key={a.id}
+                    className="border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50/50"
+                  >
                     <td className="px-6 py-3 font-medium text-ink">{a.name}</td>
                     <td className="px-4 py-3 text-ink3 capitalize">
                       {a.trigger_type.replace(/_/g, ' ')}
@@ -622,6 +703,11 @@ export default function AutomationOverviewClient() {
                     </td>
                     <td className="px-4 py-3 text-ink3">{a.run_count}</td>
                     <td className="px-4 py-3 text-ink3">{relativeTime(a.last_run_at)}</td>
+                    <td className="px-4 py-3">
+                      <Button size="small" variant="outlined" onClick={() => void openSteps(a.id)}>
+                        Steps
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -629,6 +715,132 @@ export default function AutomationOverviewClient() {
           </div>
         )}
       </div>
+
+      {stepsAutomationId && (
+        <Modal
+          onClose={() => setStepsAutomationId(null)}
+          title="Additional Steps"
+          footer={
+            <>
+              <Button onClick={() => setStepsAutomationId(null)} disabled={stepsSaving}>
+                Cancel
+              </Button>
+              <Button variant="contained" onClick={() => void saveSteps()} disabled={stepsSaving}>
+                {stepsSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4 pt-1">
+            <p className="text-xs text-ink4">
+              These run in order, after this automation's own trigger/action, spaced by whatever
+              delay you set. A step can optionally be skipped based on a contact field.
+            </p>
+            {stepsError && <p className="text-sm text-red-700">{stepsError}</p>}
+
+            {stepsLoading ? (
+              <p className="text-sm text-ink4">Loading…</p>
+            ) : (
+              <div className="space-y-3">
+                {steps.map((step, i) => (
+                  <div key={i} className="border border-border-brand rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-ink4">Step {i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSteps((rows) => rows.filter((_, idx) => idx !== i))}
+                        className="text-xs text-red-500"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <TextField
+                        select
+                        size="small"
+                        label="Action"
+                        value={step.action_type}
+                        onChange={(e) =>
+                          updateStep(i, {
+                            action_type: e.target.value as AutomationStep['action_type'],
+                          })
+                        }
+                      >
+                        {STEP_ACTION_TYPES.map((t) => (
+                          <MenuItem key={t} value={t}>
+                            {t.replace(/_/g, ' ')}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="Delay (days)"
+                        value={step.delay_days}
+                        onChange={(e) => updateStep(i, { delay_days: Number(e.target.value) || 0 })}
+                        slotProps={{ htmlInput: { min: 0 } }}
+                      />
+                    </div>
+                    <TextField
+                      size="small"
+                      label="Action config (JSON)"
+                      defaultValue={JSON.stringify(step.action_config ?? {})}
+                      onBlur={(e) => {
+                        try {
+                          updateStep(i, { action_config: JSON.parse(e.target.value) })
+                        } catch {
+                          // leave as-is — invalid JSON just won't take effect
+                        }
+                      }}
+                      fullWidth
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <TextField
+                        size="small"
+                        label="Skip unless field..."
+                        placeholder="e.g. tags"
+                        value={step.condition_field ?? ''}
+                        onChange={(e) => updateStep(i, { condition_field: e.target.value })}
+                      />
+                      <TextField
+                        select
+                        size="small"
+                        label="Op"
+                        value={step.condition_op ?? 'exists'}
+                        onChange={(e) =>
+                          updateStep(i, {
+                            condition_op: e.target.value as AutomationStep['condition_op'],
+                          })
+                        }
+                        disabled={!step.condition_field}
+                      >
+                        <MenuItem value="exists">exists</MenuItem>
+                        <MenuItem value="eq">equals</MenuItem>
+                        <MenuItem value="neq">not equals</MenuItem>
+                        <MenuItem value="contains">contains</MenuItem>
+                      </TextField>
+                      <TextField
+                        size="small"
+                        label="Value"
+                        value={step.condition_value ?? ''}
+                        onChange={(e) => updateStep(i, { condition_value: e.target.value })}
+                        disabled={!step.condition_field || step.condition_op === 'exists'}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setSteps((rows) => [...rows, { ...EMPTY_AUTOMATION_STEP }])}
+                >
+                  + Add step
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -18,6 +18,9 @@ import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
 import { sendSms } from '../lib/sms.js'
 import { sendEmail } from '../lib/email-client.js'
 import { shouldSuppressEmail } from '../lib/email-risk.js'
+import { shouldSuppressSms } from '../lib/sms-risk.js'
+import { buildUnsubscribeUrl } from '../routes/email-unsubscribe.js'
+import { resolveSegmentContactIds } from '../services/campaigns/segment-resolver.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +44,17 @@ interface MessageRow {
   subject: string | null
   body: string
   approved: boolean
+  variant: string
+}
+
+// Deterministic so the same contact always lands in the same variant across
+// retries/resends of the same campaign, rather than flipping a coin each time.
+function assignVariant(contactId: string): 'a' | 'b' {
+  let hash = 0
+  for (let i = 0; i < contactId.length; i++) {
+    hash = (hash * 31 + contactId.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash) % 2 === 0 ? 'a' : 'b'
 }
 
 interface ContactRow {
@@ -51,6 +65,8 @@ interface ContactRow {
   sms_opt_in: boolean | null
   email_status: string | null
   email_risk_score: number | null
+  sms_status: string | null
+  sms_risk_score: number | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -116,7 +132,7 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
 
   const { data: messages, error: msgErr } = await supabase
     .from('campaign_messages')
-    .select('id, channel, subject, body, approved')
+    .select('id, channel, subject, body, approved, variant')
     .eq('campaign_id', campaignId)
 
   if (msgErr) {
@@ -136,26 +152,13 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
     )
   }
 
-  // ── STEP 2b: Fail closed on segment-scoped campaigns ──────────────────────────
-  // Smart-list / segment filter execution is NOT implemented (see the contact
-  // query in STEP 4 below). Until it ships, a segment_id-scoped campaign would
-  // silently fan out to ALL active contacts, ignoring the segment the recipient
-  // count was snapshotted from at schedule time. Refuse rather than mis-send.
-  if (campaign.segment_id != null) {
-    await supabase
-      .from('campaigns')
-      .update({ status: 'paused', updated_at: new Date().toISOString() })
-      .eq('id', campaignId)
-      .eq('tenant_id', tenantId)
-    throw new Error(
-      `[campaign-sender] Campaign ${campaignId} is segment-scoped (segment_id=${campaign.segment_id}) — segment-scoped sends are not yet supported; paused without sending`
-    )
-  }
-
-  // Index messages by channel for fast lookup
-  const messageByChannel = new Map<string, MessageRow>()
+  // Index messages by channel — usually one row (variant 'a'), but a real
+  // A/B test has both 'a' and 'b' for the same channel.
+  const messagesByChannel = new Map<string, MessageRow[]>()
   for (const msg of messageRows) {
-    messageByChannel.set(msg.channel, msg)
+    const existing = messagesByChannel.get(msg.channel) ?? []
+    existing.push(msg)
+    messagesByChannel.set(msg.channel, existing)
   }
 
   // ── STEP 3: Mark campaign as running ──────────────────────────────────────────
@@ -187,26 +190,31 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   const businessName = tenantRow?.name ?? 'Us'
   const smsFromNumber = tenantPhoneNumber ?? process.env['TELNYX_FROM_NUMBER'] ?? ''
 
-  // Query contacts — DEFERRED WORK: smart-list / segment filter execution is not
-  // implemented (separate ticket). This is an intentional fallback, NOT the final
-  // behaviour: it returns all active contacts for the tenant. Segment-scoped
-  // campaigns are rejected above (STEP 2b) so this fallback only ever runs for
-  // segment_id === null campaigns.
-  const { data: contactsData, error: contactsErr } = await supabase
-    .from('contacts')
-    .select('id, full_name, phone, email, sms_opt_in, email_status, email_risk_score')
-    .eq('tenant_id', tenantId)
-    .eq('is_archived', false)
+  // Query contacts — segment-scoped campaigns resolve through the same
+  // filter logic contacts.ts's GET / uses (contact-filters.ts), replaying
+  // the smart list's saved filters; unsegmented campaigns get every active
+  // contact for the tenant.
+  let contacts: ContactRow[]
+  if (campaign.segment_id != null) {
+    contacts = await resolveSegmentContactIds(campaign.segment_id, tenantId)
+  } else {
+    const { data: contactsData, error: contactsErr } = await supabase
+      .from('contacts')
+      .select(
+        'id, full_name, phone, email, sms_opt_in, email_status, email_risk_score, sms_status, sms_risk_score'
+      )
+      .eq('tenant_id', tenantId)
+      .eq('is_archived', false)
 
-  if (contactsErr) {
-    throw new Error(`[campaign-sender] Failed to fetch contacts: ${contactsErr.message}`)
+    if (contactsErr) {
+      throw new Error(`[campaign-sender] Failed to fetch contacts: ${contactsErr.message}`)
+    }
+    contacts = (contactsData ?? []) as ContactRow[]
   }
-
-  const contacts = (contactsData ?? []) as ContactRow[]
 
   // Fail closed if the schedule-time recipient snapshot disagrees with what we
   // actually resolved — prevents sending to a different audience than the UI
-  // showed. (segment_id is null here, so contact_count is expected null or exact.)
+  // showed (e.g. the segment's membership shifted between schedule and send).
   if (campaign.contact_count != null && campaign.contact_count !== contacts.length) {
     await supabase
       .from('campaigns')
@@ -231,19 +239,31 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
   try {
     for (const contact of contacts) {
       for (const channel of campaign.channels) {
-        const msg = messageByChannel.get(channel)
-        if (!msg) {
+        const variants = messagesByChannel.get(channel)
+        if (!variants || variants.length === 0) {
           console.warn(
             `[campaign-sender] no message for channel=${channel} campaignId=${campaignId} — skipping`
           )
           continue
         }
+        // Single-variant campaigns (the overwhelming majority) always get
+        // that one row — the hash split only kicks in once a real 'b' exists.
+        const msg =
+          variants.length > 1
+            ? (variants.find((m) => m.variant === assignVariant(contact.id)) ?? variants[0]!)
+            : variants[0]!
 
         const firstName = getFirstName(contact.full_name)
 
         // ── Opt-out check ────────────────────────────────────────────────────
         if (channel === 'sms') {
-          if (!contact.sms_opt_in) {
+          if (
+            !contact.sms_opt_in ||
+            shouldSuppressSms({
+              sms_status: contact.sms_status,
+              sms_risk_score: contact.sms_risk_score,
+            })
+          ) {
             await supabase.from('campaign_sends').insert({
               campaign_id: campaignId,
               contact_id: contact.id,
@@ -291,6 +311,7 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
             campaign_id: campaignId,
             contact_id: contact.id,
             channel,
+            variant: msg.variant,
             status: 'sent',
             sent_at: now,
             created_at: now,
@@ -320,11 +341,16 @@ async function processCampaignSend(data: CampaignSenderJobData): Promise<void> {
             const taggedBody = tagUrlsWithUtm(rawBody, campaignId, contact.id)
             const html = plainTextToHtml(taggedBody)
 
+            const unsubscribeUrl = buildUnsubscribeUrl(contact.id)
             const sent = await sendEmail({
               to: contact.email!,
               subject: rawSubject,
               html,
               tenantId,
+              headers: {
+                'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              },
             })
             if (!sent) {
               throw new Error('sendEmail returned false')

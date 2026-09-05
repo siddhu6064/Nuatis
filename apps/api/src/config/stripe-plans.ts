@@ -36,6 +36,8 @@ export const PLANS = {
       'insights',
       'campaigns',
       'orders',
+      'expenses',
+      'staff-portal',
     ],
     stripePriceIdMonthly: process.env['STRIPE_PRICE_PRO_MONTHLY'] ?? '',
     stripePriceIdAnnual: process.env['STRIPE_PRICE_PRO_ANNUAL'] ?? '',
@@ -60,6 +62,9 @@ export const PLANS = {
       'campaigns',
       'cpq',
       'orders',
+      'expenses',
+      'staff-portal',
+      'sso',
     ],
     stripePriceIdMonthly: process.env['STRIPE_PRICE_SCALE_MONTHLY'] ?? '',
     stripePriceIdAnnual: process.env['STRIPE_PRICE_SCALE_ANNUAL'] ?? '',
@@ -125,7 +130,16 @@ export const BASE_SUITE = new Set([
 ])
 
 // Tier-gated features — only available when the tenant's plan includes them.
-export const TIER_GATED = new Set(['automation', 'insights', 'campaigns', 'cpq', 'orders'])
+export const TIER_GATED = new Set([
+  'automation',
+  'insights',
+  'campaigns',
+  'cpq',
+  'orders',
+  'expenses',
+  'staff-portal',
+  'sso',
+])
 
 /**
  * Default entitlement for a module given the tenant's plan + product, used

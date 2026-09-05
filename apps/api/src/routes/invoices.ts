@@ -5,7 +5,11 @@ import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { generateInvoiceNumber } from '../lib/invoice-number.js'
 import { buildInvoiceEmailHtml } from '../lib/email-templates/invoice.js'
+import { applyInvoicePayment } from '../lib/invoice-payment.js'
+import { logActivity } from '../lib/activity.js'
 import PDFDocument from 'pdfkit'
+import { getStripeOrNull } from '../lib/stripe-client.js'
+import { getTenantConnectAccount, connectRequestOptions } from '../lib/stripe-connect.js'
 
 const router = Router()
 
@@ -585,54 +589,131 @@ router.post(
       return
     }
 
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('id, amount_paid, total, status')
-      .eq('id', req.params['id'])
-      .eq('tenant_id', authed.tenantId)
-      .single()
+    const result = await applyInvoicePayment(
+      supabase,
+      req.params['id'] as string,
+      authed.tenantId,
+      amount
+    )
 
-    if (!invoice) {
+    if (result.kind === 'not_found') {
       res.status(404).json({ error: 'Invoice not found' })
       return
     }
-
-    const allowedStatuses = ['sent', 'due', 'overdue']
-    if (!allowedStatuses.includes(invoice.status as string)) {
+    if (result.kind === 'invalid_status') {
       res
         .status(400)
         .json({ error: 'Payments can only be recorded for sent, due, or overdue invoices' })
       return
     }
 
-    const newAmountPaid = Number((Number(invoice.amount_paid ?? 0) + amount).toFixed(2))
-    const total = Number(invoice.total)
-
-    const updateFields: Record<string, unknown> = {
-      amount_paid: newAmountPaid,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (newAmountPaid >= total) {
-      updateFields['status'] = 'received'
-      updateFields['paid_at'] = new Date().toISOString()
-    }
-
-    const { data, error } = await supabase
-      .from('invoices')
-      .update(updateFields)
-      .eq('id', invoice.id)
-      .select('*')
-      .single()
-
-    if (error) {
-      res.status(500).json({ error: error.message })
-      return
-    }
-
-    res.json(data)
+    res.json(result.invoice)
   }
 )
+
+// ── POST /api/invoices/:id/credit-memo ───────────────────────────────────────
+// Reduces the balance the same way a payment does (both write amount_paid,
+// since balance_due is a generated column) but is tracked as a distinct
+// credit_memos row so reporting can tell a credit apart from cash received.
+router.post('/:id/credit-memo', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const b = req.body as Record<string, unknown>
+
+  const amount =
+    typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount'] ?? ''))
+  if (isNaN(amount) || amount <= 0) {
+    res.status(400).json({ error: 'amount must be a positive number' })
+    return
+  }
+
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, contact_id, balance_due, status')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+
+  if (!invoice) {
+    res.status(404).json({ error: 'Invoice not found' })
+    return
+  }
+
+  if (amount > Number(invoice.balance_due)) {
+    res.status(400).json({
+      error: `Credit amount cannot exceed the outstanding balance of $${Number(invoice.balance_due).toFixed(2)}`,
+    })
+    return
+  }
+
+  const result = await applyInvoicePayment(
+    supabase,
+    req.params['id'] as string,
+    authed.tenantId,
+    amount
+  )
+
+  if (result.kind === 'not_found') {
+    res.status(404).json({ error: 'Invoice not found' })
+    return
+  }
+  if (result.kind === 'invalid_status') {
+    res
+      .status(400)
+      .json({ error: 'Credit memos can only be applied to sent, due, or overdue invoices' })
+    return
+  }
+
+  const reason = typeof b['reason'] === 'string' ? b['reason'].trim() || null : null
+
+  const { data: memo, error: memoError } = await supabase
+    .from('credit_memos')
+    .insert({
+      tenant_id: authed.tenantId,
+      invoice_id: invoice.id,
+      amount,
+      reason,
+      created_by: authed.appUserId ?? null,
+    })
+    .select('*')
+    .single()
+
+  if (memoError) {
+    res.status(500).json({ error: memoError.message })
+    return
+  }
+
+  void logActivity({
+    tenantId: authed.tenantId,
+    contactId: (invoice.contact_id as string | null) ?? undefined,
+    type: 'system',
+    body: `Credit memo applied: $${amount.toFixed(2)}${reason ? ` — ${reason}` : ''}`,
+    metadata: { invoice_id: invoice.id, credit_memo_id: memo.id },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
+  res.status(201).json({ credit_memo: memo, invoice: result.invoice })
+})
+
+// ── GET /api/invoices/:id/credit-memos ───────────────────────────────────────
+router.get('/:id/credit-memos', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  const { data, error } = await supabase
+    .from('credit_memos')
+    .select('*')
+    .eq('invoice_id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+  res.json({ data: data ?? [] })
+})
 
 // ── POST /api/invoices/:id/void ───────────────────────────────────────────────
 router.post('/:id/void', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -670,68 +751,6 @@ router.post('/:id/void', requireAuth, async (req: Request, res: Response): Promi
 
   res.json({ voided_at: voidedAt })
 })
-
-// ── processRecordPayment — exported for testing ───────────────────────────────
-export async function processRecordPayment(
-  invoiceId: string,
-  tenantId: string,
-  amount: number,
-  method: string
-): Promise<{ status: number; data?: unknown; error?: string }> {
-  const supabase = getServiceClient()
-
-  if (isNaN(amount) || amount <= 0) {
-    return { status: 400, error: 'amount must be a positive number' }
-  }
-  if (!method) {
-    return { status: 400, error: 'method is required' }
-  }
-
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('id, amount_paid, total, status')
-    .eq('id', invoiceId)
-    .eq('tenant_id', tenantId)
-    .single()
-
-  if (!invoice) {
-    return { status: 404, error: 'Invoice not found' }
-  }
-
-  const allowedStatuses = ['sent', 'due', 'overdue']
-  if (!allowedStatuses.includes(invoice['status'] as string)) {
-    return {
-      status: 400,
-      error: 'Payments can only be recorded for sent, due, or overdue invoices',
-    }
-  }
-
-  const newAmountPaid = Number((Number(invoice['amount_paid'] ?? 0) + amount).toFixed(2))
-  const total = Number(invoice['total'])
-
-  const updateFields: Record<string, unknown> = {
-    amount_paid: newAmountPaid,
-    updated_at: new Date().toISOString(),
-  }
-
-  if (newAmountPaid >= total) {
-    updateFields['status'] = 'received'
-    updateFields['paid_at'] = new Date().toISOString()
-  }
-
-  const { data, error } = await supabase
-    .from('invoices')
-    .update(updateFields)
-    .eq('id', invoiceId)
-    .select('*')
-    .single()
-
-  if (error) {
-    return { status: 500, error: error.message }
-  }
-
-  return { status: 200, data }
-}
 
 // ── processVoidInvoice — exported for testing ─────────────────────────────────
 export async function processVoidInvoice(
@@ -831,6 +850,79 @@ publicRouter.get('/:token', async (req: Request, res: Response): Promise<void> =
     contact_name: contactName,
     line_items: items ?? [],
   })
+})
+
+// ── POST /api/invoices/public/:token/pay — create a Stripe Payment Link ────────
+// Routes directly to the tenant's connected Stripe account when they have one
+// (see lib/stripe-connect.ts), falling back to the shared platform account
+// otherwise. A fresh link is created scoped to the CURRENT balance_due every
+// time this is called (Payment Links are amount-fixed at creation, so an old
+// link would go stale after a partial payment).
+publicRouter.post('/:token/pay', async (req: Request, res: Response): Promise<void> => {
+  const supabase = getServiceClient()
+
+  const { data: invoice, error } = await supabase
+    .from('invoices')
+    .select('id, invoice_number, tenant_id, status, total, amount_paid')
+    .eq('share_token', req.params['token'])
+    .single()
+
+  if (error || !invoice) {
+    res.status(404).json({ error: 'Invoice not found' })
+    return
+  }
+
+  const allowedStatuses = ['sent', 'due', 'overdue']
+  if (!allowedStatuses.includes(invoice.status as string)) {
+    res.status(400).json({ error: 'This invoice is not open for payment' })
+    return
+  }
+
+  const balanceDue = Number((Number(invoice.total) - Number(invoice.amount_paid ?? 0)).toFixed(2))
+  if (balanceDue <= 0) {
+    res.status(400).json({ error: 'This invoice has no balance due' })
+    return
+  }
+
+  const stripe = getStripeOrNull()
+  if (!stripe) {
+    res.status(503).json({ error: 'Online payment is not configured for this business yet' })
+    return
+  }
+
+  const connectAccount = await getTenantConnectAccount(supabase, invoice.tenant_id as string)
+  const connectOptions = connectRequestOptions(connectAccount)
+  const amountCents = Math.round(balanceDue * 100)
+
+  const price = await stripe.prices.create(
+    {
+      currency: 'usd',
+      unit_amount: amountCents,
+      product_data: { name: `Invoice ${invoice.invoice_number as string}` },
+    },
+    connectOptions
+  )
+
+  const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
+  const link = await stripe.paymentLinks.create(
+    {
+      line_items: [{ price: price.id, quantity: 1 }],
+      after_completion: {
+        type: 'redirect',
+        redirect: { url: `${webUrl}/invoices/public/${req.params['token']}?paid=1` },
+      },
+      metadata: {
+        kind: 'invoice_payment',
+        tenantId: invoice.tenant_id as string,
+        invoiceId: invoice.id as string,
+      },
+      // No application_fee_amount here — Payment Links don't support it
+      // (see payment-link.ts's createPaymentLink for the full note).
+    },
+    connectOptions
+  )
+
+  res.json({ url: link.url })
 })
 
 export default router

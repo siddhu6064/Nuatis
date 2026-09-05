@@ -192,6 +192,11 @@ beforeEach(() => {
     sendText: jest.fn(),
     close: jest.fn(),
     onClose: jest.fn(),
+    // handleCallEnd() (telnyx-handler.ts) calls this unconditionally on a real
+    // ws 'close' — previously untriggered by any test, so this gap was never
+    // hit. Now that Block 2's tests properly close their fake ws (see
+    // afterEach below), it is.
+    getLatencyBreakdown: jest.fn().mockReturnValue(null),
   }
   ;(globalThis as any).__mockGeminiSession = mockGeminiSession
 
@@ -264,12 +269,29 @@ describe('POST /voice/inbound — Telnyx webhook intake', () => {
 // ── Block 2: WebSocket /voice/stream — session initialisation ────────────────
 
 describe('WebSocket /voice/stream — session initialisation', () => {
+  // registerVoiceWebSocket's real 'connection' handler starts a real 30s
+  // setInterval ping loop, cleared only by its own `ws.on('close', ...)`
+  // listener. `ws.close = jest.fn()` below is just a stub — it does not emit
+  // 'close' on the EventEmitter, so nothing ever cleared that interval. It
+  // kept running on real timers for the rest of this worker's lifetime and,
+  // 30s later, called `ws.ping()` on this same mock — which was never given
+  // a `.ping` method — throwing into whatever unrelated test happened to be
+  // running at that moment. Track every fake ws opened in this block and
+  // close it after each test so the handler's own (already-correct) cleanup
+  // path actually runs.
+  const openWs: any[] = []
+  afterEach(() => {
+    for (const ws of openWs) ws.emit('close')
+    openWs.length = 0
+  })
+
   function makeFakeWs(): any {
     const ws: any = new EventEmitter()
     ws.send = jest.fn()
     ws.close = jest.fn()
     ws.readyState = 1
     ws.OPEN = 1
+    openWs.push(ws)
     return ws
   }
 

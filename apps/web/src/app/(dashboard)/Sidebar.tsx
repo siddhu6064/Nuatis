@@ -85,7 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         href: '/pipeline',
-        label: 'Pipeline',
+        label: 'Lead Stages',
         icon: '◈',
         suiteOnly: true,
         requireModule: 'pipeline',
@@ -143,6 +143,13 @@ const NAV_GROUPS: NavGroup[] = [
         requireModule: 'automation',
       },
       {
+        href: '/outreach-sequences',
+        label: 'Outreach Sequences',
+        icon: '📨',
+        suiteOnly: true,
+        requireModule: 'automation',
+      },
+      {
         href: '/settings/email-templates',
         label: 'Email Templates',
         icon: '📧',
@@ -158,11 +165,25 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/inventory', label: 'Inventory', icon: '◨', suiteOnly: true, requireModule: 'crm' },
       {
+        href: '/purchase-orders',
+        label: 'Purchase Orders',
+        icon: '📦',
+        suiteOnly: true,
+        requireModule: 'crm',
+      },
+      {
         href: '/orders',
         label: 'Orders',
         icon: '🧾',
         suiteOnly: true,
         requireModule: 'orders',
+      },
+      {
+        href: '/expenses',
+        label: 'Expenses',
+        icon: '💵',
+        suiteOnly: true,
+        requireModule: 'expenses',
       },
       { href: '/staff', label: 'Staff', icon: '👥', suiteOnly: true, requireModule: 'crm' },
       { href: '/tasks', label: 'Tasks', icon: '☑', suiteOnly: true },
@@ -184,19 +205,43 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/settings/phone-numbers', label: 'Phone Numbers', icon: '◈', requireModule: 'maya' },
       { href: '/settings/resources', label: 'Resources', icon: '🏢', suiteOnly: true },
       { href: '/settings/locations', label: 'Locations', icon: '◩', suiteOnly: true },
+      { href: '/settings/team', label: 'Team', icon: '👥', suiteOnly: true },
       { href: '/settings/modules', label: 'Modules', icon: '▣', suiteOnly: true },
+      {
+        href: '/settings/sso',
+        label: 'Single Sign-On',
+        icon: '🔐',
+        suiteOnly: true,
+        requireModule: 'sso',
+      },
       { href: '/settings/integrations', label: 'Integrations', icon: '🔗', suiteOnly: true },
+      { href: '/settings/developer', label: 'Developer', icon: '🧩', suiteOnly: true },
       { href: '/settings/brand-profile', label: 'Brand Voice', icon: '🎙', suiteOnly: true },
       { href: '/settings/webchat', label: 'Webchat Widget', icon: '💬', suiteOnly: true },
       { href: '/settings/notifications', label: 'Notifications', icon: '🔔', suiteOnly: true },
+      { href: '/settings/nps-surveys', label: 'Customer NPS', icon: '📈', suiteOnly: true },
+      {
+        href: '/settings/customer-referrals',
+        label: 'Customer Referrals',
+        icon: '🤝',
+        suiteOnly: true,
+      },
       { href: '/settings/billing', label: 'Billing', icon: '💰' },
       { href: '/settings/payments', label: 'Payments', icon: '💳', suiteOnly: true },
       { href: '/settings/portal', label: 'Client Portal', icon: '👥', suiteOnly: true },
       { href: '/settings/pipelines', label: 'Pipelines', icon: '🔀', suiteOnly: true },
+      { href: '/settings/custom-fields', label: 'Custom Fields', icon: '🏷', suiteOnly: true },
       {
         href: '/settings/cpq',
         label: 'Quote Settings',
         icon: '⚙',
+        suiteOnly: true,
+        requireModule: 'cpq',
+      },
+      {
+        href: '/settings/promo-codes',
+        label: 'Promo Codes',
+        icon: '🏷',
         suiteOnly: true,
         requireModule: 'cpq',
       },
@@ -214,9 +259,23 @@ const NAV_GROUPS: NavGroup[] = [
         suiteOnly: true,
         requireModule: 'orders',
       },
+      {
+        href: '/settings/expenses',
+        label: 'Expense Categories',
+        icon: '⚙',
+        suiteOnly: true,
+        requireModule: 'expenses',
+      },
       { href: '/settings/sms-health', label: 'Delivery Health', icon: '📊', suiteOnly: true },
       { href: '/settings/audit-log', label: 'Audit Log', icon: '🛡', suiteOnly: true },
       { href: '/settings/data-export', label: 'Data Export', icon: '📥', suiteOnly: true },
+      {
+        href: '/settings/accounting-export',
+        label: 'Accounting Export',
+        icon: '🧮',
+        suiteOnly: true,
+        requireModule: 'expenses',
+      },
       { href: '/settings/reports', label: 'Scheduled Reports', icon: '📨', suiteOnly: true },
       { href: '/settings/import', label: 'Import', icon: '↑', suiteOnly: true },
       { href: '/settings/trigger-links', label: 'Trigger Links', icon: '🔗', suiteOnly: true },
@@ -367,6 +426,7 @@ export default function Sidebar({
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [showAdminConsole, setShowAdminConsole] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [groupOpen, setGroupOpen] = useState<GroupState>(() =>
     NAV_GROUPS.reduce((acc, g) => ({ ...acc, [g.id]: false }), {} as GroupState)
@@ -411,6 +471,15 @@ export default function Sidebar({
     if (path === mountedPath.current) return
     onClose?.()
   }, [path, onClose])
+
+  // Internal-only: silently 403s for every tenant except the designated
+  // Nuatis platform tenant's owner — used only to decide whether to render
+  // the Admin Console link, never to gate anything security-relevant.
+  useEffect(() => {
+    fetch('/api/admin-console/access-check')
+      .then((r) => setShowAdminConsole(r.ok))
+      .catch(() => setShowAdminConsole(false))
+  }, [])
 
   useEffect(() => {
     void fetch('/api/conversations?status=open&limit=1')
@@ -916,6 +985,19 @@ export default function Sidebar({
               <p className="text-xs font-semibold text-ink truncate">{userName || 'User'}</p>
               <p className="text-[10px] text-ink4 truncate mt-0.5">{userEmail}</p>
             </div>
+            {showAdminConsole && (
+              <>
+                <div className="border-t border-border-brand" />
+                <Link
+                  href="/admin-console"
+                  onClick={() => setPopoverOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-ink3 hover:bg-bg transition-colors"
+                >
+                  <span className="w-3.5 shrink-0 text-center">⚙</span>
+                  Admin Console
+                </Link>
+              </>
+            )}
             <div className="border-t border-border-brand" />
             <button
               type="button"

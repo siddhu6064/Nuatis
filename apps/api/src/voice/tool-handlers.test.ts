@@ -13,11 +13,20 @@ const calendarInsert = jest.fn(async () => ({ data: { id: 'gcal-evt-001' } }))
 const getCalendarClient = jest.fn(() => ({
   events: { insert: calendarInsert },
 }))
+const createPaymentLink = jest.fn(async () => ({
+  id: 'pl-1',
+  url: 'https://pay.example.com/abc',
+  amount: 12.5,
+  description: 'Order ORD-1001',
+}))
+const sendSms = jest.fn(async () => ({ success: true }))
 
 jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: () => createMockSupabase(store),
 }))
 jest.unstable_mockModule('../services/google.js', () => ({ getCalendarClient }))
+jest.unstable_mockModule('../lib/payment-link.js', () => ({ createPaymentLink }))
+jest.unstable_mockModule('../lib/sms.js', () => ({ sendSms }))
 
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
@@ -47,6 +56,8 @@ beforeEach(() => {
   store.tables['caller_memory'] = []
   calendarInsert.mockClear()
   getCalendarClient.mockClear()
+  createPaymentLink.mockClear()
+  sendSms.mockClear()
 })
 
 /** Flushes the fire-and-forget caller-memory write, which isn't awaited by
@@ -338,9 +349,93 @@ describe('reschedule_appointment', () => {
   })
 })
 
+describe('cancel_appointment', () => {
+  const CALLER_PHONE = '+15125559877'
+  const CONTACT_ID = randomUUID()
+  const EXISTING_APPT_ID = randomUUID()
+  const FUTURE_ISO = new Date(Date.now() + 86_400_000).toISOString()
+
+  it('cancels the upcoming appointment without booking a new one', async () => {
+    ;(store.tables['contacts'] as Row[]).push({
+      id: CONTACT_ID,
+      tenant_id: TENANT_ID,
+      full_name: 'Cancel Casey',
+      phone: CALLER_PHONE,
+      is_archived: false,
+    })
+    ;(store.tables['appointments'] as Row[]).push({
+      id: EXISTING_APPT_ID,
+      tenant_id: TENANT_ID,
+      contact_id: CONTACT_ID,
+      status: 'scheduled',
+      start_time: FUTURE_ISO,
+      end_time: FUTURE_ISO,
+    })
+
+    const result = await executeToolCall(
+      'cancel_appointment',
+      { caller_phone: CALLER_PHONE, reason: 'change of plans' },
+      baseContext('suite')
+    )
+
+    expect(result['canceled']).toBe(true)
+    expect(result['appointment_id']).toBe(EXISTING_APPT_ID)
+
+    const appt = (store.tables['appointments'] as Row[]).find((r) => r['id'] === EXISTING_APPT_ID)
+    expect(appt?.['status']).toBe('canceled')
+
+    // No new appointment should have been created
+    const all = store.tables['appointments'] as Row[]
+    expect(all).toHaveLength(1)
+  })
+
+  it('returns canceled:false when no contact matches caller phone', async () => {
+    const result = await executeToolCall(
+      'cancel_appointment',
+      { caller_phone: '+15125550000' },
+      baseContext('suite')
+    )
+
+    expect(result['canceled']).toBe(false)
+    expect(String(result['message'])).toContain('No upcoming appointment')
+  })
+
+  it('returns canceled:false when contact exists but has no upcoming appointment', async () => {
+    ;(store.tables['contacts'] as Row[]).push({
+      id: CONTACT_ID,
+      tenant_id: TENANT_ID,
+      full_name: 'No Appt Nina',
+      phone: CALLER_PHONE,
+      is_archived: false,
+    })
+
+    const result = await executeToolCall(
+      'cancel_appointment',
+      { caller_phone: CALLER_PHONE },
+      baseContext('suite')
+    )
+
+    expect(result['canceled']).toBe(false)
+    expect(String(result['message'])).toContain('No upcoming appointment')
+  })
+})
+
 describe('get_appointments — timezone conversion', () => {
   const CONTACT_ID = randomUUID()
   const APPT_ID = randomUUID()
+
+  // get_appointments filters .gte('start_time', new Date().toISOString()) — a
+  // fixed calendar-date literal here goes stale and starts failing the moment
+  // "now" passes it. Compute a start_time that's always tomorrow at a fixed
+  // UTC hour instead, so the fixture never ages into the past. Chicago is
+  // UTC-5 (CDT) for most of the year, which is what the 12:00 PM / 1:00 PM
+  // assertions below assume.
+  function tomorrowAtUtcHour(hourUtc: number): string {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() + 1)
+    d.setUTCHours(hourUtc, 0, 0, 0)
+    return d.toISOString()
+  }
 
   it('converts start_time/end_time to context.timezone, not raw UTC (regression: 17:00 UTC read as "5 PM")', async () => {
     ;(store.tables['appointments'] as Row[]).push({
@@ -350,8 +445,8 @@ describe('get_appointments — timezone conversion', () => {
       title: 'Cleaning',
       status: 'scheduled',
       notes: null,
-      start_time: '2026-08-24T17:00:00Z',
-      end_time: '2026-08-24T18:00:00Z',
+      start_time: tomorrowAtUtcHour(17),
+      end_time: tomorrowAtUtcHour(18),
     })
 
     const result = await executeToolCall(
@@ -374,8 +469,8 @@ describe('get_appointments — timezone conversion', () => {
       title: 'Cleaning',
       status: 'scheduled',
       notes: null,
-      start_time: '2026-08-24T17:00:00Z',
-      end_time: '2026-08-24T18:00:00Z',
+      start_time: tomorrowAtUtcHour(17),
+      end_time: tomorrowAtUtcHour(18),
     })
 
     const result = await executeToolCall(
@@ -508,6 +603,79 @@ describe('place_order', () => {
     )
 
     expect(result['placed']).toBe(false)
+  })
+
+  it('sends a payment link in the confirmation text when a caller phone is given', async () => {
+    store.tables['tenants'] = [
+      { id: TENANT_ID, modules: { orders: true }, order_counter: 1000, name: 'Pete’s Diner' },
+    ]
+    store.tables['locations'] = [
+      { id: randomUUID(), tenant_id: TENANT_ID, is_primary: true, telnyx_number: '+15125550000' },
+    ]
+
+    const result = await executeToolCall(
+      'place_order',
+      {
+        items: [{ description: 'Latte', quantity: 2, unit_price: 4.5 }],
+        caller_name: 'Phone Pete',
+        caller_phone: '+15125559999',
+      },
+      baseContext('suite')
+    )
+    await flushMicrotasks()
+
+    expect(result['placed']).toBe(true)
+    expect(createPaymentLink).toHaveBeenCalledTimes(1)
+    expect(createPaymentLink.mock.calls[0]?.[0]).toMatchObject({
+      tenantId: TENANT_ID,
+      amount: 9,
+    })
+    expect(sendSms).toHaveBeenCalledTimes(1)
+    const text = sendSms.mock.calls[0]?.[2] as string
+    expect(text).toContain('Pay online: https://pay.example.com/abc')
+  })
+
+  it('skips the payment link, but still confirms by SMS, when the order has no charge (subtotal 0)', async () => {
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { orders: true }, order_counter: 1000 }]
+    store.tables['locations'] = [
+      { id: randomUUID(), tenant_id: TENANT_ID, is_primary: true, telnyx_number: '+15125550000' },
+    ]
+
+    const result = await executeToolCall(
+      'place_order',
+      {
+        items: [{ description: 'Free sample', quantity: 1, unit_price: 0 }],
+        caller_name: 'Free Fran',
+        caller_phone: '+15125559998',
+      },
+      baseContext('suite')
+    )
+    await flushMicrotasks()
+
+    expect(result['placed']).toBe(true)
+    expect(createPaymentLink).not.toHaveBeenCalled()
+    expect(sendSms).toHaveBeenCalledTimes(1)
+    const text = sendSms.mock.calls[0]?.[2] as string
+    expect(text).not.toContain('Pay online')
+  })
+
+  it('skips both the SMS and the payment link when the business has no primary Telnyx number', async () => {
+    store.tables['tenants'] = [{ id: TENANT_ID, modules: { orders: true }, order_counter: 1000 }]
+
+    const result = await executeToolCall(
+      'place_order',
+      {
+        items: [{ description: 'Latte', quantity: 1, unit_price: 4.5 }],
+        caller_name: 'No Number Nora',
+        caller_phone: '+15125559997',
+      },
+      baseContext('suite')
+    )
+    await flushMicrotasks()
+
+    expect(result['placed']).toBe(true)
+    expect(createPaymentLink).not.toHaveBeenCalled()
+    expect(sendSms).not.toHaveBeenCalled()
   })
 })
 

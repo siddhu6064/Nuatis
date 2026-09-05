@@ -1,15 +1,11 @@
 import { Router, type Request, type Response } from 'express'
-import Stripe from 'stripe'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { createPaymentLink, getStripe } from '../lib/payment-link.js'
+import { deactivateSquareCheckoutLink } from '../lib/square-client.js'
+import { connectRequestOptions } from '../lib/stripe-connect.js'
 
 const router = Router()
-
-function getStripe() {
-  const key = process.env['STRIPE_SECRET_KEY']
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not set')
-  return new Stripe(key)
-}
 
 // ── GET /api/payment-links ────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -34,7 +30,6 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 // ── POST /api/payment-links ───────────────────────────────────────────────────
 router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getServiceClient()
   const b = req.body as Record<string, unknown>
 
   const amount = typeof b['amount'] === 'number' ? b['amount'] : parseFloat(String(b['amount']))
@@ -52,59 +47,35 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   const contactId = typeof b['contactId'] === 'string' ? b['contactId'] || null : null
   const label = typeof b['label'] === 'string' ? b['label'].trim() || null : null
   const currency = typeof b['currency'] === 'string' ? b['currency'] : 'usd'
+  let tipAmount: number | null = null
+  if (b['tipAmount'] !== undefined && b['tipAmount'] !== null && b['tipAmount'] !== '') {
+    const parsed =
+      typeof b['tipAmount'] === 'number' ? b['tipAmount'] : parseFloat(String(b['tipAmount']))
+    if (isNaN(parsed) || parsed < 0) {
+      res.status(400).json({ error: 'tipAmount must be a non-negative number' })
+      return
+    }
+    tipAmount = parsed
+  }
 
-  let stripe: Stripe
   try {
-    stripe = getStripe()
-  } catch {
-    res.status(500).json({ error: 'Stripe is not configured on this server' })
-    return
-  }
-
-  const price = await stripe.prices.create({
-    currency,
-    unit_amount: Math.round(amount * 100),
-    product_data: { name: description },
-  })
-
-  const link = await stripe.paymentLinks.create({
-    line_items: [{ price: price.id, quantity: 1 }],
-    after_completion: {
-      type: 'hosted_confirmation',
-      hosted_confirmation: { custom_message: 'Thank you for your payment!' },
-    },
-    metadata: {
+    const record = await createPaymentLink({
       tenantId: authed.tenantId,
-      contactId: contactId ?? '',
-      label: label ?? '',
-    },
-  })
-
-  const { data: record, error: dbErr } = await supabase
-    .from('payment_links')
-    .insert({
-      tenant_id: authed.tenantId,
-      contact_id: contactId,
-      stripe_link_id: link.id,
-      url: link.url,
-      amount: Number(amount.toFixed(2)),
+      amount,
       description,
+      contactId,
       label,
+      currency,
+      tipAmount,
     })
-    .select('*')
-    .single()
-
-  if (dbErr || !record) {
-    res.status(500).json({ error: dbErr?.message ?? 'Failed to save payment link' })
-    return
+    res.status(201).json(record)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create payment link'
+    const isConfigError = message.includes('STRIPE_SECRET_KEY') || message.includes('No Square')
+    res.status(500).json({
+      error: isConfigError ? 'No payment processor is configured on this server' : message,
+    })
   }
-
-  res.status(201).json({
-    id: record.id,
-    url: record.url,
-    amount: record.amount,
-    description: record.description,
-  })
 })
 
 // ── DELETE /api/payment-links/:id ────────────────────────────────────────────
@@ -114,7 +85,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 
   const { data: record } = await supabase
     .from('payment_links')
-    .select('id, stripe_link_id')
+    .select('id, stripe_link_id, square_payment_link_id, processor, stripe_connect_account_id')
     .eq('id', req.params['id'])
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -125,10 +96,18 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
   }
 
   try {
-    const stripe = getStripe()
-    await stripe.paymentLinks.update(record.stripe_link_id, { active: false })
+    if (record.processor === 'square' && record.square_payment_link_id) {
+      await deactivateSquareCheckoutLink(authed.tenantId, record.square_payment_link_id)
+    } else if (record.stripe_link_id) {
+      const stripe = getStripe()
+      await stripe.paymentLinks.update(
+        record.stripe_link_id,
+        { active: false },
+        connectRequestOptions(record.stripe_connect_account_id as string | null)
+      )
+    }
   } catch (err) {
-    console.error('[payment-links] stripe deactivate error:', err)
+    console.error('[payment-links] processor deactivate error:', err)
   }
 
   await supabase.from('payment_links').update({ active: false }).eq('id', record.id)

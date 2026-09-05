@@ -18,6 +18,17 @@ interface Props {
 // Pipeline's stages this list is static, not tenant-configurable.
 const COLUMNS: OrderStatus[] = ['pending', 'confirmed', 'in_progress', 'ready', 'completed']
 
+// Matches OrdersList.tsx's STATUS_BADGE palette so the board and list view
+// read as the same status colors, not two different schemes.
+const STATUS_ACCENT: Record<OrderStatus, string> = {
+  pending: '#9ca3af',
+  confirmed: '#2563eb',
+  in_progress: '#d97706',
+  ready: '#0d9488',
+  completed: '#16a34a',
+  cancelled: '#dc2626',
+}
+
 export default function OrdersKanban({ orders, setOrders, showToast }: Props) {
   const handleDragEnd = useCallback(
     async (result: DropResult) => {
@@ -78,6 +89,10 @@ export default function OrdersKanban({ orders, setOrders, showToast }: Props) {
                   >
                     <div className="px-3 py-2.5 border-b border-border-brand bg-[#f9f8f5]">
                       <div className="flex items-center gap-2">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: STATUS_ACCENT[status] }}
+                        />
                         <span className="text-[13px] font-semibold text-ink truncate flex-1">
                           {STATUS_LABELS[status]}
                         </span>
@@ -105,6 +120,7 @@ export default function OrdersKanban({ orders, setOrders, showToast }: Props) {
                                 className="group bg-white rounded-md border border-border-brand p-3 transition-all duration-100 hover:shadow-sm"
                                 style={{
                                   ...dragProvided.draggableProps.style,
+                                  borderLeft: `3px solid ${STATUS_ACCENT[status]}`,
                                   opacity: dragSnapshot.isDragging ? 0.7 : 1,
                                   boxShadow: dragSnapshot.isDragging
                                     ? '0 10px 25px -3px rgb(0 0 0 / 0.15)'
@@ -129,6 +145,15 @@ export default function OrdersKanban({ orders, setOrders, showToast }: Props) {
                                   {order.source === 'maya' && (
                                     <span className="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide bg-teal-50 text-teal-600">
                                       MAYA
+                                    </span>
+                                  )}
+                                  {order.error && (
+                                    <span
+                                      className="text-[11px] shrink-0"
+                                      title={order.error}
+                                      aria-label="Order has an error"
+                                    >
+                                      ⚠
                                     </span>
                                   )}
                                 </div>

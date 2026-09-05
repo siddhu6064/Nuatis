@@ -50,6 +50,54 @@ jest.unstable_mockModule('../lib/portal-slug.js', () => ({
   generatePortalSlug: jest.fn().mockResolvedValue('test-biz'),
 }))
 
+// ── booking-availability mock (for the appointment reschedule/cancel routes) ─
+const getTenantCalendarCredentials = jest.fn(async () => ({
+  provider: 'native' as const,
+  calendarId: 'primary',
+  timezone: 'America/Chicago',
+  tenantId: 'tenant-1',
+  refreshToken: '',
+}))
+const isSlotAvailable = jest.fn(async () => true)
+const getAvailableSlotsForDate = jest.fn(async () => ({
+  slots: [{ start: '10:00', end: '10:30' }],
+  closed: false,
+}))
+const createCalendarEvent = jest.fn(async () => ({
+  googleEventId: null,
+  startIso: '2027-01-15T10:00:00.000Z',
+  endIso: '2027-01-15T10:30:00.000Z',
+}))
+jest.unstable_mockModule('../lib/booking-availability.js', () => ({
+  getTenantCalendarCredentials,
+  isSlotAvailable,
+  getAvailableSlotsForDate,
+  createCalendarEvent,
+}))
+
+// ── activity/webhook mocks (for the new-appointment booking route) ──────────
+const logActivity = jest.fn(async () => undefined)
+const dispatchWebhook = jest.fn(async () => undefined)
+jest.unstable_mockModule('../lib/activity.js', () => ({ logActivity }))
+jest.unstable_mockModule('../lib/webhook-dispatcher.js', () => ({ dispatchWebhook }))
+
+// ── Stripe mock (for payment-method setup-intent/remove routes) ──────────────
+process.env['STRIPE_SECRET_KEY'] = 'sk_test_mock'
+const mockCustomersCreate = jest
+  .fn<() => Promise<{ id: string }>>()
+  .mockResolvedValue({ id: 'cus_1' })
+const mockSetupIntentsCreate = jest
+  .fn<() => Promise<{ client_secret: string; id: string }>>()
+  .mockResolvedValue({ client_secret: 'seti_1_secret', id: 'seti_1' })
+const mockPaymentMethodsDetach = jest.fn<() => Promise<unknown>>().mockResolvedValue({})
+jest.unstable_mockModule('stripe', () => ({
+  default: jest.fn().mockImplementation(() => ({
+    customers: { create: mockCustomersCreate },
+    setupIntents: { create: mockSetupIntentsCreate },
+    paymentMethods: { detach: mockPaymentMethodsDetach },
+  })),
+}))
+
 // ── Dynamic imports (after all mocks) ─────────────────────────────────────────
 // Sequential, not Promise.all — concurrent dynamic imports that share a
 // newly-common dependency (lib/supabase.js, since the getServiceClient()
@@ -109,8 +157,29 @@ beforeEach(() => {
   store.tables['appointments'] = []
   store.tables['quotes'] = []
   store.tables['invoices'] = []
+  store.tables['contact_referral_codes'] = []
+  store.tables['customer_referral_rewards'] = []
+  store.tables['contact_attachments'] = []
+  store.tables['services'] = []
+  store.tables['staff_services'] = []
+  store.tables['staff_members'] = []
+  store.tables['locations'] = []
   mockEmailSend.mockClear()
+  mockCustomersCreate.mockClear()
+  mockSetupIntentsCreate.mockClear()
+  mockPaymentMethodsDetach.mockClear()
+  getTenantCalendarCredentials.mockClear()
+  isSlotAvailable.mockClear()
+  isSlotAvailable.mockResolvedValue(true)
+  getAvailableSlotsForDate.mockClear()
+  createCalendarEvent.mockClear()
+  logActivity.mockClear()
+  dispatchWebhook.mockClear()
 })
+
+function farFutureIso(hoursFromNow: number): string {
+  return new Date(Date.now() + hoursFromNow * 3600_000).toISOString()
+}
 
 // ── Test 1: GET /api/portal/verify with valid token returns { valid: true, contact_name } ──
 describe('GET /api/portal/verify — valid token', () => {
@@ -153,8 +222,8 @@ describe('GET /api/portal/data — tenant isolation', () => {
         id: 'appt-upcoming',
         contact_id: 'contact-1',
         tenant_id: 'tenant-1',
-        scheduled_at: futureDate,
-        service_name: 'Haircut',
+        start_time: futureDate,
+        title: 'Haircut',
         status: 'confirmed',
         location_id: 'loc-1',
       },
@@ -162,8 +231,8 @@ describe('GET /api/portal/data — tenant isolation', () => {
         id: 'appt-past',
         contact_id: 'contact-1',
         tenant_id: 'tenant-1',
-        scheduled_at: pastDate,
-        service_name: 'Color',
+        start_time: pastDate,
+        title: 'Color',
         status: 'completed',
         location_id: 'loc-1',
       }
@@ -181,10 +250,22 @@ describe('GET /api/portal/data — tenant isolation', () => {
       id: 'appt-other',
       contact_id: 'contact-other',
       tenant_id: 'tenant-other',
-      scheduled_at: futureDate,
-      service_name: 'Other Service',
+      start_time: futureDate,
+      title: 'Other Service',
       status: 'confirmed',
       location_id: 'loc-other',
+    })
+    ;(store.tables['invoices'] as Row[]).push({
+      id: 'inv-1',
+      contact_id: 'contact-1',
+      tenant_id: 'tenant-1',
+      invoice_number: 'INV-001',
+      total: 150,
+      balance_due: 150,
+      status: 'sent',
+      due_date: null,
+      created_at: futureDate,
+      share_token: 'share-abc123',
     })
 
     const res = await request(makeApp()).get('/api/portal/data?token=valid-token-abc123')
@@ -203,6 +284,112 @@ describe('GET /api/portal/data — tenant isolation', () => {
     expect(allApptIds).toContain('appt-upcoming')
     expect(allApptIds).toContain('appt-past')
     expect(allApptIds).not.toContain('appt-other')
+
+    // Regression guard: the route previously selected scheduled_at/service_name,
+    // columns that don't exist on appointments (real columns are start_time/
+    // title) — this silently returned an empty array against the real DB.
+    expect(upcoming[0]?.['id']).toBe('appt-upcoming')
+    expect(upcoming[0]?.['start_time']).toBe(futureDate)
+    expect(upcoming[0]?.['title']).toBe('Haircut')
+
+    // share_token must come through so the portal can link straight to the
+    // existing public pay flow (/invoices/public/[token]) instead of a dead end.
+    const invoices = res.body.invoices as Row[]
+    expect(invoices[0]?.['share_token']).toBe('share-abc123')
+
+    // Program disabled by default (tenants row above has no
+    // customer_referral_program_enabled column set) — referral must be null,
+    // not an error or a partial object.
+    expect(res.body.referral).toBeNull()
+  })
+})
+
+describe('GET /api/portal/data — documents', () => {
+  it('surfaces the contact_attachments store with a signed URL, tenant-isolated', async () => {
+    seedPortalAccess()
+    ;(store.tables['contact_attachments'] as Row[]).push(
+      {
+        id: 'att-1',
+        tenant_id: 'tenant-1',
+        contact_id: 'contact-1',
+        filename: 'stored-name.pdf',
+        original_filename: 'Consent Form.pdf',
+        file_type: 'application/pdf',
+        file_size: 24576,
+        storage_path: 'tenant-1/contact-1/stored-name.pdf',
+        storage_bucket: 'contact-attachments',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'att-other',
+        tenant_id: 'tenant-other',
+        contact_id: 'contact-other',
+        filename: 'not-mine.pdf',
+        original_filename: 'Not Mine.pdf',
+        file_type: 'application/pdf',
+        file_size: 100,
+        storage_path: 'tenant-other/contact-other/not-mine.pdf',
+        storage_bucket: 'contact-attachments',
+        created_at: new Date().toISOString(),
+      }
+    )
+
+    const res = await request(makeApp()).get('/api/portal/data?token=valid-token-abc123')
+
+    expect(res.status).toBe(200)
+    expect(res.body.documents).toHaveLength(1)
+    expect(res.body.documents[0]).toMatchObject({
+      id: 'att-1',
+      filename: 'Consent Form.pdf',
+      file_size: 24576,
+      signed_url: 'https://signed.url/test',
+    })
+  })
+})
+
+// ── Test 5: GET /api/portal/data surfaces the customer-referral block when enabled ──
+describe('GET /api/portal/data — customer referrals', () => {
+  it('lazily creates a referral code and returns it, plus past reward status', async () => {
+    seedPortalAccess()
+    store.tables['tenants'] = [
+      {
+        id: 'tenant-1',
+        name: 'Test Biz',
+        portal_enabled: true,
+        portal_slug: 'test-biz',
+        customer_referral_program_enabled: true,
+        customer_referral_reward_cents: 1500,
+        customer_referral_referred_reward_cents: 0,
+      },
+    ]
+    ;(store.tables['customer_referral_rewards'] as Row[]).push({
+      id: 'reward-1',
+      tenant_id: 'tenant-1',
+      referrer_contact_id: 'contact-1',
+      referred_contact_id: 'contact-friend',
+      status: 'issued',
+      issued_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    })
+    ;(store.tables['contacts'] as Row[]).push({
+      id: 'contact-friend',
+      tenant_id: 'tenant-1',
+      full_name: 'A Friend',
+    })
+
+    const res = await request(makeApp()).get('/api/portal/data?token=valid-token-abc123')
+
+    expect(res.status).toBe(200)
+    expect(res.body.referral).not.toBeNull()
+    expect(res.body.referral.code).toBeTruthy()
+    expect(res.body.referral.referral_url).toContain(res.body.referral.code)
+    expect(res.body.referral.reward_cents).toBe(1500)
+    expect(res.body.referral.rewards).toHaveLength(1)
+    expect(res.body.referral.rewards[0].status).toBe('issued')
+
+    // A second call must reuse the same code, not mint a new one each time.
+    const res2 = await request(makeApp()).get('/api/portal/data?token=valid-token-abc123')
+    expect(res2.body.referral.code).toBe(res.body.referral.code)
   })
 })
 
@@ -253,5 +440,309 @@ describe('POST /api/portal/enable', () => {
     expect(res.body.portal_url).toBe('https://app.nuatis.com/portal/test-biz')
     expect((generatePortalSlug as jest.Mock).mock.calls.length).toBeGreaterThan(0)
     expect((generatePortalSlug as jest.Mock).mock.calls[0]).toEqual(['tenant-1', 'Test Biz'])
+  })
+})
+
+// ── Test 7: payment-method setup-intent / remove ──────────────────────────────
+describe('POST /api/portal/payment-method/setup-intent', () => {
+  it('creates a Stripe customer + SetupIntent and returns a client secret', async () => {
+    seedPortalAccess()
+
+    const res = await request(makeApp()).post(
+      '/api/portal/payment-method/setup-intent?token=valid-token-abc123'
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.body.clientSecret).toBe('seti_1_secret')
+    expect(mockCustomersCreate).toHaveBeenCalledTimes(1)
+
+    const rows = store.tables['contacts'] as Row[]
+    expect(rows.find((c) => c['id'] === 'contact-1')?.['stripe_customer_id']).toBe('cus_1')
+  })
+
+  it('401s for an invalid token', async () => {
+    const res = await request(makeApp()).post(
+      '/api/portal/payment-method/setup-intent?token=does-not-exist'
+    )
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('DELETE /api/portal/payment-method', () => {
+  it('detaches and clears the saved payment method', async () => {
+    seedPortalAccess()
+    ;(store.tables['contacts'] as Row[])[0]!['default_payment_method_id'] = 'pm_1'
+
+    const res = await request(makeApp()).delete(
+      '/api/portal/payment-method?token=valid-token-abc123'
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockPaymentMethodsDetach).toHaveBeenCalledWith('pm_1', {}, undefined)
+    const rows = store.tables['contacts'] as Row[]
+    expect(rows[0]?.['default_payment_method_id']).toBe(null)
+  })
+
+  it('401s for an invalid token', async () => {
+    const res = await request(makeApp()).delete('/api/portal/payment-method?token=bad')
+    expect(res.status).toBe(401)
+  })
+})
+
+// ── Portal self-service: reschedule/cancel own appointments ────────────────────
+// Previously the portal was entirely read-only for appointments — a customer
+// could see them but had no route to change or cancel one from inside the
+// portal itself (a separate, unguessable-link flow off the confirmation SMS
+// existed, but nothing reachable from a logged-in portal session).
+function seedApptForContact1(overrides: Record<string, unknown> = {}) {
+  const row = {
+    id: 'appt-1',
+    tenant_id: 'tenant-1',
+    contact_id: 'contact-1',
+    title: 'Haircut',
+    start_time: farFutureIso(48),
+    end_time: farFutureIso(48.5),
+    status: 'scheduled',
+    deleted_at: null,
+    ...overrides,
+  }
+  ;(store.tables['appointments'] as Row[]).push(row)
+  return row
+}
+
+describe('GET /api/portal/appointments/:id', () => {
+  it('returns eligibility for the caller’s own appointment', async () => {
+    seedPortalAccess()
+    seedApptForContact1()
+    const res = await request(makeApp()).get(
+      '/api/portal/appointments/appt-1?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.can_modify).toBe(true)
+  })
+
+  it('404s for another contact’s appointment — cannot be reached even with a valid token', async () => {
+    seedPortalAccess()
+    seedApptForContact1({ id: 'appt-2', contact_id: 'contact-other' })
+    const res = await request(makeApp()).get(
+      '/api/portal/appointments/appt-2?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(404)
+  })
+
+  it('401s for an invalid token', async () => {
+    seedApptForContact1()
+    const res = await request(makeApp()).get('/api/portal/appointments/appt-1?token=bad')
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('POST /api/portal/appointments/:id/reschedule', () => {
+  it('reschedules to a new available slot', async () => {
+    seedPortalAccess()
+    seedApptForContact1()
+    const res = await request(makeApp())
+      .post('/api/portal/appointments/appt-1/reschedule?token=valid-token-abc123')
+      .send({ date: '2027-01-15', start_time: '10:00' })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('scheduled')
+  })
+
+  it('409s when inside the notice window', async () => {
+    seedPortalAccess()
+    seedApptForContact1({ start_time: farFutureIso(1) })
+    const res = await request(makeApp())
+      .post('/api/portal/appointments/appt-1/reschedule?token=valid-token-abc123')
+      .send({ date: '2027-01-15', start_time: '10:00' })
+    expect(res.status).toBe(409)
+  })
+
+  it('cannot reschedule another contact’s appointment', async () => {
+    seedPortalAccess()
+    seedApptForContact1({ id: 'appt-2', contact_id: 'contact-other' })
+    const res = await request(makeApp())
+      .post('/api/portal/appointments/appt-2/reschedule?token=valid-token-abc123')
+      .send({ date: '2027-01-15', start_time: '10:00' })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/portal/appointments/:id/cancel', () => {
+  it('cancels the appointment', async () => {
+    seedPortalAccess()
+    seedApptForContact1()
+    const res = await request(makeApp()).post(
+      '/api/portal/appointments/appt-1/cancel?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(200)
+    expect((store.tables['appointments'] as Row[])[0]?.['status']).toBe('canceled')
+  })
+
+  it('409s when inside the notice window', async () => {
+    seedPortalAccess()
+    seedApptForContact1({ start_time: farFutureIso(1) })
+    const res = await request(makeApp()).post(
+      '/api/portal/appointments/appt-1/cancel?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(409)
+  })
+
+  it('cannot cancel another contact’s appointment', async () => {
+    seedPortalAccess()
+    seedApptForContact1({ id: 'appt-2', contact_id: 'contact-other' })
+    const res = await request(makeApp()).post(
+      '/api/portal/appointments/appt-2/cancel?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('GET /api/portal/booking/services', () => {
+  it('returns the tenant’s curated bookable services with mapped staff', async () => {
+    seedPortalAccess()
+    ;(store.tables['tenants'] as Row[])[0]!['booking_services'] = ['svc-1']
+    store.tables['services']!.push({
+      id: 'svc-1',
+      tenant_id: 'tenant-1',
+      name: 'Haircut',
+      description: null,
+      duration_minutes: 30,
+      unit_price: 45,
+      is_active: true,
+    })
+    store.tables['staff_members']!.push({ id: 'staff-1', name: 'Jordan', color_hex: '#000' })
+    store.tables['staff_services']!.push({
+      tenant_id: 'tenant-1',
+      service_id: 'svc-1',
+      staff_id: 'staff-1',
+    })
+
+    const res = await request(makeApp()).get(
+      '/api/portal/booking/services?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.services).toHaveLength(1)
+    expect(res.body.services[0].name).toBe('Haircut')
+    expect(res.body.staffByService['svc-1']).toHaveLength(1)
+    expect(res.body.staffByService['svc-1'][0].name).toBe('Jordan')
+  })
+
+  it('returns an empty list when the tenant has no booking_services configured', async () => {
+    seedPortalAccess()
+    const res = await request(makeApp()).get(
+      '/api/portal/booking/services?token=valid-token-abc123'
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.services).toEqual([])
+  })
+
+  it('401s an invalid token', async () => {
+    const res = await request(makeApp()).get('/api/portal/booking/services?token=bogus')
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('GET /api/portal/booking/availability', () => {
+  it('returns slots for a valid service+date', async () => {
+    seedPortalAccess()
+    store.tables['services']!.push({
+      id: 'svc-1',
+      tenant_id: 'tenant-1',
+      name: 'Haircut',
+      duration_minutes: 30,
+      is_active: true,
+    })
+
+    const res = await request(makeApp()).get(
+      '/api/portal/booking/availability?token=valid-token-abc123&serviceId=svc-1&date=2027-01-15'
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.slots).toHaveLength(1)
+  })
+
+  it('404s for a service that does not exist on this tenant', async () => {
+    seedPortalAccess()
+    const res = await request(makeApp()).get(
+      '/api/portal/booking/availability?token=valid-token-abc123&serviceId=missing&date=2027-01-15'
+    )
+    expect(res.status).toBe(404)
+  })
+
+  it('400s a malformed date', async () => {
+    seedPortalAccess()
+    store.tables['services']!.push({
+      id: 'svc-1',
+      tenant_id: 'tenant-1',
+      duration_minutes: 30,
+      is_active: true,
+    })
+    const res = await request(makeApp()).get(
+      '/api/portal/booking/availability?token=valid-token-abc123&serviceId=svc-1&date=not-a-date'
+    )
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('POST /api/portal/booking/confirm', () => {
+  it('books a new appointment for the portal contact', async () => {
+    seedPortalAccess()
+    store.tables['services']!.push({
+      id: 'svc-1',
+      tenant_id: 'tenant-1',
+      name: 'Haircut',
+      duration_minutes: 30,
+      is_active: true,
+    })
+
+    const res = await request(makeApp())
+      .post('/api/portal/booking/confirm?token=valid-token-abc123')
+      .send({ serviceId: 'svc-1', date: '2027-01-15', startTime: '10:00' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBeDefined()
+
+    const appt = (store.tables['appointments'] as Row[]).find((a) => a['id'] === res.body.id)
+    expect(appt).toBeDefined()
+    expect(appt?.['contact_id']).toBe('contact-1')
+    expect(appt?.['status']).toBe('confirmed')
+    expect(logActivity).toHaveBeenCalledTimes(1)
+    expect(dispatchWebhook).toHaveBeenCalledWith(
+      'tenant-1',
+      'appointment.booked',
+      expect.objectContaining({ contact_id: 'contact-1' })
+    )
+  })
+
+  it('409s when the slot is no longer available', async () => {
+    seedPortalAccess()
+    store.tables['services']!.push({
+      id: 'svc-1',
+      tenant_id: 'tenant-1',
+      name: 'Haircut',
+      duration_minutes: 30,
+      is_active: true,
+    })
+    isSlotAvailable.mockResolvedValueOnce(false)
+
+    const res = await request(makeApp())
+      .post('/api/portal/booking/confirm?token=valid-token-abc123')
+      .send({ serviceId: 'svc-1', date: '2027-01-15', startTime: '10:00' })
+
+    expect(res.status).toBe(409)
+  })
+
+  it('400s missing required fields', async () => {
+    seedPortalAccess()
+    const res = await request(makeApp())
+      .post('/api/portal/booking/confirm?token=valid-token-abc123')
+      .send({ date: '2027-01-15' })
+    expect(res.status).toBe(400)
+  })
+
+  it('401s an invalid token', async () => {
+    const res = await request(makeApp())
+      .post('/api/portal/booking/confirm?token=bogus')
+      .send({ serviceId: 'svc-1', date: '2027-01-15', startTime: '10:00' })
+    expect(res.status).toBe(401)
   })
 })

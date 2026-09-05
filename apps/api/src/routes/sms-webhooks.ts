@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { broadcastToTenant } from '../lib/conversations-ws.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { buildSmsHelpReplySms } from '../lib/sms-templates.js'
+import { updateSmsRiskScore } from '../lib/sms-risk.js'
 
 const router = Router()
 
@@ -150,6 +151,9 @@ async function handleMessageReceived(req: Request, res: Response): Promise<void>
       } else {
         console.info(`[sms-webhook] STOP received — opted out contact=${contactId}`)
       }
+      void updateSmsRiskScore(contactId, tenantId as string, 'opted_out').catch((err) =>
+        console.error('[sms-webhook] sms-risk update failed:', err)
+      )
     }
     res.sendStatus(200)
     return
@@ -296,11 +300,18 @@ async function handleMessageFinalized(req: Request, res: Response): Promise<void
   ) {
     const { data: smsCsRow } = await sb
       .from('sms_messages')
-      .select('contact_id')
+      .select('contact_id, tenant_id')
       .eq('message_sid', messageSid)
-      .maybeSingle<{ contact_id: string | null }>()
+      .maybeSingle<{ contact_id: string | null; tenant_id: string | null }>()
 
     const smsContactId = smsCsRow?.contact_id ?? null
+    if (smsContactId && smsCsRow?.tenant_id) {
+      void updateSmsRiskScore(
+        smsContactId,
+        smsCsRow.tenant_id,
+        rawStatus === 'delivered' ? 'delivered' : 'failed'
+      ).catch((err) => console.error('[sms-webhook] sms-risk update failed:', err))
+    }
     if (smsContactId) {
       const smsCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const smsNow = new Date().toISOString()

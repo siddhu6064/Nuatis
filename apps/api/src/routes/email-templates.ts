@@ -79,7 +79,7 @@ router.get('/:id/preview', requireAuth, async (req: Request, res: Response): Pro
       .eq('id', contactId)
       .eq('tenant_id', tenantId)
       .single(),
-    supabase.from('tenants').select('business_name, name, phone').eq('id', tenantId).single(),
+    supabase.from('tenants').select('name').eq('id', tenantId).single(),
   ])
 
   if (templateRes.error || !templateRes.data) {

@@ -24,6 +24,25 @@ const TYPE_ICON: Record<string, string> = {
   stage_change: '→',
   task: '✓',
   system: '⚙',
+  lead_score: '📈',
+  quote: '📄',
+  lifecycle_change: '↻',
+  inventory_adjust: '📦',
+  low_stock_alert: '⚠',
+  revenue_drop_alert: '⚠',
+  order: '🧾',
+  order_status_change: '🧾',
+  expense: '💵',
+}
+
+const TYPE_BG: Record<string, string> = {
+  appointment: 'bg-amber-50',
+  call: 'bg-blue-50',
+  lead_score: 'bg-purple-50',
+  low_stock_alert: 'bg-red-50',
+  revenue_drop_alert: 'bg-red-50',
+  stage_change: 'bg-green-50',
+  expense: 'bg-orange-50',
 }
 
 function timeAgo(iso: string): string {
@@ -64,7 +83,7 @@ export default function RecentActivity() {
   }, [])
 
   return (
-    <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6">
+    <div className="col-span-1 md:col-span-2 bg-white rounded-xl border border-border-brand p-6 transition-shadow duration-200 hover:shadow-md">
       <h2 className="text-sm font-semibold text-ink mb-4">Recent Activity</h2>
 
       {loading ? (
@@ -90,7 +109,9 @@ export default function RecentActivity() {
               key={item.id}
               className="flex gap-3 px-1 py-2.5 hover:bg-gray-50 rounded-lg transition-colors"
             >
-              <div className="w-7 h-7 rounded-full bg-bg2 flex items-center justify-center text-sm shrink-0">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 ${TYPE_BG[item.type] ?? 'bg-bg2'}`}
+              >
                 {TYPE_ICON[item.type] ?? '●'}
               </div>
               <div className="flex-1 min-w-0">

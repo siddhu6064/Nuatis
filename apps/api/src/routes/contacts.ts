@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import { getServiceClient } from '../lib/supabase.js'
 import { getFirstName } from '@nuatis/shared'
+import { getFieldDefinitions, validateCustomFieldValue } from '../lib/custom-fields.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
@@ -11,6 +12,7 @@ import { logBulkAction } from '../middleware/audit-logger.js'
 import { smsSendLimiter, smsSendTenantLimiter } from '../middleware/rate-limit.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import { getTenantPhoneNumber } from '../lib/telnyx-tenant-lookup.js'
+import { applyContactFilters, applyOpenQuotePostFilter } from '../lib/contact-filters.js'
 
 const router = Router()
 
@@ -47,134 +49,13 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     )
     .eq('tenant_id', authed.tenantId)
 
-  // ── Archived filter (default: exclude archived) ──
-  const archived = req.query['archived'] === 'true'
-  if (!archived) {
-    query = query.eq('is_archived', false)
-  }
-
-  // ── Text search (q or search) ──
-  const rawQ = req.query['search'] ?? req.query['q']
-  const q = typeof rawQ === 'string' ? sanitizeSearchTerm(rawQ) : null
-  if (q && q.length > 0) {
-    const pattern = `%${q}%`
-    query = query.or(`full_name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
-  }
-
-  // ── Pipeline stage filter (multi-select) ──
-  const stageIds =
-    typeof req.query['pipeline_stage_id'] === 'string'
-      ? req.query['pipeline_stage_id'].split(',').filter(Boolean)
-      : null
-  if (stageIds && stageIds.length > 0) {
-    query = query.in('pipeline_stage', stageIds)
-  }
-
-  // ── Pipeline ID filter (fetch stage names for the given pipeline) ──
-  const pipelineId = req.query['pipeline_id'] as string | undefined
-  if (pipelineId) {
-    const { data: stageData } = await supabase
-      .from('pipeline_stages')
-      .select('name')
-      .eq('pipeline_id', pipelineId)
-      .eq('tenant_id', authed.tenantId)
-    const stageNames = (stageData || []).map((s) => s.name)
-    if (stageNames.length > 0) {
-      query = query.in('pipeline_stage', stageNames)
-    }
-  }
-
-  // ── Source filter (multi-select) ──
-  const sources =
-    typeof req.query['source'] === 'string' ? req.query['source'].split(',').filter(Boolean) : null
-  if (sources && sources.length > 0) {
-    query = query.in('source', sources)
-  }
-
-  // ── Tags filter (AND — contact must have ALL tags) ──
-  const tags =
-    typeof req.query['tags'] === 'string' ? req.query['tags'].split(',').filter(Boolean) : null
-  if (tags && tags.length > 0) {
-    query = query.contains('tags', tags)
-  }
-
-  // ── Last contacted date range ──
-  const lastContactedFrom =
-    typeof req.query['last_contacted_from'] === 'string' ? req.query['last_contacted_from'] : null
-  const lastContactedTo =
-    typeof req.query['last_contacted_to'] === 'string' ? req.query['last_contacted_to'] : null
-  if (lastContactedFrom) {
-    query = query.gte('last_contacted', lastContactedFrom)
-  }
-  if (lastContactedTo) {
-    query = query.lte('last_contacted', lastContactedTo)
-  }
-
-  // ── Created date range ──
-  const createdFrom =
-    typeof req.query['created_from'] === 'string' ? req.query['created_from'] : null
-  const createdTo = typeof req.query['created_to'] === 'string' ? req.query['created_to'] : null
-  if (createdFrom) {
-    query = query.gte('created_at', createdFrom)
-  }
-  if (createdTo) {
-    query = query.lte('created_at', createdTo)
-  }
-
-  // ── Referral source filter ──
-  const referralSource =
-    typeof req.query['referral_source'] === 'string' ? req.query['referral_source'].trim() : null
-  if (referralSource) {
-    query = query.ilike('referral_source_detail', `%${referralSource}%`)
-  }
-  const hasReferralSource = req.query['has_referral_source'] === 'true'
-  if (hasReferralSource) {
-    query = query.not('referral_source_detail', 'is', null)
-  }
-
-  // ── Lifecycle stage filter (multi-select) ──
-  const lifecycleStage =
-    typeof req.query['lifecycle_stage'] === 'string' ? req.query['lifecycle_stage'].trim() : null
-  if (lifecycleStage) {
-    const stages = lifecycleStage.split(',').filter(Boolean)
-    if (stages.length > 0) {
-      query = query.in('lifecycle_stage', stages)
-    }
-  }
-
-  // ── Lead score range filters ──
-  const minScore = typeof req.query['min_score'] === 'string' ? req.query['min_score'] : null
-  const maxScore = typeof req.query['max_score'] === 'string' ? req.query['max_score'] : null
-  if (minScore !== null) {
-    query = query.gte('lead_score', parseInt(minScore, 10))
-  }
-  if (maxScore !== null) {
-    query = query.lte('lead_score', parseInt(maxScore, 10))
-  }
-
-  // ── Lead grade filter (multi-select) ──
-  const gradeParam = typeof req.query['grade'] === 'string' ? req.query['grade'].trim() : null
-  if (gradeParam) {
-    const grades = gradeParam.split(',').filter(Boolean)
-    if (grades.length > 0) {
-      query = query.in('lead_grade', grades)
-    }
-  }
-
-  // ── Assigned-to filter ──
-  const assignedTo =
-    typeof req.query['assigned_to'] === 'string' ? req.query['assigned_to'].trim() : null
-  if (assignedTo) {
-    const assignedUserId = assignedTo === 'me' ? authed.userId : assignedTo
-    query = query.eq('assigned_to_user_id', assignedUserId)
-  }
-
-  // ── Territory filter ──
-  const territory =
-    typeof req.query['territory'] === 'string' ? req.query['territory'].trim() : null
-  if (territory) {
-    query = query.ilike('territory', `%${territory}%`)
-  }
+  ;({ query } = await applyContactFilters(
+    query,
+    req.query as Record<string, unknown>,
+    supabase,
+    authed.tenantId,
+    authed.userId
+  ))
 
   // ── Sort ──
   const sortBy = typeof req.query['sort_by'] === 'string' ? req.query['sort_by'] : 'created_at'
@@ -194,20 +75,12 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   // ── Post-filter: has_open_quote ──
   let contacts = data ?? []
   const hasOpenQuote = req.query['has_open_quote'] === 'true'
-  if (hasOpenQuote && contacts.length > 0) {
-    const contactIds = contacts.map((c) => c.id)
-    const { data: openQuotes } = await supabase
-      .from('quotes')
-      .select('contact_id')
-      .eq('tenant_id', authed.tenantId)
-      .in('contact_id', contactIds)
-      .not('status', 'in', '("accepted","declined","expired")')
-
-    if (openQuotes) {
-      const idsWithQuotes = new Set(openQuotes.map((q) => q.contact_id))
-      contacts = contacts.filter((c) => idsWithQuotes.has(c.id))
-    }
-  }
+  contacts = await applyOpenQuotePostFilter(
+    contacts,
+    req.query as Record<string, unknown>,
+    supabase,
+    authed.tenantId
+  )
 
   // ── Post-filter: has_unread_sms ──
   const hasUnreadSms = req.query['has_unread_sms'] === 'true'
@@ -224,6 +97,71 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     if (unreadSms) {
       const idsWithUnread = new Set(unreadSms.map((s) => s.contact_id))
       contacts = contacts.filter((c) => idsWithUnread.has(c.id))
+    }
+  }
+
+  // Only the pipeline board reads a contact's deal value (the flat list has
+  // no $ column) — scoped to pipeline_id requests so a plain paginated
+  // contacts fetch doesn't pay for a deals join it never uses.
+  if (typeof req.query['pipeline_id'] === 'string' && contacts.length > 0) {
+    const contactIds = contacts.map((c) => c.id as string)
+    const { data: dealRows } = await supabase
+      .from('deals')
+      .select('contact_id, value')
+      .eq('tenant_id', authed.tenantId)
+      .in('contact_id', contactIds)
+
+    const valueByContact = new Map<string, number>()
+    for (const d of dealRows ?? []) {
+      const cid = d.contact_id as string | null
+      if (!cid) continue
+      valueByContact.set(cid, (valueByContact.get(cid) ?? 0) + Number(d.value ?? 0))
+    }
+
+    contacts = contacts.map((c) => ({
+      ...c,
+      value: valueByContact.get(c.id as string) ?? 0,
+    }))
+  }
+
+  // A tenant can have several contacts-type pipelines (one per vertical, on
+  // a demo/multi-vertical tenant) — pipeline_stage is stored as plain text,
+  // not an FK, so a stage name that exists in only one pipeline can be
+  // attributed to it; a name reused across pipelines (e.g. "Lead") stays
+  // ambiguous and is left unattributed rather than guessed. This is display
+  // metadata only — it never filters or hides a contact from this list.
+  if (contacts.length > 0) {
+    const stageNames = new Set(
+      contacts.map((c) => c.pipeline_stage as string | null).filter((s): s is string => !!s)
+    )
+    if (stageNames.size > 0) {
+      const { data: stageRows } = await supabase
+        .from('pipeline_stages')
+        .select('name, pipelines(name, pipeline_type)')
+        .eq('tenant_id', authed.tenantId)
+        .in('name', Array.from(stageNames))
+
+      const stageToPipelines = new Map<string, Set<string>>()
+      for (const row of stageRows ?? []) {
+        const name = row.name as string
+        const pipelineField = row.pipelines as
+          | { name: string; pipeline_type: string }
+          | { name: string; pipeline_type: string }[]
+          | null
+        const pipeline = Array.isArray(pipelineField) ? pipelineField[0] : pipelineField
+        if (!pipeline || pipeline.pipeline_type !== 'contacts') continue
+        if (!stageToPipelines.has(name)) stageToPipelines.set(name, new Set())
+        stageToPipelines.get(name)!.add(pipeline.name)
+      }
+
+      contacts = contacts.map((c) => {
+        const stage = c.pipeline_stage as string | null
+        const pipelines = stage ? stageToPipelines.get(stage) : undefined
+        return {
+          ...c,
+          pipeline_name: pipelines && pipelines.size === 1 ? Array.from(pipelines)[0] : null,
+        }
+      })
     }
   }
 
@@ -284,6 +222,22 @@ router.get('/tags', requireAuth, async (req: Request, res: Response): Promise<vo
 })
 
 // ── GET /api/contacts/stages ─────────────────────────────────────────────────
+// GET /field-definitions — labels/types for the tenant's vertical_data
+// custom fields. Reads the tenant's own live, editable definitions (see
+// lib/custom-fields.ts) — tenant-managed via /api/settings/custom-fields,
+// not the static per-vertical defaults directly.
+router.get(
+  '/field-definitions',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const { vertical, fields } = await getFieldDefinitions(supabase, authed.tenantId)
+    res.json({ vertical, fields })
+  }
+)
+
 router.get('/stages', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
   const supabase = getServiceClient()
@@ -526,10 +480,27 @@ const handleContactUpdate = async (req: Request, res: Response): Promise<void> =
   // Same banner's vertical_data patch — merge rather than overwrite, since
   // vertical_data also holds unrelated keys (e.g. other enrichment data).
   if (b['custom_fields'] && typeof b['custom_fields'] === 'object') {
+    const incoming = b['custom_fields'] as Record<string, unknown>
+
+    // Only validate keys that match one of the tenant's defined custom
+    // fields — a key outside that list (enrichment data, an already-removed
+    // field definition, etc.) is passed through unvalidated, same as before.
+    const { fields: fieldDefs } = await getFieldDefinitions(supabase, authed.tenantId)
+    const defsByKey = new Map(fieldDefs.map((f) => [f.key, f]))
+    for (const [key, value] of Object.entries(incoming)) {
+      const def = defsByKey.get(key)
+      if (!def) continue
+      const err = validateCustomFieldValue(def, value)
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+    }
+
     const existingVerticalData = (existing.vertical_data as Record<string, unknown> | null) ?? {}
     updates['vertical_data'] = {
       ...existingVerticalData,
-      ...(b['custom_fields'] as Record<string, unknown>),
+      ...incoming,
     }
   }
 

@@ -51,6 +51,9 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
     mayaCallsDurationResult,
     smsSentResult,
     smsDeliveredResult,
+    overdueInvoicesResult,
+    lowStockItemsResult,
+    quotesExpiringResult,
   ] = await Promise.all([
     // Business name + brand voice
     supabase.from('tenants').select('name, brand_voice').eq('id', tenantId).single(),
@@ -176,6 +179,27 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
       .eq('direction', 'outbound')
       .eq('status', 'delivered')
       .gte('created_at', sevenDaysAgoIso),
+
+    // operations.overdue_invoices — select total for JS sum, same status set
+    // invoice-overdue-scanner.ts transitions invoices into
+    supabase.from('invoices').select('total').eq('tenant_id', tenantId).eq('status', 'overdue'),
+
+    // operations.low_stock_items — same threshold check low-stock-scanner.ts
+    // uses, computed client-side since PostgREST can't compare two columns
+    supabase
+      .from('inventory_items')
+      .select('quantity, reorder_threshold')
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null),
+
+    // operations.quotes_expiring_7d
+    supabase
+      .from('quotes')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .in('status', ['draft', 'sent', 'viewed'])
+      .gte('valid_until', nowIso)
+      .lte('valid_until', sevenDaysFromNowIso),
   ])
 
   // ── Check for DB query errors ──────────────────────────────────
@@ -197,6 +221,9 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
     mayaCallsDurationResult,
     smsSentResult,
     smsDeliveredResult,
+    overdueInvoicesResult,
+    lowStockItemsResult,
+    quotesExpiringResult,
   ]
   const dbErrors = allResults.map((r) => r.error).filter(Boolean)
   if (dbErrors.length > 0) {
@@ -245,6 +272,20 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
   const smsDelivered = smsDeliveredResult.count ?? 0
   const deliveryRate = smsSent > 0 ? Math.round((smsDelivered / smsSent) * 1000) / 10 : null
 
+  const overdueInvoiceRows = (overdueInvoicesResult.data ?? []) as Array<{ total?: number | null }>
+  const overdueInvoices = overdueInvoiceRows.length
+  const overdueInvoicesTotal = overdueInvoiceRows.reduce((sum, r) => sum + Number(r.total ?? 0), 0)
+
+  const inventoryRows = (lowStockItemsResult.data ?? []) as Array<{
+    quantity?: number | null
+    reorder_threshold?: number | null
+  }>
+  const lowStockItems = inventoryRows.filter(
+    (r) => Number(r.quantity ?? 0) <= Number(r.reorder_threshold ?? 0)
+  ).length
+
+  const quotesExpiring7d = quotesExpiringResult.count ?? 0
+
   // ── Assemble data without top_insight ────────────────────────
 
   const dataWithoutInsight = {
@@ -275,6 +316,12 @@ export async function buildDigestData(tenantId: string): Promise<WeeklyDigestDat
     sms_health: {
       sent_this_week: smsSent,
       delivery_rate: deliveryRate,
+    },
+    operations: {
+      overdue_invoices: overdueInvoices,
+      overdue_invoices_total: Number(overdueInvoicesTotal.toFixed(2)),
+      low_stock_items: lowStockItems,
+      quotes_expiring_7d: quotesExpiring7d,
     },
   }
 

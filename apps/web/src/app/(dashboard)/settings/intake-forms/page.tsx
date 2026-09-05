@@ -18,7 +18,25 @@ import { Modal } from '@/components/ui/Modal'
 // Types
 // ---------------------------------------------------------------------------
 
-type FieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number'
+type FieldType =
+  | 'text'
+  | 'email'
+  | 'phone'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
+  | 'date'
+  | 'number'
+  | 'signature'
+  | 'file'
+
+type VisibleIfOp = 'eq' | 'neq' | 'exists'
+
+interface VisibleIf {
+  fieldId: string
+  op: VisibleIfOp
+  value?: string
+}
 
 interface FormField {
   id: string
@@ -27,6 +45,7 @@ interface FormField {
   required: boolean
   placeholder?: string
   options?: string[]
+  visibleIf?: VisibleIf | null
 }
 
 interface IntakeForm {
@@ -66,6 +85,8 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'checkbox', label: 'Checkbox' },
   { value: 'date', label: 'Date' },
   { value: 'number', label: 'Number' },
+  { value: 'signature', label: 'Signature' },
+  { value: 'file', label: 'File upload' },
 ]
 
 const PLACEHOLDER_TYPES: FieldType[] = ['text', 'email', 'phone', 'number']
@@ -153,14 +174,39 @@ function exportCsv(form: IntakeForm, submissions: Submission[]) {
   URL.revokeObjectURL(url)
 }
 
+function renderSubmissionValue(type: FieldType, val: unknown) {
+  if (val === undefined || val === null || val === '') return '—'
+  const str = String(val)
+  if (type === 'signature' && str.startsWith('data:image')) {
+    return (
+      <img src={str} alt="Signature" className="h-8 border border-border-brand rounded bg-white" />
+    )
+  }
+  if (type === 'file' && str.startsWith('data:')) {
+    return (
+      <a href={str} download className="text-teal-600 hover:text-teal-700 underline">
+        Download
+      </a>
+    )
+  }
+  return str
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+const VISIBLE_IF_OPS: { value: VisibleIfOp; label: string }[] = [
+  { value: 'eq', label: 'equals' },
+  { value: 'neq', label: 'does not equal' },
+  { value: 'exists', label: 'is answered' },
+]
 
 function FieldCard({
   field,
   index,
   total,
+  otherFields,
   onChange,
   onDelete,
   onMove,
@@ -168,12 +214,14 @@ function FieldCard({
   field: FormField
   index: number
   total: number
+  otherFields: FormField[]
   onChange: (updated: FormField) => void
   onDelete: () => void
   onMove: (dir: 'up' | 'down') => void
 }) {
   const showPlaceholder = PLACEHOLDER_TYPES.includes(field.type)
   const showOptions = field.type === 'select'
+  const [showCondition, setShowCondition] = useState(!!field.visibleIf)
 
   function updateOption(idx: number, value: string) {
     const opts = [...(field.options ?? [])]
@@ -281,6 +329,90 @@ function FieldCard({
           </Button>
         </div>
       )}
+
+      {/* Conditional visibility */}
+      <div className="space-y-1.5 pt-1 border-t border-border-brand/50">
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={showCondition}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setShowCondition(checked)
+                if (!checked) {
+                  onChange({ ...field, visibleIf: null })
+                } else if (otherFields[0]) {
+                  onChange({
+                    ...field,
+                    visibleIf: { fieldId: otherFields[0].id, op: 'eq', value: '' },
+                  })
+                }
+              }}
+              disabled={otherFields.length === 0}
+            />
+          }
+          label="Show only if..."
+          sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: '12px' } }}
+        />
+        {otherFields.length === 0 && (
+          <p className="text-[10px] text-ink3">Add another field first to enable conditions.</p>
+        )}
+        {showCondition && field.visibleIf && (
+          <div className="flex items-center gap-1.5">
+            <TextField
+              select
+              size="small"
+              value={field.visibleIf.fieldId}
+              onChange={(e) =>
+                onChange({
+                  ...field,
+                  visibleIf: { ...field.visibleIf!, fieldId: e.target.value },
+                })
+              }
+              sx={{ minWidth: 140 }}
+            >
+              {otherFields.map((f) => (
+                <MenuItem key={f.id} value={f.id}>
+                  {f.label || '(untitled field)'}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              value={field.visibleIf.op}
+              onChange={(e) =>
+                onChange({
+                  ...field,
+                  visibleIf: { ...field.visibleIf!, op: e.target.value as VisibleIfOp },
+                })
+              }
+              sx={{ minWidth: 130 }}
+            >
+              {VISIBLE_IF_OPS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            {field.visibleIf.op !== 'exists' && (
+              <TextField
+                value={field.visibleIf.value ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    ...field,
+                    visibleIf: { ...field.visibleIf!, value: e.target.value },
+                  })
+                }
+                placeholder="Value"
+                size="small"
+                fullWidth
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -480,6 +612,7 @@ function FormBuilderModal({
                   field={field}
                   index={i}
                   total={fields.length}
+                  otherFields={fields.filter((f) => f.id !== field.id)}
                   onChange={(updated) => updateField(i, updated)}
                   onDelete={() => deleteField(i)}
                   onMove={(dir) => moveField(i, dir)}
@@ -608,11 +741,14 @@ function SubmissionsPanel({ form, onClose }: { form: IntakeForm; onClose: () => 
                   <td className="py-2 pr-4 text-ink2 font-medium whitespace-nowrap">
                     {sub.contactName || '—'}
                   </td>
-                  {keyFields.map((f) => (
-                    <td key={f.id} className="py-2 pr-4 text-ink3 max-w-[160px] truncate">
-                      {String(sub.data[f.id] ?? sub.data[f.label] ?? '—')}
-                    </td>
-                  ))}
+                  {keyFields.map((f) => {
+                    const val = sub.data[f.id] ?? sub.data[f.label]
+                    return (
+                      <td key={f.id} className="py-2 pr-4 text-ink3 max-w-[160px] truncate">
+                        {renderSubmissionValue(f.type, val)}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

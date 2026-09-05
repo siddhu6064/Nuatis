@@ -81,6 +81,7 @@ beforeEach(() => {
   store.tables['push_subscriptions'] = []
   store.tables['webhooks'] = []
   store.tables['webhook_subscriptions'] = []
+  store.tables['promo_codes'] = []
 })
 
 // ── POST /api/quotes ─────────────────────────────────────────────────────────
@@ -102,6 +103,30 @@ describe('POST /api/quotes', () => {
     expect(res.status).toBe(201)
     expect(res.body.id).toBeDefined()
     expect(res.body.quote_number).toMatch(/^Q-\d+/)
+  })
+
+  it('stores inventory_item_id on a line item when provided', async () => {
+    seedCpqEnabled()
+    seedContact()
+    const token = await makeToken()
+    const invItemId = 'aaaaaaaa-0000-0000-0000-00000inv0001'
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [
+          { description: 'Widget', quantity: 2, unit_price: 15, inventory_item_id: invItemId },
+        ],
+      })
+
+    expect(res.status).toBe(201)
+    const items = (store.tables['quote_line_items'] as Array<Record<string, unknown>>).filter(
+      (i) => i['quote_id'] === res.body.id
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0]?.['inventory_item_id']).toBe(invItemId)
   })
 
   it('returns 401 without auth token', async () => {
@@ -126,6 +151,149 @@ describe('POST /api/quotes', () => {
         line_items: [{ description: 'x', quantity: 1, unit_price: 1 }],
       })
     expect(res.status).toBe(403)
+  })
+})
+
+// ── POST /api/quotes — promo codes ────────────────────────────────────────────
+
+describe('POST /api/quotes — promo_code', () => {
+  it('applies a valid percent code, overriding it into discount_type/value/label, and redeems it', async () => {
+    seedCpqEnabled()
+    seedContact()
+    const promoId = randomUUID()
+    store.tables['promo_codes']!.push({
+      id: promoId,
+      tenant_id: TENANT_ID,
+      code: 'SUMMER10',
+      discount_type: 'percent',
+      discount_value: 10,
+      max_redemptions: null,
+      redemption_count: 0,
+      valid_from: null,
+      valid_until: null,
+      active: true,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [{ description: 'Exam', quantity: 1, unit_price: 100 }],
+        promo_code: 'summer10',
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.discount_type).toBe('percent')
+    expect(res.body.discount_value).toBe(10)
+    expect(res.body.discount_label).toBe('SUMMER10')
+    expect(res.body.promo_code_id).toBe(promoId)
+    expect(res.body.total).toBe(90)
+
+    const promo = (store.tables['promo_codes'] as Row[]).find((p) => p['id'] === promoId)
+    expect(promo?.['redemption_count']).toBe(1)
+  })
+
+  it('rejects an unknown promo code with 400, creating no quote', async () => {
+    seedCpqEnabled()
+    seedContact()
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [{ description: 'Exam', quantity: 1, unit_price: 100 }],
+        promo_code: 'NOPE',
+      })
+
+    expect(res.status).toBe(400)
+    expect(store.tables['quotes']).toHaveLength(0)
+  })
+
+  it('rejects a code past its redemption limit', async () => {
+    seedCpqEnabled()
+    seedContact()
+    store.tables['promo_codes']!.push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      code: 'MAXEDOUT',
+      discount_type: 'fixed',
+      discount_value: 10,
+      max_redemptions: 1,
+      redemption_count: 1,
+      active: true,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [{ description: 'Exam', quantity: 1, unit_price: 100 }],
+        promo_code: 'MAXEDOUT',
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/redemption limit/)
+  })
+
+  it('rejects an inactive code', async () => {
+    seedCpqEnabled()
+    seedContact()
+    store.tables['promo_codes']!.push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      code: 'OFFCODE',
+      discount_type: 'percent',
+      discount_value: 10,
+      active: false,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [{ description: 'Exam', quantity: 1, unit_price: 100 }],
+        promo_code: 'OFFCODE',
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('a percent code over the tenant max_discount_pct is rejected', async () => {
+    seedCpqEnabled()
+    seedContact()
+    store.tables['promo_codes']!.push({
+      id: randomUUID(),
+      tenant_id: TENANT_ID,
+      code: 'HUGE',
+      discount_type: 'percent',
+      discount_value: 50, // tenant max_discount_pct is 20 (seedCpqEnabled)
+      active: true,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/quotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Test Quote',
+        contact_id: CONTACT_ID,
+        line_items: [{ description: 'Exam', quantity: 1, unit_price: 100 }],
+        promo_code: 'HUGE',
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/exceeds maximum/)
   })
 })
 

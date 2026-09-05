@@ -55,7 +55,7 @@ beforeEach(() => {
 // ── Test 1: generateReferralCode — code format ────────────────────────────────
 describe('generateReferralCode — code format', () => {
   it('generates code matching PREFIX-XXXX format (uppercase letters only)', async () => {
-    store.tables['tenants'] = [{ id: 'tenant-1', business_name: 'Dental Associates' }]
+    store.tables['tenants'] = [{ id: 'tenant-1', name: 'Dental Associates' }]
     // generateReferralCode inserts into referral_codes
     const code = await generateReferralCode('tenant-1', 'Dental Associates')
     // Should match DENTAL-XXXX where XXXX is 4 uppercase letters
@@ -69,7 +69,7 @@ describe('generateReferralCode — code format', () => {
 
 // ── Test 2: GET /api/referrals/my-code — auto-generate ───────────────────────
 it('auto-generates a referral code if tenant has none, returns referral_url', async () => {
-  store.tables['tenants'] = [{ id: 'tenant-1', business_name: 'Green Salon' }]
+  store.tables['tenants'] = [{ id: 'tenant-1', name: 'Green Salon' }]
   // No existing referral_codes for tenant-1
 
   const res = await request(makeApp()).get('/api/referrals/my-code')

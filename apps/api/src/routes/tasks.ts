@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   let query = supabase
     .from('tasks')
     .select(
-      'id, tenant_id, contact_id, title, due_date, assigned_to_user_id, completed_at, priority, created_by_user_id, created_at, updated_at, contacts(full_name), assigned:users!tasks_assigned_to_user_id_fkey(full_name)'
+      'id, tenant_id, contact_id, title, due_date, assigned_to_user_id, completed_at, status, priority, parent_task_id, depends_on_task_id, created_by_user_id, created_at, updated_at, contacts(full_name), assigned:users!tasks_assigned_to_user_id_fkey(full_name)'
     )
     .eq('tenant_id', authed.tenantId)
 
@@ -104,6 +104,26 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     }
   }
 
+  const parentTaskId = typeof b['parent_task_id'] === 'string' ? b['parent_task_id'] || null : null
+  const dependsOnTaskId =
+    typeof b['depends_on_task_id'] === 'string' ? b['depends_on_task_id'] || null : null
+  for (const [field, value] of [
+    ['parent_task_id', parentTaskId],
+    ['depends_on_task_id', dependsOnTaskId],
+  ] as const) {
+    if (!value) continue
+    const { data: taskCheck } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('id', value)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+    if (!taskCheck) {
+      res.status(400).json({ error: `Invalid ${field}` })
+      return
+    }
+  }
+
   const insertPayload = {
     tenant_id: authed.tenantId,
     contact_id: contactId,
@@ -111,6 +131,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     due_date: dueDate?.toISOString() ?? null,
     assigned_to_user_id: assignedToUserId,
     priority,
+    parent_task_id: parentTaskId,
+    depends_on_task_id: dependsOnTaskId,
     created_by_user_id: authed.userId || null,
   }
 
@@ -206,12 +228,44 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     updates['due_date'] = null
   }
 
-  // Handle completion
-  const isCompleting = typeof b['completed_at'] === 'string' && !existing.completed_at
+  // Handle completion — status is a cosmetic kanban-column mirror of
+  // completed_at, which stays the single source of truth the dependency
+  // check below reads from.
+  const explicitStatus =
+    typeof b['status'] === 'string' && ['open', 'in_progress', 'done'].includes(b['status'])
+      ? (b['status'] as 'open' | 'in_progress' | 'done')
+      : null
+
+  const isCompleting =
+    (typeof b['completed_at'] === 'string' && !existing.completed_at) ||
+    (explicitStatus === 'done' && !existing.completed_at)
+
+  if (isCompleting && existing.depends_on_task_id) {
+    const { data: blocker } = await supabase
+      .from('tasks')
+      .select('title, completed_at')
+      .eq('id', existing.depends_on_task_id)
+      .maybeSingle()
+    if (blocker && !blocker.completed_at) {
+      res.status(409).json({
+        error: `Blocked by an incomplete task: "${blocker.title as string}"`,
+      })
+      return
+    }
+  }
+
   if (typeof b['completed_at'] === 'string') {
     updates['completed_at'] = b['completed_at']
+    updates['status'] = 'done'
   } else if (b['completed_at'] === null) {
     updates['completed_at'] = null
+    if (!explicitStatus) updates['status'] = 'open'
+  } else if (explicitStatus === 'done') {
+    updates['completed_at'] = new Date().toISOString()
+    updates['status'] = 'done'
+  } else if (explicitStatus) {
+    updates['status'] = explicitStatus
+    if (existing.completed_at) updates['completed_at'] = null
   }
 
   const { data: updated, error } = await supabase

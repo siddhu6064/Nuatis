@@ -70,3 +70,21 @@
 @layer tailwind-utilities {
   @tailwind utilities;
 }
+
+@keyframes widget-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .widget-enter {
+    animation: widget-enter 350ms ease-out both;
+    animation-delay: calc(var(--widget-stagger, 0) * 60ms);
+  }
+}

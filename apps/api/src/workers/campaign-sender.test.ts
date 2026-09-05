@@ -41,6 +41,13 @@ jest.unstable_mockModule('../lib/email-risk.js', () => ({
   shouldSuppressEmail: mockShouldSuppressEmail,
 }))
 
+// ── shouldSuppressSms mock — default: not suppressed ─────────────────────────
+const mockShouldSuppressSms = jest.fn<() => boolean>().mockReturnValue(false)
+
+jest.unstable_mockModule('../lib/sms-risk.js', () => ({
+  shouldSuppressSms: mockShouldSuppressSms,
+}))
+
 // ── BullMQ mock — capture the processor fn ───────────────────────────────────
 let capturedProcessor: ((job: { data: unknown }) => Promise<void>) | null = null
 
@@ -136,6 +143,8 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue(true)
   mockShouldSuppressEmail.mockClear()
   mockShouldSuppressEmail.mockReturnValue(false)
+  mockShouldSuppressSms.mockClear()
+  mockShouldSuppressSms.mockReturnValue(false)
 
   jest.spyOn(console, 'info').mockImplementation(() => {})
   jest.spyOn(console, 'warn').mockImplementation(() => {})
@@ -253,14 +262,46 @@ describe('campaign-sender worker — P13', () => {
     expect(camp?.['status']).toBe('complete')
   })
 
-  // ── Test 6: Segment-scoped campaign → paused, throws, zero sends ────────────
-  it('pauses and throws without sending when segment_id is set', async () => {
-    store.tables['campaigns'] = [{ ...makeScheduledCampaign(['sms']), segment_id: 'seg-1' }]
+  // ── Test 6: Segment-scoped campaign → sends only to matching contacts ───────
+  it('sends only to contacts matching the segment filter when segment_id is set', async () => {
+    store.tables['smart_lists'] = [
+      { id: 'seg-1', tenant_id: TENANT_ID, name: 'Referrals', filters: { source: ['referral'] } },
+    ]
+    store.tables['campaigns'] = [
+      { ...makeScheduledCampaign(['sms']), segment_id: 'seg-1', contact_count: 1 },
+    ]
     store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
-    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+    store.tables['contacts'] = [
+      { ...makeContact('c-1', 'Referred Rita', true), source: 'referral' },
+      { ...makeContact('c-2', 'Walkin Wes', true), source: 'walkin' },
+    ]
+
+    await expect(runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })).resolves.not.toThrow()
+
+    expect(mockSendSms).toHaveBeenCalledTimes(1)
+    const sends = store.tables['campaign_sends'] as Row[]
+    expect(sends.filter((s) => s['status'] === 'sent').length).toBe(1)
+    expect(sends[0]?.['contact_id']).toBe('c-1')
+
+    const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === CAMPAIGN_ID)
+    expect(camp?.['status']).toBe('complete')
+  })
+
+  // ── Test 6b: Segment membership drift → paused, throws, zero sends ──────────
+  it('pauses and throws when the resolved segment count drifts from the schedule-time snapshot', async () => {
+    store.tables['smart_lists'] = [
+      { id: 'seg-1', tenant_id: TENANT_ID, name: 'Referrals', filters: { source: ['referral'] } },
+    ]
+    store.tables['campaigns'] = [
+      { ...makeScheduledCampaign(['sms']), segment_id: 'seg-1', contact_count: 5 },
+    ]
+    store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
+    store.tables['contacts'] = [
+      { ...makeContact('c-1', 'Referred Rita', true), source: 'referral' },
+    ]
 
     await expect(runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })).rejects.toThrow(
-      /segment-scoped/i
+      /recipient count mismatch/i
     )
 
     expect(mockSendSms).not.toHaveBeenCalled()
@@ -301,5 +342,35 @@ describe('campaign-sender worker — P13', () => {
 
     const camp = (store.tables['campaigns'] as Row[]).find((c) => c['id'] === CAMPAIGN_ID)
     expect(camp?.['status']).toBe('paused')
+  })
+
+  // ── Test 9: email sends carry a List-Unsubscribe header ────────────────────
+  it('includes List-Unsubscribe / List-Unsubscribe-Post headers on an email send', async () => {
+    store.tables['campaigns'] = [makeScheduledCampaign(['email'])]
+    store.tables['campaign_messages'] = [makeApprovedMessage('email')]
+    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+
+    await runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(1)
+    const params = mockSendEmail.mock.calls[0]![0] as {
+      headers?: Record<string, string>
+    }
+    expect(params.headers?.['List-Unsubscribe']).toMatch(/^<.*\/api\/email\/unsubscribe\?/)
+    expect(params.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+  })
+
+  // ── Test 10: SMS-risk-suppressed contacts are skipped like opted-out ones ──
+  it('skips an SMS-risk-suppressed contact even when sms_opt_in is true', async () => {
+    store.tables['campaigns'] = [makeScheduledCampaign(['sms'])]
+    store.tables['campaign_messages'] = [makeApprovedMessage('sms')]
+    store.tables['contacts'] = [makeContact('c-1', 'John Smith', true)]
+    mockShouldSuppressSms.mockReturnValue(true)
+
+    await runSend({ campaignId: CAMPAIGN_ID, tenantId: TENANT_ID })
+
+    expect(mockSendSms).not.toHaveBeenCalled()
+    const sends = store.tables['campaign_sends'] as Row[]
+    expect(sends[0]?.['status']).toBe('opted_out')
   })
 })

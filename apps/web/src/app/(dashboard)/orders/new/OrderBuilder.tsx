@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
@@ -35,9 +35,31 @@ interface Deal {
 interface LineItem {
   key: string
   service_id: string | null
+  inventory_item_id: string | null
   description: string
   quantity: number
   unit_price: number
+}
+
+interface InventoryItemOption {
+  id: string
+  name: string
+  sku: string | null
+  unit_cost: number | null
+  quantity: number
+}
+
+interface OrderTemplate {
+  id: string
+  name: string
+  line_items: Array<{
+    service_id: string | null
+    description: string
+    quantity: number
+    unit_price: number
+  }>
+  fulfillment_type: string | null
+  notes: string | null
 }
 
 const FULFILLMENT_OPTIONS = [
@@ -71,6 +93,83 @@ export default function OrderBuilder({
   const [dealId, setDealId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [templates, setTemplates] = useState<OrderTemplate[] | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [inventoryQuery, setInventoryQuery] = useState('')
+  const [inventoryResults, setInventoryResults] = useState<InventoryItemOption[]>([])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (inventoryQuery) params.set('q', inventoryQuery)
+      fetch(`/api/inventory?${params}`)
+        .then((r) => (r.ok ? r.json() : { data: [] }))
+        .then((data: { data: InventoryItemOption[] }) => setInventoryResults(data.data ?? []))
+        .catch(() => setInventoryResults([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [inventoryQuery])
+
+  const loadTemplates = useCallback(() => {
+    fetch('/api/order-templates')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((data: { data: OrderTemplate[] }) => setTemplates(data.data ?? []))
+      .catch(() => setTemplates([]))
+  }, [])
+
+  useEffect(() => {
+    loadTemplates()
+  }, [loadTemplates])
+
+  function useTemplate(t: OrderTemplate) {
+    setItems(
+      t.line_items.map((li) => ({
+        key: crypto.randomUUID(),
+        service_id: li.service_id,
+        inventory_item_id: null,
+        description: li.description,
+        quantity: li.quantity,
+        unit_price: li.unit_price,
+      }))
+    )
+    if (t.fulfillment_type) setFulfillmentType(t.fulfillment_type)
+    if (t.notes) setNotes(t.notes)
+  }
+
+  async function saveAsTemplate() {
+    if (items.length === 0) {
+      setError('Add at least one line item before saving a template')
+      return
+    }
+    const name = window.prompt('Template name?')
+    if (!name || !name.trim()) return
+    setSavingTemplate(true)
+    try {
+      const res = await fetch('/api/order-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          line_items: items.map((i) => ({
+            service_id: i.service_id,
+            description: i.description,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+          })),
+          fulfillment_type: fulfillmentType || null,
+          notes: notes || null,
+        }),
+      })
+      if (res.ok) loadTemplates()
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  async function deleteTemplate(id: string) {
+    await fetch(`/api/order-templates/${id}`, { method: 'DELETE' })
+    loadTemplates()
+  }
 
   function addFromCatalog(svc: Service) {
     setItems((prev) => [
@@ -78,9 +177,24 @@ export default function OrderBuilder({
       {
         key: crypto.randomUUID(),
         service_id: svc.id,
+        inventory_item_id: null,
         description: svc.name,
         quantity: 1,
         unit_price: Number(svc.unit_price),
+      },
+    ])
+  }
+
+  function addFromInventory(inv: InventoryItemOption) {
+    setItems((prev) => [
+      ...prev,
+      {
+        key: crypto.randomUUID(),
+        service_id: null,
+        inventory_item_id: inv.id,
+        description: inv.name,
+        quantity: 1,
+        unit_price: Number(inv.unit_cost ?? 0),
       },
     ])
   }
@@ -91,6 +205,7 @@ export default function OrderBuilder({
       {
         key: crypto.randomUUID(),
         service_id: null,
+        inventory_item_id: null,
         description: '',
         quantity: 1,
         unit_price: 0,
@@ -133,6 +248,7 @@ export default function OrderBuilder({
           customer_phone: customerPhone.trim() || null,
           line_items: items.map((i) => ({
             service_id: i.service_id,
+            inventory_item_id: i.inventory_item_id,
             description: i.description,
             quantity: i.quantity,
             unit_price: i.unit_price,
@@ -284,6 +400,39 @@ export default function OrderBuilder({
         </div>
 
         <div className="space-y-4">
+          {templates !== null && templates.length > 0 && (
+            <div className="bg-white rounded-xl border border-border-brand p-4">
+              <h2 className="text-sm font-semibold text-ink mb-3">Templates</h2>
+              <div className="space-y-1">
+                {templates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg border border-border-brand"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => useTemplate(t)}
+                      className="text-sm text-ink2 text-left hover:text-teal-700"
+                    >
+                      {t.name}{' '}
+                      <span className="text-ink4 text-xs">
+                        ({t.line_items.length} item{t.line_items.length === 1 ? '' : 's'})
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteTemplate(t.id)}
+                      className="text-xs text-ink4 hover:text-red-600"
+                      aria-label={`Delete template ${t.name}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-xl border border-border-brand p-4">
             <h2 className="text-sm font-semibold text-ink mb-3">Catalog</h2>
             <div className="max-h-48 overflow-y-auto space-y-1 mb-3">
@@ -310,6 +459,37 @@ export default function OrderBuilder({
           </div>
 
           <div className="bg-white rounded-xl border border-border-brand p-4">
+            <h2 className="text-sm font-semibold text-ink mb-3">Inventory</h2>
+            <TextField
+              value={inventoryQuery}
+              onChange={(e) => setInventoryQuery(e.target.value)}
+              placeholder="Search stock by name or SKU..."
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {inventoryResults.map((inv) => (
+                <button
+                  key={inv.id}
+                  type="button"
+                  onClick={() => addFromInventory(inv)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm border border-border-brand hover:bg-bg transition-colors text-left"
+                >
+                  <span className="text-ink2">
+                    {inv.name}
+                    {inv.sku ? <span className="text-ink4 text-xs ml-1">({inv.sku})</span> : null}
+                  </span>
+                  <span className="text-ink4 font-mono text-xs">{inv.quantity} in stock</span>
+                </button>
+              ))}
+              {inventoryResults.length === 0 && (
+                <p className="text-xs text-ink4">No matching stock items.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-border-brand p-4">
             <h2 className="text-sm font-semibold text-ink mb-3">Line items</h2>
             {items.length === 0 ? (
               <p className="text-xs text-ink4">No items yet — pick from the catalog.</p>
@@ -323,6 +503,15 @@ export default function OrderBuilder({
                       placeholder="Description"
                       size="small"
                       sx={{ flex: 2 }}
+                      slotProps={
+                        item.inventory_item_id
+                          ? {
+                              input: {
+                                startAdornment: <span title="Linked to inventory">📦</span>,
+                              },
+                            }
+                          : undefined
+                      }
                     />
                     <TextField
                       type="number"
@@ -381,6 +570,13 @@ export default function OrderBuilder({
           <div className="flex justify-end gap-2">
             <Button onClick={() => router.push('/orders')} variant="outlined" color="inherit">
               Cancel
+            </Button>
+            <Button
+              onClick={() => void saveAsTemplate()}
+              disabled={savingTemplate || items.length === 0}
+              variant="outlined"
+            >
+              {savingTemplate ? 'Saving…' : 'Save as template'}
             </Button>
             <Button onClick={() => void save()} disabled={saving} variant="contained">
               {saving ? 'Creating...' : 'Create Order'}

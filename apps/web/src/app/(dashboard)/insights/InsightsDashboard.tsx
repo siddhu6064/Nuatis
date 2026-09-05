@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
 import Button from '@mui/material/Button'
@@ -141,6 +142,20 @@ interface FunnelStage {
   drop_off_pct: number
 }
 
+interface QuotaRep {
+  user_id: string
+  full_name: string
+  quota_amount: number | null
+  actual_amount: number
+  attainment_pct: number | null
+}
+
+interface RetentionCohort {
+  cohort: string
+  size: number
+  retention: Array<number | null>
+}
+
 interface CampaignInsightSummary {
   total_campaigns: number
   total_sent: number
@@ -252,6 +267,7 @@ const DEFAULT_ORDER = [
   'custom_reports',
   'territory_perf',
   'campaign_perf',
+  'retention',
 ]
 
 const LS_KEY = 'nuatis_insights_order'
@@ -700,6 +716,58 @@ export default function InsightsDashboard({
   const [forecastData, setForecastData] = useState<PipelineForecastData | null>(null)
   const [funnelData, setFunnelData] = useState<FunnelStage[]>([])
   const [forecastLoading, setForecastLoading] = useState(false)
+
+  // Quota attainment state — separate from pipeline forecast, not pipeline-scoped
+  const { data: session } = useSession()
+  const isManager = session?.user?.role === 'owner' || session?.user?.role === 'admin'
+  const [quotaReps, setQuotaReps] = useState<QuotaRep[]>([])
+  const [quotaDrafts, setQuotaDrafts] = useState<Record<string, string>>({})
+  const [savingQuotaFor, setSavingQuotaFor] = useState<string | null>(null)
+
+  const fetchQuotaAttainment = useCallback(() => {
+    fetch('/api/insights/quota-attainment')
+      .then((r) => r.json())
+      .then((data: { reps: QuotaRep[] }) => {
+        setQuotaReps(Array.isArray(data.reps) ? data.reps : [])
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchQuotaAttainment()
+  }, [fetchQuotaAttainment])
+
+  // Cohort retention state
+  const [retentionCohorts, setRetentionCohorts] = useState<RetentionCohort[]>([])
+  const [retentionLoading, setRetentionLoading] = useState(false)
+
+  useEffect(() => {
+    setRetentionLoading(true)
+    fetch('/api/insights/retention?months=6')
+      .then((r) => r.json())
+      .then((data: { cohorts: RetentionCohort[] }) => {
+        setRetentionCohorts(Array.isArray(data.cohorts) ? data.cohorts : [])
+      })
+      .catch(() => {})
+      .finally(() => setRetentionLoading(false))
+  }, [])
+
+  function saveQuota(userId: string) {
+    const raw = quotaDrafts[userId]
+    const amount = Number(raw)
+    if (!raw || !Number.isFinite(amount) || amount < 0) return
+    setSavingQuotaFor(userId)
+    fetch(`/api/sales-quotas/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        period_start: new Date().toISOString().slice(0, 7),
+        quota_amount: amount,
+      }),
+    })
+      .then(() => fetchQuotaAttainment())
+      .finally(() => setSavingQuotaFor(null))
+  }
 
   // Fetch available deal pipelines on mount
   useEffect(() => {
@@ -1421,6 +1489,61 @@ export default function InsightsDashboard({
                   )}
                 </div>
 
+                {quotaReps.length > 0 && (
+                  <div className="bg-white rounded-xl border border-border-brand p-6">
+                    <h3 className="text-sm font-semibold text-ink mb-4">
+                      Quota Attainment ({new Date().toLocaleString('en-US', { month: 'long' })})
+                    </h3>
+                    <div className="space-y-3">
+                      {quotaReps.map((rep) => (
+                        <div key={rep.user_id} className="flex items-center gap-3">
+                          <span className="text-sm text-ink w-32 truncate">{rep.full_name}</span>
+                          <div className="flex-1 h-2 rounded-full bg-surface2 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                rep.attainment_pct !== null && rep.attainment_pct >= 100
+                                  ? 'bg-green-600'
+                                  : 'bg-indigo-600'
+                              }`}
+                              style={{
+                                width: `${Math.min(100, rep.attainment_pct ?? 0)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-ink4 w-40 text-right">
+                            {formatCurrency(rep.actual_amount)}
+                            {rep.quota_amount !== null
+                              ? ` / ${formatCurrency(rep.quota_amount)}`
+                              : ' (no quota set)'}
+                          </span>
+                          {isManager && (
+                            <div className="flex items-center gap-1">
+                              <TextField
+                                size="small"
+                                type="number"
+                                placeholder="Quota"
+                                value={quotaDrafts[rep.user_id] ?? ''}
+                                onChange={(e) =>
+                                  setQuotaDrafts((d) => ({ ...d, [rep.user_id]: e.target.value }))
+                                }
+                                sx={{ width: 100 }}
+                              />
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled={savingQuotaFor === rep.user_id}
+                                onClick={() => saveQuota(rep.user_id)}
+                              >
+                                Set
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {monthlyForecast.length > 0 && (
                   <div className="bg-white rounded-xl border border-border-brand p-6">
                     <h3 className="text-sm font-semibold text-ink mb-4">
@@ -1915,6 +2038,79 @@ export default function InsightsDashboard({
             )}
           </div>
         )
+
+      case 'retention': {
+        const maxOffset = retentionCohorts.reduce(
+          (max, c) => Math.max(max, c.retention.length - 1),
+          0
+        )
+        return (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-ink">Cohort Retention</h2>
+              <p className="text-sm text-ink3 mt-0.5">
+                % of each month&apos;s new contacts still active in the months that followed
+              </p>
+            </div>
+
+            {retentionLoading ? (
+              <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+                <p className="text-sm text-ink4">Loading...</p>
+              </div>
+            ) : retentionCohorts.length === 0 ? (
+              <div className="bg-white rounded-xl border border-border-brand p-8 text-center">
+                <p className="text-sm text-ink4">No contacts in the selected window yet</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-border-brand overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border-brand">
+                      <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Cohort</th>
+                      <th className="text-right text-xs font-medium text-ink4 px-4 py-3">Size</th>
+                      {Array.from({ length: maxOffset + 1 }, (_, i) => (
+                        <th key={i} className="text-center text-xs font-medium text-ink4 px-3 py-3">
+                          Month {i}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...retentionCohorts].reverse().map((c) => (
+                      <tr key={c.cohort} className="border-b border-gray-50 last:border-0">
+                        <td className="px-4 py-3 text-ink font-medium whitespace-nowrap">
+                          {c.cohort}
+                        </td>
+                        <td className="px-4 py-3 text-right text-ink3">{c.size}</td>
+                        {Array.from({ length: maxOffset + 1 }, (_, i) => {
+                          const pct = c.retention[i]
+                          return (
+                            <td key={i} className="px-1.5 py-1.5 text-center">
+                              {pct == null ? (
+                                <span className="text-ink4">—</span>
+                              ) : (
+                                <span
+                                  className="inline-block w-full rounded px-2 py-1.5 text-xs font-medium"
+                                  style={{
+                                    backgroundColor: `rgba(20, 184, 166, ${Math.max(0.06, pct / 130)})`,
+                                    color: pct >= 50 ? '#0f766e' : '#334155',
+                                  }}
+                                >
+                                  {pct.toFixed(0)}%
+                                </span>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      }
 
       default:
         return null

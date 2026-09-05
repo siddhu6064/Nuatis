@@ -3,6 +3,7 @@ import { getServiceClient } from '../lib/supabase.js'
 import { randomUUID } from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { aiGenerationLimiter, sessionInitLimiter } from '../middleware/rate-limit.js'
+import { notifyOwner } from '../lib/notifications.js'
 
 // ── Supabase factory ──────────────────────────────────────────────────────────
 // ── Public webchat router ─────────────────────────────────────────────────────
@@ -30,9 +31,7 @@ router.post(
 
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select(
-          'id, business_name, webchat_enabled, webchat_greeting, webchat_color, webchat_position'
-        )
+        .select('id, name, webchat_enabled, webchat_greeting, webchat_color, webchat_position')
         .eq('id', tenant_id)
         .maybeSingle()
 
@@ -72,7 +71,7 @@ router.post(
         greeting: tenant.webchat_greeting,
         color: tenant.webchat_color,
         position: tenant.webchat_position,
-        business_name: tenant.business_name,
+        business_name: tenant.name,
       })
     } catch (err) {
       console.error('[webchat/session/init] error', err)
@@ -105,7 +104,7 @@ router.post(
       // Lookup session
       const { data: session, error: sessionError } = await supabase
         .from('webchat_sessions')
-        .select('id, tenant_id, status')
+        .select('id, tenant_id, status, mode, unread_count')
         .eq('session_token', token)
         .maybeSingle()
 
@@ -136,9 +135,18 @@ router.post(
         return
       }
 
-      // If agent message — no AI reply needed
-      if (role !== 'user') {
-        res.status(201).json({ message })
+      await supabase
+        .from('webchat_sessions')
+        .update({
+          last_message_at: message.created_at,
+          last_message_preview: content.slice(0, 140),
+          unread_count: (session.unread_count ?? 0) + 1,
+        })
+        .eq('id', session.id)
+
+      // If agent message, or a human is already handling this session — no AI reply
+      if (role !== 'user' || session.mode === 'human') {
+        res.status(201).json({ message, mode: session.mode })
         return
       }
 
@@ -155,11 +163,11 @@ router.post(
       // Fetch business name for prompt
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('business_name')
+        .select('name')
         .eq('id', session.tenant_id)
         .maybeSingle()
 
-      const businessName = tenant?.business_name ?? 'this business'
+      const businessName = tenant?.name ?? 'this business'
 
       const historyText = history
         .map((m: { role: string; content: string }) =>
@@ -205,7 +213,12 @@ Assistant:`
         return
       }
 
-      res.status(201).json({ message, reply })
+      await supabase
+        .from('webchat_sessions')
+        .update({ last_message_at: reply.created_at, last_message_preview: aiReply.slice(0, 140) })
+        .eq('id', session.id)
+
+      res.status(201).json({ message, reply, mode: session.mode })
     } catch (err) {
       console.error('[webchat/session/message] error', err)
       res.status(500).json({ error: 'Internal server error' })
@@ -221,7 +234,7 @@ router.get('/session/:token', async (req: Request, res: Response): Promise<void>
 
     const { data: session, error: sessionError } = await supabase
       .from('webchat_sessions')
-      .select('id, status, visitor_name, visitor_email, started_at')
+      .select('id, status, mode, visitor_name, visitor_email, started_at')
       .eq('session_token', token)
       .maybeSingle()
 
@@ -245,6 +258,106 @@ router.get('/session/:token', async (req: Request, res: Response): Promise<void>
     res.json({ session, messages: messages ?? [] })
   } catch (err) {
     console.error('[webchat/session/get] error', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── GET /session/:token/messages (cursor poll, public — used by the widget) ────
+router.get('/session/:token/messages', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params
+    const { after } = req.query as { after?: string }
+    const supabase = getServiceClient()
+
+    const { data: session, error: sessionError } = await supabase
+      .from('webchat_sessions')
+      .select('id, mode')
+      .eq('session_token', token)
+      .maybeSingle()
+
+    if (sessionError || !session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+
+    let query = supabase
+      .from('webchat_messages')
+      .select('id, role, content, created_at')
+      .eq('session_id', session.id)
+      .order('created_at', { ascending: true })
+
+    if (after) {
+      query = query.gt('created_at', after)
+    }
+
+    const { data: messages, error: msgsError } = await query
+
+    if (msgsError) {
+      console.error('[webchat/session/messages] error', msgsError)
+      res.status(500).json({ error: 'Failed to fetch messages' })
+      return
+    }
+
+    res.json({ messages: messages ?? [], mode: session.mode })
+  } catch (err) {
+    console.error('[webchat/session/messages] error', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── POST /session/:token/handoff (public — visitor requests a human) ───────────
+router.post('/session/:token/handoff', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params
+    const { reason } = req.body as { reason?: string }
+    const supabase = getServiceClient()
+
+    const { data: session, error: sessionError } = await supabase
+      .from('webchat_sessions')
+      .select('id, tenant_id, status, mode, visitor_name')
+      .eq('session_token', token)
+      .maybeSingle()
+
+    if (sessionError || !session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+
+    if (session.status !== 'active') {
+      res.status(400).json({ error: 'Session closed' })
+      return
+    }
+
+    // Idempotent — a double-click or retry shouldn't re-notify the owner.
+    if (session.mode === 'human') {
+      res.json({ ok: true, mode: 'human' })
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('webchat_sessions')
+      .update({
+        mode: 'human',
+        handoff_requested_at: new Date().toISOString(),
+        handoff_reason: typeof reason === 'string' ? reason.slice(0, 500) : null,
+      })
+      .eq('id', session.id)
+
+    if (updateError) {
+      console.error('[webchat/session/handoff] error', updateError)
+      res.status(500).json({ error: 'Failed to request handoff' })
+      return
+    }
+
+    void notifyOwner(session.tenant_id, 'webchat_handoff_requested', {
+      pushTitle: 'Webchat: visitor wants a human',
+      pushBody: `${session.visitor_name ?? 'A visitor'} is waiting in webchat`,
+      pushUrl: `/inbox?chat=${session.id}`,
+    })
+
+    res.json({ ok: true, mode: 'human' })
+  } catch (err) {
+    console.error('[webchat/session/handoff] error', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -289,15 +402,22 @@ router.get('/sessions', requireAuth, async (req: Request, res: Response): Promis
   try {
     const authedReq = req as AuthenticatedRequest
     const tenantId = authedReq.tenantId
+    const { status } = req.query as { status?: string }
     const supabase = getServiceClient()
 
-    const { data: sessions, error } = await supabase
+    let query = supabase
       .from('webchat_sessions')
       .select(
-        'id, session_token, status, visitor_name, visitor_email, location_id, started_at, ended_at, created_at'
+        'id, session_token, status, mode, visitor_name, visitor_email, location_id, handoff_requested_at, started_at, ended_at, created_at, last_message_at, last_message_preview, unread_count'
       )
       .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
+
+    if (status === 'active' || status === 'closed') {
+      query = query.eq('status', status)
+    }
+
+    const { data: sessions, error } = await query
+      .order('last_message_at', { ascending: false, nullsFirst: false })
       .limit(50)
 
     if (error) {

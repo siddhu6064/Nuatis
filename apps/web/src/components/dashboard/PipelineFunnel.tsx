@@ -62,7 +62,7 @@ export default function PipelineFunnel() {
   const maxCount = Math.max(...stages.map((s) => s.count), 1)
 
   return (
-    <div className="bg-white rounded-xl border border-border-brand p-5 h-full">
+    <div className="bg-white rounded-xl border border-border-brand p-5 h-full transition-shadow duration-200 hover:shadow-md">
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-ink">Pipeline Funnel</h2>
         <p className="text-xs text-ink3 mt-0.5">
@@ -84,7 +84,7 @@ export default function PipelineFunnel() {
           <p className="text-sm text-ink4">No pipeline data yet</p>
         </div>
       ) : (
-        <div className="flex gap-6">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Bar chart — 60% */}
           <div className="flex-[3] space-y-2.5 min-w-0">
             {stages.map((stage, i) => {
@@ -118,14 +118,19 @@ export default function PipelineFunnel() {
           </div>
 
           {/* Conversion table — 40% */}
-          <div className="flex-[2] min-w-0">
+          <div className="flex-[2] min-w-0 overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border-brand">
                   <th className="text-left text-ink4 font-medium pb-2 pr-2">Stage</th>
                   <th className="text-right text-ink4 font-medium pb-2 px-1">Deals</th>
                   <th className="text-right text-ink4 font-medium pb-2 px-1">Value</th>
-                  <th className="text-right text-ink4 font-medium pb-2 pl-1">→ Next</th>
+                  <th
+                    className="text-right text-ink4 font-medium pb-2 pl-1"
+                    title="Deals currently sitting in the next stage vs. this one, right now — a live snapshot, not a lifetime conversion rate, so it can read over 100%"
+                  >
+                    Next Stage Ratio
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -147,6 +152,7 @@ export default function PipelineFunnel() {
                       <td className="py-2 text-right pl-1">
                         {stage.conversionToNext !== null ? (
                           <span
+                            title="Snapshot ratio, not a lifetime conversion rate — can exceed 100% when more deals currently sit in the next stage than this one"
                             className={`font-medium ${conversionColor(stage.conversionToNext)}`}
                           >
                             {stage.conversionToNext}%

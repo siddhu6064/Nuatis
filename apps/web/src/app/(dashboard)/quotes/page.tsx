@@ -106,7 +106,7 @@ export default async function QuotesPage() {
                 return (
                   <tr
                     key={q.id}
-                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50"
+                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
                   >
                     <td className="px-6 py-4">
                       <Link

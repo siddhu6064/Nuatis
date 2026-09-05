@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import { Modal } from '@/components/ui/Modal'
 import {
   ComposedChart,
   Bar,
@@ -55,6 +57,259 @@ function ConnectBanner() {
       <Button onClick={() => void handleConnect()} disabled={loading} variant="contained">
         {loading ? 'Redirecting...' : 'Connect Google Business Profile'}
       </Button>
+    </div>
+  )
+}
+
+// ── OtherPlatformsPanel (Yelp + Facebook) ────────────────────
+
+interface YelpBusiness {
+  id: string
+  name: string
+  location: string | null
+  rating: number | null
+  review_count: number | null
+}
+
+function YelpConnectCard() {
+  const [status, setStatus] = useState<{
+    configured: boolean
+    connected: boolean
+    businessName: string | null
+  } | null>(null)
+  const [term, setTerm] = useState('')
+  const [location, setLocation] = useState('')
+  const [results, setResults] = useState<YelpBusiness[]>([])
+  const [searching, setSearching] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function refreshStatus() {
+    fetch('/api/reputation/yelp/status', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setStatus(d))
+  }
+
+  useEffect(() => {
+    refreshStatus()
+  }, [])
+
+  async function handleSearch() {
+    if (!term.trim() || !location.trim()) return
+    setSearching(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/reputation/yelp/search?term=${encodeURIComponent(term)}&location=${encodeURIComponent(location)}`,
+        { credentials: 'include' }
+      )
+      const data = (await res.json()) as { businesses?: YelpBusiness[]; error?: string }
+      if (!res.ok) {
+        setError(data.error ?? 'Search failed')
+        return
+      }
+      setResults(data.businesses ?? [])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  async function handleConnect(business: YelpBusiness) {
+    setConnecting(true)
+    try {
+      await fetch('/api/reputation/yelp/connect', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId: business.id, businessName: business.name }),
+      })
+      setResults([])
+      refreshStatus()
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  async function handleDisconnect() {
+    await fetch('/api/reputation/yelp/disconnect', { method: 'DELETE', credentials: 'include' })
+    refreshStatus()
+  }
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/reputation/yelp/sync', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = (await res.json()) as { synced?: number }
+      if (typeof data.synced === 'number') {
+        setError(`Synced ${data.synced} new review${data.synced === 1 ? '' : 's'}.`)
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  if (!status) return null
+
+  if (!status.configured) {
+    return (
+      <div className="bg-white rounded-xl border border-border-brand p-5 opacity-60">
+        <p className="text-sm font-semibold text-ink">Yelp</p>
+        <p className="text-xs text-ink4 mt-1">Not configured on this server.</p>
+      </div>
+    )
+  }
+
+  if (status.connected) {
+    return (
+      <div className="bg-white rounded-xl border border-border-brand p-5">
+        <p className="text-sm font-semibold text-ink">Yelp</p>
+        <p className="text-xs text-ink3 mt-1">Connected to {status.businessName ?? 'a business'}</p>
+        <p className="text-xs text-ink4 mt-1">
+          Read-only import — Yelp has no reply API, so replies happen on Yelp directly.
+        </p>
+        <div className="flex gap-2 mt-3">
+          <Button onClick={() => void handleSync()} disabled={syncing} size="small">
+            {syncing ? 'Syncing...' : 'Sync Reviews'}
+          </Button>
+          <Button onClick={() => void handleDisconnect()} size="small" color="inherit">
+            Disconnect
+          </Button>
+        </div>
+        {error && <p className="text-xs text-ink3 mt-2">{error}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-border-brand p-5">
+      <p className="text-sm font-semibold text-ink mb-2">Connect Yelp</p>
+      <div className="flex gap-2 mb-2">
+        <TextField
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          placeholder="Business name"
+          size="small"
+          fullWidth
+        />
+        <TextField
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="City, state"
+          size="small"
+          fullWidth
+        />
+        <Button
+          onClick={() => void handleSearch()}
+          disabled={searching || !term.trim() || !location.trim()}
+          size="small"
+          sx={{ flexShrink: 0 }}
+        >
+          {searching ? 'Searching...' : 'Search'}
+        </Button>
+      </div>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      {results.length > 0 && (
+        <ul className="space-y-1.5">
+          {results.map((b) => (
+            <li
+              key={b.id}
+              className="flex items-center justify-between text-xs bg-bg rounded-lg px-3 py-2"
+            >
+              <span className="text-ink2">
+                {b.name}
+                {b.location && <span className="text-ink4 ml-1.5">— {b.location}</span>}
+              </span>
+              <Button
+                onClick={() => void handleConnect(b)}
+                disabled={connecting}
+                size="small"
+                variant="contained"
+              >
+                Connect
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function FacebookConnectCard() {
+  const [status, setStatus] = useState<{
+    configured: boolean
+    connected: boolean
+    pageName: string | null
+  } | null>(null)
+  const [connecting, setConnecting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/reputation/facebook/status', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setStatus(d))
+  }, [])
+
+  async function handleConnect() {
+    setConnecting(true)
+    try {
+      const res = await fetch('/api/reputation/facebook/auth-url', { credentials: 'include' })
+      const data = (await res.json()) as { url?: string }
+      if (data.url) window.location.href = data.url
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  async function handleDisconnect() {
+    await fetch('/api/reputation/facebook/disconnect', { method: 'DELETE', credentials: 'include' })
+    setStatus((s) => (s ? { ...s, connected: false, pageName: null } : s))
+  }
+
+  if (!status) return null
+
+  return (
+    <div
+      className={`bg-white rounded-xl border border-border-brand p-5 ${!status.configured ? 'opacity-60' : ''}`}
+    >
+      <p className="text-sm font-semibold text-ink">Facebook</p>
+      {!status.configured ? (
+        <p className="text-xs text-ink4 mt-1">Not configured on this server.</p>
+      ) : status.connected ? (
+        <>
+          <p className="text-xs text-ink3 mt-1">Connected to {status.pageName ?? 'a Page'}</p>
+          <Button
+            onClick={() => void handleDisconnect()}
+            size="small"
+            color="inherit"
+            sx={{ mt: 1.5 }}
+          >
+            Disconnect
+          </Button>
+        </>
+      ) : (
+        <Button
+          onClick={() => void handleConnect()}
+          disabled={connecting}
+          size="small"
+          variant="contained"
+          sx={{ mt: 1.5 }}
+        >
+          {connecting ? 'Redirecting...' : 'Connect Facebook'}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function OtherPlatformsPanel() {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <YelpConnectCard />
+      <FacebookConnectCard />
     </div>
   )
 }
@@ -168,18 +423,29 @@ function StatsHeader({ stats }: { stats: ReputationStats }) {
 
 // ── ReviewCard ────────────────────────────────────────────────
 
+const SOURCE_LABEL: Record<string, string> = {
+  google: 'Google',
+  yelp: 'Yelp',
+  facebook: 'Facebook',
+  manual: 'Manual',
+  other: 'Other',
+}
+
 function ReviewCard({
   review,
   onReply,
   onIgnore,
+  onDelete,
 }: {
   review: Review
   onReply: (id: string, text: string) => Promise<void>
   onIgnore: (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }) {
-  const [replyText, setReplyText] = useState(review.replyText ?? '')
+  const [replyText, setReplyText] = useState(review.reply_text ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [ignoring, setIgnoring] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function handleSend() {
     if (!replyText.trim()) return
@@ -194,17 +460,31 @@ function ReviewCard({
     setIgnoring(false)
   }
 
+  async function handleDelete() {
+    if (!window.confirm('Remove this review? This cannot be undone.')) return
+    setDeleting(true)
+    await onDelete(review.id)
+    setDeleting(false)
+  }
+
   const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
 
   return (
     <div className="bg-white rounded-xl border border-border-brand p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ink">{review.reviewerName ?? 'Anonymous'}</p>
+          <p className="text-sm font-semibold text-ink">
+            {review.reviewer_name ?? 'Anonymous'}
+            {review.source !== 'google' && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-bg2 text-ink4 font-normal align-middle">
+                {SOURCE_LABEL[review.source] ?? review.source}
+              </span>
+            )}
+          </p>
           <p className="text-xs text-amber-500 tracking-wider">{stars}</p>
-          {review.publishedAt && (
+          {review.published_at && (
             <p className="text-xs text-ink4 mt-0.5">
-              {new Date(review.publishedAt).toLocaleDateString('en-US', {
+              {new Date(review.published_at).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
@@ -212,36 +492,48 @@ function ReviewCard({
             </p>
           )}
         </div>
-        <span
-          className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
-            review.status === 'new'
-              ? 'bg-teal-50 text-teal-700'
-              : review.status === 'replied'
-                ? 'bg-green-50 text-green-700'
-                : 'bg-gray-100 text-ink4'
-          }`}
-        >
-          {review.status}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+              review.status === 'new'
+                ? 'bg-teal-50 text-teal-700'
+                : review.status === 'replied'
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-gray-100 text-ink4'
+            }`}
+          >
+            {review.status}
+          </span>
+          {review.source !== 'google' && (
+            <button
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+              className="text-xs text-ink4 hover:text-red-600"
+              title="Remove this review"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {review.comment && <p className="text-sm text-ink3 leading-relaxed">{review.comment}</p>}
 
-      {review.replyText && (
+      {review.reply_text && (
         <div className="bg-bg rounded-lg p-3 text-sm text-ink3 border-l-2 border-teal-400">
           <p className="text-xs font-medium text-teal-700 mb-1">Your reply</p>
-          {review.replyText}
+          {review.reply_text}
         </div>
       )}
 
       {review.status === 'new' && (
         <div className="space-y-2">
-          {review.aiSuggestedReply ? (
+          {review.ai_suggested_reply ? (
             <div className="bg-teal-50 rounded-lg p-3 text-sm text-ink3">
               <p className="text-xs font-medium text-teal-700 mb-1">AI suggested reply</p>
-              <p className="leading-relaxed">{review.aiSuggestedReply}</p>
+              <p className="leading-relaxed">{review.ai_suggested_reply}</p>
               <button
-                onClick={() => setReplyText(review.aiSuggestedReply!)}
+                onClick={() => setReplyText(review.ai_suggested_reply!)}
                 className="mt-2 text-xs font-medium text-teal-700 hover:text-teal-800 underline underline-offset-2"
               >
                 Use this reply
@@ -302,12 +594,23 @@ function ReviewCard({
 
 // ── ReviewFeed ────────────────────────────────────────────────
 
+const MANUAL_SOURCES = ['yelp', 'facebook', 'manual', 'other'] as const
+
 function ReviewFeed() {
   const [tab, setTab] = useState<Tab>('new')
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
+
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newSource, setNewSource] = useState<(typeof MANUAL_SOURCES)[number]>('yelp')
+  const [newReviewerName, setNewReviewerName] = useState('')
+  const [newRating, setNewRating] = useState(5)
+  const [newComment, setNewComment] = useState('')
+  const [newPublishedAt, setNewPublishedAt] = useState('')
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState('')
 
   useEffect(() => {
     void fetchReviews('new', 1)
@@ -363,6 +666,58 @@ function ReviewFeed() {
     }
   }
 
+  async function handleDelete(id: string) {
+    try {
+      await fetch(`/api/reputation/reviews/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      void fetchReviews(tab, page)
+    } catch (err) {
+      console.error('[reputation] delete error:', err)
+    }
+  }
+
+  function openAddModal() {
+    setNewSource('yelp')
+    setNewReviewerName('')
+    setNewRating(5)
+    setNewComment('')
+    setNewPublishedAt('')
+    setAddError('')
+    setShowAddModal(true)
+  }
+
+  async function handleAddReview() {
+    setAddSaving(true)
+    setAddError('')
+    try {
+      const res = await fetch('/api/reputation/reviews/manual', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: newSource,
+          reviewer_name: newReviewerName.trim() || null,
+          rating: newRating,
+          comment: newComment.trim() || null,
+          published_at: newPublishedAt ? new Date(newPublishedAt).toISOString() : undefined,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setAddError((d as { error?: string }).error ?? 'Failed to save review')
+        return
+      }
+      setShowAddModal(false)
+      void fetchReviews(tab, page)
+    } catch {
+      setAddError('Network error')
+    } finally {
+      setAddSaving(false)
+    }
+  }
+
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'new', label: 'New' },
     { id: 'replied', label: 'Replied' },
@@ -371,15 +726,20 @@ function ReviewFeed() {
 
   return (
     <div className="space-y-4">
-      <Tabs
-        value={tab}
-        onChange={(_e, v: Tab) => handleTabChange(v)}
-        sx={{ minHeight: 36, borderBottom: 1, borderColor: 'divider' }}
-      >
-        {tabs.map((t) => (
-          <Tab key={t.id} value={t.id} label={t.label} sx={{ minHeight: 36, py: 0.5 }} />
-        ))}
-      </Tabs>
+      <div className="flex items-center justify-between">
+        <Tabs
+          value={tab}
+          onChange={(_e, v: Tab) => handleTabChange(v)}
+          sx={{ minHeight: 36, borderBottom: 1, borderColor: 'divider' }}
+        >
+          {tabs.map((t) => (
+            <Tab key={t.id} value={t.id} label={t.label} sx={{ minHeight: 36, py: 0.5 }} />
+          ))}
+        </Tabs>
+        <Button onClick={openAddModal} size="small" variant="outlined" color="inherit">
+          + Add Review
+        </Button>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-ink4 text-sm">
@@ -397,6 +757,7 @@ function ReviewFeed() {
               review={review}
               onReply={handleReply}
               onIgnore={handleIgnore}
+              onDelete={handleDelete}
             />
           ))}
         </div>
@@ -436,6 +797,92 @@ function ReviewFeed() {
             </Button>
           </div>
         </div>
+      )}
+
+      {showAddModal && (
+        <Modal
+          onClose={() => setShowAddModal(false)}
+          title="Add a Review"
+          footer={
+            <>
+              <Button onClick={() => setShowAddModal(false)} variant="text" color="inherit">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleAddReview()}
+                disabled={addSaving}
+                variant="contained"
+              >
+                {addSaving ? 'Saving…' : 'Add Review'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <TextField
+              select
+              label="Source"
+              value={newSource}
+              onChange={(e) => setNewSource(e.target.value as (typeof MANUAL_SOURCES)[number])}
+              fullWidth
+              size="small"
+            >
+              {MANUAL_SOURCES.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {SOURCE_LABEL[s]}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Rating"
+              value={newRating}
+              onChange={(e) => setNewRating(Number(e.target.value))}
+              fullWidth
+              size="small"
+            >
+              {[5, 4, 3, 2, 1].map((r) => (
+                <MenuItem key={r} value={r}>
+                  {'★'.repeat(r) + '☆'.repeat(5 - r)}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Reviewer name"
+              helperText="optional"
+              value={newReviewerName}
+              onChange={(e) => setNewReviewerName(e.target.value)}
+              fullWidth
+              size="small"
+            />
+
+            <TextField
+              label="Review text"
+              helperText="optional"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+            />
+
+            <TextField
+              label="Date left"
+              helperText="optional, defaults to today"
+              type="date"
+              value={newPublishedAt}
+              onChange={(e) => setNewPublishedAt(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+              size="small"
+            />
+
+            {addError && <p className="text-xs text-rose-600">{addError}</p>}
+          </div>
+        </Modal>
       )}
     </div>
   )
@@ -639,33 +1086,31 @@ export default function ReputationClient({ connected, locationName, stats }: Pro
         </div>
       )}
 
-      {!connected ? (
-        <ConnectBanner />
-      ) : (
-        <div className="space-y-6">
-          {/* Page-level tabs */}
-          <Tabs
-            value={pageTab}
-            onChange={(_e, v: PageTab) => setPageTab(v)}
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
-          >
-            <Tab value="reviews" label="Reviews" />
-            <Tab value="requests" label="Requests" />
-            <Tab value="video" label="Video Reviews" />
-          </Tabs>
+      <div className="space-y-6">
+        {/* Page-level tabs */}
+        <Tabs
+          value={pageTab}
+          onChange={(_e, v: PageTab) => setPageTab(v)}
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab value="reviews" label="Reviews" />
+          <Tab value="requests" label="Requests" />
+          <Tab value="video" label="Video Reviews" />
+        </Tabs>
 
-          {pageTab === 'reviews' && (
-            <div className="space-y-8">
-              {stats && <StatsHeader stats={stats} />}
-              <ReviewFeed />
-            </div>
-          )}
+        {pageTab === 'reviews' && (
+          <div className="space-y-8">
+            {!connected && <ConnectBanner />}
+            <OtherPlatformsPanel />
+            {stats && <StatsHeader stats={stats} />}
+            <ReviewFeed />
+          </div>
+        )}
 
-          {pageTab === 'requests' && <RequestsPanel />}
+        {pageTab === 'requests' && <RequestsPanel />}
 
-          {pageTab === 'video' && <VideoReviewsTab />}
-        </div>
-      )}
+        {pageTab === 'video' && <VideoReviewsTab />}
+      </div>
     </div>
   )
 }

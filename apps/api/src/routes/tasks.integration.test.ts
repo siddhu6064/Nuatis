@@ -144,3 +144,181 @@ describe('PUT /api/tasks/:id', () => {
     expect(taskActivity).toBeDefined()
   })
 })
+
+describe('Kanban status', () => {
+  it('moves an open task to in_progress without touching completed_at', async () => {
+    const taskId = randomUUID()
+    ;(store.tables['tasks'] as Row[]).push({
+      id: taskId,
+      tenant_id: TENANT_ID,
+      title: 'Board task',
+      priority: 'medium',
+      status: 'open',
+      completed_at: null,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'in_progress' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('in_progress')
+    expect(res.body.completed_at).toBe(null)
+  })
+
+  it('dragging a task to the done column completes it, including the dependency block', async () => {
+    const blockerId = randomUUID()
+    const taskId = randomUUID()
+    ;(store.tables['tasks'] as Row[]).push(
+      {
+        id: blockerId,
+        tenant_id: TENANT_ID,
+        title: 'Blocker',
+        priority: 'medium',
+        status: 'open',
+        completed_at: null,
+      },
+      {
+        id: taskId,
+        tenant_id: TENANT_ID,
+        title: 'Blocked',
+        priority: 'medium',
+        status: 'open',
+        completed_at: null,
+        depends_on_task_id: blockerId,
+      }
+    )
+
+    const token = await makeToken()
+    const app = makeApp()
+
+    const blocked = await request(app)
+      .put(`/api/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'done' })
+    expect(blocked.status).toBe(409)
+
+    await request(app)
+      .put(`/api/tasks/${blockerId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'done' })
+
+    const res = await request(app)
+      .put(`/api/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'done' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('done')
+    expect(res.body.completed_at).toBeTruthy()
+  })
+
+  it('dragging a done task back to open clears completed_at', async () => {
+    const taskId = randomUUID()
+    ;(store.tables['tasks'] as Row[]).push({
+      id: taskId,
+      tenant_id: TENANT_ID,
+      title: 'Done task',
+      priority: 'medium',
+      status: 'done',
+      completed_at: new Date().toISOString(),
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'open' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('open')
+    expect(res.body.completed_at).toBe(null)
+  })
+})
+
+describe('Subtasks', () => {
+  it('creates a subtask linked via parent_task_id', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+
+    const parentRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Parent task' })
+    const parentId = parentRes.body.id as string
+
+    const childRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Subtask', parent_task_id: parentId })
+
+    expect(childRes.status).toBe(201)
+    expect(childRes.body.parent_task_id).toBe(parentId)
+  })
+
+  it('400s an invalid parent_task_id', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Subtask', parent_task_id: 'nope' })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('Dependencies', () => {
+  it('blocks completing a task whose dependency is not yet complete', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+
+    const blockerRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Do this first' })
+    const blockerId = blockerRes.body.id as string
+
+    const dependentRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Do this second', depends_on_task_id: blockerId })
+    const dependentId = dependentRes.body.id as string
+
+    const completeRes = await request(app)
+      .put(`/api/tasks/${dependentId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ completed_at: new Date().toISOString() })
+
+    expect(completeRes.status).toBe(409)
+  })
+
+  it('allows completing once the dependency is done', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+
+    const blockerRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Do this first' })
+    const blockerId = blockerRes.body.id as string
+
+    await request(app)
+      .put(`/api/tasks/${blockerId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ completed_at: new Date().toISOString() })
+
+    const dependentRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Do this second', depends_on_task_id: blockerId })
+    const dependentId = dependentRes.body.id as string
+
+    const completeRes = await request(app)
+      .put(`/api/tasks/${dependentId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ completed_at: new Date().toISOString() })
+
+    expect(completeRes.status).toBe(200)
+  })
+})

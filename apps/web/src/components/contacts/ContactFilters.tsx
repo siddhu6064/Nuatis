@@ -226,8 +226,8 @@ export default function ContactFilters({ filters, onChange, onClose }: Props) {
   useEffect(() => {
     void fetch('/api/users')
       .then((r) => r.json())
-      .then((d: { users: { id: string; full_name: string }[] }) => {
-        if (d.users) setTenantUsers(d.users)
+      .then((d: { id: string; full_name: string }[]) => {
+        if (Array.isArray(d)) setTenantUsers(d)
       })
       .catch(() => {})
   }, [])

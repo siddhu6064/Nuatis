@@ -78,6 +78,12 @@ const MODULE_DISPLAY: ModuleDisplay[] = [
     description: 'Order intake, kanban fulfillment tracking, payments, and inventory deduction.',
     minPlan: 'pro',
   },
+  {
+    key: 'expenses',
+    label: 'Expenses',
+    description: 'Expense logging, category breakdown, recurring expenses, and P&L reporting.',
+    minPlan: 'pro',
+  },
   // Hidden — valid keys, no toggle row.
   { key: 'companies', label: 'Companies', description: '', minPlan: 'core', hidden: true },
   { key: 'deals', label: 'Deals', description: '', minPlan: 'core', hidden: true },

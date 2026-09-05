@@ -14,6 +14,8 @@ interface ReferralData {
   }>
   total_referred: number
   referral_conversion_rate: number
+  rewards_issued: number
+  rewards_pending: number
 }
 
 export default function ReferralInsights() {
@@ -29,7 +31,11 @@ export default function ReferralInsights() {
   }, [])
 
   if (loading) return null
-  if (!data || (data.total_referred === 0 && data.top_sources.length === 0)) return null
+  if (
+    !data ||
+    (data.total_referred === 0 && data.top_sources.length === 0 && data.rewards_issued === 0)
+  )
+    return null
 
   return (
     <div className="mt-10">
@@ -51,6 +57,20 @@ export default function ReferralInsights() {
           <p className="text-2xl font-bold text-ink">{data.top_sources.length}</p>
         </div>
       </div>
+
+      {/* Customer-referral reward stats — from the refer-a-friend program */}
+      {(data.rewards_issued > 0 || data.rewards_pending > 0) && (
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-border-brand p-4">
+            <p className="text-xs text-ink4 mb-1">Referral Rewards Issued</p>
+            <p className="text-2xl font-bold text-teal-600">{data.rewards_issued}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-border-brand p-4">
+            <p className="text-xs text-ink4 mb-1">Referral Rewards Pending</p>
+            <p className="text-2xl font-bold text-amber-600">{data.rewards_pending}</p>
+          </div>
+        </div>
+      )}
 
       {/* Top Sources chart */}
       {data.top_sources.length > 0 && (

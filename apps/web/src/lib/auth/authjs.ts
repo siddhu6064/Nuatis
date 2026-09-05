@@ -98,6 +98,110 @@ const result = NextAuth({
         }
       },
     }),
+    // SSO — the identity check already happened at WorkOS. This provider
+    // only trades the single-use exchange code (minted by the Express
+    // /api/auth/sso/callback route) for the same session shape the password
+    // provider above produces, so the jwt()/session() callbacks below need
+    // zero changes to support it.
+    Credentials({
+      id: 'sso',
+      name: 'sso',
+      credentials: {
+        exchangeCode: { label: 'Exchange code', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.exchangeCode) return null
+
+        const apiUrl = process.env.API_BASE_URL ?? 'http://localhost:3001'
+        const res = await fetch(`${apiUrl}/api/auth/sso/redeem`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exchangeCode: credentials.exchangeCode }),
+        })
+        if (!res.ok) return null
+
+        const claims = (await res.json()) as {
+          appUserId: string
+          tenantId: string
+          role: string
+          email: string
+          name: string
+          vertical: string
+          businessName: string
+          subscriptionStatus: string
+          modules: Record<string, boolean>
+        }
+
+        return {
+          id: claims.appUserId,
+          appUserId: claims.appUserId,
+          email: claims.email,
+          name: claims.name,
+          tenantId: claims.tenantId,
+          role: claims.role,
+          vertical: claims.vertical,
+          businessName: claims.businessName,
+          subscriptionStatus: claims.subscriptionStatus,
+          modules: claims.modules ?? {},
+        }
+      },
+    }),
+    // Platform-support "log in as this tenant" — same exchange-code handoff
+    // as the sso provider above, but the claims additionally carry an
+    // `impersonation` block (which platform admin, why, until when). jwt()
+    // below caps the session to that expiry instead of the normal 12h, and
+    // forwards the block into the Express-facing token so every request is
+    // fingerprinted server-side too (lib/impersonation.ts).
+    Credentials({
+      id: 'impersonate',
+      name: 'impersonate',
+      credentials: {
+        exchangeCode: { label: 'Exchange code', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.exchangeCode) return null
+
+        const apiUrl = process.env.API_BASE_URL ?? 'http://localhost:3001'
+        const res = await fetch(`${apiUrl}/api/impersonate/redeem`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exchangeCode: credentials.exchangeCode }),
+        })
+        if (!res.ok) return null
+
+        const claims = (await res.json()) as {
+          appUserId: string
+          tenantId: string
+          role: string
+          email: string
+          name: string
+          vertical: string
+          businessName: string
+          subscriptionStatus: string
+          modules: Record<string, boolean>
+          impersonation: {
+            sessionId: string
+            platformUserId: string
+            platformUserEmail: string
+            expiresAt: string
+          }
+        }
+
+        return {
+          id: claims.appUserId,
+          appUserId: claims.appUserId,
+          email: claims.email,
+          name: claims.name,
+          tenantId: claims.tenantId,
+          role: claims.role,
+          vertical: claims.vertical,
+          businessName: claims.businessName,
+          subscriptionStatus: claims.subscriptionStatus,
+          modules: claims.modules ?? {},
+          impersonation: claims.impersonation,
+        }
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user }) {
@@ -113,9 +217,25 @@ const result = NextAuth({
         // because authorize() already fetched it; storing it avoids a per-request
         // DB lookup in the API auth middleware.
         token.appUserId = u.appUserId as string
-        // 12h absolute session cap — stamped once at sign-in only, so refresh
-        // (every updateAge) does not reset it.
-        token.absoluteExpiry = Date.now() + 12 * 60 * 60 * 1000
+        const impersonation = u.impersonation as
+          | {
+              sessionId: string
+              platformUserId: string
+              platformUserEmail: string
+              expiresAt: string
+            }
+          | undefined
+        if (impersonation) {
+          token.impersonation = impersonation
+          // Capped to the impersonation session's own short TTL, not the
+          // normal 12h — ending is "the token expires," there's no separate
+          // revoke-in-place mechanism.
+          token.absoluteExpiry = new Date(impersonation.expiresAt).getTime()
+        } else {
+          // 12h absolute session cap — stamped once at sign-in only, so refresh
+          // (every updateAge) does not reset it.
+          token.absoluteExpiry = Date.now() + 12 * 60 * 60 * 1000
+        }
       }
 
       // Enforce the 12h hard cap on every invocation (incl. refresh). Also
@@ -156,6 +276,7 @@ const result = NextAuth({
             businessName: token.businessName,
             subscriptionStatus: token.subscriptionStatus,
             ...(token.appUserId ? { appUserId: token.appUserId } : {}),
+            ...(token.impersonation ? { impersonation: token.impersonation } : {}),
           })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
@@ -177,6 +298,9 @@ const result = NextAuth({
       session.user.subscriptionStatus = token.subscriptionStatus as string
       session.user.modules = (token.modules as Record<string, boolean>) ?? {}
       ;(session as unknown as Record<string, unknown>).accessToken = token.accessToken as string
+      if (token.impersonation) {
+        ;(session as unknown as Record<string, unknown>).impersonation = token.impersonation
+      }
       return session
     },
   },

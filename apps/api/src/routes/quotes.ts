@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { randomUUID, createHash } from 'crypto'
 import { getServiceClient } from '../lib/supabase.js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { sendEmail } from '../lib/email-client.js'
 import { sendReceiptEmail } from '../lib/receipt-email.js'
 import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
@@ -16,8 +16,9 @@ import { generateOrderNumber } from '../lib/order-number.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { buildQuoteEmailHtml, buildQuoteApprovalEmailHtml } from '../lib/email-templates/quote.js'
 import { maybeAdvanceLifecycle } from '../lib/lifecycle.js'
-import { createSquarePayment } from '../lib/square-client.js'
+import { createSquarePayment, createSquareRefund } from '../lib/square-client.js'
 import { publicPaymentLimiter } from '../middleware/rate-limit.js'
+import { resolvePromoCode } from '../lib/promo-code.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -82,6 +83,7 @@ async function nextQuoteNumber(
 
 interface LineItemInput {
   service_id?: string
+  inventory_item_id?: string
   description: string
   quantity: number
   unit_price: number
@@ -207,12 +209,28 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
   const validDays = typeof b['valid_days'] === 'number' ? b['valid_days'] : 30
 
   // Discount fields
-  const discountType =
+  let discountType =
     typeof b['discount_type'] === 'string' ? (b['discount_type'] as 'percent' | 'fixed') : null
-  const discountValue = typeof b['discount_value'] === 'number' ? b['discount_value'] : 0
-  const discountLabel =
+  let discountValue = typeof b['discount_value'] === 'number' ? b['discount_value'] : 0
+  let discountLabel =
     typeof b['discount_label'] === 'string' ? b['discount_label'].trim() || null : null
   const discountPct = typeof b['discount_pct'] === 'number' ? b['discount_pct'] : 0
+
+  // A reusable promo code, if given, wins over any manually-entered discount
+  // fields in the same request — a staff member typing both is treated as
+  // "apply the code," not a conflict.
+  let promoCodeId: string | null = null
+  if (typeof b['promo_code'] === 'string' && b['promo_code'].trim()) {
+    const resolved = await resolvePromoCode(supabase, authed.tenantId, b['promo_code'])
+    if (!resolved.ok) {
+      res.status(400).json({ error: resolved.error })
+      return
+    }
+    promoCodeId = resolved.promoCode.id
+    discountType = resolved.promoCode.discount_type
+    discountValue = resolved.promoCode.discount_value
+    discountLabel = b['promo_code'].trim().toUpperCase()
+  }
 
   // Compute discount_amount from type+value, fall back to legacy discount_amount field
   const rawSubtotal = lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
@@ -262,6 +280,7 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
       discount_type: discountType,
       discount_value: discountValue,
       discount_label: discountLabel,
+      promo_code_id: promoCodeId,
       approval_status: approvalStatus,
       requires_signature:
         typeof b['requires_signature'] === 'boolean' ? b['requires_signature'] : false,
@@ -279,9 +298,24 @@ router.post('/', requireAuth, requireCpq, async (req: Request, res: Response): P
     return
   }
 
+  // Redemption is only committed once the quote row actually exists — an
+  // earlier validation failure never touches the counter.
+  if (promoCodeId) {
+    const { data: current } = await supabase
+      .from('promo_codes')
+      .select('redemption_count')
+      .eq('id', promoCodeId)
+      .single()
+    await supabase
+      .from('promo_codes')
+      .update({ redemption_count: (current?.redemption_count ?? 0) + 1 })
+      .eq('id', promoCodeId)
+  }
+
   const itemRows = lineItems.map((item, i) => ({
     quote_id: quote.id,
     service_id: item.service_id || null,
+    inventory_item_id: item.inventory_item_id || null,
     description: item.description,
     quantity: item.quantity,
     unit_price: item.unit_price,
@@ -346,7 +380,7 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
 
   const { data: existing } = await supabase
     .from('quotes')
-    .select('status')
+    .select('status, promo_code_id')
     .eq('id', req.params['id'])
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -420,6 +454,35 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
   }
   if (discountAmountVal !== undefined) updates['discount_amount'] = discountAmountVal
 
+  // A reusable promo code, if given, wins over any manually-entered discount
+  // fields in the same request — overwrites whatever the block above set.
+  let appliedPromoCodeId: string | null = null
+  if (typeof b['promo_code'] === 'string' && b['promo_code'].trim()) {
+    const resolved = await resolvePromoCode(supabase, authed.tenantId, b['promo_code'])
+    if (!resolved.ok) {
+      res.status(400).json({ error: resolved.error })
+      return
+    }
+    if (resolved.promoCode.discount_type === 'percent' && resolved.promoCode.discount_value > 0) {
+      const cpq = await getCpqSettings(supabase, authed.tenantId)
+      if (resolved.promoCode.discount_value > cpq.max_discount_pct) {
+        res
+          .status(400)
+          .json({ error: `Discount exceeds maximum allowed (${cpq.max_discount_pct}%)` })
+        return
+      }
+      updates['approval_status'] =
+        resolved.promoCode.discount_value > cpq.require_approval_above ? 'pending' : null
+    }
+    appliedPromoCodeId = resolved.promoCode.id
+    updates['promo_code_id'] = appliedPromoCodeId
+    updates['discount_type'] = resolved.promoCode.discount_type
+    updates['discount_value'] = resolved.promoCode.discount_value
+    updates['discount_label'] = b['promo_code'].trim().toUpperCase()
+    updates['discount_pct'] =
+      resolved.promoCode.discount_type === 'percent' ? resolved.promoCode.discount_value : 0
+  }
+
   // Replace line items if provided
   if (Array.isArray(b['line_items'])) {
     const lineItems = b['line_items'] as LineItemInput[]
@@ -435,6 +498,7 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
     const itemRows = lineItems.map((item, i) => ({
       quote_id: req.params['id'],
       service_id: item.service_id || null,
+      inventory_item_id: item.inventory_item_id || null,
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price,
@@ -456,6 +520,21 @@ router.put('/:id', requireAuth, requireCpq, async (req: Request, res: Response):
     res.status(500).json({ error: 'Database operation failed' })
     return
   }
+
+  // Only increment on first application to this quote — resaving with the
+  // same code already applied must not double-count the redemption.
+  if (appliedPromoCodeId && appliedPromoCodeId !== existing.promo_code_id) {
+    const { data: current } = await supabase
+      .from('promo_codes')
+      .select('redemption_count')
+      .eq('id', appliedPromoCodeId)
+      .single()
+    await supabase
+      .from('promo_codes')
+      .update({ redemption_count: (current?.redemption_count ?? 0) + 1 })
+      .eq('id', appliedPromoCodeId)
+  }
+
   res.json(data)
 })
 
@@ -1118,6 +1197,12 @@ router.post(
       res.status(404).json({ error: 'Quote not found' })
       return
     }
+    const { data: tenantForCurrency } = await supabase
+      .from('tenants')
+      .select('currency')
+      .eq('id', quote.tenant_id)
+      .maybeSingle()
+    const currency = tenantForCurrency?.currency ?? 'USD'
     if (quote.status !== 'accepted') {
       res.status(400).json({ error: 'Payment only allowed for accepted quotes' })
       return
@@ -1170,7 +1255,7 @@ router.post(
       const squareResult = await createSquarePayment({
         tenantId: quote.tenant_id,
         amountCents,
-        currency: 'USD',
+        currency,
         sourceId,
         referenceId: String(quote.id),
         idempotencyKey: `${quote.id}:${paymentType}:${amountCents}:${sourceId}`,
@@ -1821,6 +1906,12 @@ router.post(
       res.status(404).json({ error: 'Quote not found' })
       return
     }
+    const { data: tenantForCurrency } = await supabase
+      .from('tenants')
+      .select('currency')
+      .eq('id', authed.tenantId)
+      .maybeSingle()
+    const currency = tenantForCurrency?.currency ?? 'USD'
 
     let squarePaymentId: string | null = null
     let squareReceiptUrl: string | null = null
@@ -1834,7 +1925,7 @@ router.post(
         const squareResult = await createSquarePayment({
           tenantId: authed.tenantId,
           amountCents: Math.round(amount * 100),
-          currency: 'USD',
+          currency,
           sourceId,
           referenceId: String(req.params['id']),
         })
@@ -1893,6 +1984,110 @@ router.post(
       },
       receipt_url: squareReceiptUrl,
     })
+  }
+)
+
+// ── POST /api/quotes/:id/payments/:paymentId/refund ─────────────────────────
+// Only quote_payments with a real, stored Square payment id are refundable
+// here — Stripe quote payments only ever exist as a manually-recorded
+// (method='stripe') row with a free-text reference, never a real charge this
+// app made, so there's nothing to call Stripe's refund API against (see
+// migration 0189's comment). Square supports repeated partial refunds
+// against one payment, so refunded_amount is a running total, not a flag —
+// the WHERE clause's own arithmetic guard is what prevents a double-refund
+// race between two concurrent requests, not a read-then-write check.
+router.post(
+  '/:id/payments/:paymentId/refund',
+  requireAuth,
+  requireCpq,
+  requireRole('owner', 'admin', 'manager'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const b = req.body as Record<string, unknown>
+
+    const { data: payment } = await supabase
+      .from('quote_payments')
+      .select('id, quote_id, tenant_id, amount, provider, square_payment_id, refunded_amount')
+      .eq('id', req.params['paymentId'])
+      .eq('quote_id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (!payment) {
+      res.status(404).json({ error: 'Payment not found' })
+      return
+    }
+    if (payment.provider !== 'square' || !payment.square_payment_id) {
+      res.status(400).json({
+        error:
+          'Only Square payments can be refunded here — this payment has no processor id on file',
+      })
+      return
+    }
+
+    const alreadyRefunded = Number(payment.refunded_amount)
+    const refundable = Number(payment.amount) - alreadyRefunded
+    const requestedAmount = typeof b['amount'] === 'number' ? b['amount'] : refundable
+    if (requestedAmount <= 0 || requestedAmount > refundable) {
+      res.status(400).json({
+        error: `Refund amount must be between $0.01 and the remaining refundable amount of $${refundable.toFixed(2)}`,
+      })
+      return
+    }
+    const amountCents = Math.round(requestedAmount * 100)
+
+    try {
+      await createSquareRefund({
+        tenantId: authed.tenantId,
+        paymentId: payment.square_payment_id as string,
+        amountCents,
+        currency: 'USD',
+        reason: typeof b['reason'] === 'string' ? b['reason'] : undefined,
+      })
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Refund failed' })
+      return
+    }
+
+    const newRefundedAmount = Number((alreadyRefunded + requestedAmount).toFixed(2))
+    const newRefundStatus = newRefundedAmount >= Number(payment.amount) ? 'full' : 'partial'
+
+    // The arithmetic guard in the WHERE clause (refunded_amount = <the value
+    // we read>) is what prevents a race — if a concurrent refund already
+    // changed the row, this update matches zero rows rather than silently
+    // stacking on top of stale data.
+    const { data: updated, error } = await supabase
+      .from('quote_payments')
+      .update({
+        refunded_amount: newRefundedAmount,
+        refund_status: newRefundStatus,
+        refunded_at: new Date().toISOString(),
+        refunded_by: authed.appUserId ?? null,
+      })
+      .eq('id', payment.id)
+      .eq('refunded_amount', alreadyRefunded)
+      .select('*')
+      .single()
+
+    if (error || !updated) {
+      res.status(409).json({
+        error:
+          'This payment was refunded by another request in the meantime — please refresh and try again',
+      })
+      return
+    }
+
+    void logActivity({
+      tenantId: authed.tenantId,
+      type: 'system',
+      body: `Refunded $${requestedAmount.toFixed(2)} of a Square payment on quote`,
+      metadata: { quote_id: payment.quote_id, quote_payment_id: payment.id },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+
+    res.json(updated)
   }
 )
 

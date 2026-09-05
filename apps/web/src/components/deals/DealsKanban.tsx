@@ -283,6 +283,7 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
         <div>
           <h1 className="text-xl font-bold text-ink">Deals</h1>
           <p className="text-sm text-ink3 mt-0.5">
+            Dollar-value opportunities {'\u2014'}{' '}
             {deals.filter((d) => !d.is_closed_won && !d.is_closed_lost).length} active deals
             {' \u00B7 '}
             {formatValue(
@@ -290,7 +291,11 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
                 .filter((d) => !d.is_closed_won && !d.is_closed_lost)
                 .reduce((s, d) => s + Number(d.value), 0)
             )}{' '}
-            pipeline
+            pipeline. For a contact&apos;s lead stage, see{' '}
+            <Link href="/pipeline" className="underline hover:text-ink2">
+              Lead Stages
+            </Link>
+            .
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -458,7 +463,8 @@ export default function DealsKanban({ viewToggle }: { viewToggle?: React.ReactNo
                       return (
                         <div
                           key={deal.id}
-                          className="bg-white rounded-xl border border-border-brand px-4 py-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                          className="bg-white rounded-xl border border-border-brand px-4 py-3 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+                          style={{ borderLeft: `3px solid ${stage.color ?? '#e5e7eb'}` }}
                           onClick={() => router.push(`/deals/${deal.id}`)}
                         >
                           <p className="text-sm font-medium text-ink truncate mb-1">{deal.title}</p>

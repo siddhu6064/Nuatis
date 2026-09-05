@@ -5,11 +5,18 @@ import { useSearchParams } from 'next/navigation'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import IconButton from '@mui/material/IconButton'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 import { Modal } from '@/components/ui/Modal'
 import InventorySlideOver, { type InventoryItem } from './InventorySlideOver'
 
 interface Props {
   pageTitle: string
+}
+
+interface Location {
+  id: string
+  name: string
 }
 
 function qtyClass(qty: number, threshold: number): string {
@@ -31,14 +38,27 @@ export default function InventoryList({ pageTitle }: Props) {
   const [toast, setToast] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<InventoryItem | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [locationId, setLocationId] = useState('')
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set())
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsedParents((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchItems = useCallback(async (query: string) => {
+  const fetchItems = useCallback(async (query: string, location: string) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (query) params.set('q', query)
+      if (location) params.set('location_id', location)
       const res = await fetch(`/api/inventory?${params}`)
       if (res.ok) {
         const data = (await res.json()) as { data: InventoryItem[] }
@@ -50,12 +70,20 @@ export default function InventoryList({ pageTitle }: Props) {
   }, [])
 
   useEffect(() => {
+    fetch('/api/locations')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { locations: Location[] } | null) => {
+        if (data) setLocations(data.locations)
+      })
+  }, [])
+
+  useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => void fetchItems(q), 300)
+    debounceRef.current = setTimeout(() => void fetchItems(q, locationId), 300)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [q, fetchItems])
+  }, [q, locationId, fetchItems])
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -95,6 +123,103 @@ export default function InventoryList({ pageTitle }: Props) {
     setSlideOver({ open: false })
   }
 
+  // Group variants under their parent for nested rendering — only when the
+  // parent is present in the current (possibly filtered/searched) result
+  // set; a variant whose parent isn't loaded falls back to the flat
+  // "Variant of X" subtitle exactly as before, same named limitation.
+  const itemById = new Map(items.map((i) => [i.id, i]))
+  const childrenByParent = new Map<string, InventoryItem[]>()
+  for (const item of items) {
+    if (item.parent_item_id && itemById.has(item.parent_item_id)) {
+      const siblings = childrenByParent.get(item.parent_item_id) ?? []
+      siblings.push(item)
+      childrenByParent.set(item.parent_item_id, siblings)
+    }
+  }
+  const rootItems = items.filter((i) => !i.parent_item_id || !itemById.has(i.parent_item_id))
+
+  function renderRow(item: InventoryItem, isChild: boolean, childCount: number) {
+    const qty = Number(item.quantity ?? 0)
+    const thr = Number(item.reorder_threshold ?? 0)
+    const flash = flashId === item.id
+    // Only reached for an orphan variant rendered as a root row (its parent
+    // isn't in the current, possibly filtered, result set) — a nested child
+    // row never needs this since the parent-name is implied by nesting.
+    const parentName =
+      !isChild && item.parent_item_id ? (itemById.get(item.parent_item_id)?.name ?? null) : null
+
+    return (
+      <tr
+        key={item.id}
+        id={`inv-row-${item.id}`}
+        className={`border-b border-gray-50 last:border-0 transition-colors ${
+          flash ? 'bg-yellow-50' : 'hover:bg-gray-50/50'
+        } ${isChild ? 'bg-gray-50/30' : ''}`}
+      >
+        <td className={`px-6 py-4 text-sm font-medium text-ink ${isChild ? 'pl-12' : ''}`}>
+          <div className="flex items-center gap-1.5">
+            {childCount > 0 && (
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(item.id)}
+                aria-label={collapsedParents.has(item.id) ? 'Expand variants' : 'Collapse variants'}
+                className="text-ink4 hover:text-ink text-xs w-4 shrink-0"
+              >
+                {collapsedParents.has(item.id) ? '▸' : '▾'}
+              </button>
+            )}
+            {isChild && <span className="text-ink4 text-xs shrink-0">↳</span>}
+            <span>{item.name}</span>
+            {childCount > 0 && (
+              <span className="text-xs font-normal text-ink4">
+                ({childCount} variant{childCount === 1 ? '' : 's'})
+              </span>
+            )}
+          </div>
+          {(isChild || (item.parent_item_id && !itemById.has(item.parent_item_id))) && (
+            <div className="text-xs font-normal text-ink4 mt-0.5 pl-5">
+              {isChild
+                ? item.variant_label || 'Variant'
+                : `Variant${parentName ? ` of ${parentName}` : ''}${item.variant_label ? ` · ${item.variant_label}` : ''}`}
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4 text-sm text-ink3">{item.sku ?? '—'}</td>
+        <td className="px-6 py-4 text-sm">
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${qtyClass(qty, thr)}`}
+          >
+            {qty}
+          </span>
+        </td>
+        <td className="px-6 py-4 text-sm text-ink3">{item.unit}</td>
+        <td className="px-6 py-4 text-sm text-ink3">
+          {item.unit_cost != null ? `$${Number(item.unit_cost).toFixed(2)}` : '—'}
+        </td>
+        <td className="px-6 py-4 text-sm text-ink3">{item.supplier ?? '—'}</td>
+        <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
+          <IconButton
+            onClick={() => setSlideOver({ open: true, item })}
+            size="small"
+            aria-label="Edit"
+            color="primary"
+            sx={{ mr: 0.5 }}
+          >
+            ✎
+          </IconButton>
+          <IconButton
+            onClick={() => setConfirmDelete(item)}
+            size="small"
+            aria-label="Delete"
+            color="error"
+          >
+            ✕
+          </IconButton>
+        </td>
+      </tr>
+    )
+  }
+
   const handleDelete = async (item: InventoryItem) => {
     const res = await fetch(`/api/inventory/${item.id}`, { method: 'DELETE' })
     if (res.ok) {
@@ -122,7 +247,7 @@ export default function InventoryList({ pageTitle }: Props) {
       </div>
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <TextField
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -130,6 +255,22 @@ export default function InventoryList({ pageTitle }: Props) {
           size="small"
           sx={{ width: '100%', maxWidth: 384 }}
         />
+        {locations.length > 0 && (
+          <Select
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            displayEmpty
+            size="small"
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value="">All locations</MenuItem>
+            {locations.map((l) => (
+              <MenuItem key={l.id} value={l.id}>
+                {l.name}
+              </MenuItem>
+            ))}
+          </Select>
+        )}
       </div>
 
       {/* Table */}
@@ -165,53 +306,14 @@ export default function InventoryList({ pageTitle }: Props) {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
-                const qty = Number(item.quantity ?? 0)
-                const thr = Number(item.reorder_threshold ?? 0)
-                const flash = flashId === item.id
-                return (
-                  <tr
-                    key={item.id}
-                    id={`inv-row-${item.id}`}
-                    className={`border-b border-gray-50 last:border-0 transition-colors ${
-                      flash ? 'bg-yellow-50' : 'hover:bg-gray-50/50'
-                    }`}
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-ink">{item.name}</td>
-                    <td className="px-6 py-4 text-sm text-ink3">{item.sku ?? '—'}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${qtyClass(qty, thr)}`}
-                      >
-                        {qty}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-ink3">{item.unit}</td>
-                    <td className="px-6 py-4 text-sm text-ink3">
-                      {item.unit_cost != null ? `$${Number(item.unit_cost).toFixed(2)}` : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-ink3">{item.supplier ?? '—'}</td>
-                    <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
-                      <IconButton
-                        onClick={() => setSlideOver({ open: true, item })}
-                        size="small"
-                        aria-label="Edit"
-                        color="primary"
-                        sx={{ mr: 0.5 }}
-                      >
-                        ✎
-                      </IconButton>
-                      <IconButton
-                        onClick={() => setConfirmDelete(item)}
-                        size="small"
-                        aria-label="Delete"
-                        color="error"
-                      >
-                        ✕
-                      </IconButton>
-                    </td>
-                  </tr>
-                )
+              {rootItems.flatMap((item) => {
+                const children = childrenByParent.get(item.id) ?? []
+                const collapsed = collapsedParents.has(item.id)
+                const rows = [renderRow(item, false, children.length)]
+                if (children.length > 0 && !collapsed) {
+                  rows.push(...children.map((c) => renderRow(c, true, 0)))
+                }
+                return rows
               })}
             </tbody>
           </table>

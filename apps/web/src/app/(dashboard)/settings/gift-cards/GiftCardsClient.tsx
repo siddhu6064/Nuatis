@@ -3,7 +3,15 @@
 import { useState, useEffect } from 'react'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
 import { Modal } from '@/components/ui/Modal'
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card (in-store terminal)',
+  stripe: 'Online payment link',
+  other: 'Other',
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -12,7 +20,7 @@ interface GiftCard {
   code: string
   amount_cents: number
   balance_cents: number
-  status: 'active' | 'redeemed' | 'expired' | 'cancelled'
+  status: 'active' | 'redeemed' | 'expired' | 'cancelled' | 'pending_payment'
   recipient_name: string | null
   recipient_email: string | null
   expires_at: string | null
@@ -41,6 +49,7 @@ const STATUS_BADGE: Record<GiftCard['status'], { bg: string; text: string; label
   redeemed: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Redeemed' },
   expired: { bg: 'bg-red-100', text: 'text-red-700', label: 'Expired' },
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', label: 'Cancelled' },
+  pending_payment: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Awaiting Payment' },
 }
 
 function StatusBadge({ status }: { status: GiftCard['status'] }) {
@@ -194,6 +203,93 @@ function RedeemModal({ onClose, onSuccess, apiUrl, prefillCode }: RedeemModalPro
   )
 }
 
+// ── Transfer Modal ────────────────────────────────────────────────────────────
+
+interface TransferModalProps {
+  card: GiftCard
+  onClose: () => void
+  onSuccess: () => void
+  apiUrl: string
+}
+
+function TransferModal({ card, onClose, onSuccess, apiUrl }: TransferModalProps) {
+  const [recipientName, setRecipientName] = useState(card.recipient_name ?? '')
+  const [recipientEmail, setRecipientEmail] = useState(card.recipient_email ?? '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleTransfer() {
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/gift-cards/${card.id}/transfer`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_name: recipientName.trim(),
+          recipient_email: recipientEmail.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(json.error ?? 'Failed to transfer')
+        return
+      }
+      onSuccess()
+      onClose()
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal
+      onClose={onClose}
+      title="Transfer Gift Card"
+      maxWidth="xs"
+      footer={
+        <>
+          <Button onClick={onClose} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={() => void handleTransfer()} variant="contained" disabled={loading}>
+            {loading ? 'Transferring…' : 'Transfer'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-xs text-ink4">
+          Reassign this card's recipient. The balance and code stay the same — only who it belongs
+          to changes.
+        </p>
+        <TextField
+          label="New Recipient Name"
+          value={recipientName}
+          onChange={(e) => setRecipientName(e.target.value)}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="New Recipient Email"
+          type="email"
+          value={recipientEmail}
+          onChange={(e) => setRecipientEmail(e.target.value)}
+          fullWidth
+          size="small"
+        />
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 // ── Issue Form ────────────────────────────────────────────────────────────────
 
 interface IssueFormProps {
@@ -206,8 +302,10 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
   const [amountDollars, setAmountDollars] = useState('')
   const [recipientName, setRecipientName] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('cash')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
 
   async function handleSubmit() {
     setError(null)
@@ -226,11 +324,16 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
           amount_cents,
           recipient_name: recipientName.trim() || undefined,
           recipient_email: recipientEmail.trim() || undefined,
+          payment_method: paymentMethod,
         }),
       })
-      const json = (await res.json()) as { error?: string }
+      const json = (await res.json()) as { error?: string; payment_url?: string | null }
       if (!res.ok) {
         setError(json.error ?? 'Failed to issue gift card')
+      } else if (json.payment_url) {
+        // Online payment link — stay open so staff can copy/send it rather
+        // than closing immediately, since the card isn't active until paid.
+        setPaymentUrl(json.payment_url)
       } else {
         onSuccess()
       }
@@ -239,6 +342,47 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (paymentUrl) {
+    return (
+      <div className="bg-white rounded-xl border border-border-brand mt-4">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Send this payment link</h2>
+        </div>
+        <div className="px-5 py-5">
+          <p className="text-xs text-ink4 mb-3">
+            The gift card activates automatically once this is paid. Copy the link and send it to
+            the customer.
+          </p>
+          <div className="flex items-center gap-2">
+            <TextField
+              value={paymentUrl}
+              size="small"
+              fullWidth
+              slotProps={{ input: { readOnly: true } }}
+            />
+            <Button
+              variant="outlined"
+              onClick={() => void navigator.clipboard.writeText(paymentUrl)}
+            >
+              Copy
+            </Button>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-brand">
+          <Button
+            onClick={() => {
+              setPaymentUrl(null)
+              onSuccess()
+            }}
+            variant="contained"
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -275,6 +419,21 @@ function IssueForm({ apiUrl, onSuccess, onCancel }: IssueFormProps) {
           size="small"
           fullWidth
         />
+        <TextField
+          select
+          label="Payment Method"
+          required
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+          size="small"
+          fullWidth
+        >
+          {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
+        </TextField>
       </div>
       {error && (
         <div className="mx-5 mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -302,6 +461,7 @@ export default function GiftCardsClient() {
   const [loading, setLoading] = useState(true)
   const [showIssueForm, setShowIssueForm] = useState(false)
   const [redeemCode, setRedeemCode] = useState<string | null>(null)
+  const [transferCard, setTransferCard] = useState<GiftCard | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   function showToast(type: 'success' | 'error', msg: string) {
@@ -334,6 +494,11 @@ export default function GiftCardsClient() {
 
   function handleRedeemSuccess() {
     showToast('success', 'Gift card redeemed successfully')
+    void fetchCards()
+  }
+
+  function handleTransferSuccess() {
+    showToast('success', 'Gift card transferred successfully')
     void fetchCards()
   }
 
@@ -443,11 +608,20 @@ export default function GiftCardsClient() {
                       <StatusBadge status={card.status} />
                     </td>
                     <td className="px-4 py-3 text-sm text-ink3">{formatDate(card.expires_at)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       {card.status === 'active' && (
-                        <Button onClick={() => setRedeemCode(card.code)} size="small">
-                          Redeem
-                        </Button>
+                        <>
+                          <Button onClick={() => setRedeemCode(card.code)} size="small">
+                            Redeem
+                          </Button>
+                          <Button
+                            onClick={() => setTransferCard(card)}
+                            size="small"
+                            color="inherit"
+                          >
+                            Transfer
+                          </Button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -465,6 +639,16 @@ export default function GiftCardsClient() {
           prefillCode={redeemCode}
           onClose={() => setRedeemCode(null)}
           onSuccess={handleRedeemSuccess}
+        />
+      )}
+
+      {/* Transfer modal */}
+      {transferCard && (
+        <TransferModal
+          apiUrl={API_URL}
+          card={transferCard}
+          onClose={() => setTransferCard(null)}
+          onSuccess={handleTransferSuccess}
         />
       )}
 

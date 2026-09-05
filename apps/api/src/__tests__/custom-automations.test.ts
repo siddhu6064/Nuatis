@@ -112,6 +112,25 @@ describe('POST /api/custom-automations', () => {
   })
 })
 
+describe('POST /api/custom-automations — send_webhook action', () => {
+  it('accepts send_webhook as a valid action_type', async () => {
+    const res = await request(makeApp())
+      .post('/api/custom-automations')
+      .set('Content-Type', 'application/json')
+      .send({
+        name: 'Notify External System',
+        natural_language_prompt: 'Send new contacts to my Zapier webhook',
+        trigger_type: 'new_contact',
+        trigger_config: {},
+        action_type: 'send_webhook',
+        action_config: { url: 'https://hooks.example.com/inbound' },
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.action_type).toBe('send_webhook')
+  })
+})
+
 describe('POST /api/custom-automations — invalid trigger_type', () => {
   it('returns 400 for unknown trigger_type', async () => {
     const res = await request(makeApp())

@@ -43,6 +43,7 @@ function makeApp() {
 beforeEach(() => {
   store = createStore()
   store.tables['contacts'] = []
+  store.tables['companies'] = []
   store.tables['activity_log'] = []
   store.tables['users'] = []
 })
@@ -115,5 +116,53 @@ describe('GET /api/contacts/:contactId/activity', () => {
     expect(Array.isArray(res.body.items)).toBe(true)
     expect(typeof res.body.hasMore).toBe('boolean')
     expect(res.body.nextCursor === null || typeof res.body.nextCursor === 'string').toBe(true)
+  })
+})
+
+describe('GET /api/companies/:companyId/activity', () => {
+  it('returns only the activity for that company, tenant-scoped', async () => {
+    store.tables['companies'] = [{ id: 'comp-1', tenant_id: TENANT_ID, name: 'Acme' }]
+    store.tables['activity_log'] = [
+      {
+        id: randomUUID(),
+        tenant_id: TENANT_ID,
+        company_id: 'comp-1',
+        type: 'system',
+        body: 'Merged Beta Inc into this company',
+        actor_type: 'user',
+        actor_id: USER_ID,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: randomUUID(),
+        tenant_id: TENANT_ID,
+        company_id: 'other-company',
+        type: 'system',
+        body: 'unrelated',
+        actor_type: 'system',
+        created_at: new Date().toISOString(),
+      },
+    ]
+    store.tables['users'] = [{ id: USER_ID, full_name: 'Sid' }]
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .get('/api/companies/comp-1/activity')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    expect((res.body.items as Row[]).map((i) => i['body'] as string)).toEqual([
+      'Merged Beta Inc into this company',
+    ])
+    expect((res.body.items as Row[])[0]?.['actor_name']).toBe('Sid')
+  })
+
+  it('404s for a company in another tenant', async () => {
+    store.tables['companies'] = [{ id: 'comp-x', tenant_id: 'other-tenant', name: 'X' }]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .get('/api/companies/comp-x/activity')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
   })
 })

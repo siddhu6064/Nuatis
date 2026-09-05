@@ -25,6 +25,8 @@ export interface Appointment {
   staff_members: { id: string; name: string; color_hex: string } | null
   video_link?: string | null
   video_provider?: string | null
+  fee_amount_cents?: number | null
+  fee_status?: 'link_sent' | 'charged' | 'refunded' | null
 }
 
 const STATUS_COLOR: Record<AppointmentStatus, string> = {
@@ -124,8 +126,11 @@ export default function AppointmentDrawer({
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [refundingFee, setRefundingFee] = useState(false)
+  const [refundFeeError, setRefundFeeError] = useState<string | null>(null)
 
   const canDelete = userRole === 'owner' || userRole === 'admin'
+  const canRefund = userRole === 'owner' || userRole === 'admin' || userRole === 'manager'
 
   const start = formatDateTime(localAppt.start_time)
   const endTime = new Date(localAppt.end_time).toLocaleTimeString('en-US', {
@@ -203,6 +208,25 @@ export default function AppointmentDrawer({
       setDeleteConfirm(false)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handleRefundFee() {
+    setRefundingFee(true)
+    setRefundFeeError(null)
+    try {
+      const res = await fetch(`/api/appointments/${localAppt.id}/refund-fee`, { method: 'POST' })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(d.error ?? 'Refund failed')
+      }
+      const updated = { ...localAppt, fee_status: 'refunded' as const }
+      setLocalAppt(updated)
+      onUpdated(updated)
+    } catch (err) {
+      setRefundFeeError(err instanceof Error ? err.message : 'Refund failed')
+    } finally {
+      setRefundingFee(false)
     }
   }
 
@@ -397,6 +421,33 @@ export default function AppointmentDrawer({
             <div>
               <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">Notes</p>
               <p className="text-sm text-ink2 whitespace-pre-wrap">{localAppt.notes}</p>
+            </div>
+          )}
+
+          {localAppt.fee_status && (
+            <div>
+              <p className="text-xs font-medium text-ink4 uppercase tracking-wide mb-1">
+                Cancellation / No-Show Fee
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm text-ink2">
+                  ${((localAppt.fee_amount_cents ?? 0) / 100).toFixed(2)}
+                  {localAppt.fee_status === 'link_sent' && ' — payment link sent'}
+                  {localAppt.fee_status === 'charged' && ' — charged to saved card'}
+                  {localAppt.fee_status === 'refunded' && ' — refunded'}
+                </p>
+                {canRefund && localAppt.fee_status === 'charged' && (
+                  <Button
+                    onClick={() => void handleRefundFee()}
+                    disabled={refundingFee}
+                    size="small"
+                    color="error"
+                  >
+                    {refundingFee ? 'Refunding…' : 'Refund'}
+                  </Button>
+                )}
+              </div>
+              {refundFeeError && <p className="text-xs text-red-600 mt-1">{refundFeeError}</p>}
             </div>
           )}
         </div>

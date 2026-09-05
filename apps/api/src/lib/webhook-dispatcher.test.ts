@@ -13,34 +13,36 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: () => createMockSupabase(store),
 }))
 
+// dispatchWebhook no longer calls fetch directly — it inserts a
+// webhook_deliveries row and enqueues a job; the actual HTTP POST happens in
+// workers/webhook-delivery-worker.ts (covered by its own test), driven by
+// BullMQ's own retry/backoff instead of a single inline attempt. Mock the
+// queue the same way every other test in this codebase mocks a BullMQ queue
+// module (see lead-score-queue.js usage elsewhere) rather than hitting Redis.
+const addMock = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({}))
+jest.unstable_mockModule('./webhook-delivery-queue.js', () => ({
+  getWebhookDeliveryQueue: () => ({ add: addMock }),
+}))
+
 process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
 process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000wd00001'
-
-const fetchMock = jest.fn<typeof fetch>(async () => {
-  return { ok: true, status: 200, text: async () => '' } as unknown as Response
-})
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).fetch = fetchMock
 
 const { dispatchWebhook } = await import('./webhook-dispatcher.js')
 
 beforeEach(() => {
   store = createStore()
   store.tables['webhook_subscriptions'] = []
-  fetchMock.mockClear()
-  fetchMock.mockResolvedValue({
-    ok: true,
-    status: 200,
-    text: async () => '',
-  } as unknown as Response)
+  store.tables['webhook_deliveries'] = []
+  addMock.mockClear()
 })
 
 describe('dispatchWebhook', () => {
-  it('POSTs to subscriber URL with HMAC signature header when event_type matches', async () => {
+  it('logs a delivery and enqueues a job when event_type matches an active subscription', async () => {
+    const subId = randomUUID()
     ;(store.tables['webhook_subscriptions'] as Row[]).push({
-      id: randomUUID(),
+      id: subId,
       tenant_id: TENANT_ID,
       url: 'https://hook.test/recv',
       event_types: ['call.completed'],
@@ -50,17 +52,19 @@ describe('dispatchWebhook', () => {
 
     await dispatchWebhook(TENANT_ID, 'call.completed', { duration: 30 })
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, opts] = fetchMock.mock.calls[0]! as [string, RequestInit]
-    expect(url).toBe('https://hook.test/recv')
-    expect(opts.method).toBe('POST')
-    const headers = opts.headers as Record<string, string>
-    expect(headers['X-Webhook-Signature']).toBeDefined()
-    expect(typeof headers['X-Webhook-Signature']).toBe('string')
-    expect(headers['X-Webhook-Signature']!.length).toBeGreaterThan(0)
+    const deliveries = store.tables['webhook_deliveries'] as Row[]
+    expect(deliveries).toHaveLength(1)
+    expect(deliveries[0]?.['subscription_id']).toBe(subId)
+    expect(deliveries[0]?.['event_type']).toBe('call.completed')
+    expect(deliveries[0]?.['status']).toBe('pending')
+
+    expect(addMock).toHaveBeenCalledTimes(1)
+    const [jobName, jobData] = addMock.mock.calls[0]! as [string, { deliveryId: string }]
+    expect(jobName).toBe('deliver')
+    expect(jobData.deliveryId).toBe(deliveries[0]?.['id'])
   })
 
-  it('does NOT call fetch when event_type does not match subscription event_types', async () => {
+  it('does NOT enqueue when event_type does not match subscription event_types', async () => {
     ;(store.tables['webhook_subscriptions'] as Row[]).push({
       id: randomUUID(),
       tenant_id: TENANT_ID,
@@ -72,10 +76,11 @@ describe('dispatchWebhook', () => {
 
     await dispatchWebhook(TENANT_ID, 'call.completed', {})
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(addMock).not.toHaveBeenCalled()
+    expect(store.tables['webhook_deliveries']).toHaveLength(0)
   })
 
-  it('does NOT call fetch for inactive subscription', async () => {
+  it('does NOT enqueue for an inactive subscription', async () => {
     ;(store.tables['webhook_subscriptions'] as Row[]).push({
       id: randomUUID(),
       tenant_id: TENANT_ID,
@@ -87,6 +92,6 @@ describe('dispatchWebhook', () => {
 
     await dispatchWebhook(TENANT_ID, 'call.completed', {})
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(addMock).not.toHaveBeenCalled()
   })
 })

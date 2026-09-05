@@ -598,12 +598,7 @@ router.get('/plg', requireAuth, async (req: Request, res: Response): Promise<voi
       supabase
         .from('analytics_events')
         .select('event_name, created_at')
-        .in('event_name', [
-          'upgrade_completed',
-          'upgrade_page_viewed',
-          'upgrade_cta_clicked',
-          'signup_started',
-        ]),
+        .in('event_name', ['upgrade_completed', 'upgrade_page_viewed', 'upgrade_cta_clicked']),
     ])
 
     const mayaOnly = mayaRes.count ?? 0
@@ -638,13 +633,15 @@ router.get('/referrals', requireAuth, async (req: Request, res: Response): Promi
   const supabase = getServiceClient()
 
   try {
-    // Contacts with referral sources
+    // Contacts with referral sources — catches both manually/voice-captured
+    // attribution (referral_source_detail) and link-based customer referrals
+    // (referred_by_contact_id, from the customer-refers-a-friend program).
     const { data: referred } = await supabase
       .from('contacts')
       .select('id, referral_source_detail, referred_by_contact_id')
       .eq('tenant_id', authed.tenantId)
       .eq('is_archived', false)
-      .not('referral_source_detail', 'is', null)
+      .or('referral_source_detail.not.is.null,referred_by_contact_id.not.is.null')
 
     const referredContacts = referred ?? []
     const totalReferred = referredContacts.length
@@ -652,7 +649,8 @@ router.get('/referrals', requireAuth, async (req: Request, res: Response): Promi
     // Top sources by count
     const sourceCounts = new Map<string, number>()
     for (const c of referredContacts) {
-      const src = c.referral_source_detail as string
+      const src = c.referral_source_detail as string | null
+      if (!src) continue
       sourceCounts.set(src, (sourceCounts.get(src) ?? 0) + 1)
     }
 
@@ -708,11 +706,21 @@ router.get('/referrals', requireAuth, async (req: Request, res: Response): Promi
       conversionRate = Math.round(((withAppointments ?? 0) / totalReferred) * 100)
     }
 
+    // Customer-referral reward issuance — separate from the source/attribution
+    // stats above, but reported alongside since it's the same "referrals" view.
+    const { data: rewards } = await supabase
+      .from('customer_referral_rewards')
+      .select('status')
+      .eq('tenant_id', authed.tenantId)
+    const rewardRows = rewards ?? []
+
     res.json({
       top_sources: topSources,
       top_referrers: topReferrers,
       total_referred: totalReferred,
       referral_conversion_rate: conversionRate,
+      rewards_issued: rewardRows.filter((r) => r.status === 'issued').length,
+      rewards_pending: rewardRows.filter((r) => r.status === 'pending').length,
     })
   } catch (err) {
     console.error('[insights] referrals error:', err)
@@ -1005,6 +1013,105 @@ router.get(
     }
   }
 )
+
+// ── GET /api/insights/quota-attainment ───────────────────────────────────────
+// Per-rep sales quota vs. actual closed-won value for one month. Owner/admin
+// see every rep; anyone else sees only their own row.
+router.get('/quota-attainment', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  const rawPeriod = req.query['period_start'] as string | undefined
+  const match = rawPeriod ? /^(\d{4})-(\d{2})/.exec(rawPeriod) : null
+  const now = new Date()
+  const periodStart = match
+    ? `${match[1]}-${match[2]}-01`
+    : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const periodDate = new Date(`${periodStart}T00:00:00Z`)
+  const periodEnd = new Date(
+    Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth() + 1, 1)
+  ).toISOString()
+
+  try {
+    const { data: quotaRows } = await supabase
+      .from('sales_quotas')
+      .select('user_id, quota_amount')
+      .eq('tenant_id', authed.tenantId)
+      .eq('period_start', periodStart)
+
+    const quotaByUser = new Map<string, number>()
+    for (const row of quotaRows ?? []) {
+      quotaByUser.set(row.user_id, Number(row.quota_amount ?? 0))
+    }
+
+    const isManager = authed.role === 'owner' || authed.role === 'admin'
+    const selfId = authed.appUserId
+
+    const { data: wonDeals } = await supabase
+      .from('deals')
+      .select('value, assigned_to_user_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('is_closed_won', true)
+      .gte('updated_at', `${periodStart}T00:00:00.000Z`)
+      .lt('updated_at', periodEnd)
+
+    const actualByUser = new Map<string, number>()
+    for (const deal of wonDeals ?? []) {
+      if (!deal.assigned_to_user_id) continue
+      actualByUser.set(
+        deal.assigned_to_user_id,
+        (actualByUser.get(deal.assigned_to_user_id) ?? 0) + Number(deal.value ?? 0)
+      )
+    }
+
+    let userIds: string[]
+    let nameById: Map<string, string>
+    if (isManager) {
+      // Managers see every active rep, even one nobody has set a quota for
+      // yet — otherwise there'd be no way to set someone's FIRST quota.
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('tenant_id', authed.tenantId)
+        .eq('is_active', true)
+      userIds = (users ?? []).map((u) => u.id)
+      nameById = new Map((users ?? []).map((u) => [u.id, u.full_name as string]))
+    } else if (selfId) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('tenant_id', authed.tenantId)
+        .eq('id', selfId)
+        .maybeSingle()
+      userIds = users ? [selfId] : []
+      nameById = new Map(users ? [[selfId, users.full_name as string]] : [])
+    } else {
+      userIds = []
+      nameById = new Map()
+    }
+
+    const reps = userIds.map((userId) => {
+      const quota_amount = quotaByUser.get(userId) ?? null
+      const actual_amount = Math.round((actualByUser.get(userId) ?? 0) * 100) / 100
+      const attainment_pct =
+        quota_amount && quota_amount > 0
+          ? Math.round((actual_amount / quota_amount) * 10000) / 100
+          : null
+      return {
+        user_id: userId,
+        full_name: nameById.get(userId) ?? 'Unknown',
+        quota_amount,
+        actual_amount,
+        attainment_pct,
+      }
+    })
+
+    res.json({ period_start: periodStart, reps })
+  } catch (err) {
+    console.error('[insights] quota-attainment error:', err)
+    res.status(500).json({ error: 'Failed to fetch quota attainment' })
+  }
+})
 
 // ── GET /api/insights/pipeline-funnel ────────────────────────────────────────
 router.get('/pipeline-funnel', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -1615,6 +1722,346 @@ router.get('/maya-latency', requireAuth, async (req: Request, res: Response): Pr
   } catch (err) {
     console.error('[insights] maya-latency error:', err)
     res.status(500).json({ error: 'Failed to fetch latency data' })
+  }
+})
+
+// ── GET /api/insights/expenses ────────────────────────────────────────────────
+router.get('/expenses', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  try {
+    // Expenses module gate — soft: return an empty/zeroed shape instead of
+    // 403, since a tenant can have Insights without Expenses.
+    const expensesEnabled = await isModuleEnabled(authed.tenantId, 'expenses')
+    if (!expensesEnabled) {
+      res.json({ summary: null, by_category: [], by_month: [], pnl: [], recent_expenses: [] })
+      return
+    }
+
+    const { from, to } = getDateRange(req)
+
+    const { data: expensesData } = await supabase
+      .from('expenses')
+      .select(
+        'id, expense_number, amount, expense_date, vendor, category_id, recurring_expense_id, expense_categories(name)'
+      )
+      .eq('tenant_id', authed.tenantId)
+      .is('deleted_at', null)
+      // A rejected expense didn't happen — exclude it from P&L. Pending stays
+      // in (real money already logged, just needs sign-off). NULL (no
+      // approval required) must stay too — plain .neq() drops NULLs under
+      // SQL's three-valued logic, hence the explicit .or().
+      .or('approval_status.is.null,approval_status.neq.rejected')
+      .gte('expense_date', from.slice(0, 10))
+      .lte('expense_date', to.slice(0, 10))
+      .order('expense_date', { ascending: false })
+
+    const expenses = expensesData ?? []
+
+    // Supabase infers a nested to-one relation as an array without generated
+    // types configured — normalize to a single name here.
+    function categoryName(e: { expense_categories: unknown }): string {
+      const rel = e.expense_categories
+      const row = Array.isArray(rel) ? (rel[0] as { name?: string } | undefined) : rel
+      return (row as { name?: string } | null)?.name ?? 'Uncategorized'
+    }
+
+    const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0)
+    const monthStart = new Date()
+    monthStart.setUTCDate(1)
+    monthStart.setUTCHours(0, 0, 0, 0)
+    const monthStartStr = monthStart.toISOString().slice(0, 10)
+    const recurringAmountThisMonth = expenses
+      .filter((e) => e.recurring_expense_id != null && (e.expense_date as string) >= monthStartStr)
+      .reduce((sum, e) => sum + Number(e.amount ?? 0), 0)
+
+    // by_category
+    const categoryMap = new Map<string, { name: string; total: number; count: number }>()
+    for (const e of expenses) {
+      const cid = (e.category_id as string | null) ?? 'uncategorized'
+      const cname = categoryName(e)
+      const entry = categoryMap.get(cid) ?? { name: cname, total: 0, count: 0 }
+      entry.total += Number(e.amount ?? 0)
+      entry.count += 1
+      categoryMap.set(cid, entry)
+    }
+    const by_category = [...categoryMap.entries()]
+      .map(([category_id, v]) => ({
+        category_id,
+        category_name: v.name,
+        total_amount: Math.round(v.total * 100) / 100,
+        count: v.count,
+        pct: totalAmount > 0 ? Math.round((v.total / totalAmount) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.total_amount - a.total_amount)
+
+    // by_month
+    const monthMap = new Map<string, { total: number; count: number }>()
+    for (const e of expenses) {
+      const month = (e.expense_date as string).slice(0, 7)
+      const entry = monthMap.get(month) ?? { total: 0, count: 0 }
+      entry.total += Number(e.amount ?? 0)
+      entry.count += 1
+      monthMap.set(month, entry)
+    }
+    const by_month = [...monthMap.entries()]
+      .map(([month, v]) => ({
+        month,
+        total_amount: Math.round(v.total * 100) / 100,
+        count: v.count,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+
+    // Revenue side (cash-basis: completed orders + received invoices),
+    // grouped by month, for the pnl array.
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('total, completed_at')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'completed')
+      .gte('completed_at', from)
+      .lte('completed_at', to)
+
+    const { data: invoicesData } = await supabase
+      .from('invoices')
+      .select('total, paid_at')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'received')
+      .gte('paid_at', from)
+      .lte('paid_at', to)
+
+    const revenueMonthMap = new Map<string, number>()
+    for (const o of ordersData ?? []) {
+      if (!o.completed_at) continue
+      const month = (o.completed_at as string).slice(0, 7)
+      revenueMonthMap.set(month, (revenueMonthMap.get(month) ?? 0) + Number(o.total ?? 0))
+    }
+    for (const inv of invoicesData ?? []) {
+      if (!inv.paid_at) continue
+      const month = (inv.paid_at as string).slice(0, 7)
+      revenueMonthMap.set(month, (revenueMonthMap.get(month) ?? 0) + Number(inv.total ?? 0))
+    }
+
+    const allMonths = new Set([...monthMap.keys(), ...revenueMonthMap.keys()])
+    const pnl = [...allMonths].sort().map((month) => {
+      const revenue = Math.round((revenueMonthMap.get(month) ?? 0) * 100) / 100
+      const monthExpenses = Math.round((monthMap.get(month)?.total ?? 0) * 100) / 100
+      return {
+        month,
+        revenue,
+        expenses: monthExpenses,
+        net: Math.round((revenue - monthExpenses) * 100) / 100,
+      }
+    })
+
+    const recent_expenses = expenses.slice(0, 10).map((e) => ({
+      id: e.id,
+      expense_number: e.expense_number,
+      vendor: e.vendor,
+      category_name: categoryName(e),
+      amount: Number(e.amount ?? 0),
+      expense_date: e.expense_date,
+    }))
+
+    res.json({
+      summary: {
+        total_expenses: expenses.length,
+        total_amount: Math.round(totalAmount * 100) / 100,
+        avg_expense_amount:
+          expenses.length > 0 ? Math.round((totalAmount / expenses.length) * 100) / 100 : 0,
+        recurring_amount_this_month: Math.round(recurringAmountThisMonth * 100) / 100,
+      },
+      by_category,
+      by_month,
+      pnl,
+      recent_expenses,
+    })
+  } catch (err) {
+    console.error('[insights] expenses error:', err)
+    res.status(500).json({ error: 'Failed to fetch expense insights' })
+  }
+})
+
+router.get('/customer-nps', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  try {
+    const { data: responsesData } = await supabase
+      .from('nps_responses')
+      .select('score, comment, responded_at, contacts(full_name)')
+      .eq('tenant_id', authed.tenantId)
+      .eq('status', 'responded')
+      .order('responded_at', { ascending: false })
+
+    const responses = responsesData ?? []
+
+    function contactName(r: { contacts: unknown }): string | null {
+      const rel = r.contacts
+      const row = Array.isArray(rel) ? (rel[0] as { full_name?: string } | undefined) : rel
+      return (row as { full_name?: string } | null)?.full_name ?? null
+    }
+
+    const promoters = responses.filter((r) => Number(r.score) >= 9).length
+    const passives = responses.filter((r) => Number(r.score) >= 7 && Number(r.score) <= 8).length
+    const detractors = responses.filter((r) => Number(r.score) <= 6).length
+    const responseCount = responses.length
+    const avgScore =
+      responseCount > 0
+        ? responses.reduce((sum, r) => sum + Number(r.score ?? 0), 0) / responseCount
+        : 0
+    const npsScore =
+      responseCount > 0 ? Math.round(((promoters - detractors) / responseCount) * 100) : 0
+
+    const monthMap = new Map<string, { total: number; count: number }>()
+    for (const r of responses) {
+      if (!r.responded_at) continue
+      const month = (r.responded_at as string).slice(0, 7)
+      const entry = monthMap.get(month) ?? { total: 0, count: 0 }
+      entry.total += Number(r.score ?? 0)
+      entry.count += 1
+      monthMap.set(month, entry)
+    }
+    const trend = [...monthMap.entries()]
+      .map(([month, v]) => ({
+        month,
+        avg_score: Math.round((v.total / v.count) * 10) / 10,
+        response_count: v.count,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+
+    const recent_responses = responses.slice(0, 10).map((r) => ({
+      score: r.score,
+      comment: r.comment,
+      responded_at: r.responded_at,
+      contact_name: contactName(r),
+    }))
+
+    res.json({
+      summary: {
+        response_count: responseCount,
+        avg_score: Math.round(avgScore * 10) / 10,
+        nps_score: npsScore,
+        promoters,
+        passives,
+        detractors,
+      },
+      trend,
+      recent_responses,
+    })
+  } catch (err) {
+    console.error('[insights] customer-nps error:', err)
+    res.status(500).json({ error: 'Failed to fetch customer NPS insights' })
+  }
+})
+
+// ── GET /api/insights/retention — cohort retention curve ─────────────────────
+// Cohorts contacts by the month they were created, then for each subsequent
+// month reports the % of that cohort with at least one activity_log entry —
+// a real "active" signal already written by nearly every subsystem (calls,
+// notes, appointments, deals, etc), so this needs no new table.
+router.get('/retention', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  try {
+    const months = Math.min(12, Math.max(1, Number(req.query['months']) || 6))
+
+    const now = new Date()
+    const windowStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1)
+    )
+
+    const { data: contactsData, error: contactsErr } = await supabase
+      .from('contacts')
+      .select('id, created_at')
+      .eq('tenant_id', authed.tenantId)
+      .gte('created_at', windowStart.toISOString())
+
+    if (contactsErr) {
+      res.status(500).json({ error: contactsErr.message })
+      return
+    }
+
+    const contacts = contactsData ?? []
+    const contactIds = contacts.map((c) => c.id)
+
+    const monthKey = (d: Date): string =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+    const monthsBetween = (a: Date, b: Date): number =>
+      (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
+
+    const cohortOf = new Map<string, string>() // contact_id -> cohort month key
+    const cohortSize = new Map<string, number>()
+    for (const c of contacts) {
+      const key = monthKey(new Date(c.created_at as string))
+      cohortOf.set(c.id, key)
+      cohortSize.set(key, (cohortSize.get(key) ?? 0) + 1)
+    }
+
+    // active[cohortKey][offset] = Set of contact ids active that many months
+    // after their own cohort month.
+    const active = new Map<string, Map<number, Set<string>>>()
+
+    if (contactIds.length > 0) {
+      const { data: activityData, error: activityErr } = await supabase
+        .from('activity_log')
+        .select('contact_id, created_at')
+        .eq('tenant_id', authed.tenantId)
+        .in('contact_id', contactIds)
+        .gte('created_at', windowStart.toISOString())
+
+      if (activityErr) {
+        res.status(500).json({ error: activityErr.message })
+        return
+      }
+
+      for (const row of activityData ?? []) {
+        const contactId = row.contact_id as string | null
+        if (!contactId) continue
+        const cohortKey = cohortOf.get(contactId)
+        if (!cohortKey) continue
+        const cohortStart = new Date(`${cohortKey}-01T00:00:00.000Z`)
+        const offset = monthsBetween(cohortStart, new Date(row.created_at as string))
+        if (offset < 0) continue
+
+        if (!active.has(cohortKey)) active.set(cohortKey, new Map())
+        const byOffset = active.get(cohortKey)!
+        if (!byOffset.has(offset)) byOffset.set(offset, new Set())
+        byOffset.get(offset)!.add(contactId)
+      }
+    }
+
+    const cohortKeys = [...cohortSize.keys()].sort()
+    const nowKey = monthKey(now)
+    const maxAvailableOffset = monthsBetween(windowStart, now)
+
+    const cohorts = cohortKeys.map((key) => {
+      const size = cohortSize.get(key) ?? 0
+      const cohortStart = new Date(`${key}-01T00:00:00.000Z`)
+      const offsetsForThisCohort = monthsBetween(
+        cohortStart,
+        new Date(`${nowKey}-01T00:00:00.000Z`)
+      )
+
+      const retention: Array<number | null> = []
+      for (let offset = 0; offset <= maxAvailableOffset; offset++) {
+        if (offset > offsetsForThisCohort) {
+          retention.push(null) // this month hasn't happened yet for this cohort
+          continue
+        }
+        const activeCount = active.get(key)?.get(offset)?.size ?? 0
+        retention.push(size > 0 ? Math.round((activeCount / size) * 1000) / 10 : 0)
+      }
+
+      return { cohort: key, size, retention }
+    })
+
+    res.json({ cohorts, months })
+  } catch (err) {
+    console.error('[insights] retention error:', err)
+    res.status(500).json({ error: 'Failed to fetch retention cohorts' })
   }
 })
 

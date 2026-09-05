@@ -3,6 +3,7 @@ import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { logActivity } from '../lib/activity.js'
+import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import type { NextFunction } from 'express'
 
 const router = Router()
@@ -15,6 +16,16 @@ async function requireDeals(req: Request, res: Response, next: NextFunction): Pr
     return
   }
   next()
+}
+
+interface DealLineItemInput {
+  description: string
+  quantity: number
+  unit_price: number
+}
+
+function sumLineItems(items: DealLineItemInput[]): number {
+  return Number(items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0).toFixed(2))
 }
 
 // ── GET /api/deals ───────────────────────────────────────────────────────────
@@ -340,6 +351,12 @@ router.get(
       role: row.role ?? null,
     }))
 
+    const { data: lineItems } = await supabase
+      .from('deal_line_items')
+      .select('id, description, quantity, unit_price, amount, sort_order')
+      .eq('deal_id', req.params['id'])
+      .order('sort_order', { ascending: true })
+
     res.json({
       ...deal,
       stage_name: (deal.pipeline_stages as { name: string } | null)?.name ?? null,
@@ -347,6 +364,7 @@ router.get(
       contact_name: (deal.contacts as { full_name: string } | null)?.full_name ?? null,
       company_name: (deal.companies as { name: string } | null)?.name ?? null,
       deal_contacts: dealContacts,
+      line_items: lineItems ?? [],
     })
   }
 )
@@ -363,7 +381,13 @@ router.post('/', requireAuth, requireDeals, async (req: Request, res: Response):
     return
   }
 
-  const value = typeof b['value'] === 'number' ? b['value'] : 0
+  const lineItems = Array.isArray(b['line_items'])
+    ? (b['line_items'] as DealLineItemInput[]).filter(
+        (i) => typeof i?.description === 'string' && i.description.trim()
+      )
+    : []
+  const value =
+    lineItems.length > 0 ? sumLineItems(lineItems) : typeof b['value'] === 'number' ? b['value'] : 0
   const contactId = typeof b['contact_id'] === 'string' ? b['contact_id'] : null
   const companyId = typeof b['company_id'] === 'string' ? b['company_id'] : null
   const stageId = typeof b['pipeline_stage_id'] === 'string' ? b['pipeline_stage_id'] : null
@@ -393,6 +417,32 @@ router.post('/', requireAuth, requireDeals, async (req: Request, res: Response):
     return
   }
 
+  let insertedLineItems: unknown[] = []
+  if (lineItems.length > 0) {
+    const itemRows = lineItems.map((item, i) => ({
+      deal_id: deal.id,
+      tenant_id: authed.tenantId,
+      description: item.description.trim(),
+      quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+      unit_price: typeof item.unit_price === 'number' ? item.unit_price : 0,
+      sort_order: i,
+    }))
+    const { data: items, error: itemsErr } = await supabase
+      .from('deal_line_items')
+      .insert(itemRows)
+      .select('*')
+    if (itemsErr) {
+      // The deal row itself already committed with a value derived from
+      // these line items — better to say so explicitly than return 201 with
+      // a value that doesn't match an empty line_items array.
+      res
+        .status(500)
+        .json({ error: `Deal created, but line items failed to save: ${itemsErr.message}` })
+      return
+    }
+    insertedLineItems = items ?? []
+  }
+
   void logActivity({
     tenantId: authed.tenantId,
     contactId: contactId ?? undefined,
@@ -408,6 +458,7 @@ router.post('/', requireAuth, requireDeals, async (req: Request, res: Response):
     stage_color: (deal.pipeline_stages as { color: string } | null)?.color ?? null,
     contact_name: (deal.contacts as { full_name: string } | null)?.full_name ?? null,
     company_name: (deal.companies as { name: string } | null)?.name ?? null,
+    line_items: insertedLineItems,
   })
 })
 
@@ -448,6 +499,9 @@ router.put(
     if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
     if (typeof b['is_closed_won'] === 'boolean') updates['is_closed_won'] = b['is_closed_won']
     if (typeof b['is_closed_lost'] === 'boolean') updates['is_closed_lost'] = b['is_closed_lost']
+    if (typeof b['lost_reason'] === 'string')
+      updates['lost_reason'] = b['lost_reason'].trim() || null
+    if (b['lost_reason'] === null) updates['lost_reason'] = null
     if (typeof b['assigned_to_user_id'] === 'string')
       updates['assigned_to_user_id'] = b['assigned_to_user_id']
     if (b['assigned_to_user_id'] === null) updates['assigned_to_user_id'] = null
@@ -455,6 +509,14 @@ router.put(
       updates['tags'] = (b['tags'] as unknown[]).filter((t) => typeof t === 'string')
     // Invalidate tag cache on tag update
     if (Array.isArray(b['tags'])) dealTagsCache.delete(authed.tenantId)
+
+    const replacingLineItems = Array.isArray(b['line_items'])
+    const newLineItems = replacingLineItems
+      ? (b['line_items'] as DealLineItemInput[]).filter(
+          (i) => typeof i?.description === 'string' && i.description.trim()
+        )
+      : []
+    if (replacingLineItems) updates['value'] = sumLineItems(newLineItems)
 
     const { data: updated, error } = await supabase
       .from('deals')
@@ -467,6 +529,37 @@ router.put(
     if (error) {
       res.status(500).json({ error: error.message })
       return
+    }
+
+    let updatedLineItems: unknown[] | null = null
+    if (replacingLineItems) {
+      await supabase.from('deal_line_items').delete().eq('deal_id', req.params['id'])
+      if (newLineItems.length > 0) {
+        const itemRows = newLineItems.map((item, i) => ({
+          deal_id: req.params['id'],
+          tenant_id: authed.tenantId,
+          description: item.description.trim(),
+          quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+          unit_price: typeof item.unit_price === 'number' ? item.unit_price : 0,
+          sort_order: i,
+        }))
+        const { data: items, error: itemsErr } = await supabase
+          .from('deal_line_items')
+          .insert(itemRows)
+          .select('*')
+        if (itemsErr) {
+          // The deal's value has already been updated from these line items
+          // above — surfacing this loudly beats a 200 whose line_items
+          // silently don't match what value implies.
+          res
+            .status(500)
+            .json({ error: `Deal updated, but line items failed to save: ${itemsErr.message}` })
+          return
+        }
+        updatedLineItems = items ?? []
+      } else {
+        updatedLineItems = []
+      }
     }
 
     // Activity logging for stage changes
@@ -499,16 +592,29 @@ router.put(
         actorType: 'user',
         actorId: authed.userId,
       })
+      void dispatchWebhook(authed.tenantId, 'deal.won', {
+        deal_id: req.params['id'],
+        title: dealTitle,
+        value: Number(updated?.value ?? existing.value),
+        contact_id: contactId,
+      })
     }
 
     if (b['is_closed_lost'] === true && !existing.is_closed_lost) {
+      const reason = typeof b['lost_reason'] === 'string' ? b['lost_reason'].trim() : ''
       void logActivity({
         tenantId: authed.tenantId,
         contactId: contactId ?? undefined,
         type: 'system',
-        body: `Deal lost: "${dealTitle}"`,
+        body: reason ? `Deal lost: "${dealTitle}" — ${reason}` : `Deal lost: "${dealTitle}"`,
         actorType: 'user',
         actorId: authed.userId,
+      })
+      void dispatchWebhook(authed.tenantId, 'deal.lost', {
+        deal_id: req.params['id'],
+        title: dealTitle,
+        reason: reason || null,
+        contact_id: contactId,
       })
     }
 
@@ -556,6 +662,7 @@ router.put(
       stage_color: (updated?.pipeline_stages as { color: string } | null)?.color ?? null,
       contact_name: (updated?.contacts as { full_name: string } | null)?.full_name ?? null,
       company_name: (updated?.companies as { name: string } | null)?.name ?? null,
+      ...(updatedLineItems !== null ? { line_items: updatedLineItems } : {}),
     })
   }
 )

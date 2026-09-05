@@ -74,6 +74,8 @@ interface StatItem {
   icon: string
   color: string
   href?: string
+  trend?: number[]
+  delta?: string
 }
 
 interface Props {
@@ -140,7 +142,7 @@ export default function DashboardClient({ stats, userName }: Props) {
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <RecentActivity />
-            <div className="bg-white rounded-xl border border-border-brand p-6">
+            <div className="bg-white rounded-xl border border-border-brand p-6 transition-shadow duration-200 hover:shadow-md">
               <h2 className="text-sm font-semibold text-ink mb-4">Quick Actions</h2>
               <div className="space-y-2">
                 {ACTIONS.map(({ label, icon, href }) => (
@@ -181,10 +183,15 @@ export default function DashboardClient({ stats, userName }: Props) {
                     <div
                       ref={dragProvided.innerRef}
                       {...dragProvided.draggableProps}
-                      className={`relative group/widget transition-opacity ${
+                      className={`relative group/widget transition-opacity widget-enter ${
                         dragSnapshot.isDragging ? 'opacity-75' : 'opacity-100'
                       }`}
-                      style={{ ...dragProvided.draggableProps.style }}
+                      style={
+                        {
+                          ...dragProvided.draggableProps.style,
+                          '--widget-stagger': idx,
+                        } as React.CSSProperties & Record<'--widget-stagger', number>
+                      }
                     >
                       <DragHandle dragHandleProps={dragProvided.dragHandleProps} />
                       {renderWidget(id)}

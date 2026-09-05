@@ -250,4 +250,51 @@ router.get('/health', requireAuth, async (req: Request, res: Response): Promise<
   }
 })
 
+const SUPPRESSED_STATUSES = ['soft_bounce', 'hard_bounce', 'complained', 'unsubscribed']
+
+// ── GET /api/email/suppressed — contacts currently excluded from email sends ──
+router.get('/suppressed', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('id, full_name, email, email_status, email_risk_score')
+    .eq('tenant_id', authed.tenantId)
+    .in('email_status', SUPPRESSED_STATUSES)
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.json({ data: data ?? [] })
+})
+
+// ── PATCH /api/email/suppressed/:contactId — re-activate a suppressed contact ─
+router.patch(
+  '/suppressed/:contactId',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const { data, error } = await supabase
+      .from('contacts')
+      .update({ email_status: 'ok', email_risk_score: 0 })
+      .eq('id', req.params['contactId'])
+      .eq('tenant_id', authed.tenantId)
+      .select('id, full_name, email, email_status, email_risk_score')
+      .single()
+
+    if (error || !data) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+
+    res.json(data)
+  }
+)
+
 export default router

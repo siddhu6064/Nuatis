@@ -31,6 +31,7 @@ const EVENTS: EventDef[] = [
   { key: 'quote_accepted', label: 'Quote Accepted' },
   { key: 'deposit_paid', label: 'Deposit Paid' },
   { key: 'new_sms', label: 'New SMS' },
+  { key: 'webchat_handoff_requested', label: 'Webchat Handoff Requested' },
   { key: 'task_due', label: 'Task Due' },
   { key: 'review_sent', label: 'Review Request Sent' },
   { key: 'form_submitted', label: 'Form Submitted' },
@@ -38,6 +39,11 @@ const EVENTS: EventDef[] = [
   { key: 'contact_assigned', label: 'Contact Assigned' },
   { key: 'inventory_low_stock', label: 'Low Stock Alert', requireModule: 'crm' },
   { key: 'staff_shift_conflict', label: 'Shift Conflict', requireModule: 'crm' },
+  { key: 'revenue_drop_alert', label: 'Revenue Drop Alert', requireModule: 'crm' },
+  { key: 'payment_failed', label: 'Bank Payment Failed' },
+  { key: 'expense_pending_approval', label: 'Expense Needs Approval' },
+  { key: 'time_off_requested', label: 'Time Off Requested' },
+  { key: 'invoice_overdue', label: 'Invoice Overdue' },
 ]
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -48,6 +54,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   quote_accepted: { push: true, sms: false, email: true },
   deposit_paid: { push: true, sms: false, email: true },
   new_sms: { push: true, sms: false, email: false },
+  webchat_handoff_requested: { push: true, sms: false, email: false },
   task_due: { push: true, sms: false, email: false },
   review_sent: { push: false, sms: false, email: false },
   form_submitted: { push: true, sms: false, email: false },
@@ -55,6 +62,11 @@ const DEFAULT_PREFS: NotificationPrefs = {
   contact_assigned: { push: true, sms: false, email: false },
   inventory_low_stock: { push: true, sms: false, email: false },
   staff_shift_conflict: { push: true, sms: false, email: false },
+  revenue_drop_alert: { push: true, sms: false, email: false },
+  payment_failed: { push: true, sms: false, email: false },
+  expense_pending_approval: { push: true, sms: false, email: false },
+  time_off_requested: { push: true, sms: false, email: false },
+  invoice_overdue: { push: true, sms: false, email: false },
 }
 
 // ─── Toggle component ─────────────────────────────────────────────────────────

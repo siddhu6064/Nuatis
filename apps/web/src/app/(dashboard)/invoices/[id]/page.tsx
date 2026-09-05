@@ -114,6 +114,8 @@ export default function InvoiceDetailPage() {
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState<string>('cash')
   const [payNotes, setPayNotes] = useState('')
+  const [creditAmount, setCreditAmount] = useState('')
+  const [creditReason, setCreditReason] = useState('')
 
   // ── Fetch invoice ──────────────────────────────────────────────────────────
   const fetchInvoice = useCallback(async () => {
@@ -291,6 +293,36 @@ export default function InvoiceDetailPage() {
       await fetchInvoice()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to record payment')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  // ── Credit Memo ──────────────────────────────────────────────────────────────
+  async function handleCreditMemo() {
+    const amount = parseFloat(creditAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setActionError('Enter a valid amount')
+      return
+    }
+    setActing(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/invoices/${id}/credit-memo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, reason: creditReason || null }),
+      })
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? 'Failed to apply credit memo')
+      }
+      showToast('success', 'Credit memo applied')
+      setCreditAmount('')
+      setCreditReason('')
+      await fetchInvoice()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to apply credit memo')
     } finally {
       setActing(false)
     }
@@ -743,6 +775,50 @@ export default function InvoiceDetailPage() {
                   fullWidth
                 >
                   {acting ? 'Recording…' : 'Record Payment'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Credit Memo */}
+          {canRecordPayment && (
+            <div className="bg-white rounded-xl border border-border-brand p-4">
+              <h3 className="text-sm font-semibold text-ink mb-3">Apply Credit Memo</h3>
+              <p className="text-xs text-ink4 mb-2">
+                Reduces the balance without recording it as cash received — for an overpayment or
+                correction.
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-xs text-ink4 mb-1">Amount</label>
+                  <TextField
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                    placeholder="0.00"
+                    fullWidth
+                    size="small"
+                    slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-ink4 mb-1">Reason</label>
+                  <TextField
+                    value={creditReason}
+                    onChange={(e) => setCreditReason(e.target.value)}
+                    placeholder="Optional reason…"
+                    fullWidth
+                    size="small"
+                  />
+                </div>
+                <Button
+                  onClick={() => void handleCreditMemo()}
+                  disabled={acting}
+                  variant="outlined"
+                  color="inherit"
+                  fullWidth
+                >
+                  {acting ? 'Applying…' : 'Apply Credit Memo'}
                 </Button>
               </div>
             </div>

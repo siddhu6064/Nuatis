@@ -10,6 +10,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
 import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
+import TasksKanban, { type TaskStatus } from './TasksKanban'
 
 interface Task {
   id: string
@@ -17,8 +18,11 @@ interface Task {
   due_date: string | null
   priority: string
   completed_at: string | null
+  status: TaskStatus
   contact_id: string | null
   assigned_to_user_id: string | null
+  parent_task_id: string | null
+  depends_on_task_id: string | null
   contacts: { full_name: string } | null
   assigned: { full_name: string } | null
 }
@@ -93,10 +97,14 @@ const TASKS_COLUMNS = [
 ]
 const TASKS_DEFAULTS = Object.fromEntries(TASKS_COLUMNS.map((c) => [c.key, true]))
 
+type ViewMode = 'list' | 'kanban'
+
 export default function TasksDashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [kanbanTasks, setKanbanTasks] = useState<Task[]>([])
 
   // Add task modal
   const [showAdd, setShowAdd] = useState(false)
@@ -104,7 +112,10 @@ export default function TasksDashboard() {
   const [newDue, setNewDue] = useState('')
   const [newTime, setNewTime] = useState('12:00')
   const [newPriority, setNewPriority] = useState('medium')
+  const [newParentId, setNewParentId] = useState('')
+  const [newDependsOnId, setNewDependsOnId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   // TODO(G65): When a table/list view is added to tasks, use colVisible to gate columns
   const { visible: colVisible, toggle: toggleCol } = useColumnVisibility(
     'nuatis_tasks_columns',
@@ -132,13 +143,38 @@ export default function TasksDashboard() {
     void fetchTasks().finally(() => setLoading(false))
   }, [fetchTasks])
 
+  const fetchKanbanTasks = useCallback(async () => {
+    const [openRes, doneRes] = await Promise.all([
+      fetch('/api/tasks?completed=false'),
+      fetch('/api/tasks?completed=true'),
+    ])
+    const [openData, doneData] = (await Promise.all([openRes.json(), doneRes.json()])) as [
+      { tasks: Task[] },
+      { tasks: Task[] },
+    ]
+    setKanbanTasks([...(openData.tasks ?? []), ...(doneData.tasks ?? [])])
+  }, [])
+
+  useEffect(() => {
+    if (viewMode === 'kanban') void fetchKanbanTasks()
+  }, [viewMode, fetchKanbanTasks])
+
+  function showToast(msg: string, type: 'error' | 'success') {
+    if (type === 'error') setError(msg)
+  }
+
   const completeTask = async (taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
-    await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed_at: new Date().toISOString() }),
     })
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      setError(body.error ?? 'Could not complete task')
+      void fetchTasks()
+    }
   }
 
   const addTask = async () => {
@@ -152,6 +188,8 @@ export default function TasksDashboard() {
           title: newTitle.trim(),
           due_date: newDue ? new Date(`${newDue}T${newTime}`).toISOString() : undefined,
           priority: newPriority,
+          parent_task_id: newParentId || undefined,
+          depends_on_task_id: newDependsOnId || undefined,
         }),
       })
       if (res.ok) {
@@ -159,8 +197,13 @@ export default function TasksDashboard() {
         setNewDue('')
         setNewTime('12:00')
         setNewPriority('medium')
+        setNewParentId('')
+        setNewDependsOnId('')
         setShowAdd(false)
         void fetchTasks()
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(body.error ?? 'Could not add task')
       }
     } finally {
       setSaving(false)
@@ -200,7 +243,15 @@ export default function TasksDashboard() {
                 size="small"
                 sx={{ p: 0 }}
               />
-              <span className="text-sm text-ink2 flex-1">{task.title}</span>
+              <span className="text-sm text-ink2 flex-1">
+                {task.parent_task_id && <span className="text-ink4 mr-1">&#8618;</span>}
+                {task.title}
+                {task.depends_on_task_id && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                    Blocked by another task
+                  </span>
+                )}
+              </span>
               {task.contacts?.full_name && (
                 <Link
                   href={`/contacts/${task.contact_id}`}
@@ -232,12 +283,33 @@ export default function TasksDashboard() {
           <p className="text-sm text-ink3 mt-0.5">{tasks.length} active</p>
         </div>
         <div className="flex items-center gap-2">
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_e, v: ViewMode | null) => v !== null && setViewMode(v)}
+            size="small"
+          >
+            <ToggleButton value="list">List</ToggleButton>
+            <ToggleButton value="kanban">Board</ToggleButton>
+          </ToggleButtonGroup>
           <ColumnsButton columns={TASKS_COLUMNS} visible={colVisible} onChange={toggleCol} />
+          <Link href="/tasks/recurring">
+            <Button variant="outlined">Recurring</Button>
+          </Link>
           <Button onClick={() => setShowAdd(true)} variant="contained">
             + Add Task
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-sm flex items-center justify-between">
+          {error}
+          <button onClick={() => setError('')} className="text-red-700 font-medium ml-3">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <ToggleButtonGroup
@@ -292,6 +364,36 @@ export default function TasksDashboard() {
               <MenuItem value="medium">Medium</MenuItem>
               <MenuItem value="high">High</MenuItem>
             </TextField>
+            <TextField
+              select
+              value={newParentId}
+              onChange={(e) => setNewParentId(e.target.value)}
+              size="small"
+              label="Parent task"
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="">None</MenuItem>
+              {tasks.map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  {t.title}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              value={newDependsOnId}
+              onChange={(e) => setNewDependsOnId(e.target.value)}
+              size="small"
+              label="Blocked by"
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="">None</MenuItem>
+              {tasks.map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  {t.title}
+                </MenuItem>
+              ))}
+            </TextField>
             <div className="flex-1" />
             <Button onClick={() => setShowAdd(false)} size="small" color="inherit">
               Cancel
@@ -308,7 +410,9 @@ export default function TasksDashboard() {
         </div>
       )}
 
-      {loading ? (
+      {viewMode === 'kanban' ? (
+        <TasksKanban tasks={kanbanTasks} setTasks={setKanbanTasks} showToast={showToast} />
+      ) : loading ? (
         <div className="py-12 text-center text-sm text-ink4">Loading tasks...</div>
       ) : (
         <>

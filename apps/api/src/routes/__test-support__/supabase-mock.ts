@@ -36,6 +36,8 @@ export interface MockStore {
   storage: StorageMock
   /** Optional per-table error to return from maybeSingle() / single() */
   tableErrors?: Record<string, { message: string }>
+  /** email → supabase auth user id, backing auth.admin.createUser/deleteUser */
+  authUsers: Map<string, string>
 }
 
 export function createStore(): MockStore {
@@ -51,7 +53,11 @@ export function createStore(): MockStore {
   const createBucket = jest
     .fn<(name: string, opts?: unknown) => Promise<CreateBucketResult>>()
     .mockResolvedValue({ data: { name: 'mock-bucket' }, error: null })
-  return { tables: {}, storage: { upload, createSignedUrl, remove, createBucket } }
+  return {
+    tables: {},
+    storage: { upload, createSignedUrl, remove, createBucket },
+    authUsers: new Map(),
+  }
 }
 
 type Op = 'select' | 'insert' | 'update' | 'delete'
@@ -175,7 +181,10 @@ function execute(
       if (hasNestedSelect(state.selectCols)) {
         for (const r of copies) resolveNestedSelect(store, state.table, r, state.selectCols!)
       }
-      const data: Row | Row[] = copies.length === 1 ? (copies[0] as Row) : copies
+      // Shape must follow the ORIGINAL payload, not the result count — real
+      // supabase-js always returns an array from .insert(array).select(),
+      // even when the array has one element; only .insert(object) collapses.
+      const data: Row | Row[] = Array.isArray(state.payload) ? copies : (copies[0] as Row)
       return { data, error: null }
     }
     return { data: null, error: null }
@@ -272,6 +281,7 @@ function buildQuery(store: MockStore, table: string): unknown {
     like: (col: string, pat: string) => QueryAPI
     filter: (col: string, op: string, val: unknown) => QueryAPI
     not: (col: string, op: 'is' | 'in', val: unknown) => QueryAPI
+    contains: (col: string, val: unknown) => QueryAPI
     order: (col: string, opts?: { ascending?: boolean }) => QueryAPI
     range: (from: number, to: number) => QueryAPI
     limit: (n: number) => QueryAPI
@@ -388,6 +398,14 @@ function buildQuery(store: MockStore, table: string): unknown {
     filter() {
       return q
     },
+    contains(col, val) {
+      addFilter((r) => {
+        const target = r[col] as Record<string, unknown> | null | undefined
+        if (target == null || typeof target !== 'object') return false
+        return Object.entries(val as Record<string, unknown>).every(([k, v]) => target[k] === v)
+      })
+      return q
+    },
     not(col, op, val) {
       if (op === 'is') addFilter((r) => r[col] !== val)
       if (op === 'in') {
@@ -464,9 +482,25 @@ export function createMockSupabase(store: MockStore): unknown {
     },
     auth: {
       admin: {
-        createUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        deleteUser: () => Promise.resolve({ error: null }),
+        createUser: (opts: { email: string }) => {
+          if (store.authUsers.has(opts.email)) {
+            return Promise.resolve({
+              data: { user: null },
+              error: { message: 'A user with this email address has already been registered' },
+            })
+          }
+          const id = randomUUID()
+          store.authUsers.set(opts.email, id)
+          return Promise.resolve({ data: { user: { id } }, error: null })
+        },
+        deleteUser: (id: string) => {
+          for (const [email, userId] of store.authUsers) {
+            if (userId === id) store.authUsers.delete(email)
+          }
+          return Promise.resolve({ error: null })
+        },
       },
+      resetPasswordForEmail: () => Promise.resolve({ data: {}, error: null }),
     },
     storage: {
       createBucket: store.storage.createBucket,

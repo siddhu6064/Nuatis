@@ -31,6 +31,7 @@ interface CreatedLink {
   url: string
   amount: number
   description: string
+  processor: string
 }
 
 export default function PaymentLinksPage() {
@@ -40,6 +41,7 @@ export default function PaymentLinksPage() {
 
   // Form state
   const [amount, setAmount] = useState('')
+  const [tipAmount, setTipAmount] = useState('')
   const [description, setDescription] = useState('')
   const [label, setLabel] = useState('')
   const [contactSearch, setContactSearch] = useState('')
@@ -106,6 +108,7 @@ export default function PaymentLinksPage() {
 
   function openModal() {
     setAmount('')
+    setTipAmount('')
     setDescription('')
     setLabel('')
     setContactSearch('')
@@ -124,6 +127,14 @@ export default function PaymentLinksPage() {
       setFormError('Enter a valid amount.')
       return
     }
+    let tip: number | null = null
+    if (tipAmount.trim()) {
+      tip = parseFloat(tipAmount)
+      if (isNaN(tip) || tip < 0) {
+        setFormError('Enter a valid tip amount.')
+        return
+      }
+    }
     if (!description.trim()) {
       setFormError('Description is required.')
       return
@@ -136,6 +147,7 @@ export default function PaymentLinksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: amt,
+          tipAmount: tip,
           description: description.trim(),
           label: label.trim() || null,
           contactId: selectedContact?.id ?? null,
@@ -201,7 +213,7 @@ export default function PaymentLinksPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-ink">Payment Links</h1>
-          <p className="text-sm text-ink4 mt-0.5">Collect deposits and fees instantly via Stripe</p>
+          <p className="text-sm text-ink4 mt-0.5">Collect deposits, fees, and tips instantly</p>
         </div>
         <Button onClick={openModal} variant="contained">
           Get Payment Link
@@ -314,6 +326,9 @@ export default function PaymentLinksPage() {
             <div>
               <p className="text-xs text-ink3 mb-3">
                 {createdLink.description} · ${Number(createdLink.amount).toFixed(2)}
+                {createdLink.processor === 'square' && (
+                  <span className="ml-2 text-ink4">(via Square)</span>
+                )}
               </p>
               <div className="flex items-center gap-2 mb-4">
                 <TextField
@@ -353,6 +368,21 @@ export default function PaymentLinksPage() {
                 }}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                fullWidth
+                size="small"
+              />
+
+              <TextField
+                label="Tip"
+                type="number"
+                helperText="optional, added on top of the amount"
+                slotProps={{
+                  htmlInput: { min: '0', step: '0.01' },
+                  input: { startAdornment: <InputAdornment position="start">$</InputAdornment> },
+                }}
+                value={tipAmount}
+                onChange={(e) => setTipAmount(e.target.value)}
                 placeholder="0.00"
                 fullWidth
                 size="small"

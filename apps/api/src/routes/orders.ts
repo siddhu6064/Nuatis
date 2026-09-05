@@ -1,7 +1,9 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
+import { Queue } from 'bullmq'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import { generateOrderNumber } from '../lib/order-number.js'
@@ -10,6 +12,7 @@ import {
   buildOrderConfirmationSms,
   buildOrderReadySms,
   buildOrderCompletedSms,
+  buildOrderTrackingSms,
 } from '../lib/sms-templates.js'
 
 const router = Router()
@@ -88,6 +91,31 @@ function validateLineItems(raw: unknown): LineItemInput[] | null {
   return items
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** Persists a staff-visible error flag on an order after a best-effort side
+ *  effect (SMS, inventory deduction, deal rollup) fails. Never throws —
+ *  called from within a catch block that must not itself blow up the
+ *  response. Cleared by staff via PUT /:id { error: null }. */
+async function setOrderError(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string,
+  orderId: string,
+  message: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('orders')
+      .update({ error: message })
+      .eq('id', orderId)
+      .eq('tenant_id', tenantId)
+  } catch (err) {
+    console.error('[orders] failed to persist error flag:', err)
+  }
+}
+
 async function getOrderSettings(
   supabase: ReturnType<typeof getServiceClient>,
   tenantId: string
@@ -105,6 +133,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
   const countOnly = req.query['count'] === 'true'
   const status = typeof req.query['status'] === 'string' ? req.query['status'] : ''
   const contactId = typeof req.query['contact_id'] === 'string' ? req.query['contact_id'] : ''
+  const locationId = typeof req.query['location_id'] === 'string' ? req.query['location_id'] : ''
   const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   if (countOnly) {
@@ -114,6 +143,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
       .eq('tenant_id', authed.tenantId)
       .is('deleted_at', null)
     if (status) countQuery = countQuery.eq('status', status)
+    if (locationId) countQuery = countQuery.eq('location_id', locationId)
     const { count, error } = await countQuery
     if (error) {
       res.status(500).json({ error: error.message })
@@ -136,6 +166,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
 
   if (status) query = query.eq('status', status)
   if (contactId) query = query.eq('contact_id', contactId)
+  if (locationId) query = query.eq('location_id', locationId)
   if (q) {
     const pat = `%${q}%`
     query = query.or(`order_number.ilike.${pat},customer_name.ilike.${pat}`)
@@ -209,6 +240,8 @@ router.post('/', requireAuth, requireOrders, async (req: Request, res: Response)
       notes: (b['notes'] as string) || null,
       assigned_staff_id: (b['assigned_staff_id'] as string) || null,
       deal_id: (b['deal_id'] as string) || null,
+      location_id: (b['location_id'] as string) || null,
+      metadata: isPlainObject(b['metadata']) ? b['metadata'] : {},
     })
     .select('*')
     .single()
@@ -311,6 +344,8 @@ router.put(
     if (b['assigned_staff_id'] === null) updates['assigned_staff_id'] = null
     if (typeof b['deal_id'] === 'string') updates['deal_id'] = b['deal_id']
     if (b['deal_id'] === null) updates['deal_id'] = null
+    if (typeof b['location_id'] === 'string') updates['location_id'] = b['location_id']
+    if (b['location_id'] === null) updates['location_id'] = null
 
     if (b['fulfillment_type'] !== undefined) {
       if (
@@ -352,9 +387,47 @@ router.put(
       updates['total'] = total
     }
 
+    // Staff-dismissible error flag (auto-set by the status endpoint when a
+    // side effect fails). Only clearing is exposed here — the route never
+    // lets a client set an arbitrary error string.
+    if (b['error'] === null) updates['error'] = null
+
+    if (typeof b['tracking_number'] === 'string') updates['tracking_number'] = b['tracking_number']
+    if (b['tracking_number'] === null) updates['tracking_number'] = null
+    if (typeof b['tracking_carrier'] === 'string')
+      updates['tracking_carrier'] = b['tracking_carrier']
+    if (b['tracking_carrier'] === null) updates['tracking_carrier'] = null
+
+    if (isPlainObject(b['metadata'])) {
+      const { data: current } = await supabase
+        .from('orders')
+        .select('metadata')
+        .eq('id', req.params['id'])
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle()
+      updates['metadata'] = {
+        ...((current?.metadata as Record<string, unknown>) ?? {}),
+        ...b['metadata'],
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No valid fields to update' })
       return
+    }
+
+    // Snapshot pre-update state only when we need to detect a tracking-number
+    // transition (fresh fetch, not reused from the metadata block above,
+    // since that one only runs conditionally).
+    let previousTrackingNumber: string | null = null
+    if (typeof updates['tracking_number'] === 'string') {
+      const { data: before } = await supabase
+        .from('orders')
+        .select('tracking_number')
+        .eq('id', req.params['id'])
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle()
+      previousTrackingNumber = (before?.tracking_number as string | null) ?? null
     }
 
     const { data, error } = await supabase
@@ -369,6 +442,53 @@ router.put(
     if (error || !data) {
       res.status(404).json({ error: 'Not found' })
       return
+    }
+
+    // Tracking-added SMS — fires once, only on the null/empty → set transition.
+    if (
+      typeof updates['tracking_number'] === 'string' &&
+      updates['tracking_number'] &&
+      !previousTrackingNumber &&
+      data.customer_phone
+    ) {
+      void (async () => {
+        try {
+          const { data: location } = await supabase
+            .from('locations')
+            .select('telnyx_number')
+            .eq('tenant_id', authed.tenantId)
+            .eq('is_primary', true)
+            .maybeSingle()
+          const fromNumber = location?.telnyx_number as string | null
+          if (!fromNumber) return
+
+          const { data: tenantRow } = await supabase
+            .from('tenants')
+            .select('name')
+            .eq('id', authed.tenantId)
+            .maybeSingle()
+
+          const text = buildOrderTrackingSms({
+            contactName: (data.customer_name as string) || null,
+            businessName: (tenantRow?.name as string) || 'the business',
+            orderNumber: data.order_number as string,
+            trackingCarrier: (data.tracking_carrier as string) || 'the carrier',
+            trackingNumber: data.tracking_number as string,
+          })
+          await sendSms(fromNumber, data.customer_phone as string, text, {
+            tenantId: authed.tenantId,
+            contactId: (data.contact_id as string) ?? undefined,
+          })
+        } catch (err) {
+          console.error('[orders] tracking SMS failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            data.id as string,
+            'Tracking SMS failed to send to the customer.'
+          )
+        }
+      })()
     }
 
     res.json(data)
@@ -567,6 +687,12 @@ router.put(
         }
       } catch (err) {
         console.error('[orders] inventory auto-deduct failed:', err)
+        void setOrderError(
+          supabase,
+          authed.tenantId,
+          order.id,
+          'Inventory deduction failed on completion — check stock levels manually.'
+        )
       }
 
       // Deal value rollup — additive only, never overwrites a rep-set value:
@@ -625,8 +751,53 @@ router.put(
           }
         } catch (err) {
           console.error('[orders] deal value rollup failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            order.id,
+            'Failed to update linked deal value/status.'
+          )
         }
       }
+
+      // Trigger customer-referral reward — mirrors the appointments.ts
+      // trigger (order completion is the other "first purchase" qualifying
+      // event; the worker's unique-constraint insert decides which trigger
+      // wins if both an appointment and an order complete for the same contact).
+      void (async () => {
+        try {
+          if (!order.contact_id) return
+          const { data: tenantData } = await supabase
+            .from('tenants')
+            .select('customer_referral_program_enabled')
+            .eq('id', authed.tenantId)
+            .single()
+          if (!tenantData?.customer_referral_program_enabled) return
+
+          const { data: contactRow } = await supabase
+            .from('contacts')
+            .select('referred_by_contact_id')
+            .eq('id', order.contact_id)
+            .eq('tenant_id', authed.tenantId)
+            .maybeSingle()
+          if (!contactRow?.referred_by_contact_id) return
+
+          const referralQueue = new Queue('customer-referral-reward', {
+            connection: createBullMQConnection(),
+            skipVersionCheck: true,
+          })
+          await referralQueue.add('issue-reward', {
+            tenantId: authed.tenantId,
+            referredContactId: order.contact_id,
+            referrerContactId: contactRow.referred_by_contact_id,
+            triggerType: 'order',
+            triggerId: order.id,
+          })
+          await referralQueue.close()
+        } catch (err) {
+          console.error('[orders] Failed to enqueue customer-referral reward:', err)
+        }
+      })()
     }
 
     // SMS notification — best-effort, never blocks the response.
@@ -672,6 +843,12 @@ router.put(
           })
         } catch (err) {
           console.error('[orders] status-change SMS failed:', err)
+          void setOrderError(
+            supabase,
+            authed.tenantId,
+            order.id,
+            `Customer SMS failed to send for the "${nextStatus}" update.`
+          )
         }
       })()
     }

@@ -103,6 +103,170 @@ describe('POST /api/intake-forms', () => {
 
     expect(res.status).toBe(400)
   })
+
+  it('accepts signature and file field types', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Waiver Form',
+        fields: [
+          { id: 'f1', label: 'Sign here', type: 'signature' },
+          { id: 'f2', label: 'Upload ID', type: 'file' },
+        ],
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.data.fields).toHaveLength(2)
+  })
+
+  it('still rejects an unknown field type', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Bad Form',
+        fields: [{ id: 'f1', label: 'X', type: 'not_a_real_type' }],
+      })
+
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('POST /api/intake-forms — visibleIf validation', () => {
+  it('accepts a valid visibleIf condition referencing another field', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Conditional Form',
+        fields: [
+          {
+            id: 'f1',
+            label: 'Has allergies?',
+            type: 'select',
+            options: ['Yes', 'No'],
+          },
+          {
+            id: 'f2',
+            label: 'List allergies',
+            type: 'text',
+            visibleIf: { fieldId: 'f1', op: 'eq', value: 'Yes' },
+          },
+        ],
+      })
+
+    expect(res.status).toBe(201)
+  })
+
+  it('accepts an exists condition with no value', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Conditional Form',
+        fields: [
+          { id: 'f1', label: 'Email', type: 'email' },
+          {
+            id: 'f2',
+            label: 'Follow-up',
+            type: 'text',
+            visibleIf: { fieldId: 'f1', op: 'exists' },
+          },
+        ],
+      })
+
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects a visibleIf that references itself', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Bad Form',
+        fields: [
+          {
+            id: 'f1',
+            label: 'X',
+            type: 'text',
+            visibleIf: { fieldId: 'f1', op: 'eq', value: 'x' },
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects a visibleIf that references a nonexistent field', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Bad Form',
+        fields: [
+          {
+            id: 'f1',
+            label: 'X',
+            type: 'text',
+            visibleIf: { fieldId: 'does-not-exist', op: 'eq', value: 'x' },
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an eq condition missing a value', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Bad Form',
+        fields: [
+          { id: 'f1', label: 'X', type: 'text' },
+          { id: 'f2', label: 'Y', type: 'text', visibleIf: { fieldId: 'f1', op: 'eq' } },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an invalid op', async () => {
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .post('/api/intake-forms')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Bad Form',
+        fields: [
+          { id: 'f1', label: 'X', type: 'text' },
+          {
+            id: 'f2',
+            label: 'Y',
+            type: 'text',
+            visibleIf: { fieldId: 'f1', op: 'contains', value: 'x' },
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('DELETE /api/intake-forms/:id', () => {

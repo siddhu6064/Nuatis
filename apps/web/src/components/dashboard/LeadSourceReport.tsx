@@ -83,7 +83,7 @@ export default function LeadSourceReport() {
   const overallWinRate = totalLeads > 0 ? Math.round((totalWon / totalLeads) * 100) : 0
 
   return (
-    <div className="bg-white rounded-xl border border-border-brand p-5 h-full">
+    <div className="bg-white rounded-xl border border-border-brand p-5 h-full transition-shadow duration-200 hover:shadow-md">
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-ink">Lead Source Report</h2>
         <p className="text-xs text-ink3 mt-0.5">Where your leads come from</p>

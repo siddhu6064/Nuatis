@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
+import { Modal } from '@/components/ui/Modal'
 
 interface LedgerEntry {
   id: string
-  source: 'stripe' | 'cash' | 'check' | 'other'
+  source: 'stripe' | 'cash' | 'check' | 'square' | 'other'
   amount: number
   currency: string
   status: string
@@ -18,6 +19,9 @@ interface LedgerEntry {
   quote_id: string | null
   contact_name: string | null
   metadata: Record<string, string>
+  quote_payment_id: string | null
+  refundable_amount: number | null
+  refund_status: 'none' | 'partial' | 'full' | null
 }
 
 interface LedgerResponse {
@@ -32,6 +36,7 @@ const SOURCE_LABELS: Record<string, string> = {
   stripe: 'Stripe',
   cash: 'Cash',
   check: 'Check',
+  square: 'Square',
   other: 'Other',
 }
 
@@ -39,6 +44,7 @@ const SOURCE_COLORS: Record<string, string> = {
   stripe: 'bg-indigo-50 text-indigo-700',
   cash: 'bg-green-50 text-green-700',
   check: 'bg-amber-50 text-amber-700',
+  square: 'bg-blue-50 text-blue-700',
   other: 'bg-gray-100 text-gray-600',
 }
 
@@ -56,6 +62,10 @@ export default function LedgerPage() {
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('all')
+  const [refunding, setRefunding] = useState<LedgerEntry | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundBusy, setRefundBusy] = useState(false)
+  const [refundError, setRefundError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -71,6 +81,43 @@ export default function LedgerPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  function openRefund(entry: LedgerEntry) {
+    setRefunding(entry)
+    setRefundAmount(entry.refundable_amount != null ? String(entry.refundable_amount) : '')
+    setRefundError(null)
+  }
+
+  async function confirmRefund() {
+    if (!refunding || !refunding.quote_id || !refunding.quote_payment_id) return
+    const amount = Number(refundAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setRefundError('Enter a valid amount')
+      return
+    }
+    setRefundBusy(true)
+    setRefundError(null)
+    try {
+      const res = await fetch(
+        `/api/quotes/${refunding.quote_id}/payments/${refunding.quote_payment_id}/refund`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount }),
+        }
+      )
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error((d as { error?: string }).error ?? 'Refund failed')
+      }
+      setRefunding(null)
+      load()
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : 'Refund failed')
+    } finally {
+      setRefundBusy(false)
+    }
+  }
 
   const filtered = (data?.transactions ?? []).filter((t) => {
     if (sourceFilter !== 'all' && t.source !== sourceFilter) return false
@@ -130,7 +177,7 @@ export default function LedgerPage() {
             <div className="bg-white rounded-xl border border-border-brand p-4">
               <p className="text-xs text-ink4 mb-1">Manual / Offline</p>
               <p className="text-2xl font-bold text-green-600">${fmt(data?.manualVolume ?? 0)}</p>
-              <p className="text-xs text-ink4 mt-1">Cash, check, other</p>
+              <p className="text-xs text-ink4 mt-1">Cash, check, Square, other</p>
             </div>
           </>
         )}
@@ -155,6 +202,7 @@ export default function LedgerPage() {
           <MenuItem value="stripe">Stripe</MenuItem>
           <MenuItem value="cash">Cash</MenuItem>
           <MenuItem value="check">Check</MenuItem>
+          <MenuItem value="square">Square</MenuItem>
           <MenuItem value="other">Other</MenuItem>
         </TextField>
         <TextField
@@ -202,6 +250,7 @@ export default function LedgerPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-ink4">Method</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-ink4">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-ink4">Receipt</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink4">Refund</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -257,6 +306,23 @@ export default function LedgerPage() {
                         <span className="text-xs text-ink4">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      {t.refund_status === 'full' ? (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          Refunded
+                        </span>
+                      ) : t.quote_payment_id ? (
+                        <button
+                          type="button"
+                          onClick={() => openRefund(t)}
+                          className="text-xs text-teal-600 hover:underline"
+                        >
+                          {t.refund_status === 'partial' ? 'Refund more' : 'Refund'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-ink4">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -276,6 +342,49 @@ export default function LedgerPage() {
           </div>
         )}
       </div>
+
+      {refunding && (
+        <Modal
+          onClose={() => (refundBusy ? null : setRefunding(null))}
+          title="Refund payment"
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRefunding(null)}
+                disabled={refundBusy}
+                className="text-sm text-ink4 hover:underline disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <Button
+                onClick={() => void confirmRefund()}
+                disabled={refundBusy}
+                variant="contained"
+                color="error"
+                size="small"
+              >
+                {refundBusy ? 'Refunding…' : 'Refund'}
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-sm text-ink3 mb-3">
+            {refunding.contact_name ?? refunding.customer ?? 'This customer'} — up to $
+            {fmt(refunding.refundable_amount ?? 0)} refundable via Square.
+          </p>
+          <TextField
+            type="number"
+            label="Amount"
+            value={refundAmount}
+            onChange={(e) => setRefundAmount(e.target.value)}
+            size="small"
+            fullWidth
+            slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
+          />
+          {refundError && <p className="text-xs text-red-600 mt-2">{refundError}</p>}
+        </Modal>
+      )}
     </div>
   )
 }

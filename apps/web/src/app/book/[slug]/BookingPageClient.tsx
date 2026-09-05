@@ -1,17 +1,45 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import { formatTime } from '@nuatis/shared'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+type VisibleIfOp = 'eq' | 'neq' | 'exists'
+
+interface VisibleIf {
+  fieldId: string
+  op: VisibleIfOp
+  value?: string
+}
+
 interface IntakeField {
   id: string
   label: string
-  type: 'text' | 'email' | 'phone' | 'number' | 'date' | 'textarea' | 'select' | 'checkbox'
+  type:
+    | 'text'
+    | 'email'
+    | 'phone'
+    | 'number'
+    | 'date'
+    | 'textarea'
+    | 'select'
+    | 'checkbox'
+    | 'signature'
+    | 'file'
   required: boolean
   options?: string[]
+  visibleIf?: VisibleIf | null
+}
+
+function isFieldVisible(field: IntakeField, intakeData: Record<string, string | boolean>): boolean {
+  const cond = field.visibleIf
+  if (!cond) return true
+  const actual = intakeData[cond.fieldId]
+  if (cond.op === 'exists') return !!actual && String(actual).trim() !== ''
+  if (cond.op === 'eq') return String(actual ?? '') === cond.value
+  return String(actual ?? '') !== cond.value
 }
 
 interface IntakeForm {
@@ -29,6 +57,12 @@ interface Service {
   intakeForm: IntakeForm | null
 }
 
+interface StaffOption {
+  id: string
+  name: string
+  color_hex: string
+}
+
 interface BookingPage {
   tenantId: string
   businessName: string
@@ -40,12 +74,19 @@ interface BookingPage {
   advanceDays: number
   services: Service[]
   resources: Array<{ id: string; name: string; resource_type: string; color: string }>
+  staffByService: Record<string, StaffOption[]>
   vertical: string | null
+}
+
+interface BookingPageResponse extends Omit<BookingPage, 'services'> {
+  services: Array<Omit<Service, 'intakeForm'>>
+  intakeForms?: Record<string, IntakeForm>
 }
 
 interface ConfirmResponse {
   confirmationMessage: string
   bookingId: string
+  manageUrl?: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -285,6 +326,9 @@ function StepSelectDateTime({
   page,
   service,
   slug,
+  staffOptions,
+  selectedStaffId,
+  onSelectStaff,
   selectedDate,
   onSelectDate,
   onSelectSlot,
@@ -293,23 +337,29 @@ function StepSelectDateTime({
   page: BookingPage
   service: Service
   slug: string
+  staffOptions: StaffOption[]
+  selectedStaffId: string | null
+  onSelectStaff: (staffId: string | null) => void
   selectedDate: Date | null
   onSelectDate: (d: Date) => void
   onSelectSlot: (slot: string) => void
   onBack: () => void
 }) {
-  const [slots, setSlots] = useState<string[]>([])
+  const [slots, setSlots] = useState<{ start: string; end: string }[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
   useEffect(() => {
     if (!selectedDate) return
     setLoadingSlots(true)
-    fetch(`/api/booking/${slug}/availability?serviceId=${service.id}&date=${toYMD(selectedDate)}`)
+    const staffParam = selectedStaffId ? `&staffId=${selectedStaffId}` : ''
+    fetch(
+      `/api/booking/${slug}/availability?serviceId=${service.id}&date=${toYMD(selectedDate)}${staffParam}`
+    )
       .then((r) => (r.ok ? r.json() : { slots: [] }))
       .then((data) => setSlots(data.slots ?? []))
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false))
-  }, [selectedDate, service.id, slug])
+  }, [selectedDate, service.id, slug, selectedStaffId])
 
   return (
     <div>
@@ -318,6 +368,41 @@ function StepSelectDateTime({
       <p className="text-sm text-ink3 mb-5">
         {service.name} · {service.duration_minutes} min · {formatPrice(service.unit_price)}
       </p>
+
+      {staffOptions.length > 0 && (
+        <div className="rounded-xl border border-border-brand bg-white p-4 shadow-sm mb-4">
+          <p className="text-xs font-medium text-ink3 mb-2">Who would you like to see?</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => onSelectStaff(null)}
+              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                selectedStaffId === null
+                  ? 'border-teal-500 bg-teal-50 text-teal-700'
+                  : 'border-border-brand text-ink3 hover:border-gray-400'
+              }`}
+            >
+              No preference
+            </button>
+            {staffOptions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onSelectStaff(s.id)}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors flex items-center gap-1.5 ${
+                  selectedStaffId === s.id
+                    ? 'border-teal-500 bg-teal-50 text-teal-700'
+                    : 'border-border-brand text-ink3 hover:border-gray-400'
+                }`}
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: s.color_hex }}
+                />
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border-brand bg-white p-5 shadow-sm mb-4">
         <CalendarGrid
@@ -339,17 +424,140 @@ function StepSelectDateTime({
             <div className="grid grid-cols-3 gap-2">
               {slots.map((slot) => (
                 <button
-                  key={slot}
-                  onClick={() => onSelectSlot(slot)}
+                  key={slot.start}
+                  onClick={() => onSelectSlot(slot.start)}
                   className="rounded-lg border border-border-brand px-3 py-2 text-sm text-ink2 hover:border-gray-400 hover:bg-bg transition-colors"
                 >
-                  {formatTime(slot)}
+                  {formatTime(slot.start)}
                 </button>
               ))}
             </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Intake field widgets ────────────────────────────────────────────────────
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5MB — the /api/booking body limit is 8mb total
+
+function SignaturePad({ value, onChange }: { value: string; onChange: (dataUrl: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingRef = useRef(false)
+
+  function getPos(e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    drawingRef.current = true
+    const ctx = canvas.getContext('2d')
+    const { x, y } = getPos(e, canvas)
+    ctx?.beginPath()
+    ctx?.moveTo(x, y)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const { x, y } = getPos(e, canvas)
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#1b1d1f'
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  function handlePointerUp() {
+    if (!drawingRef.current) return
+    drawingRef.current = false
+    const canvas = canvasRef.current
+    if (canvas) onChange(canvas.toDataURL('image/png'))
+  }
+
+  function handleClear() {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+    onChange('')
+  }
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={400}
+        height={120}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        className="w-full rounded-lg border border-border-brand bg-white touch-none"
+        style={{ height: 120 }}
+      />
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs text-ink4">Draw your signature above</span>
+        {value && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="text-xs text-teal-600 hover:text-teal-700"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FileFieldInput({
+  fieldId,
+  value,
+  onChange,
+}: {
+  fieldId: string
+  value: string
+  onChange: (dataUrl: string) => void
+}) {
+  const [fileName, setFileName] = useState('')
+  const [error, setError] = useState('')
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    if (file.size > MAX_FILE_BYTES) {
+      setError('File must be under 5MB')
+      e.target.value = ''
+      return
+    }
+    setFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = () => onChange(String(reader.result ?? ''))
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <input
+        id={fieldId}
+        name={fieldId}
+        type="file"
+        onChange={handleFile}
+        className="block w-full text-sm text-ink3 file:mr-3 file:rounded-lg file:border file:border-border-brand file:bg-white file:px-3 file:py-1.5 file:text-sm"
+      />
+      {fileName && !error && <p className="text-xs text-ink4 mt-1">Selected: {fileName}</p>}
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {!fileName && value && <p className="text-xs text-ink4 mt-1">File attached</p>}
     </div>
   )
 }
@@ -363,6 +571,7 @@ function StepYourInfo({
   selectedSlot,
   slug,
   resourceId,
+  staffId,
   onConfirmed,
   onBack,
   onSlotTaken,
@@ -373,10 +582,14 @@ function StepYourInfo({
   selectedSlot: string
   slug: string
   resourceId?: string | null
+  staffId?: string | null
   onConfirmed: (resp: ConfirmResponse) => void
   onBack: () => void
   onSlotTaken: () => void
 }) {
+  const searchParams = useSearchParams()
+  const referralCode = searchParams.get('ref')
+
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -399,7 +612,7 @@ function StepYourInfo({
 
     if (intakeForm) {
       for (const field of intakeForm.fields) {
-        if (field.required) {
+        if (field.required && isFieldVisible(field, intakeData)) {
           const val = intakeData[field.id]
           if (field.type === 'checkbox') {
             if (!val) errs[field.id] = 'Required'
@@ -438,6 +651,8 @@ function StepYourInfo({
           intakeFormId: intakeForm?.id ?? undefined,
           intakeData: intakeForm ? intakeData : undefined,
           resource_id: resourceId ?? undefined,
+          referralCode: referralCode || undefined,
+          staffId: staffId ?? undefined,
         }),
       })
 
@@ -563,70 +778,83 @@ function StepYourInfo({
         {intakeForm && intakeForm.fields.length > 0 && (
           <div className="rounded-xl border border-border-brand bg-white p-5 shadow-sm mt-4 space-y-4">
             <p className="text-sm font-semibold text-ink">{intakeForm.name}</p>
-            {intakeForm.fields.map((field) => (
-              <div key={field.id}>
-                <label className="block text-xs font-medium text-ink2 mb-1">
-                  {field.label}
-                  {field.required && <span className="text-red-400 ml-0.5">*</span>}
-                </label>
+            {intakeForm.fields
+              .filter((field) => isFieldVisible(field, intakeData))
+              .map((field) => (
+                <div key={field.id}>
+                  <label className="block text-xs font-medium text-ink2 mb-1">
+                    {field.label}
+                    {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </label>
 
-                {field.type === 'textarea' ? (
-                  <textarea
-                    id={field.id}
-                    name={field.id}
-                    rows={3}
-                    required={field.required}
-                    value={String(intakeData[field.id] ?? '')}
-                    onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors resize-none ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
-                  />
-                ) : field.type === 'select' ? (
-                  <select
-                    id={field.id}
-                    name={field.id}
-                    required={field.required}
-                    value={String(intakeData[field.id] ?? '')}
-                    onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
-                  >
-                    <option value="">Select...</option>
-                    {field.options?.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                ) : field.type === 'checkbox' ? (
-                  <div className="flex items-center gap-2">
+                  {field.type === 'textarea' ? (
+                    <textarea
+                      id={field.id}
+                      name={field.id}
+                      rows={3}
+                      required={field.required}
+                      value={String(intakeData[field.id] ?? '')}
+                      onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors resize-none ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
+                    />
+                  ) : field.type === 'select' ? (
+                    <select
+                      id={field.id}
+                      name={field.id}
+                      required={field.required}
+                      value={String(intakeData[field.id] ?? '')}
+                      onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
+                    >
+                      <option value="">Select...</option>
+                      {field.options?.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === 'checkbox' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={field.id}
+                        name={field.id}
+                        type="checkbox"
+                        checked={Boolean(intakeData[field.id])}
+                        onChange={(e) =>
+                          setIntakeData((d) => ({ ...d, [field.id]: e.target.checked }))
+                        }
+                        className="rounded border-border-brand"
+                      />
+                      <span className="text-sm text-ink3">{field.label}</span>
+                    </div>
+                  ) : field.type === 'signature' ? (
+                    <SignaturePad
+                      value={String(intakeData[field.id] ?? '')}
+                      onChange={(dataUrl) => setIntakeData((d) => ({ ...d, [field.id]: dataUrl }))}
+                    />
+                  ) : field.type === 'file' ? (
+                    <FileFieldInput
+                      fieldId={field.id}
+                      value={String(intakeData[field.id] ?? '')}
+                      onChange={(dataUrl) => setIntakeData((d) => ({ ...d, [field.id]: dataUrl }))}
+                    />
+                  ) : (
                     <input
                       id={field.id}
                       name={field.id}
-                      type="checkbox"
-                      checked={Boolean(intakeData[field.id])}
-                      onChange={(e) =>
-                        setIntakeData((d) => ({ ...d, [field.id]: e.target.checked }))
-                      }
-                      className="rounded border-border-brand"
+                      type={field.type}
+                      required={field.required}
+                      value={String(intakeData[field.id] ?? '')}
+                      onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
                     />
-                    <span className="text-sm text-ink3">{field.label}</span>
-                  </div>
-                ) : (
-                  <input
-                    id={field.id}
-                    name={field.id}
-                    type={field.type}
-                    required={field.required}
-                    value={String(intakeData[field.id] ?? '')}
-                    onChange={(e) => setIntakeData((d) => ({ ...d, [field.id]: e.target.value }))}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400 transition-colors ${errors[field.id] ? 'border-red-300' : 'border-border-brand'}`}
-                  />
-                )}
+                  )}
 
-                {errors[field.id] && (
-                  <p className="text-xs text-red-500 mt-1">{errors[field.id]}</p>
-                )}
-              </div>
-            ))}
+                  {errors[field.id] && (
+                    <p className="text-xs text-red-500 mt-1">{errors[field.id]}</p>
+                  )}
+                </div>
+              ))}
           </div>
         )}
 
@@ -659,6 +887,7 @@ function StepConfirmation({
   firstName,
   lastName,
   confirmationMessage,
+  manageUrl,
   onBookAnother,
 }: {
   page: BookingPage
@@ -668,6 +897,7 @@ function StepConfirmation({
   firstName: string
   lastName: string
   confirmationMessage: string
+  manageUrl: string
   onBookAnother: () => void
 }) {
   return (
@@ -712,6 +942,15 @@ function StepConfirmation({
           </span>
         </div>
       </div>
+
+      {manageUrl && (
+        <a
+          href={manageUrl}
+          className="block w-full rounded-lg border border-border-brand px-6 py-3 text-sm font-medium text-ink2 hover:bg-bg transition-colors mb-3"
+        >
+          Need to reschedule or cancel? Manage this booking →
+        </a>
+      )}
 
       {/* Google review */}
       {page.googleReviewUrl && (
@@ -814,9 +1053,11 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [confirmationMessage, setConfirmationMessage] = useState('')
+  const [manageUrl, setManageUrl] = useState('')
 
   // Fetch booking page on mount
   useEffect(() => {
@@ -831,8 +1072,14 @@ export default function BookingPage() {
           setNotFound(true)
           return
         }
-        const data = (await r.json()) as BookingPage
-        setPage(data)
+        const data = (await r.json()) as BookingPageResponse
+        setPage({
+          ...data,
+          services: data.services.map((s) => ({
+            ...s,
+            intakeForm: data.intakeForms?.[s.id] ?? null,
+          })),
+        })
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -844,9 +1091,11 @@ export default function BookingPage() {
     setSelectedDate(null)
     setSelectedSlot(null)
     setSelectedResourceId(null)
+    setSelectedStaffId(null)
     setFirstName('')
     setLastName('')
     setConfirmationMessage('')
+    setManageUrl('')
   }
 
   // ── Loading / error states ────────────────────────────────────────────────
@@ -920,6 +1169,7 @@ export default function BookingPage() {
             page={{ ...page, accentColor }}
             onSelect={(service) => {
               setSelectedService(service)
+              setSelectedStaffId(null)
               setStep(2)
             }}
           />
@@ -930,6 +1180,12 @@ export default function BookingPage() {
             page={{ ...page, accentColor }}
             service={selectedService}
             slug={slug}
+            staffOptions={page.staffByService[selectedService.id] ?? []}
+            selectedStaffId={selectedStaffId}
+            onSelectStaff={(staffId) => {
+              setSelectedStaffId(staffId)
+              setSelectedSlot(null)
+            }}
             selectedDate={selectedDate}
             onSelectDate={(d) => {
               setSelectedDate(d)
@@ -967,8 +1223,10 @@ export default function BookingPage() {
             selectedSlot={selectedSlot}
             slug={slug}
             resourceId={selectedResourceId}
+            staffId={selectedStaffId}
             onConfirmed={(resp) => {
               setConfirmationMessage(resp.confirmationMessage || page.confirmationMessage)
+              setManageUrl(resp.manageUrl ?? '')
               setStep(5)
             }}
             onBack={() => setStep(hasResources ? 3 : 2)}
@@ -989,6 +1247,7 @@ export default function BookingPage() {
             firstName={firstName}
             lastName={lastName}
             confirmationMessage={confirmationMessage || page.confirmationMessage}
+            manageUrl={manageUrl}
             onBookAnother={reset}
           />
         )}

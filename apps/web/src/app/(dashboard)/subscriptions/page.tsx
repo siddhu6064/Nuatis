@@ -11,6 +11,7 @@ import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import MenuList from '@mui/material/MenuList'
 import { Modal } from '@/components/ui/Modal'
+import { bucketAmountsByDay, sumTrend, MiniSparkline } from '@/lib/sparkline'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ interface Subscription {
   current_period_end: string | null
   cancel_at: string | null
   cancelled_at: string | null
+  created_at: string
   contacts: { full_name: string } | null
 }
 
@@ -464,6 +466,19 @@ export default function SubscriptionsPage() {
 
   const arr = mrr * 12
 
+  // 7-day sparklines — real created_at timestamps from the already-fetched
+  // subscription list, no fabricated trend data.
+  const newSubsTrend = bucketAmountsByDay(
+    allSubscriptions.map((s) => ({ date: s.created_at, amount: 1 }))
+  )
+  const newMrrTrend = bucketAmountsByDay(
+    allSubscriptions
+      .filter((s) => s.status === 'active')
+      .map((s) => ({ date: s.created_at, amount: computeMRR(s) }))
+  )
+  const newSubsThisWeek = sumTrend(newSubsTrend)
+  const newMrrThisWeek = sumTrend(newMrrTrend)
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   async function handlePause(id: string) {
@@ -589,22 +604,43 @@ export default function SubscriptionsPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">
             Active Subscriptions
           </p>
-          <p className="text-2xl font-bold text-ink">{activeCount}</p>
-          <p className="text-xs text-ink4 mt-0.5">currently active</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-ink">{activeCount}</p>
+            <MiniSparkline trend={newSubsTrend} color="#1b1d1f" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {newSubsThisWeek > 0
+              ? `+${newSubsThisWeek} new this week`
+              : 'No new subscriptions this week'}
+          </p>
         </div>
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">MRR</p>
-          <p className="text-2xl font-bold text-teal-600">{formatCurrency(mrr)}</p>
-          <p className="text-xs text-ink4 mt-0.5">monthly recurring revenue</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-teal-600">{formatCurrency(mrr)}</p>
+            <MiniSparkline trend={newMrrTrend} color="#0d9488" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {newMrrThisWeek > 0
+              ? `+${formatCurrency(newMrrThisWeek)} added this week`
+              : 'No MRR added this week'}
+          </p>
         </div>
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">ARR</p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(arr)}</p>
-          <p className="text-xs text-ink4 mt-0.5">annual run rate</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(arr)}</p>
+            <MiniSparkline trend={newMrrTrend} color="#16a34a" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {newMrrThisWeek > 0
+              ? `+${formatCurrency(newMrrThisWeek * 12)} annualized this week`
+              : 'No ARR added this week'}
+          </p>
         </div>
       </div>
 

@@ -85,7 +85,10 @@ export default function GbpInsightsWidget() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {METRICS.map(({ key, label, icon }) => (
-          <div key={key} className="bg-white rounded-xl border border-border-brand p-5">
+          <div
+            key={key}
+            className="bg-white rounded-xl border border-border-brand p-5 transition-shadow duration-200 hover:shadow-md"
+          >
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-medium text-ink3">{label}</p>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm bg-teal-50 text-teal-600">

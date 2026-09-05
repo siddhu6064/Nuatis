@@ -14,6 +14,7 @@ export interface EmailParams {
   replyTo?: string
   attachments?: EmailAttachment[]
   tenantId?: string
+  headers?: Record<string, string>
   suppressionCheck?: {
     email_status: string | null
     email_risk_score: number | null
@@ -67,6 +68,10 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 
     if (params.tenantId) {
       sendParams['tags'] = [{ name: 'tenant_id', value: params.tenantId }]
+    }
+
+    if (params.headers) {
+      sendParams['headers'] = params.headers
     }
 
     const { error } = await client.emails.send(

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
 import BookingPageClient from './BookingPageClient'
 
@@ -32,5 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default function BookingPage() {
-  return <BookingPageClient />
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg" />}>
+      <BookingPageClient />
+    </Suspense>
+  )
 }

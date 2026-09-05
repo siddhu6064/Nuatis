@@ -232,6 +232,44 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             resourceId: sub.id,
             details: { plan: planKey, status },
           })
+
+          // Referral commission activation — additive, never blocks billing.
+          // If this tenant was linked to a referral at signup (tenants.ts),
+          // this is the first real payment, so compute and record the
+          // commission the referring tenant earns; a support workflow marks
+          // it paid later (admin-console.ts).
+          try {
+            const { data: referralSignup } = await supabase
+              .from('referral_signups')
+              .select('id, referral_code_id')
+              .eq('referred_tenant_id', resolvedTenantId)
+              .eq('status', 'signed_up')
+              .maybeSingle()
+
+            if (referralSignup) {
+              const { data: code } = await supabase
+                .from('referral_codes')
+                .select('commission_rate, reward_type, fixed_reward_cents')
+                .eq('id', referralSignup.referral_code_id)
+                .maybeSingle()
+              const commissionAmount =
+                code?.reward_type === 'fixed' && code?.fixed_reward_cents != null
+                  ? Number(code.fixed_reward_cents) / 100
+                  : (plan.monthlyPrice / 100) * (Number(code?.commission_rate ?? 20) / 100)
+
+              await supabase
+                .from('referral_signups')
+                .update({
+                  status: 'active',
+                  activated_at: new Date().toISOString(),
+                  first_payment_at: new Date().toISOString(),
+                  commission_amount: commissionAmount,
+                })
+                .eq('id', referralSignup.id)
+            }
+          } catch (err) {
+            console.error('[stripe-billing-webhook] referral activation failed:', err)
+          }
         }
         break
       }
@@ -339,6 +377,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             // Reset Maya usage at the start of each new billing period.
             maya_minutes_used: 0,
             current_period_end: unixToIso(inv.period_end),
+            // A real payment landed — the dunning escalation resets.
+            payment_failure_count: 0,
           })
           .eq('stripe_customer_id', customerId)
 
@@ -357,17 +397,23 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
         const { data: tenant } = await supabase
           .from('tenants')
-          .select('id, billing_email')
+          .select('id, billing_email, payment_failure_count')
           .eq('stripe_customer_id', customerId)
-          .maybeSingle<{ id: string; billing_email: string | null }>()
+          .maybeSingle<{
+            id: string
+            billing_email: string | null
+            payment_failure_count: number | null
+          }>()
+
+        const attemptNumber = (tenant?.payment_failure_count ?? 0) + 1
 
         await supabase
           .from('tenants')
-          .update({ subscription_status: 'past_due' })
+          .update({ subscription_status: 'past_due', payment_failure_count: attemptNumber })
           .eq('stripe_customer_id', customerId)
 
         if (tenant?.billing_email) {
-          const paymentFailedEmail = buildPaymentFailedEmail()
+          const paymentFailedEmail = buildPaymentFailedEmail(attemptNumber)
           void sendEmail({
             to: tenant.billing_email,
             subject: paymentFailedEmail.subject,

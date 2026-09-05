@@ -20,6 +20,7 @@ interface Contact {
   email: string | null
   phone: string | null
   pipeline_stage: string | null
+  pipeline_name: string | null
   source: string | null
   tags: string[] | null
   created_at: string
@@ -251,8 +252,8 @@ export default function ContactsList() {
   useEffect(() => {
     void fetch('/api/users')
       .then((r) => r.json())
-      .then((d: { users: { id: string; full_name: string }[] }) => {
-        if (d.users) setTenantUsers(d.users)
+      .then((d: { id: string; full_name: string }[]) => {
+        if (Array.isArray(d)) setTenantUsers(d)
       })
       .catch(() => {})
   }, [])
@@ -642,7 +643,12 @@ export default function ContactsList() {
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Lifecycle</th>
                   )}
                   {colVisible['lead_score'] !== false && (
-                    <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Score</th>
+                    <th
+                      className="text-left text-xs font-medium text-ink4 px-4 py-3"
+                      title="Lead score 0-100, graded A (80+) to F (under 20) based on engagement and fit"
+                    >
+                      Score
+                    </th>
                   )}
                   {colVisible['assigned'] !== false && (
                     <th className="text-left text-xs font-medium text-ink4 px-4 py-3">Assigned</th>
@@ -741,9 +747,16 @@ export default function ContactsList() {
                     {colVisible['stage'] !== false && (
                       <td className="px-4 py-4">
                         {contact.pipeline_stage ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
-                            {contact.pipeline_stage}
-                          </span>
+                          <div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-700">
+                              {contact.pipeline_stage}
+                            </span>
+                            {contact.pipeline_name && (
+                              <p className="text-[11px] text-ink4 mt-0.5">
+                                {contact.pipeline_name}
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-sm text-gray-300">{'\u2014'}</span>
                         )}
@@ -785,6 +798,7 @@ export default function ContactsList() {
                             )}
                             {contact.lead_grade && (
                               <span
+                                title={`Lead grade ${contact.lead_grade} — based on a 0-100 engagement/fit score`}
                                 className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                   {
                                     A: 'bg-green-50 text-green-700',

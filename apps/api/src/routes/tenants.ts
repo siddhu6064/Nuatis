@@ -9,6 +9,7 @@ import {
 } from '@nuatis/shared'
 import { z } from 'zod'
 import { seedSampleData } from '../lib/seed-sample-data.js'
+import { linkReferralSignup } from '../lib/referral-signup-link.js'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import { PLANS, SUITE_MODULE_KEYS } from '../config/stripe-plans.js'
 import { authLimiter } from '../middleware/rate-limit.js'
@@ -30,6 +31,7 @@ const CreateTenantSchema = z.object({
   owner_name: z.string().min(2).max(100),
   timezone: z.string().default('America/Chicago'),
   product: z.enum(['maya_only', 'suite']).default('suite'),
+  referral_code: z.string().optional(),
 })
 
 // ── POST /api/tenants ─────────────────────────────────────────
@@ -55,6 +57,7 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
     owner_name,
     timezone,
     product,
+    referral_code,
   } = parsed.data
 
   // 2. Create Supabase auth user
@@ -156,6 +159,12 @@ router.post('/', authLimiter, async (req: Request, res: Response): Promise<void>
     vertical: vertical_slug,
     product,
   })
+
+  // Link this signup to Nuatis's own tenant-affiliate referral program, if a
+  // code was passed through — best-effort, never blocks signup.
+  if (referral_code) {
+    await linkReferralSignup(supabase, referral_code, owner_email, tenantId)
+  }
 
   // 6b. Create tenant_users record (RBAC foundation)
   await supabase.from('tenant_users').insert({

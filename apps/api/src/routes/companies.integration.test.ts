@@ -41,6 +41,8 @@ beforeEach(() => {
   store.tables['tenants'] = [{ id: TENANT_ID, modules: { companies: true } }]
   store.tables['companies'] = []
   store.tables['contacts'] = []
+  store.tables['deals'] = []
+  store.tables['activity_log'] = []
 })
 
 describe('GET /api/companies', () => {
@@ -82,6 +84,125 @@ describe('POST /api/companies', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ domain: 'acmeroofing.com' })
 
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('GET /api/companies/duplicates', () => {
+  it('pairs companies by matching domain at confidence 100', async () => {
+    store.tables['companies'] = [
+      { id: 'c1', tenant_id: TENANT_ID, name: 'Acme Inc', domain: 'acme.com', is_archived: false },
+      { id: 'c2', tenant_id: TENANT_ID, name: 'Acme LLC', domain: 'acme.com', is_archived: false },
+    ]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .get('/api/companies/duplicates')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.pairs).toHaveLength(1)
+    expect(res.body.pairs[0].confidence).toBe(100)
+    expect(res.body.pairs[0].match_reason).toBe('domain')
+  })
+
+  it('is not shadowed by GET /:id — "duplicates" must not be read as an id', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .get('/api/companies/duplicates')
+      .set('Authorization', `Bearer ${token}`)
+    // A regression would hit GET /:id, which 404s ("Company not found") for
+    // a nonexistent id — this must instead reach the duplicates handler.
+    expect(res.status).toBe(200)
+    expect(res.body.pairs).toBeDefined()
+  })
+})
+
+describe('POST /api/companies/merge', () => {
+  it('reassigns contacts and deals, archives the secondary', async () => {
+    store.tables['companies'] = [
+      {
+        id: 'primary',
+        tenant_id: TENANT_ID,
+        name: 'Primary Co',
+        domain: 'primary.com',
+        is_archived: false,
+      },
+      {
+        id: 'secondary',
+        tenant_id: TENANT_ID,
+        name: 'Secondary Co',
+        domain: null,
+        is_archived: false,
+      },
+    ]
+    store.tables['contacts'] = [
+      { id: 'contact-1', tenant_id: TENANT_ID, company_id: 'secondary', full_name: 'Jane' },
+    ]
+    store.tables['deals'] = [
+      { id: 'deal-1', tenant_id: TENANT_ID, company_id: 'secondary', name: 'Big Deal' },
+    ]
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/companies/merge')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ primary_id: 'primary', secondary_id: 'secondary' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe('primary')
+
+    expect(store.tables['contacts']?.[0]?.['company_id']).toBe('primary')
+    expect(store.tables['deals']?.[0]?.['company_id']).toBe('primary')
+    const secondaryRow = store.tables['companies']?.find((c) => c['id'] === 'secondary')
+    expect(secondaryRow?.['is_archived']).toBe(true)
+  })
+
+  it('400s merging a company into itself', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/companies/merge')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ primary_id: 'x', secondary_id: 'x' })
+    expect(res.status).toBe(400)
+  })
+
+  it('404s when either company is missing', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/companies/merge')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ primary_id: 'nope', secondary_id: 'also-nope' })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/companies/bulk/archive', () => {
+  it('archives the given ids, tenant-scoped', async () => {
+    store.tables['companies'] = [
+      { id: 'c1', tenant_id: TENANT_ID, name: 'A', is_archived: false },
+      { id: 'c2', tenant_id: TENANT_ID, name: 'B', is_archived: false },
+      { id: 'other-tenant-co', tenant_id: 'other-tenant', name: 'C', is_archived: false },
+    ]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/companies/bulk/archive')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ids: ['c1', 'c2', 'other-tenant-co'] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.archived).toBe(2) // cross-tenant id silently dropped
+    expect(store.tables['companies']?.find((c) => c['id'] === 'c1')?.['is_archived']).toBe(true)
+    expect(
+      store.tables['companies']?.find((c) => c['id'] === 'other-tenant-co')?.['is_archived']
+    ).toBe(false)
+  })
+
+  it('400s an empty ids array', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/companies/bulk/archive')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ids: [] })
     expect(res.status).toBe(400)
   })
 })

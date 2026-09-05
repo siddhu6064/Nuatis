@@ -13,11 +13,13 @@ import { shutdownPostHog } from './lib/posthog.js'
 import tenantsRouter from './routes/tenants.js'
 import googleAuthRouter from './routes/google-auth.js'
 import appointmentsRouter from './routes/appointments.js'
+import recurringAppointmentsRouter from './routes/recurring-appointments.js'
 import knowledgeRouter from './routes/knowledge.js'
 import callsRouter from './routes/calls.js'
 import mayaSettingsRouter from './routes/maya-settings.js'
 import callerMemoryRouter from './routes/caller-memory.js'
 import webhooksRouter from './routes/webhooks.js'
+import apiKeysRouter from './routes/api-keys.js'
 import demoRouter from './routes/demo.js'
 import insightsRouter from './routes/insights.js'
 import provisioningRouter from './routes/provisioning.js'
@@ -25,6 +27,7 @@ import pushRouter from './routes/push.js'
 import pushMobileRouter from './routes/push-mobile.js'
 import servicesRouter from './routes/services.js'
 import quotesRouter from './routes/quotes.js'
+import promoCodesRouter from './routes/promo-codes.js'
 import analyticsEventsRouter from './routes/analytics-events.js'
 import locationsRouter from './routes/locations.js'
 import npsRouter from './routes/nps.js'
@@ -33,6 +36,7 @@ import packagesRouter from './routes/packages.js'
 import settingsModulesRouter from './routes/settings-modules.js'
 import activityRouter from './routes/activity.js'
 import tasksRouter from './routes/tasks.js'
+import recurringTasksRouter from './routes/recurring-tasks.js'
 import contactsRouter from './routes/contacts.js'
 import searchRouter from './routes/search.js'
 import savedViewsRouter from './routes/saved-views.js'
@@ -42,33 +46,50 @@ import smsRouter from './routes/sms.js'
 import companiesRouter from './routes/companies.js'
 import dealsRouter from './routes/deals.js'
 import inventoryRouter from './routes/inventory.js'
+import vendorsRouter from './routes/vendors.js'
+import purchaseOrdersRouter from './routes/purchase-orders.js'
 import inventorySettingsRouter from './routes/inventory-settings.js'
 import ordersRouter from './routes/orders.js'
+import orderTemplatesRouter from './routes/order-templates.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
+import expensesRouter from './routes/expenses.js'
+import expenseCategoriesRouter from './routes/expense-categories.js'
+import recurringExpensesRouter from './routes/recurring-expenses.js'
+import expensesSettingsRouter from './routes/expenses-settings.js'
 import staffRouter from './routes/staff.js'
+import staffPortalRouter from './routes/staff-portal.js'
+import timeOffRouter from './routes/time-off.js'
 import usersRouter from './routes/users.js'
+import salesQuotasRouter from './routes/sales-quotas.js'
 import emailIntegrationsRouter from './routes/email-integrations.js'
 import emailTemplatesRouter from './routes/email-templates.js'
 import emailTrackingRouter from './routes/email-tracking.js'
 import bccLoggingRouter, { emailInboundWebhookRouter } from './routes/email-inbound.js'
 import emailWebhooksRouter from './routes/email-webhooks.js'
 import bookingPublicRouter from './routes/booking-public.js'
+import bookingManageRouter from './routes/booking-manage.js'
 import bookingSettingsRouter from './routes/booking-settings.js'
+import customFieldDefinitionsRouter from './routes/custom-field-definitions.js'
 import intakeFormsRouter from './routes/intake-forms.js'
 import leadScoringRouter from './routes/lead-scoring.js'
 import reportsRouter from './routes/reports.js'
 import reviewSettingsRouter, { reviewTrackingRouter } from './routes/review-settings.js'
+import npsSurveysRouter from './routes/nps-surveys.js'
+import npsSurveySettingsRouter from './routes/nps-survey-settings.js'
 import notificationSettingsRouter from './routes/notification-settings.js'
 import pipelinesRouter from './routes/pipelines.js'
-import chatPublicRouter from './routes/chat-public.js'
-import chatAgentRouter from './routes/chat-agent.js'
-import chatSettingsRouter from './routes/chat-settings.js'
 import dataExportRouter from './routes/data-export.js'
+import accountingExportRouter from './routes/accounting-export.js'
+import adminConsoleRouter from './routes/admin-console.js'
 import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
 import auditLogRouter from './routes/audit-log.js'
 import smartListsRouter from './routes/smart-lists.js'
 import followUpTemplatesRouter from './routes/follow-up-templates.js'
 import mobileAuthRouter from './routes/mobile-auth.js'
+import ssoAuthRouter from './routes/sso-auth.js'
+import ssoAdminRouter from './routes/sso-admin.js'
+import impersonateAuthRouter from './routes/impersonate-auth.js'
+import { impersonationAuditMiddleware } from './lib/impersonation.js'
 import voiceTestRouter from './routes/voice-test.js'
 import voiceLiveProxyRouter, {
   voiceLiveProxy,
@@ -83,14 +104,20 @@ import availabilitySchedulesRouter from './routes/availability-schedules.js'
 import calendarGroupsRouter from './routes/calendar-groups.js'
 import googleReserveRouter from './routes/google-reserve.js'
 import invoicesRouter, { publicRouter as invoicesPublicRouter } from './routes/invoices.js'
+import recurringInvoicesRouter from './routes/recurring-invoices.js'
+import outreachSequencesRouter from './routes/outreach-sequences.js'
 import subscriptionsRouter from './routes/subscriptions.js'
 import stripeWebhooksRouter from './routes/stripe-webhooks.js'
+import stripeConnectWebhooksRouter from './routes/stripe-connect-webhooks.js'
+import stripeConnectRouter from './routes/stripe-connect.js'
 import billingRouter from './routes/billing.js'
 import stripeBillingWebhooksRouter from './routes/stripe-billing-webhooks.js'
 import triggerLinksRouter, { triggerLinkPublicRouter } from './routes/trigger-links.js'
 import smsWebhooksRouter from './routes/sms-webhooks.js'
+import automationWebhookPublicRouter from './routes/automation-webhook-public.js'
 import smsHealthRouter from './routes/sms-health.js'
 import emailHealthRouter from './routes/email-health.js'
+import emailUnsubscribeRouter from './routes/email-unsubscribe.js'
 import businessProfileRouter from './routes/business-profile.js'
 import brandVoiceRouter from './routes/brand-voice.js'
 import mayaKbRouter from './routes/maya-kb.js'
@@ -108,14 +135,18 @@ import settingsLabsRouter from './routes/settings-labs.js'
 import announcementsRouter from './routes/announcements.js'
 import qrRouter from './routes/qr.js'
 import giftCardsRouter from './routes/gift-cards.js'
+import giftCardsPublicRouter from './routes/gift-cards-public.js'
 import mediaLibraryRouter from './routes/media-library.js'
 import referralsRouter from './routes/referrals.js'
+import customerReferralsRouter from './routes/customer-referrals.js'
+import customerReferralSettingsRouter from './routes/customer-referral-settings.js'
 import outboundCallsRouter from './routes/outbound-calls.js'
 import customAutomationsRouter from './routes/custom-automations.js'
 import portalRouter from './routes/portal.js'
 import videoTestimonialsRouter from './routes/video-testimonials.js'
 import voiceOutboundRouter from './routes/voice-outbound.js'
 import webchatRouter, { webchatSettingsRouter } from './routes/webchat.js'
+import webchatAgentRouter from './routes/webchat-agent.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { auditLoggerMiddleware } from './middleware/audit-logger.js'
 import { verifyTelnyxWebhook } from './middleware/verify-telnyx-webhook.js'
@@ -155,6 +186,10 @@ app.use(
 app.use('/api/webhooks/email', express.raw({ type: '*/*' }))
 // Capture raw body for Stripe webhook signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }))
+// Separate Connect-scoped webhook endpoint (events on connected accounts —
+// see stripe-connect-webhooks.ts) — its own signing secret, must also be
+// mounted before express.json() for the same raw-body reason.
+app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }))
 // SaaS billing webhooks (Nuatis-as-vendor) — must also be mounted BEFORE
 // express.json() so Stripe signature verification sees the raw body.
 app.use(
@@ -176,6 +211,11 @@ app.use('/webhooks/telnyx/sms', telnyxBodyCapture, verifyTelnyxWebhook)
 // Voice Live proxy — must be BEFORE express.json() so the raw WebSocket
 // upgrade is not disrupted by body parsing middleware.
 app.use('/api/voice/live', voiceLiveProxyRouter)
+// Booking confirm can carry base64 intake-form file/signature uploads — the
+// global express.json()'s default 100kb limit would 413 those. Same
+// pre-parse-then-skip pattern as the Telnyx body capture above: once this
+// runs, the global express.json() below sees req._body=true and no-ops.
+app.use('/api/booking', express.json({ limit: '8mb' }))
 app.use(express.json())
 app.use(auditLoggerMiddleware)
 
@@ -191,10 +231,18 @@ app.use(generalLimiter)
 // token or DB problem — requireAuth inside each router stays authoritative.
 app.use('/api', enforceTrial)
 
+// Fingerprints every mutating request made during an impersonation session.
+// Fails open/silent — never the source of truth for auth, just the audit log.
+app.use('/api', impersonationAuditMiddleware)
+
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
 app.use('/api/auth/mobile', authLimiter, mobileAuthRouter)
+app.use('/api/auth/sso', authLimiter, ssoAuthRouter)
+app.use('/api/sso', ssoAdminRouter)
+app.use('/api/impersonate', authLimiter, impersonateAuthRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/recurring-appointments', recurringAppointmentsRouter)
 app.use('/api/knowledge', knowledgeRouter)
 app.use('/api/calls', callsRouter)
 app.use('/api/maya-settings', mayaSettingsRouter)
@@ -207,6 +255,7 @@ app.use('/api/reputation', reputationRouter)
 app.use('/api/conversations', conversationsRouter)
 app.use('/api/digest', digestRouter)
 app.use('/api/webhooks', webhooksRouter)
+app.use('/api/api-keys', apiKeysRouter)
 app.use('/api/demo', demoRouter)
 app.use('/api/insights', insightsRouter)
 app.use('/api/provisioning', provisioningRouter)
@@ -214,10 +263,14 @@ app.use('/api/push', pushRouter)
 app.use('/api/push/mobile', pushMobileRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/quotes', quotesRouter)
+app.use('/api/promo-codes', promoCodesRouter)
 app.use('/api/invoices/public', invoicesPublicRouter)
 app.use('/api/invoices', invoicesRouter)
+app.use('/api/recurring-invoices', recurringInvoicesRouter)
+app.use('/api/outreach-sequences', outreachSequencesRouter)
 app.use('/api/subscriptions', subscriptionsRouter)
 app.use('/api/webhooks/stripe', stripeWebhooksRouter)
+app.use('/api/webhooks/stripe-connect', stripeConnectWebhooksRouter)
 app.use('/api/billing', billingRouter)
 app.use('/api/analytics', analyticsEventsRouter)
 app.use('/api/locations', locationsRouter)
@@ -227,6 +280,7 @@ app.use('/api/packages', packagesRouter)
 app.use('/api/settings/modules', settingsModulesRouter)
 app.use('/api', activityRouter)
 app.use('/api/tasks', tasksRouter)
+app.use('/api/recurring-tasks', recurringTasksRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/views', savedViewsRouter)
@@ -235,14 +289,25 @@ app.use('/api/contacts', attachmentsRouter)
 app.use('/api', smsRouter)
 app.use('/api/sms', smsHealthRouter)
 app.use('/api/email', emailHealthRouter)
+app.use('/api/email', emailUnsubscribeRouter)
 app.use('/api/companies', companiesRouter)
 app.use('/api/deals', dealsRouter)
 app.use('/api/inventory', inventoryRouter)
+app.use('/api/vendors', vendorsRouter)
+app.use('/api/purchase-orders', purchaseOrdersRouter)
 app.use('/api/settings/inventory', inventorySettingsRouter)
 app.use('/api/orders', ordersRouter)
+app.use('/api/order-templates', orderTemplatesRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
+app.use('/api/expenses', expensesRouter)
+app.use('/api/expense-categories', expenseCategoriesRouter)
+app.use('/api/recurring-expenses', recurringExpensesRouter)
+app.use('/api/settings/expenses', expensesSettingsRouter)
 app.use('/api/staff', staffRouter)
+app.use('/api/staff-portal', staffPortalRouter)
+app.use('/api/time-off', timeOffRouter)
 app.use('/api/users', usersRouter)
+app.use('/api/sales-quotas', salesQuotasRouter)
 app.use('/api/email-integrations', emailIntegrationsRouter)
 app.use('/api/email-templates', emailTemplatesRouter)
 app.use('/api/email-tracking', emailTrackingRouter)
@@ -250,18 +315,21 @@ app.use('/api/settings/bcc-logging', bccLoggingRouter)
 app.use('/api/webhooks/email-inbound', emailInboundWebhookRouter)
 app.use('/api/webhooks/email', emailWebhooksRouter)
 app.use('/api/booking', bookingPublicRouter)
+app.use('/api/booking-manage', bookingManageRouter)
 app.use('/api/settings/booking', bookingSettingsRouter)
+app.use('/api/settings/custom-fields', customFieldDefinitionsRouter)
 app.use('/api/intake-forms', intakeFormsRouter)
 app.use('/api/lead-scoring', leadScoringRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/settings/review-automation', reviewSettingsRouter)
 app.use('/api/review-tracking', reviewTrackingRouter)
+app.use('/api/nps-surveys', npsSurveysRouter)
+app.use('/api/settings/nps-surveys', npsSurveySettingsRouter)
 app.use('/api/settings/notifications', notificationSettingsRouter)
 app.use('/api/pipelines', pipelinesRouter)
-app.use('/api/chat', cors({ origin: '*' }), chatPublicRouter)
-app.use('/api/chat/sessions', chatAgentRouter)
-app.use('/api/settings/chat-widget', chatSettingsRouter)
 app.use('/api/settings/data-export', dataExportRouter)
+app.use('/api/accounting-export', accountingExportRouter)
+app.use('/api/admin-console', adminConsoleRouter)
 app.use('/api/settings/calendar', calendarSettingsRouter)
 app.use('/api/calendar', calendarCallbackRouter) // PUBLIC callback
 app.use('/api/audit-log', auditLogRouter)
@@ -272,6 +340,7 @@ app.use('/api/scheduled-reports', scheduledReportsRouter)
 app.use('/api/payment-links', paymentLinksRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/square', squareRouter)
+app.use('/api/stripe-connect', stripeConnectRouter)
 app.use('/api/availability-schedules', availabilitySchedulesRouter)
 app.use('/api/calendar-groups', calendarGroupsRouter)
 app.use('/api/google-reserve', googleReserveRouter)
@@ -282,6 +351,8 @@ app.use('/api/snippets', snippetsRouter)
 app.use('/api/automation', automationOverviewRouter)
 app.use('/api/resources', resourcesRouter)
 app.use('/api/referrals', referralsRouter)
+app.use('/api/customer-referrals', customerReferralsRouter)
+app.use('/api/settings/customer-referrals', customerReferralSettingsRouter)
 app.use('/api/custom-automations', customAutomationsRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/campaigns', campaignsPrereqRouter)
@@ -290,12 +361,15 @@ app.use('/api/portal', portalRouter)
 app.use('/api/video-testimonials', videoTestimonialsRouter)
 // PUBLIC webchat routes — CORS *
 app.use('/api/webchat', cors({ origin: '*' }), webchatRouter)
+// Authenticated webchat agent (dashboard thread view/reply/handoff)
+app.use('/api/webchat/sessions', webchatAgentRouter)
 // Authenticated webchat settings
 app.use('/api/settings/webchat', webchatSettingsRouter)
 app.use('/api/settings/labs', settingsLabsRouter)
 app.use('/api/announcements', announcementsRouter)
 app.use('/api/qr', qrRouter)
 app.use('/api/gift-cards', giftCardsRouter)
+app.use('/api/gift-cards-public', giftCardsPublicRouter)
 app.use('/api/media', mediaLibraryRouter)
 
 // Widget JS file — served with CORS * so any website can embed it
@@ -592,6 +666,9 @@ app.use('/voice/outbound-status', voiceOutboundRouter)
 
 // ── Telnyx SMS webhooks (message.received + message.finalized) ────────────────
 app.use('/webhooks/telnyx/sms', smsWebhooksRouter)
+
+// PUBLIC — inbound webhook trigger for custom automations (token in path is the auth)
+app.use('/webhooks/automations', automationWebhookPublicRouter)
 
 // Sentry error handler — must be after all routes
 Sentry.setupExpressErrorHandler(app)
