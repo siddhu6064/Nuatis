@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useRef } from 'react'
+import { Suspense, useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signIn } from 'next-auth/react'
@@ -8,6 +8,21 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? ''
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? ''
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+
+const SSO_ERROR_MESSAGES: Record<string, string> = {
+  sso_failed: 'SSO sign-in failed. Try again or contact your admin.',
+  sso_expired: 'That SSO sign-in link expired. Try again.',
+  sso_inactive: 'Your account is inactive. Contact your admin.',
+  // Standard NextAuth error codes — reached when a sign-in error redirects
+  // here directly (pages.error === '/sign-in') instead of being caught
+  // inline by a `signIn(..., { redirect: false })` call.
+  CredentialsSignin: 'Invalid email or password.',
+  AccessDenied: "You don't have access to sign in.",
+  Verification: 'That sign-in link is invalid or has expired.',
+  Configuration: 'Sign-in is misconfigured. Contact support.',
+}
+const DEFAULT_ERROR_MESSAGE = 'Something went wrong signing in. Try again.'
 
 // Lucide-style SVG icons — no extra dependency
 function IconCopy() {
@@ -141,12 +156,55 @@ function SignInForm() {
   const callbackUrl = isSafeRedirect(rawCallbackUrl) ? rawCallbackUrl : '/dashboard'
   const reset = params.get('reset') === '1'
   const passwordUpdated = params.get('passwordUpdated') === '1'
+  const ssoExchange = params.get('ssoExchange')
+  const ssoErrorParam = params.get('error')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(
+    ssoErrorParam ? (SSO_ERROR_MESSAGES[ssoErrorParam] ?? DEFAULT_ERROR_MESSAGE) : ''
+  )
+  const [loading, setLoading] = useState(Boolean(ssoExchange))
+  const [ssoTenantId, setSsoTenantId] = useState<string | null>(null)
+  const [ssoChecking, setSsoChecking] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+
+  // A completed WorkOS login lands back here with a one-time exchange code
+  // instead of a password — trade it for a real session via the "sso"
+  // Credentials provider, which calls the API to redeem it server-to-server.
+  useEffect(() => {
+    if (!ssoExchange) return
+    signIn('sso', { exchangeCode: ssoExchange, redirect: false }).then((res) => {
+      if (res?.error) {
+        setError('SSO sign-in failed. Try again or contact your admin.')
+        setLoading(false)
+        return
+      }
+      router.push(callbackUrl)
+    })
+    // Only ever fires once per exchange code — deliberately not re-running on
+    // callbackUrl/router identity changes.
+  }, [ssoExchange])
+
+  async function handleEmailBlur() {
+    setSsoTenantId(null)
+    if (!email.includes('@')) return
+    setSsoChecking(true)
+    try {
+      const res = await fetch(`${API_URL}/api/auth/sso/check?email=${encodeURIComponent(email)}`)
+      const data = (await res.json()) as { ssoEnabled: boolean; tenantId?: string }
+      setSsoTenantId(data.ssoEnabled && data.tenantId ? data.tenantId : null)
+    } catch {
+      setSsoTenantId(null)
+    } finally {
+      setSsoChecking(false)
+    }
+  }
+
+  function handleSsoSignIn() {
+    if (!ssoTenantId) return
+    window.location.href = `${API_URL}/api/auth/sso/authorize?tenantId=${ssoTenantId}`
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -225,6 +283,7 @@ function SignInForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={handleEmailBlur}
                 required
                 autoFocus
                 placeholder="you@example.com"
@@ -233,29 +292,34 @@ function SignInForm() {
                            focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10
                            transition-colors"
               />
+              {ssoChecking && (
+                <p className="mt-1 text-[11px] text-ink4">Checking sign-in method…</p>
+              )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-ink3">Password</label>
-                <a href="/forgot-password" className="text-xs text-teal-600 hover:underline">
-                  Forgot password?
-                </a>
+            {!ssoTenantId && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-ink3">Password</label>
+                  <a href="/forgot-password" className="text-xs text-teal-600 hover:underline">
+                    Forgot password?
+                  </a>
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required={!ssoTenantId}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-border-brand text-sm
+                             text-ink placeholder-gray-300 outline-none
+                             focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10
+                             transition-colors"
+                />
               </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-border-brand text-sm
-                           text-ink placeholder-gray-300 outline-none
-                           focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10
-                           transition-colors"
-              />
-            </div>
+            )}
 
             {error && (
               <p
@@ -266,15 +330,27 @@ function SignInForm() {
               </p>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-60
-                         text-white text-sm font-medium py-2.5 rounded-lg
-                         transition-colors cursor-pointer disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
+            {ssoTenantId ? (
+              <button
+                type="button"
+                onClick={handleSsoSignIn}
+                className="w-full bg-teal-600 hover:bg-teal-700
+                           text-white text-sm font-medium py-2.5 rounded-lg
+                           transition-colors cursor-pointer"
+              >
+                Sign in with SSO
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-60
+                           text-white text-sm font-medium py-2.5 rounded-lg
+                           transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+            )}
           </form>
 
           {/* New-account CTA — divider + link to the existing sign-up flow */}

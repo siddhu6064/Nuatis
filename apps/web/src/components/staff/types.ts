@@ -19,6 +19,8 @@ export const DAY_LABEL: Record<DayKey, string> = {
   sun: 'Sun',
 }
 
+export type PayType = 'hourly' | 'salary' | null
+
 export interface StaffMember {
   id: string
   tenant_id: string
@@ -32,6 +34,10 @@ export interface StaffMember {
   notes: string | null
   created_at: string
   updated_at: string
+  user_id?: string | null
+  pay_type?: PayType
+  hourly_rate_cents?: number | null
+  salary_cents?: number | null
 }
 
 export interface Shift {

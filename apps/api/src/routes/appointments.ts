@@ -3,7 +3,7 @@ import { getServiceClient } from '../lib/supabase.js'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
 import { getFirstName } from '@nuatis/shared'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, type AuthenticatedRequest } from '../lib/auth.js'
 import {
   createEvent,
   createEventWithMeet,
@@ -12,11 +12,15 @@ import {
 } from '../services/scheduling.js'
 import { publishActivityEvent } from '../lib/ops-copilot-client.js'
 import { logActivity } from '../lib/activity.js'
+import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { checkResourceAvailable } from '../lib/resource-availability.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
+import { applyLateCancellationFee } from '../lib/cancellation-fee.js'
+import { getStripe } from '../lib/payment-link.js'
+import { connectRequestOptions } from '../lib/stripe-connect.js'
 import { capture } from '../lib/posthog.js'
 
 const router = Router()
@@ -400,6 +404,14 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     actorId: authed.userId,
   })
 
+  void dispatchWebhook(authed.tenantId, 'appointment.booked', {
+    appointment_id: appointment.id,
+    contact_id,
+    title,
+    start_time,
+    end_time,
+  })
+
   // Fire-and-forget confirmation SMS — never blocks the response or throws
   void (async () => {
     try {
@@ -481,7 +493,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   // Verify appointment belongs to this tenant
   const { data: existing } = await supabase
     .from('appointments')
-    .select('google_event_id, tenant_id, contact_id')
+    .select('google_event_id, tenant_id, contact_id, assigned_staff_id, start_time')
     .eq('id', id)
     .eq('tenant_id', authed.tenantId)
     .single()
@@ -489,6 +501,35 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   if (!existing) {
     res.status(404).json({ error: 'Appointment not found' })
     return
+  }
+
+  // Staff double-booking check — only the resource_ids path was ever
+  // conflict-checked before; a reschedule (including drag-and-drop on the
+  // calendar) previously moved a staff member's appointment onto another one
+  // of theirs with no warning at all.
+  if (parsed.data.start_time && parsed.data.end_time) {
+    const staffId = parsed.data.assigned_staff_id ?? existing.assigned_staff_id
+    if (staffId) {
+      const { data: conflicting } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('tenant_id', authed.tenantId)
+        .eq('assigned_staff_id', staffId)
+        .neq('id', id)
+        .neq('status', 'canceled')
+        .lt('start_time', parsed.data.end_time)
+        .gt('end_time', parsed.data.start_time)
+        .limit(1)
+        .maybeSingle()
+
+      if (conflicting) {
+        res.status(409).json({
+          error: 'This staff member already has an appointment at that time',
+          conflict: true,
+        })
+        return
+      }
+    }
   }
 
   // Sync update to Google Calendar
@@ -540,6 +581,16 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       .eq('appointment_id', id)
       .eq('tenant_id', authed.tenantId)
       .neq('status', 'cancelled')
+
+    // Late-cancellation fee — reuses the existing payment-link infra, same
+    // as the no-show-scanner's fee path. Only fires when the tenant has set
+    // a notice window and the appointment falls inside it.
+    void applyLateCancellationFee(supabase, {
+      tenantId: authed.tenantId,
+      appointmentId: id,
+      contactId: existing.contact_id,
+      startTime: existing.start_time,
+    })
   }
 
   // Activity logging for status changes
@@ -590,6 +641,71 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
         }
       } catch (err) {
         console.error('[appointments] Failed to enqueue review request:', err)
+      }
+    })()
+    // Trigger customer NPS survey — independently toggleable from review automation
+    void (async () => {
+      try {
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('nps_survey_automation_enabled, nps_survey_delay_minutes')
+          .eq('id', authed.tenantId)
+          .single()
+        if (tenantData?.nps_survey_automation_enabled && existing.contact_id) {
+          const npsQueue = new Queue('nps-survey', {
+            connection: createBullMQConnection(),
+            skipVersionCheck: true,
+          })
+          await npsQueue.add(
+            'send-survey',
+            {
+              tenantId: authed.tenantId,
+              contactId: existing.contact_id,
+              appointmentId: req.params['id'],
+            },
+            { delay: (tenantData.nps_survey_delay_minutes || 120) * 60 * 1000 }
+          )
+          await npsQueue.close()
+        }
+      } catch (err) {
+        console.error('[appointments] Failed to enqueue NPS survey:', err)
+      }
+    })()
+    // Trigger customer-referral reward — fires once per referred contact.
+    // orders.ts enqueues the same job type on order completion; the worker's
+    // unique-constraint insert on customer_referral_rewards decides which
+    // trigger (appointment or order) wins as the "first" qualifying event.
+    void (async () => {
+      try {
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('customer_referral_program_enabled')
+          .eq('id', authed.tenantId)
+          .single()
+        if (!tenantData?.customer_referral_program_enabled || !existing.contact_id) return
+
+        const { data: contactRow } = await supabase
+          .from('contacts')
+          .select('referred_by_contact_id')
+          .eq('id', existing.contact_id)
+          .eq('tenant_id', authed.tenantId)
+          .maybeSingle()
+        if (!contactRow?.referred_by_contact_id) return
+
+        const referralQueue = new Queue('customer-referral-reward', {
+          connection: createBullMQConnection(),
+          skipVersionCheck: true,
+        })
+        await referralQueue.add('issue-reward', {
+          tenantId: authed.tenantId,
+          referredContactId: existing.contact_id,
+          referrerContactId: contactRow.referred_by_contact_id,
+          triggerType: 'appointment',
+          triggerId: req.params['id'],
+        })
+        await referralQueue.close()
+      } catch (err) {
+        console.error('[appointments] Failed to enqueue customer-referral reward:', err)
       }
     })()
   } else if (parsed.data.start_time) {
@@ -696,5 +812,81 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<
 
   res.status(204).send()
 })
+
+// ── POST /api/appointments/:id/refund-fee — refund a charged cancellation/
+// no-show fee. Only possible when the fee was actually charged via the
+// contact's saved card (fee_status='charged', a real Stripe PaymentIntent id
+// stored) — a fee that only ever went out as a hosted payment link has no
+// retrievable payment id to refund against (see migration 0189's comment).
+router.post(
+  '/:id/refund-fee',
+  requireAuth,
+  requireRole('owner', 'admin', 'manager'),
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const { data: appt } = await supabase
+      .from('appointments')
+      .select('id, contact_id, fee_status, fee_payment_intent_id, fee_amount_cents')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (!appt) {
+      res.status(404).json({ error: 'Appointment not found' })
+      return
+    }
+    if (appt.fee_status !== 'charged' || !appt.fee_payment_intent_id) {
+      res.status(400).json({
+        error: 'This fee was never charged to a saved card, so there is nothing to refund here',
+      })
+      return
+    }
+
+    try {
+      const stripe = getStripe()
+      // The charge was created against whichever account the contact's card
+      // was saved on (see contact-payment-methods.ts) — not necessarily the
+      // tenant's CURRENT connect status — so look that up rather than
+      // re-deriving it, same reasoning as everywhere else this is pinned.
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('stripe_connect_account_id')
+        .eq('id', appt.contact_id as string)
+        .maybeSingle()
+      await stripe.refunds.create(
+        { payment_intent: appt.fee_payment_intent_id as string },
+        connectRequestOptions(contact?.stripe_connect_account_id as string | null)
+      )
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Refund failed' })
+      return
+    }
+
+    const { data: updated, error } = await supabase
+      .from('appointments')
+      .update({ fee_status: 'refunded' })
+      .eq('id', appt.id)
+      .select('id, fee_status')
+      .single()
+
+    if (error || !updated) {
+      res.status(500).json({ error: error?.message ?? 'Refund succeeded but failed to record' })
+      return
+    }
+
+    void logActivity({
+      tenantId: authed.tenantId,
+      type: 'appointment',
+      body: `Refunded $${((appt.fee_amount_cents as number) / 100).toFixed(2)} cancellation/no-show fee`,
+      metadata: { appointment_id: appt.id },
+      actorType: 'user',
+      actorId: authed.userId,
+    })
+
+    res.json(updated)
+  }
+)
 
 export default router

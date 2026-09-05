@@ -114,7 +114,13 @@ export default function ShiftSlideOver({
         setError(data.error ?? 'Failed to save')
         return
       }
+      const saved = (await res.json().catch(() => ({}))) as { availability_warning?: string | null }
       onSaved()
+      if (saved.availability_warning) {
+        // Stays open to show the warning, same convention as the conflict case above.
+        setToast(saved.availability_warning)
+        return
+      }
       onClose()
     } finally {
       setSaving(false)

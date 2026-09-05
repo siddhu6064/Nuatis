@@ -83,6 +83,50 @@ router.get('/subscription', requireAuth, async (req: Request, res: Response): Pr
   })
 })
 
+// ── GET /api/billing/invoices ─────────────────────────────────────────────────
+// The tenant's own Nuatis subscription invoice history — previously the only
+// way to see even one past invoice was leaving the app for the Stripe portal.
+router.get('/invoices', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getSupabase()
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('stripe_customer_id')
+    .eq('id', authed.tenantId)
+    .single<{ stripe_customer_id: string | null }>()
+
+  if (!tenant?.stripe_customer_id) {
+    res.json({ invoices: [] })
+    return
+  }
+
+  const stripe = getStripe()
+  if (!stripe) {
+    res.status(503).json({ error: 'Billing is not configured' })
+    return
+  }
+
+  try {
+    const list = await stripe.invoices.list({ customer: tenant.stripe_customer_id, limit: 24 })
+    res.json({
+      invoices: list.data.map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        status: inv.status,
+        amount_paid_cents: inv.amount_paid,
+        currency: inv.currency,
+        created: inv.created,
+        hosted_invoice_url: inv.hosted_invoice_url,
+        invoice_pdf: inv.invoice_pdf,
+      })),
+    })
+  } catch (err) {
+    console.error('[billing] invoices.list failed:', err)
+    res.status(500).json({ error: 'Failed to load invoice history' })
+  }
+})
+
 // ── POST /api/billing/checkout ────────────────────────────────────────────────
 // Body: { plan: 'core'|'pro'|'scale', interval: 'month'|'year' }
 router.post(
@@ -190,6 +234,105 @@ router.post(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Stripe error'
       console.error('[billing] checkout error:', message)
+      res.status(502).json({ error: message })
+    }
+  }
+)
+
+// ── POST /api/billing/change-plan ─────────────────────────────────────────────
+// Body: { plan: 'core'|'pro'|'scale', interval: 'month'|'year' }
+// Swaps the price on the tenant's EXISTING Stripe subscription (unlike
+// /checkout, which always starts a brand-new one) — self-serve upgrade or
+// downgrade. Stripe prorates by default; tenants.subscription_plan/modules
+// are NOT written here — customer.subscription.updated (stripe-billing-
+// webhooks.ts) is the single source of truth and re-derives both from
+// whatever price/items the subscription ends up with.
+router.post(
+  '/change-plan',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  checkoutLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const stripe = getStripe()
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe not configured' })
+      return
+    }
+
+    const body = req.body as { plan?: string; interval?: string }
+    const planKey = body.plan as PlanKey | undefined
+    const interval = body.interval
+
+    if (!planKey || !PLAN_KEYS.includes(planKey)) {
+      res.status(400).json({ error: 'plan must be one of: core, pro, scale' })
+      return
+    }
+    if (interval !== 'month' && interval !== 'year') {
+      res.status(400).json({ error: 'interval must be month or year' })
+      return
+    }
+
+    const plan = PLANS[planKey]
+    const newBasePriceId =
+      interval === 'year' ? plan.stripePriceIdAnnual : plan.stripePriceIdMonthly
+    if (!newBasePriceId) {
+      res.status(503).json({ error: `Stripe price ID not configured for ${planKey}/${interval}` })
+      return
+    }
+
+    const supabase = getSupabase()
+    const { data: tenant, error: tenantErr } = await supabase
+      .from('tenants')
+      .select('id, subscription_plan, stripe_subscription_id')
+      .eq('id', authed.tenantId)
+      .single<
+        Pick<TenantBillingRow, 'id' | 'subscription_plan' | 'stripe_subscription_id'> & {
+          stripe_subscription_id: string | null
+        }
+      >()
+
+    if (tenantErr || !tenant) {
+      res.status(404).json({ error: 'Tenant not found' })
+      return
+    }
+    if (!tenant.stripe_subscription_id) {
+      res.status(400).json({
+        error: 'No active subscription to change — use checkout to start one',
+      })
+      return
+    }
+    if (tenant.subscription_plan === planKey) {
+      res.status(400).json({ error: `Already on the ${plan.name} plan` })
+      return
+    }
+
+    try {
+      const sub = await stripe.subscriptions.retrieve(tenant.stripe_subscription_id)
+      const baseItem = sub.items.data.find((i) => i.price.recurring?.usage_type !== 'metered')
+      const overageItem = sub.items.data.find((i) => i.price.recurring?.usage_type === 'metered')
+
+      const items: Stripe.SubscriptionUpdateParams.Item[] = []
+      items.push(baseItem ? { id: baseItem.id, price: newBasePriceId } : { price: newBasePriceId })
+      if (plan.stripeOveragePriceId) {
+        items.push(
+          overageItem
+            ? { id: overageItem.id, price: plan.stripeOveragePriceId }
+            : { price: plan.stripeOveragePriceId }
+        )
+      } else if (overageItem) {
+        items.push({ id: overageItem.id, deleted: true })
+      }
+
+      await stripe.subscriptions.update(tenant.stripe_subscription_id, {
+        items,
+        proration_behavior: 'create_prorations',
+      })
+
+      res.json({ success: true, plan: planKey })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stripe error'
+      console.error('[billing] change-plan error:', message)
       res.status(502).json({ error: message })
     }
   }

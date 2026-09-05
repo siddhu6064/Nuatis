@@ -93,7 +93,8 @@ export async function getAvailableSlotsForDate(
   creds: CalendarCredentials,
   date: string,
   durationMinutes: number,
-  bufferMinutes = 0
+  bufferMinutes = 0,
+  staffId?: string
 ): Promise<{ slots: TimeSlot[]; closed: boolean }> {
   const hoursWindow = getHoursForDateStr(date)
 
@@ -133,13 +134,17 @@ export async function getAvailableSlotsForDate(
     }
 
     const bookingBufferMs = (ts?.booking_buffer_minutes ?? 0) * 60_000
-    const { data: nativeAppts } = await supabase
+    let nativeApptsQuery = supabase
       .from('appointments')
       .select('start_time, end_time')
       .eq('tenant_id', creds.tenantId)
       .in('status', ['scheduled', 'completed'])
       .lt('start_time', timeMax)
       .gt('end_time', timeMin)
+    // A specific staff member's own bookings, not the whole business calendar —
+    // other staff can be booked in the same window.
+    if (staffId) nativeApptsQuery = nativeApptsQuery.eq('assigned_staff_id', staffId)
+    const { data: nativeAppts } = await nativeApptsQuery
     busyPeriods = (nativeAppts ?? []).map((a: { start_time: string; end_time: string }) => ({
       start: new Date(new Date(a.start_time).getTime() - bookingBufferMs),
       end: new Date(new Date(a.end_time).getTime() + bookingBufferMs),
@@ -204,7 +209,8 @@ export async function isSlotAvailable(
   creds: CalendarCredentials,
   date: string,
   startTime: string,
-  durationMinutes: number
+  durationMinutes: number,
+  staffId?: string
 ): Promise<boolean> {
   const { calendarId, timezone } = creds
   const provider = creds.provider ?? 'google'
@@ -216,13 +222,15 @@ export async function isSlotAvailable(
   if (provider === 'native') {
     if (!creds.tenantId) throw new Error('tenantId required for native calendar access')
     const supabase = getServiceClient()
-    const { data: conflicts } = await supabase
+    let conflictsQuery = supabase
       .from('appointments')
       .select('id')
       .eq('tenant_id', creds.tenantId)
       .in('status', ['scheduled', 'completed'])
       .lt('start_time', endIso)
       .gt('end_time', startIso)
+    if (staffId) conflictsQuery = conflictsQuery.eq('assigned_staff_id', staffId)
+    const { data: conflicts } = await conflictsQuery
     return (conflicts ?? []).length === 0
   }
 

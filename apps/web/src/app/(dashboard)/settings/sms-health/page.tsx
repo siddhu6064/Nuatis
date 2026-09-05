@@ -17,6 +17,14 @@ import {
 } from 'recharts'
 import type { SmsHealthStats, SmsDeliveryError, EmailHealthStats } from '@nuatis/shared'
 
+interface SuppressedContact {
+  id: string
+  full_name: string
+  email: string
+  email_status: string
+  email_risk_score: number | null
+}
+
 export default function DeliveryHealthPage() {
   const [stats, setStats] = useState<SmsHealthStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -61,6 +69,34 @@ export default function DeliveryHealthPage() {
     }
   }, [])
 
+  const [suppressed, setSuppressed] = useState<SuppressedContact[] | null>(null)
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
+
+  const fetchSuppressed = useCallback(async () => {
+    const res = await fetch('/api/email/suppressed', { credentials: 'include' })
+    if (res.ok) {
+      const data = (await res.json()) as { data: SuppressedContact[] }
+      setSuppressed(data.data)
+    }
+  }, [])
+
+  async function reactivate(contactId: string) {
+    setReactivatingId(contactId)
+    try {
+      await fetch(`/api/email/suppressed/${contactId}`, { method: 'PATCH' })
+      await fetchSuppressed()
+    } finally {
+      setReactivatingId(null)
+    }
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    soft_bounce: 'Soft bounce',
+    hard_bounce: 'Hard bounce',
+    complained: 'Marked as spam',
+    unsubscribed: 'Unsubscribed',
+  }
+
   useEffect(() => {
     void fetchStats()
   }, [fetchStats])
@@ -70,6 +106,12 @@ export default function DeliveryHealthPage() {
       void fetchEmailStats()
     }
   }, [activeTab, emailStats, emailLoading, emailError, fetchEmailStats])
+
+  useEffect(() => {
+    if (activeTab === 'email' && suppressed === null) {
+      void fetchSuppressed()
+    }
+  }, [activeTab, suppressed, fetchSuppressed])
 
   const trendIsEmpty = useMemo(
     () =>
@@ -473,14 +515,62 @@ export default function DeliveryHealthPage() {
                 </div>
               </div>
 
-              {/* Row 5 — Suppressed contacts link */}
-              <div className="text-sm text-ink3">
-                <Link
-                  href="/contacts?email_status=hard_bounce"
-                  className="text-teal-600 hover:underline text-sm"
-                >
-                  View suppressed contacts →
-                </Link>
+              {/* Row 5 — Suppressed contacts list */}
+              <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
+                <div className="px-4 py-3 border-b border-border-brand">
+                  <h3 className="text-sm font-semibold text-ink">Suppressed contacts</h3>
+                  <p className="text-xs text-ink4 mt-0.5">
+                    Excluded from email sends. Reactivating clears the suppression and resets risk
+                    score — only do this if you're sure the address is good again.
+                  </p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead className="bg-bg2 text-ink3 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="text-left px-4 py-2">Contact</th>
+                      <th className="text-left px-4 py-2">Email</th>
+                      <th className="text-left px-4 py-2">Reason</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-brand">
+                    {suppressed === null ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-ink4">
+                          Loading…
+                        </td>
+                      </tr>
+                    ) : suppressed.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-ink4">
+                          No suppressed contacts.
+                        </td>
+                      </tr>
+                    ) : (
+                      suppressed.map((c) => (
+                        <tr key={c.id}>
+                          <td className="px-4 py-2.5 text-ink font-medium">{c.full_name}</td>
+                          <td className="px-4 py-2.5 text-ink3">{c.email}</td>
+                          <td className="px-4 py-2.5">
+                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700">
+                              {STATUS_LABEL[c.email_status] ?? c.email_status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void reactivate(c.id)}
+                              disabled={reactivatingId === c.id}
+                              className="text-xs text-teal-700 hover:underline"
+                            >
+                              {reactivatingId === c.id ? 'Reactivating…' : 'Reactivate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </>
           )}

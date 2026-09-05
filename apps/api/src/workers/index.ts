@@ -27,6 +27,15 @@ import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
 import { createCampaignSenderWorker } from './campaign-sender.js'
 import { createRecurringExpenseScanner } from './recurring-expense-scanner.js'
+import { createRecurringInvoiceScanner } from './recurring-invoice-scanner.js'
+import { createRevenueDropScanner } from './revenue-drop-scanner.js'
+import { createOutreachSequenceWorker } from './outreach-sequence-worker.js'
+import { createWebhookDeliveryWorker } from './webhook-delivery-worker.js'
+import { createNpsSurveyWorker } from './nps-survey-worker.js'
+import { createCustomerReferralWorker } from './customer-referral-worker.js'
+import { createRecurringAppointmentScanner } from './recurring-appointment-scanner.js'
+import { createRecurringTaskScanner } from './recurring-task-scanner.js'
+import { createStaleApprovalScanner } from './stale-approval-scanner.js'
 
 interface ManagedWorker {
   name: string
@@ -254,6 +263,86 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'recurring-expense-scanner', ...recurringExpenseScanner })
   console.info('[workers] recurring-expense-scanner started, cron 0 6 * * *')
+
+  // 28. NPS survey — processes one-shot delayed jobs (on appointment completion)
+  const npsSurvey = createNpsSurveyWorker()
+  managed.push({ name: 'nps-survey', ...npsSurvey })
+  console.info('[workers] nps-survey worker started')
+
+  // 29. Customer-referral reward — processes on-demand jobs (on appointment/order completion)
+  const customerReferral = createCustomerReferralWorker()
+  managed.push({ name: 'customer-referral-reward', ...customerReferral })
+  console.info('[workers] customer-referral-reward worker started')
+
+  // 30. Recurring appointment scanner — daily at 06:15 UTC (offset from the
+  // recurring-expense scanner's :00 slot to avoid both hitting Redis at once)
+  const recurringAppointmentScanner = createRecurringAppointmentScanner()
+  await recurringAppointmentScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '15 6 * * *' }, jobId: 'recurring-appointment-scanner-daily' }
+  )
+  managed.push({ name: 'recurring-appointment-scanner', ...recurringAppointmentScanner })
+  console.info('[workers] recurring-appointment-scanner started, cron 15 6 * * *')
+
+  // 31. Recurring task scanner — daily at 06:30 UTC
+  const recurringTaskScanner = createRecurringTaskScanner()
+  await recurringTaskScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '30 6 * * *' }, jobId: 'recurring-task-scanner-daily' }
+  )
+  managed.push({ name: 'recurring-task-scanner', ...recurringTaskScanner })
+  console.info('[workers] recurring-task-scanner started, cron 30 6 * * *')
+
+  // 32. Recurring invoice scanner — daily at 06:45 UTC
+  const recurringInvoiceScanner = createRecurringInvoiceScanner()
+  await recurringInvoiceScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '45 6 * * *' }, jobId: 'recurring-invoice-scanner-daily' }
+  )
+  managed.push({ name: 'recurring-invoice-scanner', ...recurringInvoiceScanner })
+  console.info('[workers] recurring-invoice-scanner started, cron 45 6 * * *')
+
+  // 33. Revenue-drop alert scanner — daily at 09:00 UTC (cooldown column
+  // keeps this to at most one alert per tenant per week regardless of cadence)
+  const revenueDropScanner = createRevenueDropScanner()
+  await revenueDropScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 9 * * *' }, jobId: 'revenue-drop-scanner-daily' }
+  )
+  managed.push({ name: 'revenue-drop-scanner', ...revenueDropScanner })
+  console.info('[workers] revenue-drop-scanner started, cron 0 9 * * *')
+
+  // 34. Outreach sequence scanner — daily at 07:00 UTC (offset from the
+  // other 06:xx/09:00 daily scanners)
+  const outreachSequenceWorker = createOutreachSequenceWorker()
+  await outreachSequenceWorker.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 7 * * *' }, jobId: 'outreach-sequence-scanner-daily' }
+  )
+  managed.push({ name: 'outreach-sequence-scanner', ...outreachSequenceWorker })
+  console.info('[workers] outreach-sequence-scanner started, cron 0 7 * * *')
+
+  // 35. Outbound webhook delivery — on-demand, driven by dispatchWebhook()
+  // enqueuing a job per matching subscription. Not a scheduled scan.
+  const webhookDeliveryWorker = createWebhookDeliveryWorker()
+  managed.push({ name: 'webhook-delivery', ...webhookDeliveryWorker })
+  console.info('[workers] webhook-delivery worker started')
+
+  // 36. Stale-pending-approval scanner (time-off requests + expenses) —
+  // daily at 10:00 UTC, offset from the other daily scanners.
+  const staleApprovalScanner = createStaleApprovalScanner()
+  await staleApprovalScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '0 10 * * *' }, jobId: 'stale-approval-scanner-daily' }
+  )
+  managed.push({ name: 'stale-approval-scanner', ...staleApprovalScanner })
+  console.info('[workers] stale-approval-scanner started, cron 0 10 * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

@@ -100,4 +100,41 @@ describe('lead-score-decay processor (via processCompute trigger=decay)', () => 
     expect(Number(row?.['lead_score'])).toBe(80)
     expect(logActivity).not.toHaveBeenCalled()
   })
+
+  it('does not log activity on first-ever compute landing at 0 (no prior grade)', async () => {
+    // Regression: current.lead_grade is null (never computed before), so the
+    // old "grade !== oldGrade" check compared '' to 'F' and always logged —
+    // flooding the activity feed with "Lead score updated: 0 → 0 (F)" noise
+    // for every contact whose first-ever score computation landed at 0.
+    const contactId = randomUUID()
+    store.tables['contacts']!.push({
+      id: contactId,
+      tenant_id: TENANT_ID,
+      lead_score: null,
+      lead_grade: null,
+    })
+    computeLeadScore.mockResolvedValueOnce({ score: 0, grade: 'F' })
+
+    await processCompute({ tenantId: TENANT_ID, contactId, trigger: 'signup' })
+
+    const row = (store.tables['contacts'] as Row[]).find((r) => r['id'] === contactId)
+    expect(Number(row?.['lead_score'])).toBe(0)
+    expect(row?.['lead_grade']).toBe('F')
+    expect(logActivity).not.toHaveBeenCalled()
+  })
+
+  it('still logs a real first-ever compute that lands at a meaningful score', async () => {
+    const contactId = randomUUID()
+    store.tables['contacts']!.push({
+      id: contactId,
+      tenant_id: TENANT_ID,
+      lead_score: null,
+      lead_grade: null,
+    })
+    computeLeadScore.mockResolvedValueOnce({ score: 45, grade: 'C' })
+
+    await processCompute({ tenantId: TENANT_ID, contactId, trigger: 'signup' })
+
+    expect(logActivity).toHaveBeenCalledTimes(1)
+  })
 })

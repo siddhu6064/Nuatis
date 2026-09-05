@@ -13,7 +13,10 @@ import {
   type CampaignObjective,
   type BrandVoiceConfig,
 } from '../services/campaigns/ai-copy-generator.js'
-import { resolveSegmentDescription } from '../services/campaigns/segment-resolver.js'
+import {
+  resolveSegmentDescription,
+  resolveSegmentContactIds,
+} from '../services/campaigns/segment-resolver.js'
 import type { Campaign, BrandVoice, CampaignStats, CampaignRecipientStatus } from '@nuatis/shared'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -44,11 +47,6 @@ function mapTone(tone?: string): BrandVoiceConfig['tone'] {
   if (tone === 'friendly' || tone === 'warm') return 'friendly'
   if (tone === 'casual') return 'casual'
   return 'professional'
-}
-
-function parseContactCount(desc: string): number | null {
-  const match = desc.match(/(\d+)\s+contacts?/)
-  return match ? parseInt(match[1]!, 10) : null
 }
 
 // ── Lazy BullMQ queue singleton ───────────────────────────────────────────────
@@ -109,12 +107,12 @@ async function scheduleCampaignSend(
   )
   if (unapproved.length > 0) return { kind: 'unapproved' }
 
-  // Snapshot contact_count from the segment when set (display only). The worker
-  // fails closed on segment-scoped sends until smart-list execution ships.
+  // Snapshot contact_count from the segment when set — campaign-sender.ts
+  // re-resolves the same segment at send time and pauses rather than sends
+  // if the resolved count has drifted from this snapshot.
   let contactCount: number | null = null
   if (campaign.segment_id) {
-    const desc = await resolveSegmentDescription(campaign.segment_id, tenantId)
-    contactCount = parseContactCount(desc)
+    contactCount = (await resolveSegmentContactIds(campaign.segment_id, tenantId)).length
   }
 
   const scheduleAt = sendAt ?? new Date()
@@ -522,24 +520,33 @@ router.post(
         return
       }
 
+      // A/B test: generate for variant 'a' (default) or 'b' — regenerating
+      // 'b' never touches 'a', so an approved primary message is untouched
+      // while a second variant is drafted alongside it.
+      const requestedVariant = (req.body as { variant?: unknown })?.variant
+      const variant = requestedVariant === 'b' ? 'b' : 'a'
+
       // Fetch existing messages to check which are already approved
       const { data: existingMessages } = await supabase
         .from('campaign_messages')
-        .select('channel, approved')
+        .select('channel, variant, approved')
         .eq('campaign_id', campaign.id)
 
-      type MsgRow = { channel: string; approved: boolean }
-      const approvedChannels = new Set(
-        ((existingMessages ?? []) as MsgRow[]).filter((m) => m.approved).map((m) => m.channel)
+      type MsgRow = { channel: string; variant: string; approved: boolean }
+      const approvedChannelVariants = new Set(
+        ((existingMessages ?? []) as MsgRow[])
+          .filter((m) => m.approved)
+          .map((m) => `${m.channel}:${m.variant}`)
       )
 
-      // Upsert non-approved channels
-      const toUpsert = drafts.filter((d) => !approvedChannels.has(d.channel))
+      // Upsert non-approved channels for this variant
+      const toUpsert = drafts.filter((d) => !approvedChannelVariants.has(`${d.channel}:${variant}`))
       if (toUpsert.length > 0) {
         await supabase.from('campaign_messages').upsert(
           toUpsert.map((d) => ({
             campaign_id: campaign.id,
             channel: d.channel,
+            variant,
             subject: d.subject ?? null,
             body: d.body,
             ai_generated: true,
@@ -548,7 +555,7 @@ router.post(
             approved_at: null,
             updated_at: new Date().toISOString(),
           })),
-          { onConflict: 'campaign_id,channel' }
+          { onConflict: 'campaign_id,channel,variant' }
         )
       }
 
@@ -823,30 +830,7 @@ router.post('/:id/cancel', requireAuth, async (req: Request, res: Response): Pro
 // is now 'scheduled' (was 'sending' under the deleted legacy worker path).
 router.post('/:id/send-now', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
-  const supabase = getServiceClient()
   const id = req.params['id'] as string
-
-  // Fail closed on segment-scoped sends at the edge — do not enqueue a job the
-  // worker would only pause. Segment/smart-list execution is a separate ticket.
-  const { data: campaign, error: fetchErr } = await supabase
-    .from('campaigns')
-    .select('id, segment_id')
-    .eq('id', id)
-    .eq('tenant_id', authed.tenantId)
-    .single<{ id: string; segment_id: string | null }>()
-
-  if (fetchErr || !campaign) {
-    res.status(404).json({ error: 'Campaign not found' })
-    return
-  }
-
-  if (campaign.segment_id != null) {
-    res.status(400).json({
-      error:
-        'Segment-scoped sends are not yet supported — remove the segment or send to all contacts',
-    })
-    return
-  }
 
   const result = await scheduleCampaignSend(id, authed.tenantId, null)
   respondSchedule(res, result)
@@ -1133,6 +1117,28 @@ router.get(
         supabase.from('campaign_performance').select('*').eq('campaign_id', id),
       ])
 
+    // A/B variant breakdown — grouped in JS from the raw sends rather than a
+    // new view, since this is the only place that needs it.
+    const { data: variantRows } = await supabase
+      .from('campaign_sends')
+      .select('variant, status')
+      .eq('campaign_id', id)
+      .not('variant', 'is', null)
+
+    const byVariant: Record<
+      string,
+      { total_sent: number; delivered: number; opened: number; clicked: number }
+    > = {}
+    for (const row of variantRows ?? []) {
+      const v = row.variant as string
+      const status = row.status as string
+      const entry = (byVariant[v] ??= { total_sent: 0, delivered: 0, opened: 0, clicked: 0 })
+      entry.total_sent++
+      if (['delivered', 'opened', 'clicked'].includes(status)) entry.delivered++
+      if (['opened', 'clicked'].includes(status)) entry.opened++
+      if (status === 'clicked') entry.clicked++
+    }
+
     const totalSent = totalRes.count ?? 0
     const delivered = deliveredRes.count ?? 0
     const opened = openedRes.count ?? 0
@@ -1155,6 +1161,32 @@ router.get(
       failed: number
     }
 
+    const variantEntries = Object.entries(byVariant).map(([variant, v]) => ({
+      variant,
+      total_sent: v.total_sent,
+      delivered: v.delivered,
+      opened: v.opened,
+      clicked: v.clicked,
+      open_rate: rate(v.opened, v.delivered),
+      click_rate: rate(v.clicked, v.opened),
+    }))
+
+    // Only call a winner once there's a real sample on both sides — a 2-send
+    // test calling itself decisive would be worse than not calling one at all.
+    const MIN_SAMPLE = 10
+    const [a, b] = [
+      variantEntries.find((v) => v.variant === 'a'),
+      variantEntries.find((v) => v.variant === 'b'),
+    ]
+    const winner =
+      a && b && a.total_sent >= MIN_SAMPLE && b.total_sent >= MIN_SAMPLE
+        ? a.open_rate === b.open_rate
+          ? null
+          : a.open_rate > b.open_rate
+            ? 'a'
+            : 'b'
+        : null
+
     res.json({
       total_sent: totalSent,
       delivered,
@@ -1167,6 +1199,8 @@ router.get(
       click_rate: rate(clicked, opened),
       opt_out_rate: rate(optedOut, totalSent),
       by_channel: (perfRes.data ?? []) as PerfRow[],
+      by_variant: variantEntries,
+      variant_winner: winner,
     })
   }
 )

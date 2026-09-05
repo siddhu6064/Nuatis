@@ -13,6 +13,7 @@ import { callSessionState } from './post-call.js'
 import { maskPhone } from './pre-call-lookup.js'
 import { getMayaCircuitBreaker } from './maya-circuit-breaker.js'
 import { sendSms } from '../lib/sms.js'
+import { createPaymentLink } from '../lib/payment-link.js'
 import {
   buildConfirmationSms,
   buildEscalationTransferSms,
@@ -196,6 +197,25 @@ export const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
         },
       },
       required: ['caller_phone', 'new_date', 'new_start_time'],
+    },
+  },
+  {
+    name: 'cancel_appointment',
+    description:
+      "Cancel the caller's upcoming appointment outright — without booking a new one. Use when the caller wants to cancel, not move to a different time. If they want a different time instead, use reschedule_appointment.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        caller_phone: {
+          type: Type.STRING,
+          description: 'Caller E.164 phone number',
+        },
+        reason: {
+          type: Type.STRING,
+          description: 'Optional reason for cancelling',
+        },
+      },
+      required: ['caller_phone'],
     },
   },
   {
@@ -1544,11 +1564,31 @@ const handlers: Record<string, ToolHandler> = {
                 .eq('id', context.tenantId)
                 .maybeSingle()
 
+              // Payment link is offered, not forced — many callers still pay
+              // in person on pickup/delivery. A Stripe failure (unconfigured
+              // tenant, API error) just means no link in the text, same
+              // graceful-skip shape as the missing-fromNumber guard above.
+              let paymentUrl: string | null = null
+              if (subtotal > 0) {
+                try {
+                  const link = await createPaymentLink({
+                    tenantId: context.tenantId,
+                    amount: subtotal,
+                    description: `Order ${orderNumber}`,
+                    contactId,
+                  })
+                  paymentUrl = link.url
+                } catch (err) {
+                  console.error('[tool-handlers] place_order payment link failed:', err)
+                }
+              }
+
               const text = buildOrderConfirmationSms({
                 contactName: callerName || null,
                 businessName: (tenantRow?.name as string) || 'the business',
                 orderNumber,
                 vertical: (tenantRow?.vertical as string) || '',
+                paymentUrl,
               })
               await sendSms(fromNumber, callerPhone, text, {
                 tenantId: context.tenantId,
@@ -1772,6 +1812,104 @@ const handlers: Record<string, ToolHandler> = {
       } catch (err) {
         console.error('[tool-handlers] reschedule_appointment error:', err)
         return JSON.stringify({ rescheduled: false, message: 'Unable to reschedule appointment' })
+      }
+    })
+    return JSON.parse(resultStr) as Record<string, unknown>
+  },
+
+  cancel_appointment: async (args, context) => {
+    if (context.trialExpired) {
+      console.info(
+        `[tool-handlers] cancel_appointment blocked — trial expired tenant=${context.tenantId}`
+      )
+      return {
+        canceled: false,
+        message: "I've made a note of that and someone will call you back to confirm.",
+      }
+    }
+    const rawPhone = String(args['caller_phone'] ?? context.callerId ?? '')
+    const callerPhone = normalizePhone(rawPhone)
+    const reason = args['reason'] ? String(args['reason']) : undefined
+
+    console.info(
+      `[tool-handlers] cancel_appointment: caller=${callerPhone} tenant=${context.tenantId}`
+    )
+
+    const resultStr = await getMayaCircuitBreaker().wrap('cancel_appointment', async () => {
+      try {
+        const supabase = getServiceClient()
+        const digitsOnly = callerPhone.replace(/\+/, '')
+
+        let { data: contact } = await supabase
+          .from('contacts')
+          .select('id, full_name, phone')
+          .eq('tenant_id', context.tenantId)
+          .eq('phone', callerPhone)
+          .eq('is_archived', false)
+          .maybeSingle()
+
+        if (!contact) {
+          ;({ data: contact } = await supabase
+            .from('contacts')
+            .select('id, full_name, phone')
+            .eq('tenant_id', context.tenantId)
+            .eq('phone', digitsOnly)
+            .eq('is_archived', false)
+            .maybeSingle())
+        }
+
+        if (!contact) {
+          return JSON.stringify({
+            canceled: false,
+            message: 'No upcoming appointment found for this number',
+          })
+        }
+
+        const { data: existing } = await supabase
+          .from('appointments')
+          .select('id, start_time, end_time, status')
+          .eq('tenant_id', context.tenantId)
+          .eq('contact_id', contact['id'])
+          .in('status', ['scheduled', 'confirmed'])
+          .gt('start_time', new Date().toISOString())
+          .order('start_time', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (!existing) {
+          return JSON.stringify({
+            canceled: false,
+            message: 'No upcoming appointment found for this number',
+          })
+        }
+
+        const { error: cancelErr } = await supabase
+          .from('appointments')
+          .update({ status: 'canceled' })
+          .eq('id', existing['id'])
+
+        if (cancelErr) {
+          console.error(`[tool-handlers] cancel_appointment: cancel failed: ${cancelErr.message}`)
+          return JSON.stringify({ canceled: false, message: 'Failed to cancel appointment' })
+        }
+
+        const { logActivity } = await import('../lib/activity.js')
+        void logActivity({
+          tenantId: context.tenantId,
+          contactId: contact['id'] as string,
+          type: 'appointment',
+          body: reason
+            ? `Appointment canceled by Maya (phone) — ${reason}`
+            : 'Appointment canceled by Maya (phone)',
+          metadata: { appointment_id: existing['id'] },
+          actorType: 'ai',
+        })
+
+        console.info(`[tool-handlers] cancel_appointment: canceled id=${existing['id']}`)
+        return JSON.stringify({ canceled: true, appointment_id: existing['id'] })
+      } catch (err) {
+        console.error('[tool-handlers] cancel_appointment error:', err)
+        return JSON.stringify({ canceled: false, message: 'Unable to cancel appointment' })
       }
     })
     return JSON.parse(resultStr) as Record<string, unknown>

@@ -7,12 +7,15 @@ import {
   createCalendarEvent,
 } from '../lib/booking-availability.js'
 import { logActivity } from '../lib/activity.js'
+import { dispatchWebhook } from '../lib/webhook-dispatcher.js'
 import { enqueueScoreCompute } from '../lib/lead-score-queue.js'
 import { sendSms } from '../lib/sms.js'
 import { buildConfirmationSms } from '../lib/sms-templates.js'
 import { sendPushNotification } from '../lib/push-client.js'
 import { autoEnrichContact } from '../lib/contact-enrichment.js'
 import { bookingLimiter } from '../middleware/rate-limit.js'
+
+const WEB_URL = process.env['WEB_URL'] ?? 'http://localhost:3000'
 
 const router = Router()
 
@@ -25,7 +28,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, phone, booking_page_enabled, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
+      'id, name, booking_page_enabled, booking_services, booking_buffer_minutes, booking_advance_days, booking_confirmation_message, booking_google_review_url, booking_accent_color'
     )
     .eq('booking_page_slug', slug)
     .maybeSingle()
@@ -94,8 +97,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
     .eq('is_primary', true)
     .maybeSingle()
 
-  const businessPhone =
-    (location?.telnyx_number as string | null) ?? (tenant.phone as string | null) ?? null
+  const businessPhone = (location?.telnyx_number as string | null) ?? null
 
   const { data: resources } = await supabase
     .from('bookable_resources')
@@ -110,9 +112,51 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
     .eq('id', tenant.id as string)
     .maybeSingle()
 
+  // Staff picker data — only services with mapped staff show a picker;
+  // services with none are unaffected (no staff needed to book them).
+  // Manual batch-fetch-and-merge (not a nested select): staff_services.staff_id
+  // doesn't follow the singular-table-name FK convention some helpers assume.
+  const staffByService: Record<string, { id: string; name: string; color_hex: string }[]> = {}
+  if (services.length > 0) {
+    const { data: mappings } = await supabase
+      .from('staff_services')
+      .select('service_id, staff_id')
+      .eq('tenant_id', tenantId)
+      .in(
+        'service_id',
+        services.map((s) => s.id)
+      )
+
+    const staffIds = [...new Set((mappings ?? []).map((m) => m.staff_id as string))]
+    if (staffIds.length > 0) {
+      const { data: staffRows } = await supabase
+        .from('staff_members')
+        .select('id, name, color_hex, is_active')
+        .eq('tenant_id', tenantId)
+        .in('id', staffIds)
+
+      const staffById = new Map(
+        (staffRows ?? [])
+          .filter((s) => s.is_active)
+          .map((s) => [
+            s.id as string,
+            { id: s.id as string, name: s.name as string, color_hex: s.color_hex as string },
+          ])
+      )
+
+      for (const row of mappings ?? []) {
+        const staffInfo = staffById.get(row.staff_id as string)
+        if (!staffInfo) continue
+        const serviceId = row.service_id as string
+        if (!staffByService[serviceId]) staffByService[serviceId] = []
+        staffByService[serviceId].push(staffInfo)
+      }
+    }
+  }
+
   res.json({
     tenantId,
-    businessName: tenant.business_name,
+    businessName: tenant.name,
     businessPhone,
     accentColor: tenant.booking_accent_color ?? '#2563eb',
     confirmationMessage:
@@ -124,6 +168,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
     services,
     intakeForms,
     resources: resources ?? [],
+    staffByService,
     vertical: tenantFull?.vertical ?? null,
   })
 })
@@ -131,7 +176,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
 // ── GET /:slug/availability — available slots for a date ─────────────────────
 router.get('/:slug/availability', async (req: Request, res: Response): Promise<void> => {
   const { slug } = req.params
-  const { serviceId, date } = req.query as Record<string, string>
+  const { serviceId, date, staffId } = req.query as Record<string, string>
 
   // Validate required params
   if (!serviceId || !date) {
@@ -196,6 +241,20 @@ router.get('/:slug/availability', async (req: Request, res: Response): Promise<v
 
   const durationMinutes: number = (service.duration_minutes as number | null) ?? 60
 
+  // A staffId is only honored if it's actually mapped to this service —
+  // otherwise silently ignore rather than error (defensive against stale UI state).
+  let staffFilter: string | undefined
+  if (staffId) {
+    const { data: mapping } = await supabase
+      .from('staff_services')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('service_id', serviceId)
+      .eq('staff_id', staffId)
+      .maybeSingle()
+    if (mapping) staffFilter = staffId
+  }
+
   // Get calendar credentials
   const creds = await getTenantCalendarCredentials(tenantId)
 
@@ -204,7 +263,13 @@ router.get('/:slug/availability', async (req: Request, res: Response): Promise<v
     return
   }
 
-  const { slots } = await getAvailableSlotsForDate(creds, date, durationMinutes, bufferMinutes)
+  const { slots } = await getAvailableSlotsForDate(
+    creds,
+    date,
+    durationMinutes,
+    bufferMinutes,
+    staffFilter
+  )
 
   res.json({ date, slots })
 })
@@ -229,6 +294,8 @@ router.post(
       intakeData,
       notes,
       resource_id,
+      referralCode,
+      staffId,
     } = body as {
       serviceId?: string
       date?: string
@@ -241,6 +308,8 @@ router.post(
       intakeData?: Record<string, unknown>
       notes?: string
       resource_id?: string
+      referralCode?: string
+      staffId?: string
     }
 
     // Validate required fields
@@ -296,10 +365,29 @@ router.post(
     const durationMinutes: number = (service.duration_minutes as number | null) ?? 60
     const serviceName: string = service.name as string
 
+    // A staffId is only honored if it's actually mapped to this service.
+    let assignedStaffId: string | null = null
+    if (staffId) {
+      const { data: mapping } = await supabase
+        .from('staff_services')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('service_id', serviceId!)
+        .eq('staff_id', staffId)
+        .maybeSingle()
+      if (mapping) assignedStaffId = staffId
+    }
+
     // Re-check slot availability
     const creds = await getTenantCalendarCredentials(tenantId)
     if (creds) {
-      const available = await isSlotAvailable(creds, date!, startTime!, durationMinutes)
+      const available = await isSlotAvailable(
+        creds,
+        date!,
+        startTime!,
+        durationMinutes,
+        assignedStaffId ?? undefined
+      )
       if (!available) {
         res.status(409).json({ error: 'This time slot is no longer available' })
         return
@@ -316,6 +404,22 @@ router.post(
 
     const locationId: string | null = (primaryLocation?.id as string | null) ?? null
     const telnyxNumber: string | null = (primaryLocation?.telnyx_number as string | null) ?? null
+
+    // Resolve a customer-referral code (if any) to the referring contact —
+    // separate from Nuatis's own tenant-affiliate referral_codes table.
+    let referrerContactId: string | null = null
+    if (typeof referralCode === 'string' && referralCode.trim()) {
+      const { data: referralRow } = await supabase
+        .from('contact_referral_codes')
+        .select('id, contact_id')
+        .eq('tenant_id', tenantId)
+        .eq('code', referralCode.trim().toUpperCase())
+        .eq('status', 'active')
+        .maybeSingle()
+      if (referralRow) {
+        referrerContactId = referralRow.contact_id as string
+      }
+    }
 
     // Find or create contact — match by phone first, then email
     let contactId: string | null = null
@@ -336,6 +440,19 @@ router.post(
         .update({ full_name: fullName })
         .eq('id', contactId)
         .eq('tenant_id', tenantId)
+      // Backfill attribution only if this contact has none yet — never
+      // overwrite an existing referrer.
+      if (referrerContactId) {
+        await supabase
+          .from('contacts')
+          .update({
+            referred_by_contact_id: referrerContactId,
+            referral_source_detail: 'Referral link',
+          })
+          .eq('id', contactId)
+          .eq('tenant_id', tenantId)
+          .is('referred_by_contact_id', null)
+      }
     } else {
       // Try match by email
       const { data: byEmail } = await supabase
@@ -353,6 +470,17 @@ router.post(
           .update({ full_name: fullName })
           .eq('id', contactId)
           .eq('tenant_id', tenantId)
+        if (referrerContactId) {
+          await supabase
+            .from('contacts')
+            .update({
+              referred_by_contact_id: referrerContactId,
+              referral_source_detail: 'Referral link',
+            })
+            .eq('id', contactId)
+            .eq('tenant_id', tenantId)
+            .is('referred_by_contact_id', null)
+        }
       } else {
         // Create new contact
         const { data: newContact, error: contactError } = await supabase
@@ -362,7 +490,9 @@ router.post(
             full_name: fullName,
             email: email!,
             phone: phone!,
-            source: 'booking_page',
+            source: referrerContactId ? 'referral' : 'web_form',
+            referred_by_contact_id: referrerContactId,
+            referral_source_detail: referrerContactId ? 'Referral link' : null,
             sms_opt_in: true, // Submitting phone on booking form = explicit TCPA consent
           })
           .select('id')
@@ -435,6 +565,7 @@ router.post(
         tenant_id: tenantId,
         contact_id: contactId,
         location_id: locationId,
+        assigned_staff_id: assignedStaffId,
         title: `${serviceName} — ${fullName}`,
         description: notes ?? '',
         start_time: startIso,
@@ -443,7 +574,7 @@ router.post(
         google_event_id: googleEventId,
         notes: 'Booked via online booking page',
       })
-      .select('id')
+      .select('id, manage_token')
       .single()
 
     if (appointmentError || !appointment) {
@@ -452,6 +583,7 @@ router.post(
     }
 
     const appointmentId: string = appointment.id as string
+    const manageUrl = `${WEB_URL.replace(/\/+$/, '')}/book/manage/${appointment.manage_token as string}`
 
     // Insert resource booking if resource_id provided (fire-and-forget)
     if (resource_id) {
@@ -498,16 +630,24 @@ router.post(
       actorType: 'system',
     })
 
+    void dispatchWebhook(tenantId, 'appointment.booked', {
+      appointment_id: appointmentId,
+      contact_id: contactId,
+      title: `${serviceName} — ${fullName}`,
+      start_time: startIso,
+      end_time: endIso,
+    })
+
     if (contactId) enqueueScoreCompute(tenant.id, contactId, 'appointment_booked')
 
     // Send SMS confirmation
     if (telnyxNumber && phone) {
-      const smsBody = buildConfirmationSms({
+      const smsBody = `${buildConfirmationSms({
         contactName: firstName ?? null,
         businessName: (tenant.name as string | undefined) ?? 'your business',
         appointmentDateTime: `${date} at ${startTime}`,
         vertical: (tenant.vertical as string | undefined) ?? 'sales_crm',
-      })
+      })} Manage booking: ${manageUrl}`
       void sendSms(telnyxNumber, phone, smsBody, { tenantId, contactId: contactId ?? undefined })
     }
 
@@ -522,6 +662,7 @@ router.post(
       success: true,
       appointmentId,
       confirmationMessage,
+      manageUrl,
     })
   }
 )

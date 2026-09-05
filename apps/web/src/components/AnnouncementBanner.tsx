@@ -47,12 +47,12 @@ export function AnnouncementBanner() {
   const style = TYPE_STYLE[announcement.type] ?? TYPE_STYLE['feature']!
 
   return (
-    <div className={`border-b ${style.border} ${style.bg} px-4 py-3 flex items-start gap-3`}>
-      <span className="text-base leading-none mt-0.5 flex-shrink-0">{style.icon}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-ink">{announcement.title}</p>
-        <p className="text-xs text-ink3 mt-0.5">{announcement.body}</p>
-      </div>
+    <div className={`border-b ${style.border} ${style.bg} px-4 py-1.5 flex items-center gap-2`}>
+      <span className="text-sm leading-none flex-shrink-0">{style.icon}</span>
+      <p className="flex-1 min-w-0 truncate text-xs text-ink">
+        <span className="font-semibold">{announcement.title}</span>
+        <span className="text-ink3"> — {announcement.body}</span>
+      </p>
       <div className="flex items-center gap-3 flex-shrink-0">
         {announcement.cta_label && announcement.cta_url && (
           <Link
@@ -66,7 +66,7 @@ export function AnnouncementBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss"
-          className="text-ink4 hover:text-ink text-xl leading-none"
+          className="text-ink4 hover:text-ink text-base leading-none"
         >
           ×
         </button>

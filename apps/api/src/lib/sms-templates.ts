@@ -131,17 +131,20 @@ export interface OrderSmsParams {
   businessName: string
   orderNumber: string
   vertical: string
+  paymentUrl?: string | null
 }
 
 export function buildOrderConfirmationSms({
   contactName,
   businessName: biz,
   orderNumber,
+  paymentUrl,
 }: OrderSmsParams): string {
   const name = contactName?.trim() || null
-  if (name)
-    return `Hi ${name}, your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
-  return `Your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
+  const base = name
+    ? `Hi ${name}, your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
+    : `Your order ${orderNumber} with ${biz} is confirmed. We'll text you when it's ready.`
+  return paymentUrl ? `${base} Pay online: ${paymentUrl}` : base
 }
 
 export function buildOrderReadySms({
@@ -186,6 +189,25 @@ export function buildOrderTrackingSms({
   const tail = `${trackingCarrier} tracking # ${trackingNumber}.`
   if (name) return `Hi ${name}, your order ${orderNumber} from ${biz} is on its way! ${tail}`
   return `Your order ${orderNumber} from ${biz} is on its way! ${tail}`
+}
+
+// ── Customer NPS survey ────────────────────────────────────────────────────────
+
+export interface NpsSurveySmsParams {
+  contactName?: string | null
+  businessName: string
+  surveyUrl: string
+}
+
+export function buildNpsSurveySms({
+  contactName,
+  businessName: biz,
+  surveyUrl,
+}: NpsSurveySmsParams): string {
+  const name = contactName?.trim() || null
+  if (name)
+    return `Hi ${name}, thanks for choosing ${biz}! On a scale of 0-10, how likely are you to recommend us to a friend? ${surveyUrl}\n\nReply STOP to opt out.`
+  return `Thanks for choosing ${biz}! On a scale of 0-10, how likely are you to recommend us to a friend? ${surveyUrl}\n\nReply STOP to opt out.`
 }
 
 // ── Trigger Links in SMS ───────────────────────────────────────────────────────

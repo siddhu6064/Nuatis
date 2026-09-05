@@ -28,10 +28,19 @@ interface Service {
 interface LineItem {
   key: string
   service_id: string | null
+  inventory_item_id: string | null
   package_id: string | null
   description: string
   quantity: number
   unit_price: number
+}
+
+interface InventoryItemOption {
+  id: string
+  name: string
+  sku: string | null
+  unit_cost: number | null
+  quantity: number
 }
 
 interface PackageData {
@@ -89,6 +98,13 @@ export default function QuoteBuilder({
   const [discountValue, setDiscountValue] = useState(0)
   const [discountLabel, setDiscountLabel] = useState('')
 
+  // Promo code — resolves to the same discount state above, so the rest of
+  // the totals/CPQ-approval logic doesn't need to know it came from a code.
+  const [promoCodeInput, setPromoCodeInput] = useState('')
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
+  const [promoCodeError, setPromoCodeError] = useState('')
+  const [applyingPromoCode, setApplyingPromoCode] = useState(false)
+
   // CPQ settings
   const [cpqSettings, setCpqSettings] = useState({
     max_discount_pct: 20,
@@ -133,7 +149,22 @@ export default function QuoteBuilder({
 
   // Packages state
   const [availablePackages, setAvailablePackages] = useState<ResolvedPackage[]>([])
-  const [catalogTab, setCatalogTab] = useState<'services' | 'packages'>('services')
+  const [catalogTab, setCatalogTab] = useState<'services' | 'packages' | 'inventory'>('services')
+
+  const [inventoryQuery, setInventoryQuery] = useState('')
+  const [inventoryResults, setInventoryResults] = useState<InventoryItemOption[]>([])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (inventoryQuery) params.set('q', inventoryQuery)
+      fetch(`/api/inventory?${params}`)
+        .then((r) => (r.ok ? r.json() : { data: [] }))
+        .then((data: { data: InventoryItemOption[] }) => setInventoryResults(data.data ?? []))
+        .catch(() => setInventoryResults([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [inventoryQuery])
 
   useState(() => {
     fetch('/api/packages')
@@ -172,6 +203,7 @@ export default function QuoteBuilder({
       newItems.push({
         key: crypto.randomUUID(),
         service_id: item.service_id,
+        inventory_item_id: null,
         package_id: pkgLocalId,
         description: item.service_name,
         quantity: item.qty,
@@ -184,6 +216,7 @@ export default function QuoteBuilder({
       newItems.push({
         key: crypto.randomUUID(),
         service_id: null,
+        inventory_item_id: null,
         package_id: pkgLocalId,
         description: `${pkg.name} — Bundle Savings`,
         quantity: 1,
@@ -204,10 +237,26 @@ export default function QuoteBuilder({
       {
         key: crypto.randomUUID(),
         service_id: svc.id,
+        inventory_item_id: null,
         package_id: null,
         description: svc.name,
         quantity: 1,
         unit_price: svc.unit_price,
+      },
+    ])
+  }
+
+  function addFromInventory(inv: InventoryItemOption) {
+    setItems((prev) => [
+      ...prev,
+      {
+        key: crypto.randomUUID(),
+        service_id: null,
+        inventory_item_id: inv.id,
+        package_id: null,
+        description: inv.name,
+        quantity: 1,
+        unit_price: Number(inv.unit_cost ?? 0),
       },
     ])
   }
@@ -218,6 +267,7 @@ export default function QuoteBuilder({
       {
         key: crypto.randomUUID(),
         service_id: null,
+        inventory_item_id: null,
         package_id: null,
         description: '',
         quantity: 1,
@@ -232,6 +282,40 @@ export default function QuoteBuilder({
 
   function removeItem(key: string) {
     setItems((prev) => prev.filter((i) => i.key !== key))
+  }
+
+  async function applyPromoCode() {
+    const code = promoCodeInput.trim()
+    if (!code) return
+    setApplyingPromoCode(true)
+    setPromoCodeError('')
+    try {
+      const res = await fetch(`/api/promo-codes/lookup/${encodeURIComponent(code)}`)
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setPromoCodeError((d as { error?: string }).error ?? 'Invalid promo code')
+        return
+      }
+      const data = (await res.json()) as {
+        discount_type: 'percent' | 'fixed'
+        discount_value: number
+      }
+      setDiscountEnabled(true)
+      setDiscountType(data.discount_type === 'percent' ? 'percentage' : 'fixed')
+      setDiscountValue(data.discount_value)
+      setDiscountLabel(code.toUpperCase())
+      setAppliedPromoCode(code.toUpperCase())
+    } catch {
+      setPromoCodeError('Unable to validate promo code')
+    } finally {
+      setApplyingPromoCode(false)
+    }
+  }
+
+  function clearPromoCode() {
+    setAppliedPromoCode(null)
+    setPromoCodeInput('')
+    setPromoCodeError('')
   }
 
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0)
@@ -281,6 +365,7 @@ export default function QuoteBuilder({
           title,
           line_items: items.map((i) => ({
             service_id: i.service_id,
+            inventory_item_id: i.inventory_item_id,
             description: i.description,
             quantity: i.quantity,
             unit_price: i.unit_price,
@@ -298,6 +383,7 @@ export default function QuoteBuilder({
           discount_label: discountLabel || null,
           discount_pct: discountPct,
           discount_amount: discountAmount,
+          promo_code: appliedPromoCode || undefined,
           requires_signature: requireSignature,
         }),
       })
@@ -369,7 +455,9 @@ export default function QuoteBuilder({
               <ToggleButtonGroup
                 value={catalogTab}
                 exclusive
-                onChange={(_e, v: 'services' | 'packages' | null) => v && setCatalogTab(v)}
+                onChange={(_e, v: 'services' | 'packages' | 'inventory' | null) =>
+                  v && setCatalogTab(v)
+                }
                 size="small"
               >
                 <ToggleButton value="services" sx={{ fontSize: 12, py: 0.5 }}>
@@ -377,6 +465,9 @@ export default function QuoteBuilder({
                 </ToggleButton>
                 <ToggleButton value="packages" sx={{ fontSize: 12, py: 0.5 }}>
                   Packages
+                </ToggleButton>
+                <ToggleButton value="inventory" sx={{ fontSize: 12, py: 0.5 }}>
+                  Inventory
                 </ToggleButton>
               </ToggleButtonGroup>
               <Button onClick={addCustom} size="small" sx={{ fontSize: 12 }}>
@@ -401,6 +492,36 @@ export default function QuoteBuilder({
               {services.length === 0 && (
                 <p className="px-3 py-4 text-xs text-ink4 text-center">No services configured</p>
               )}
+            </div>
+          )}
+          {catalogTab === 'inventory' && (
+            <div className="mb-4">
+              <TextField
+                value={inventoryQuery}
+                onChange={(e) => setInventoryQuery(e.target.value)}
+                placeholder="Search stock by name or SKU..."
+                size="small"
+                fullWidth
+                sx={{ mb: 1 }}
+              />
+              <div className="border border-border-brand rounded-lg max-h-40 overflow-y-auto">
+                {inventoryResults.map((inv) => (
+                  <button
+                    key={inv.id}
+                    onClick={() => addFromInventory(inv)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-bg flex justify-between border-b border-gray-50 last:border-0"
+                  >
+                    <span className="text-ink2">
+                      {inv.name}
+                      {inv.sku ? <span className="text-ink4 text-xs ml-1">({inv.sku})</span> : null}
+                    </span>
+                    <span className="text-ink4">{inv.quantity} in stock</span>
+                  </button>
+                ))}
+                {inventoryResults.length === 0 && (
+                  <p className="px-3 py-4 text-xs text-ink4 text-center">No matching stock items</p>
+                )}
+              </div>
             </div>
           )}
           {catalogTab === 'packages' && (
@@ -529,6 +650,15 @@ export default function QuoteBuilder({
                             placeholder="Description"
                             fullWidth
                             size="small"
+                            slotProps={
+                              item.inventory_item_id
+                                ? {
+                                    input: {
+                                      startAdornment: <span title="Linked to inventory">📦</span>,
+                                    },
+                                  }
+                                : undefined
+                            }
                           />
                         </div>
                         <div className="col-span-2">
@@ -581,6 +711,49 @@ export default function QuoteBuilder({
         <div className="bg-white rounded-xl border border-border-brand p-6">
           <div className="flex justify-end">
             <div className="w-64 space-y-2">
+              {/* Promo code */}
+              {appliedPromoCode ? (
+                <div className="flex items-center justify-between text-xs bg-teal-50 text-teal-700 rounded px-2 py-1 mb-1">
+                  <span>
+                    Code <b>{appliedPromoCode}</b> applied
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearPromoCode}
+                    className="text-teal-700 hover:text-teal-900"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <TextField
+                      value={promoCodeInput}
+                      onChange={(e) => setPromoCodeInput(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && (e.preventDefault(), void applyPromoCode())
+                      }
+                      placeholder="Promo code"
+                      size="small"
+                      fullWidth
+                      sx={{ '& .MuiInputBase-input': { fontSize: 12 } }}
+                    />
+                    <Button
+                      onClick={() => void applyPromoCode()}
+                      disabled={!promoCodeInput.trim() || applyingPromoCode}
+                      size="small"
+                      sx={{ fontSize: 12, flexShrink: 0 }}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {promoCodeError && (
+                    <p className="text-xs text-red-600 mt-0.5">{promoCodeError}</p>
+                  )}
+                </div>
+              )}
+
               {/* Inline discount toggle */}
               {!discountEnabled ? (
                 <Button
@@ -637,6 +810,7 @@ export default function QuoteBuilder({
                         setDiscountEnabled(false)
                         setDiscountValue(0)
                         setDiscountLabel('')
+                        clearPromoCode()
                       }}
                       size="small"
                       sx={{

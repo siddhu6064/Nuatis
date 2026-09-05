@@ -5,6 +5,16 @@ import crypto from 'crypto'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { syncReviews, refreshTokenIfNeeded, fetchGbpInsights } from '../lib/gbp-sync.js'
 import redis from '../lib/redis.js'
+import { searchYelpBusinesses } from '../lib/yelp-client.js'
+import { syncYelpReviews } from '../lib/yelp-sync.js'
+import {
+  isFacebookConfigured,
+  getFacebookAuthUrl,
+  exchangeFacebookCode,
+  getFacebookPages,
+  saveFacebookConnection,
+} from '../lib/facebook-oauth.js'
+import { syncFacebookReviews } from '../lib/facebook-sync.js'
 
 const router = Router()
 
@@ -45,7 +55,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
   const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
 
   if (!code || !rawState) {
-    res.redirect(`${webUrl}/settings/reputation?error=missing_params`)
+    res.redirect(`${webUrl}/reputation?error=missing_params`)
     return
   }
 
@@ -58,13 +68,13 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     if (!parsed.nonce || !parsed.tenantId) throw new Error('Invalid state')
     const stored = await redis.get(`oauth_nonce:${parsed.nonce}`)
     if (!stored || stored !== parsed.tenantId) {
-      res.redirect(`${webUrl}/settings/reputation?error=invalid_state`)
+      res.redirect(`${webUrl}/reputation?error=invalid_state`)
       return
     }
     await redis.del(`oauth_nonce:${parsed.nonce}`)
     tenantId = parsed.tenantId
   } catch {
-    res.redirect(`${webUrl}/settings/reputation?error=invalid_state`)
+    res.redirect(`${webUrl}/reputation?error=invalid_state`)
     return
   }
 
@@ -78,7 +88,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     })
     if (!accountsRes.ok) {
       console.error(`[reputation] GBP accounts fetch failed: ${accountsRes.status}`)
-      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      res.redirect(`${webUrl}/reputation?error=oauth_failed`)
       return
     }
     const accountsBody = (await accountsRes.json()) as {
@@ -93,7 +103,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     )
     if (!locationsRes.ok) {
       console.error(`[reputation] GBP locations fetch failed: ${locationsRes.status}`)
-      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      res.redirect(`${webUrl}/reputation?error=oauth_failed`)
       return
     }
     const locationsBody = (await locationsRes.json()) as {
@@ -126,15 +136,15 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
     if (upsertError) {
       console.error('[reputation] gbp_connections upsert error:', upsertError.message)
-      res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+      res.redirect(`${webUrl}/reputation?error=oauth_failed`)
       return
     }
 
     console.info(`[reputation] GBP connected for tenant=${tenantId}, location=${locationName}`)
-    res.redirect(`${webUrl}/settings/reputation?connected=true`)
+    res.redirect(`${webUrl}/reputation?connected=true`)
   } catch (err) {
     console.error('[reputation] callback error:', err)
-    res.redirect(`${webUrl}/settings/reputation?error=oauth_failed`)
+    res.redirect(`${webUrl}/reputation?error=oauth_failed`)
   }
 })
 
@@ -235,6 +245,88 @@ router.get('/reviews', requireAuth, async (req: Request, res: Response): Promise
     console.error('[reputation] reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
+})
+
+const MANUAL_REVIEW_SOURCES = ['yelp', 'facebook', 'manual', 'other']
+
+// POST /api/reputation/reviews/manual — a review left somewhere other than
+// Google (Yelp, Facebook, in person) entered by hand so it shows in the same
+// feed/stats. Zero touches to the Google OAuth/sync machinery in gbp-sync.ts.
+router.post('/reviews/manual', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const b = req.body as Record<string, unknown>
+
+  const rating = typeof b['rating'] === 'number' ? b['rating'] : NaN
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    res.status(400).json({ error: 'rating must be an integer between 1 and 5' })
+    return
+  }
+
+  const source = typeof b['source'] === 'string' ? b['source'] : 'manual'
+  if (!MANUAL_REVIEW_SOURCES.includes(source)) {
+    res.status(400).json({ error: `source must be one of: ${MANUAL_REVIEW_SOURCES.join(', ')}` })
+    return
+  }
+
+  const reviewerName =
+    typeof b['reviewer_name'] === 'string' ? b['reviewer_name'].trim() || null : null
+  const comment = typeof b['comment'] === 'string' ? b['comment'].trim() || null : null
+  const publishedAt =
+    typeof b['published_at'] === 'string' && !isNaN(Date.parse(b['published_at']))
+      ? b['published_at']
+      : new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({
+      tenant_id: authed.tenantId,
+      google_review_id: `manual-${crypto.randomUUID()}`,
+      source,
+      reviewer_name: reviewerName,
+      rating,
+      comment,
+      published_at: publishedAt,
+      status: 'new',
+    })
+    .select('*')
+    .single()
+
+  if (error || !data) {
+    res.status(500).json({ error: error?.message ?? 'Failed to save review' })
+    return
+  }
+
+  res.status(201).json(data)
+})
+
+// DELETE /api/reputation/reviews/:id — manual/non-Google entries only. A real
+// synced Google review isn't deletable here since the next sync just brings
+// it back; this is for removing a mis-entered manual one.
+router.delete('/reviews/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const { id } = req.params as { id: string }
+
+  const { data, error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .neq('source', 'google')
+    .select('id')
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+  if (!data) {
+    res.status(404).json({ error: 'Manual review not found' })
+    return
+  }
+
+  res.json({ success: true })
 })
 
 // GET /api/reputation/stats
@@ -430,6 +522,210 @@ router.get('/insights', requireAuth, async (req: Request, res: Response): Promis
     return
   }
   res.json(insights)
+})
+
+// ── Yelp: read-only import, app-level key (no OAuth) ─────────────────────────
+
+// GET /api/reputation/yelp/search?term=&location=
+router.get('/yelp/search', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const term = typeof req.query['term'] === 'string' ? req.query['term'] : ''
+  const location = typeof req.query['location'] === 'string' ? req.query['location'] : ''
+  if (!term.trim() || !location.trim()) {
+    res.status(400).json({ error: 'term and location are required' })
+    return
+  }
+  try {
+    const businesses = await searchYelpBusinesses(term.trim(), location.trim())
+    res.json({ businesses })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Yelp search failed'
+    if (message.includes('YELP_API_KEY')) {
+      res.status(503).json({ error: 'Yelp is not configured' })
+      return
+    }
+    console.error('[reputation] yelp search error:', err)
+    res.status(500).json({ error: 'Yelp search failed' })
+  }
+})
+
+// GET /api/reputation/yelp/status
+router.get('/yelp/status', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const { data } = await supabase
+    .from('yelp_connections')
+    .select('yelp_business_id, business_name, connected_at')
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+  res.json({
+    configured: Boolean(process.env['YELP_API_KEY']),
+    connected: Boolean(data),
+    businessName: data?.business_name ?? null,
+  })
+})
+
+// POST /api/reputation/yelp/connect — body { businessId, businessName }
+router.post('/yelp/connect', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { businessId, businessName } = req.body as {
+    businessId?: string
+    businessName?: string
+  }
+  if (!businessId?.trim()) {
+    res.status(400).json({ error: 'businessId is required' })
+    return
+  }
+  const supabase = getServiceClient()
+  const { error } = await supabase.from('yelp_connections').upsert(
+    {
+      tenant_id: authed.tenantId,
+      yelp_business_id: businessId.trim(),
+      business_name: businessName?.trim() || null,
+    },
+    { onConflict: 'tenant_id' }
+  )
+  if (error) {
+    console.error('[reputation] yelp connect error:', error.message)
+    res.status(500).json({ error: 'Failed to connect Yelp' })
+    return
+  }
+  res.json({ connected: true })
+})
+
+// DELETE /api/reputation/yelp/disconnect
+router.delete(
+  '/yelp/disconnect',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    await supabase.from('yelp_connections').delete().eq('tenant_id', authed.tenantId)
+    res.json({ disconnected: true })
+  }
+)
+
+// POST /api/reputation/yelp/sync
+router.post('/yelp/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  try {
+    const result = await syncYelpReviews(authed.tenantId)
+    res.json(result)
+  } catch (err) {
+    console.error('[reputation] yelp sync error:', err)
+    res.status(500).json({ error: 'Yelp sync failed' })
+  }
+})
+
+// ── Facebook: OAuth scaffold, built ready to activate ─────────────────────────
+// Every route here 503s cleanly when META_APP_ID/META_APP_SECRET aren't set —
+// which they never are in this environment — rather than half-working.
+
+// GET /api/reputation/facebook/status
+router.get('/facebook/status', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const { data } = await supabase
+    .from('facebook_connections')
+    .select('page_name')
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+  res.json({
+    configured: isFacebookConfigured(),
+    connected: Boolean(data),
+    pageName: data?.page_name ?? null,
+  })
+})
+
+// GET /api/reputation/facebook/auth-url
+router.get(
+  '/facebook/auth-url',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    if (!isFacebookConfigured()) {
+      res.status(503).json({ error: 'Facebook is not configured' })
+      return
+    }
+    const nonce = crypto.randomBytes(32).toString('hex')
+    await redis.set(`oauth_nonce:fb:${nonce}`, authed.tenantId, 'EX', 600)
+    const state = Buffer.from(JSON.stringify({ nonce, tenantId: authed.tenantId })).toString(
+      'base64'
+    )
+    res.json({ url: getFacebookAuthUrl(state) })
+  }
+)
+
+// GET /api/reputation/facebook/callback
+router.get('/facebook/callback', async (req: Request, res: Response): Promise<void> => {
+  const { code, state: rawState } = req.query as { code?: string; state?: string }
+  const webUrl = process.env['WEB_URL'] ?? 'http://localhost:3000'
+
+  if (!code || !rawState) {
+    res.redirect(`${webUrl}/reputation?error=missing_params`)
+    return
+  }
+
+  let tenantId: string
+  try {
+    const parsed = JSON.parse(Buffer.from(rawState, 'base64').toString()) as {
+      nonce?: string
+      tenantId?: string
+    }
+    if (!parsed.nonce || !parsed.tenantId) throw new Error('Invalid state')
+    const stored = await redis.get(`oauth_nonce:fb:${parsed.nonce}`)
+    if (!stored || stored !== parsed.tenantId) {
+      res.redirect(`${webUrl}/reputation?error=invalid_state`)
+      return
+    }
+    await redis.del(`oauth_nonce:fb:${parsed.nonce}`)
+    tenantId = parsed.tenantId
+  } catch {
+    res.redirect(`${webUrl}/reputation?error=invalid_state`)
+    return
+  }
+
+  try {
+    const tokenRes = await exchangeFacebookCode(code)
+    const pages = await getFacebookPages(tokenRes.access_token)
+    const page = pages[0]
+    if (!page) {
+      res.redirect(`${webUrl}/reputation?error=no_pages`)
+      return
+    }
+    await saveFacebookConnection(tenantId, page, tokenRes.expires_in)
+    res.redirect(`${webUrl}/reputation?connected=facebook`)
+  } catch (err) {
+    console.error('[reputation] facebook callback error:', err)
+    res.redirect(`${webUrl}/reputation?error=oauth_failed`)
+  }
+})
+
+// DELETE /api/reputation/facebook/disconnect
+router.delete(
+  '/facebook/disconnect',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    await supabase.from('facebook_connections').delete().eq('tenant_id', authed.tenantId)
+    res.json({ disconnected: true })
+  }
+)
+
+// POST /api/reputation/facebook/sync
+router.post('/facebook/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  if (!isFacebookConfigured()) {
+    res.status(503).json({ error: 'Facebook is not configured' })
+    return
+  }
+  try {
+    const result = await syncFacebookReviews(authed.tenantId)
+    res.json(result)
+  } catch (err) {
+    console.error('[reputation] facebook sync error:', err)
+    res.status(500).json({ error: 'Facebook sync failed' })
+  }
 })
 
 export default router

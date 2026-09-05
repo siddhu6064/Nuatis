@@ -15,6 +15,7 @@ interface FormData {
   owner_password: string
   timezone: string
   product: 'maya_only' | 'suite'
+  referral_code?: string
 }
 
 const INITIAL: FormData = {
@@ -47,6 +48,10 @@ function SignUpForm() {
     const p = searchParams.get('product')
     if (p === 'maya_only' || p === 'suite') {
       setForm((prev) => ({ ...prev, product: p }))
+    }
+    const ref = searchParams.get('ref')
+    if (ref) {
+      setForm((prev) => ({ ...prev, referral_code: ref }))
     }
   }, [searchParams])
 

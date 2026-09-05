@@ -37,6 +37,7 @@ export const PLANS = {
       'campaigns',
       'orders',
       'expenses',
+      'staff-portal',
     ],
     stripePriceIdMonthly: process.env['STRIPE_PRICE_PRO_MONTHLY'] ?? '',
     stripePriceIdAnnual: process.env['STRIPE_PRICE_PRO_ANNUAL'] ?? '',
@@ -62,6 +63,8 @@ export const PLANS = {
       'cpq',
       'orders',
       'expenses',
+      'staff-portal',
+      'sso',
     ],
     stripePriceIdMonthly: process.env['STRIPE_PRICE_SCALE_MONTHLY'] ?? '',
     stripePriceIdAnnual: process.env['STRIPE_PRICE_SCALE_ANNUAL'] ?? '',
@@ -134,6 +137,8 @@ export const TIER_GATED = new Set([
   'cpq',
   'orders',
   'expenses',
+  'staff-portal',
+  'sso',
 ])
 
 /**

@@ -13,6 +13,8 @@ const VALID_FIELD_TYPES = [
   'checkbox',
   'date',
   'number',
+  'signature',
+  'file',
 ] as const
 type FieldType = (typeof VALID_FIELD_TYPES)[number]
 
@@ -28,7 +30,15 @@ function toCamelForm(form: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+const VALID_VISIBLE_IF_OPS = ['eq', 'neq', 'exists'] as const
+
 function validateFields(fields: unknown[]): { valid: boolean; error?: string } {
+  const ids = new Set(
+    fields
+      .map((field) => (field as Record<string, unknown>)['id'])
+      .filter((id): id is string => typeof id === 'string')
+  )
+
   for (const field of fields) {
     const f = field as Record<string, unknown>
     if (!f['id'] || typeof f['id'] !== 'string') {
@@ -46,6 +56,25 @@ function validateFields(fields: unknown[]): { valid: boolean; error?: string } {
     if (f['type'] === 'select') {
       if (!Array.isArray(f['options']) || (f['options'] as unknown[]).length === 0) {
         return { valid: false, error: 'Select fields must have an options array' }
+      }
+    }
+    if (f['visibleIf'] !== undefined && f['visibleIf'] !== null) {
+      const cond = f['visibleIf'] as Record<string, unknown>
+      const condFieldId = cond['fieldId']
+      if (typeof condFieldId !== 'string' || condFieldId === f['id'] || !ids.has(condFieldId)) {
+        return {
+          valid: false,
+          error: 'visibleIf.fieldId must reference a different field in the same form',
+        }
+      }
+      if (!VALID_VISIBLE_IF_OPS.includes(cond['op'] as (typeof VALID_VISIBLE_IF_OPS)[number])) {
+        return {
+          valid: false,
+          error: `visibleIf.op must be one of: ${VALID_VISIBLE_IF_OPS.join(', ')}`,
+        }
+      }
+      if (cond['op'] !== 'exists' && typeof cond['value'] !== 'string') {
+        return { valid: false, error: 'visibleIf.value is required for eq/neq conditions' }
       }
     }
   }

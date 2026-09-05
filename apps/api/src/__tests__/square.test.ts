@@ -20,7 +20,8 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
 }))
 
 // ── Dynamic imports ───────────────────────────────────────────────────────────
-const { createSquarePayment } = await import('../lib/square-client.js')
+const { createSquarePayment, createSquareCheckoutLink, deactivateSquareCheckoutLink } =
+  await import('../lib/square-client.js')
 const { getSquareConnectionStatus } = await import('../routes/square.js')
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -117,5 +118,101 @@ describe('square', () => {
     expect(result.connected).toBe(true)
     expect(result.merchant_id).toBe('M1')
     expect(result.location_id).toBe('L1')
+  })
+
+  // ── Test 5: createSquareCheckoutLink throws if no square_connections row ─────
+
+  it('createSquareCheckoutLink throws when no square_connections row found for tenant', async () => {
+    store.tables['square_connections'] = []
+
+    await expect(
+      createSquareCheckoutLink({
+        tenantId: 'tenant-1',
+        amountCents: 1000,
+        currency: 'USD',
+        name: 'Deposit',
+      })
+    ).rejects.toThrow('No Square connection found for tenant tenant-1')
+  })
+
+  // ── Test 6: createSquareCheckoutLink resolves with id + url ──────────────────
+
+  it('createSquareCheckoutLink resolves with a payment link id + url', async () => {
+    store.tables['square_connections'] = [
+      {
+        id: 'conn-1',
+        tenant_id: 'tenant-1',
+        access_token: 'tok',
+        refresh_token: 'ref',
+        token_expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+        square_merchant_id: 'M1',
+        square_location_id: 'L1',
+      },
+    ]
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        payment_link: { id: 'sqlink-1', url: 'https://square.link/u/abc' },
+      }),
+    } as Response)
+
+    const result = await createSquareCheckoutLink({
+      tenantId: 'tenant-1',
+      amountCents: 2500,
+      currency: 'USD',
+      name: 'Deposit',
+    })
+
+    expect(result.id).toBe('sqlink-1')
+    expect(result.url).toBe('https://square.link/u/abc')
+  })
+
+  // ── Test 7: deactivateSquareCheckoutLink deletes the link ────────────────────
+
+  it('deactivateSquareCheckoutLink resolves when Square confirms deletion', async () => {
+    store.tables['square_connections'] = [
+      {
+        id: 'conn-1',
+        tenant_id: 'tenant-1',
+        access_token: 'tok',
+        refresh_token: 'ref',
+        token_expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+        square_merchant_id: 'M1',
+        square_location_id: 'L1',
+      },
+    ]
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response)
+
+    await expect(deactivateSquareCheckoutLink('tenant-1', 'sqlink-1')).resolves.toBeUndefined()
+  })
+
+  // ── Test 8: deactivateSquareCheckoutLink throws on Square API error ──────────
+
+  it('deactivateSquareCheckoutLink throws when Square returns an error', async () => {
+    store.tables['square_connections'] = [
+      {
+        id: 'conn-1',
+        tenant_id: 'tenant-1',
+        access_token: 'tok',
+        refresh_token: 'ref',
+        token_expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+        square_merchant_id: 'M1',
+        square_location_id: 'L1',
+      },
+    ]
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Not Found',
+      json: async () => ({ errors: [{ detail: 'Payment link not found' }] }),
+    } as Response)
+
+    await expect(deactivateSquareCheckoutLink('tenant-1', 'sqlink-missing')).rejects.toThrow(
+      'Payment link not found'
+    )
   })
 })

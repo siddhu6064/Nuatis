@@ -30,6 +30,14 @@ interface Props {
   companyId: string
 }
 
+interface ActivityItem {
+  id: string
+  type: string
+  body: string | null
+  actor_name: string | null
+  created_at: string
+}
+
 interface ContactResult {
   id: string
   full_name: string
@@ -54,6 +62,8 @@ export default function CompanyDetail({ companyId }: Props) {
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null)
   const linkDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [activity, setActivity] = useState<ActivityItem[] | null>(null)
+
   const fetchCompany = useCallback(async () => {
     const res = await fetch(`/api/companies/${companyId}`)
     if (res.ok) {
@@ -70,6 +80,12 @@ export default function CompanyDetail({ companyId }: Props) {
     setLoading(true)
     void fetchCompany().finally(() => setLoading(false))
   }, [fetchCompany])
+
+  useEffect(() => {
+    fetch(`/api/companies/${companyId}/activity`)
+      .then((r) => r.json())
+      .then((data: { items: ActivityItem[] }) => setActivity(data.items))
+  }, [companyId])
 
   const handleLinkSearch = (q: string) => {
     setLinkSearch(q)
@@ -304,6 +320,27 @@ export default function CompanyDetail({ companyId }: Props) {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Activity */}
+      <div className="bg-white rounded-xl border border-border-brand p-5 mt-6">
+        <h3 className="text-sm font-semibold text-ink2 mb-3">Activity</h3>
+        {activity === null ? (
+          <p className="text-xs text-ink4 py-4 text-center">Loading…</p>
+        ) : activity.length === 0 ? (
+          <p className="text-xs text-ink4 py-4 text-center">No activity yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {activity.map((item) => (
+              <li key={item.id} className="text-sm">
+                <span className="text-ink">{item.body}</span>
+                <span className="text-ink4 text-xs ml-2">
+                  {item.actor_name ?? 'System'} · {new Date(item.created_at).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

@@ -199,6 +199,23 @@ export function renderWeeklyDigest(
                 </td>
               </tr>
 
+              <!-- Section: Operations -->
+              ${sectionHeader('Operations')}
+              <tr>
+                <td colspan="2" style="padding-bottom:8px">
+                  <table cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      ${statCell(`${data.operations.overdue_invoices} (${fmtDollars(data.operations.overdue_invoices_total)})`, 'Overdue Invoices')}
+                      ${statCell(String(data.operations.low_stock_items), 'Low Stock Items')}
+                    </tr>
+                    <tr>
+                      ${statCell(String(data.operations.quotes_expiring_7d), 'Quotes Expiring (7d)')}
+                      <td style="padding:4px"></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
               <!-- SMS Health -->
               <tr>
                 <td colspan="2" style="padding-top:16px;padding-bottom:8px">

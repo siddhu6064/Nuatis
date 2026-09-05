@@ -160,6 +160,75 @@ describe('PUT /api/contacts/:id', () => {
   })
 })
 
+describe('PUT /api/contacts/:id — custom_fields type validation', () => {
+  beforeEach(() => {
+    store.tables['tenants'] = [{ id: TENANT_ID, vertical: 'sales_crm', modules: { crm: true } }]
+    store.tables['vertical_configs'] = [
+      {
+        id: 'vc-1',
+        tenant_id: TENANT_ID,
+        vertical_slug: 'sales_crm',
+        field_definitions: [
+          { key: 'deal_value', label: 'Deal value ($)', type: 'number', required: false },
+          {
+            key: 'lead_source',
+            label: 'Lead source',
+            type: 'select',
+            required: false,
+            options: ['Website', 'Referral'],
+          },
+        ],
+      },
+    ]
+  })
+
+  it('accepts a valid value for a typed field', async () => {
+    const id = seedContact()
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/contacts/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ custom_fields: { deal_value: 5000 } })
+
+    expect(res.status).toBe(200)
+    expect(res.body.vertical_data.deal_value).toBe(5000)
+  })
+
+  it('400s a non-numeric value for a number field', async () => {
+    const id = seedContact()
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/contacts/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ custom_fields: { deal_value: 'a lot' } })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('400s a select value outside its options', async () => {
+    const id = seedContact()
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/contacts/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ custom_fields: { lead_source: 'Carrier Pigeon' } })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('passes through a key with no matching field definition unvalidated', async () => {
+    const id = seedContact()
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/contacts/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ custom_fields: { enrichment_suggested_company: 'Acme Inc' } })
+
+    expect(res.status).toBe(200)
+    expect(res.body.vertical_data.enrichment_suggested_company).toBe('Acme Inc')
+  })
+})
+
 // ── GET /api/contacts/duplicates ─────────────────────────────────────────────
 
 describe('GET /api/contacts/duplicates', () => {
@@ -385,5 +454,139 @@ describe('ENUM-1 — pipeline_id filter is tenant-scoped', () => {
     expect(res.status).toBe(200)
     const idsOut = (res.body.contacts as Array<{ id: string }>).map((c) => c.id).sort()
     expect(idsOut).toEqual([won1, won2].sort())
+  })
+})
+
+// ── pipeline_name attribution on the flat list (multi-vertical demo tenants) ──
+describe('GET /api/contacts — pipeline_name attribution', () => {
+  beforeEach(() => {
+    store.tables['pipelines'] = [
+      {
+        id: 'pl-sales',
+        tenant_id: TENANT_ID,
+        name: 'Sales CRM Pipeline',
+        pipeline_type: 'contacts',
+      },
+      {
+        id: 'pl-realestate',
+        tenant_id: TENANT_ID,
+        name: 'Real Estate Pipeline',
+        pipeline_type: 'contacts',
+      },
+    ]
+    store.tables['pipeline_stages'] = [
+      { id: 'ps-1', tenant_id: TENANT_ID, pipeline_id: 'pl-sales', name: 'Contacted' },
+      { id: 'ps-2', tenant_id: TENANT_ID, pipeline_id: 'pl-realestate', name: 'Showing' },
+      // "Lead" exists in both pipelines — genuinely ambiguous by name alone.
+      { id: 'ps-3', tenant_id: TENANT_ID, pipeline_id: 'pl-sales', name: 'Lead' },
+      { id: 'ps-4', tenant_id: TENANT_ID, pipeline_id: 'pl-realestate', name: 'Lead' },
+    ]
+  })
+
+  it('attributes an unambiguous stage name to its one pipeline', async () => {
+    const id = seedContact({ full_name: 'Solo Match', pipeline_stage: 'Showing' })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (res.body.contacts as Array<{ id: string; pipeline_name: string | null }>).find(
+      (c) => c.id === id
+    )
+    expect(contact?.pipeline_name).toBe('Real Estate Pipeline')
+  })
+
+  it('leaves a stage name shared across pipelines unattributed rather than guessing', async () => {
+    const id = seedContact({ full_name: 'Ambiguous', pipeline_stage: 'Lead' })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (res.body.contacts as Array<{ id: string; pipeline_name: string | null }>).find(
+      (c) => c.id === id
+    )
+    expect(contact?.pipeline_name).toBeNull()
+  })
+
+  it('leaves pipeline_name null when the contact has no stage at all', async () => {
+    const id = seedContact({ full_name: 'No Stage', pipeline_stage: null })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (
+      res.body.contacts as Array<{ id: string; pipeline_name?: string | null }>
+    ).find((c) => c.id === id)
+    expect(contact?.pipeline_name ?? null).toBeNull()
+  })
+})
+
+// ── deal value attached to pipeline-board requests only ───────────────────────
+describe('GET /api/contacts — deal value on pipeline_id requests', () => {
+  beforeEach(() => {
+    store.tables['deals'] = []
+  })
+
+  it('attaches the sum of a contact’s deal values when pipeline_id is present', async () => {
+    const id = seedContact({ full_name: 'Has Deals' })
+    ;(store.tables['deals'] as Row[]).push(
+      { id: 'd1', tenant_id: TENANT_ID, contact_id: id, value: 1000 },
+      { id: 'd2', tenant_id: TENANT_ID, contact_id: id, value: 500 }
+    )
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts?pipeline_id=any-pipeline')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (res.body.contacts as Array<{ id: string; value: number }>).find(
+      (c) => c.id === id
+    )
+    expect(contact?.value).toBe(1500)
+  })
+
+  it('does not compute a deal value on a plain contacts-list request (no pipeline_id)', async () => {
+    const id = seedContact({ full_name: 'Plain List' })
+    ;(store.tables['deals'] as Row[]).push({
+      id: 'd3',
+      tenant_id: TENANT_ID,
+      contact_id: id,
+      value: 999,
+    })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (res.body.contacts as Array<{ id: string; value?: number }>).find(
+      (c) => c.id === id
+    )
+    expect(contact?.value).toBeUndefined()
+  })
+
+  it('reports zero for a contact on the board with no deal at all', async () => {
+    const id = seedContact({ full_name: 'No Deal' })
+    const token = await makeToken()
+
+    const res = await request(makeApp())
+      .get('/api/contacts?pipeline_id=any-pipeline')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    const contact = (res.body.contacts as Array<{ id: string; value: number }>).find(
+      (c) => c.id === id
+    )
+    expect(contact?.value).toBe(0)
   })
 })

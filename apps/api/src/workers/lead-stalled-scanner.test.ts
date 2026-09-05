@@ -24,7 +24,6 @@ const { scan } = await import('./lead-stalled-scanner.js')
 beforeEach(() => {
   store = createStore()
   store.tables['contacts'] = []
-  store.tables['pipeline_entries'] = []
   store.tables['pipeline_stages'] = []
   publishActivityEvent.mockClear()
 })
@@ -32,7 +31,6 @@ beforeEach(() => {
 describe('lead-stalled-scanner scan()', () => {
   it('publishes lead.stalled event for contact stuck in non-terminal stage past 7 days', async () => {
     const contactId = randomUUID()
-    const stageId = randomUUID()
     ;(store.tables['contacts'] as Row[]).push({
       id: contactId,
       tenant_id: TENANT_ID,
@@ -40,19 +38,13 @@ describe('lead-stalled-scanner scan()', () => {
       is_archived: false,
       updated_at: new Date(Date.now() - 8 * 86400000).toISOString(),
       last_contacted: null,
+      pipeline_stage: 'Qualified',
     })
     ;(store.tables['pipeline_stages'] as Row[]).push({
-      id: stageId,
-      tenant_id: TENANT_ID,
-      name: 'Qualified',
-    })
-    ;(store.tables['pipeline_entries'] as Row[]).push({
       id: randomUUID(),
       tenant_id: TENANT_ID,
-      contact_id: contactId,
-      pipeline_stage_id: stageId,
-      status: 'open',
-      created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
+      name: 'Qualified',
+      is_terminal: false,
     })
 
     await scan()
@@ -64,7 +56,6 @@ describe('lead-stalled-scanner scan()', () => {
 
   it('skips contact in terminal stage (won/lost)', async () => {
     const contactId = randomUUID()
-    const stageId = randomUUID()
     ;(store.tables['contacts'] as Row[]).push({
       id: contactId,
       tenant_id: TENANT_ID,
@@ -72,19 +63,13 @@ describe('lead-stalled-scanner scan()', () => {
       is_archived: false,
       updated_at: new Date(Date.now() - 8 * 86400000).toISOString(),
       last_contacted: null,
+      pipeline_stage: 'Closed Won',
     })
     ;(store.tables['pipeline_stages'] as Row[]).push({
-      id: stageId,
-      tenant_id: TENANT_ID,
-      name: 'Closed Won',
-    })
-    ;(store.tables['pipeline_entries'] as Row[]).push({
       id: randomUUID(),
       tenant_id: TENANT_ID,
-      contact_id: contactId,
-      pipeline_stage_id: stageId,
-      status: 'won',
-      created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
+      name: 'Closed Won',
+      is_terminal: true,
     })
 
     await scan()

@@ -34,7 +34,7 @@ export type SubscriptionStatus =
   | 'unpaid'
   | 'paused'
 
-export type UserRole = 'owner' | 'admin' | 'staff'
+export type UserRole = 'owner' | 'admin' | 'manager' | 'staff'
 
 export type ContactSource =
   | 'inbound_call'
@@ -43,6 +43,8 @@ export type ContactSource =
   | 'import'
   | 'referral'
   | 'outbound_call'
+  | 'sms'
+  | 'inbound_webhook'
 
 export type AppointmentStatus =
   | 'scheduled'
@@ -488,17 +490,18 @@ export type ReviewStatus = 'new' | 'replied' | 'ignored'
 
 export interface Review {
   id: string
-  tenantId: string
-  googleReviewId: string
-  reviewerName: string | null
+  tenant_id: string
+  google_review_id: string
+  source: 'google' | 'yelp' | 'facebook' | 'manual' | 'other'
+  reviewer_name: string | null
   rating: number
   comment: string | null
-  publishedAt: string | null
-  replyText: string | null
-  replySentAt: string | null
-  aiSuggestedReply: string | null
+  published_at: string | null
+  reply_text: string | null
+  reply_sent_at: string | null
+  ai_suggested_reply: string | null
   status: ReviewStatus
-  createdAt: string
+  created_at: string
 }
 
 export interface ReputationStats {
@@ -772,6 +775,12 @@ export interface WeeklyDigestData {
   sms_health: {
     sent_this_week: number
     delivery_rate: number | null
+  }
+  operations: {
+    overdue_invoices: number
+    overdue_invoices_total: number
+    low_stock_items: number
+    quotes_expiring_7d: number
   }
   top_insight: string | null
 }
@@ -1241,6 +1250,7 @@ export type CustomAutomationTrigger =
   | 'inactive_customer'
   | 'new_contact'
   | 'appointment_followup'
+  | 'inbound_webhook'
 
 export type CustomAutomationAction =
   | 'send_sms'
@@ -1249,6 +1259,7 @@ export type CustomAutomationAction =
   | 'add_tag'
   | 'update_field'
   | 'send_to_campaign'
+  | 'send_webhook'
 
 export type CustomAutomationStatus = 'active' | 'paused' | 'draft'
 
@@ -1276,6 +1287,7 @@ export interface CustomAutomation {
   status: CustomAutomationStatus
   run_count: number
   last_run_at: string | null
+  inbound_webhook_token: string | null
   created_at: string
   updated_at: string
 }

@@ -10,6 +10,8 @@ import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
 import Slider from '@mui/material/Slider'
 
+const LOST_REASONS = ['Price', 'Chose a competitor', 'No response', 'Bad timing', 'Other']
+
 const TAG_COLORS = [
   { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
   { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
@@ -35,6 +37,13 @@ interface DealContact {
   role: string | null
 }
 
+interface DealLineItem {
+  id?: string
+  description: string
+  quantity: number
+  unit_price: number
+}
+
 interface Deal {
   id: string
   title: string
@@ -47,12 +56,14 @@ interface Deal {
   notes: string | null
   is_closed_won: boolean
   is_closed_lost: boolean
+  lost_reason: string | null
   stage_name: string | null
   stage_color: string | null
   contact_name: string | null
   company_name: string | null
   tags: string[]
   deal_contacts?: DealContact[]
+  line_items?: DealLineItem[]
 }
 
 interface Stage {
@@ -117,6 +128,10 @@ export default function DealDetail({ dealId }: Props) {
   const [calendars, setCalendars] = useState<Calendar[]>([])
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
+  const [showLostReason, setShowLostReason] = useState(false)
+  const [lostReason, setLostReason] = useState('')
+  const [editingLineItems, setEditingLineItems] = useState(false)
+  const [lineItems, setLineItems] = useState<DealLineItem[]>([])
 
   const fetchDeal = useCallback(async () => {
     const res = await fetch(`/api/deals/${dealId}`)
@@ -126,6 +141,7 @@ export default function DealDetail({ dealId }: Props) {
       setNotes(d.notes ?? '')
       setDealContacts(d.deal_contacts ?? [])
       setTags(Array.isArray(d.tags) ? d.tags : [])
+      setLineItems(d.line_items ?? [])
     }
   }, [dealId])
 
@@ -200,6 +216,12 @@ export default function DealDetail({ dealId }: Props) {
     } finally {
       setSaving(false)
     }
+  }
+
+  const saveLineItems = async () => {
+    const cleaned = lineItems.filter((i) => i.description.trim())
+    await updateDeal({ line_items: cleaned })
+    setEditingLineItems(false)
   }
 
   const addContact = async (contactId: string) => {
@@ -299,8 +321,13 @@ export default function DealDetail({ dealId }: Props) {
           {isClosed && (
             <span
               className={`px-2 py-0.5 rounded text-xs font-bold ${deal.is_closed_won ? 'bg-green-100 text-green-700' : 'bg-bg2 text-ink3'}`}
+              title={deal.lost_reason ?? undefined}
             >
-              {deal.is_closed_won ? 'Won' : 'Lost'}
+              {deal.is_closed_won
+                ? 'Won'
+                : deal.lost_reason
+                  ? `Lost — ${deal.lost_reason}`
+                  : 'Lost'}
             </span>
           )}
         </div>
@@ -440,7 +467,7 @@ export default function DealDetail({ dealId }: Props) {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {!isClosed && (
+          {!isClosed && !showLostReason && (
             <>
               <Button
                 onClick={() => void updateDeal({ is_closed_won: true })}
@@ -452,7 +479,7 @@ export default function DealDetail({ dealId }: Props) {
                 Mark Won
               </Button>
               <Button
-                onClick={() => void updateDeal({ is_closed_lost: true })}
+                onClick={() => setShowLostReason(true)}
                 disabled={saving}
                 size="small"
                 color="inherit"
@@ -467,6 +494,173 @@ export default function DealDetail({ dealId }: Props) {
             </Button>
           )}
         </div>
+
+        {!isClosed && showLostReason && (
+          <div className="mt-3 p-3 rounded-lg bg-bg2 flex items-center gap-2 flex-wrap">
+            <TextField
+              select
+              value={lostReason}
+              onChange={(e) => setLostReason(e.target.value)}
+              size="small"
+              label="Why was it lost?"
+              sx={{ minWidth: 180 }}
+            >
+              {LOST_REASONS.map((r) => (
+                <MenuItem key={r} value={r}>
+                  {r}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button
+              onClick={() => {
+                void updateDeal({ is_closed_lost: true, lost_reason: lostReason || null })
+                setShowLostReason(false)
+                setLostReason('')
+              }}
+              disabled={saving}
+              size="small"
+              variant="contained"
+              color="inherit"
+            >
+              Confirm
+            </Button>
+            <Button
+              onClick={() => {
+                setShowLostReason(false)
+                setLostReason('')
+              }}
+              size="small"
+              color="inherit"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Line items */}
+      <div className="bg-white rounded-xl border border-border-brand p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-ink">Line Items</h3>
+          {!editingLineItems && (
+            <Button size="small" variant="outlined" onClick={() => setEditingLineItems(true)}>
+              {lineItems.length > 0 ? 'Edit' : '+ Add Line Items'}
+            </Button>
+          )}
+        </div>
+
+        {!editingLineItems ? (
+          lineItems.length === 0 ? (
+            <p className="text-sm text-ink4">
+              No line items — value is a single manually-entered number.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {lineItems.map((item, i) => (
+                  <tr key={item.id ?? i} className="border-b border-gray-50 last:border-0">
+                    <td className="py-1.5 text-ink2">{item.description}</td>
+                    <td className="py-1.5 text-ink4 text-right w-16">×{item.quantity}</td>
+                    <td className="py-1.5 text-ink2 text-right w-24">
+                      ${Number(item.unit_price).toFixed(2)}
+                    </td>
+                    <td className="py-1.5 text-ink font-medium text-right w-24">
+                      ${(item.quantity * item.unit_price).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        ) : (
+          <div className="space-y-2">
+            {lineItems.map((item, i) => (
+              <div key={item.id ?? i} className="flex items-center gap-2">
+                <TextField
+                  placeholder="Description"
+                  size="small"
+                  value={item.description}
+                  onChange={(e) =>
+                    setLineItems((items) =>
+                      items.map((it, idx) =>
+                        idx === i ? { ...it, description: e.target.value } : it
+                      )
+                    )
+                  }
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  type="number"
+                  size="small"
+                  label="Qty"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    setLineItems((items) =>
+                      items.map((it, idx) =>
+                        idx === i ? { ...it, quantity: Number(e.target.value) || 0 } : it
+                      )
+                    )
+                  }
+                  sx={{ width: 90 }}
+                />
+                <TextField
+                  type="number"
+                  size="small"
+                  label="Unit price"
+                  value={item.unit_price}
+                  onChange={(e) =>
+                    setLineItems((items) =>
+                      items.map((it, idx) =>
+                        idx === i ? { ...it, unit_price: Number(e.target.value) || 0 } : it
+                      )
+                    )
+                  }
+                  sx={{ width: 110 }}
+                />
+                <IconButton
+                  size="small"
+                  aria-label="Remove line item"
+                  onClick={() => setLineItems((items) => items.filter((_, idx) => idx !== i))}
+                >
+                  ✕
+                </IconButton>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  setLineItems((items) => [
+                    ...items,
+                    { description: '', quantity: 1, unit_price: 0 },
+                  ])
+                }
+              >
+                + Add row
+              </Button>
+              <div className="flex-1" />
+              <Button
+                size="small"
+                onClick={() => {
+                  setLineItems(deal.line_items ?? [])
+                  setEditingLineItems(false)
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => void saveLineItems()}
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Inline appointment booking form */}

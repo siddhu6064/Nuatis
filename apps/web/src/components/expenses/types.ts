@@ -4,6 +4,7 @@ export interface ExpenseCategory {
   name: string
   is_archived: boolean
   created_at: string
+  gl_code?: string | null
 }
 
 export interface Expense {
@@ -22,6 +23,10 @@ export interface Expense {
   receipt_file_size: number | null
   receipt_signed_url: string | null
   created_at: string
+  approval_status: 'pending' | 'approved' | 'rejected' | null
+  approved_by: string | null
+  approved_at: string | null
+  approval_note: string | null
 }
 
 export type RecurringFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annually'

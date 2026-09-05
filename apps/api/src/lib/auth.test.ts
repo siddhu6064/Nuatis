@@ -46,6 +46,9 @@ testApp.get('/protected', requireAuth, (req, res) => {
     provider: authed.authProvider,
   })
 })
+testApp.get('/api/staff-portal/protected', requireAuth, (req, res) => {
+  res.json({ ok: true })
+})
 
 // ── Helpers ───────────────────────────────────────────────────
 const SECRET = process.env['AUTH_SECRET'] ?? 'test-secret-for-unit-tests-only-32ch'
@@ -216,5 +219,41 @@ describe('Auth middleware — cross-tenant isolation', () => {
 
     expect(res.status).toBe(401)
     expect(res.body.error).toMatch(/invalid|failed/i)
+  })
+})
+
+describe('Auth middleware — staff-portal isolation (portalScope claim)', () => {
+  it('a portalScope=staff token is 403d outside /api/staff-portal', async () => {
+    const token = await makeToken({
+      sub: 'staff-001',
+      tenantId: TENANT_A,
+      role: 'staff',
+      portalScope: 'staff',
+    })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('a portalScope=staff token is allowed into /api/staff-portal/*', async () => {
+    const token = await makeToken({
+      sub: 'staff-001',
+      tenantId: TENANT_A,
+      role: 'staff',
+      portalScope: 'staff',
+    })
+    const res = await request(testApp)
+      .get('/api/staff-portal/protected')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+  })
+
+  it('a token with role=staff but NO portalScope claim is unaffected (legacy/test fallback path)', async () => {
+    // requireAuth defaults `role` to 'staff' when the claim is absent — this
+    // fallback is exercised by dozens of existing tests that never set
+    // portalScope. Only the explicit claim triggers the isolation gate.
+    const token = await makeToken({ sub: 'user-001', tenantId: TENANT_A })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.role).toBe('staff')
   })
 })

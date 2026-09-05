@@ -31,13 +31,13 @@ router.post('/submit', requireAuth, async (req: Request, res: Response): Promise
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('business_name, booking_page_slug, booking_page_enabled')
+    .select('name, booking_page_slug, booking_page_enabled')
     .eq('id', authed.tenantId)
     .single()
 
   // Validate required fields
   const missing: string[] = []
-  if (!tenant?.business_name) missing.push('business name')
+  if (!tenant?.name) missing.push('business name')
   if (!location.phone && !tenant) missing.push('phone number')
   if (!location.address) missing.push('address')
   if (!tenant?.booking_page_slug || !tenant?.booking_page_enabled)
@@ -86,7 +86,7 @@ router.post('/submit', requireAuth, async (req: Request, res: Response): Promise
     details: {
       booking_url: bookingUrl,
       place_id: (location as Record<string, unknown>)['google_place_id'],
-      business_name: tenant!.business_name,
+      business_name: tenant!.name,
     },
     ip_address: req.ip ?? null,
     user_agent: req.get('user-agent') ?? null,

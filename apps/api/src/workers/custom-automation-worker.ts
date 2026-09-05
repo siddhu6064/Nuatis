@@ -8,7 +8,7 @@ const MAX_CONTACTS_PER_RUN = 50
 
 const SAFE_UPDATE_FIELDS = ['status', 'stage', 'priority']
 
-type CustomAutomation = {
+export type CustomAutomation = {
   id: string
   tenant_id: string
   status: string
@@ -21,7 +21,7 @@ type CustomAutomation = {
   updated_at: string
 }
 
-type Contact = {
+export type Contact = {
   id: string
   tenant_id: string
   [key: string]: unknown
@@ -175,18 +175,30 @@ async function getContactsForTrigger(
       return (data ?? []) as Contact[]
     }
 
+    case 'inbound_webhook':
+      // Event-driven, not poll-based — fired synchronously by
+      // automation-webhook-public.ts when the external system POSTs, not by
+      // this scan loop.
+      return []
+
     default:
       console.warn(`[custom-automation-scanner] unknown trigger_type: ${trigger_type}`)
       return []
   }
 }
 
-async function runAction(
+export async function runAction(
   supabase: ReturnType<typeof getServiceClient>,
   automation: CustomAutomation,
-  contact: Contact
+  contact: Contact,
+  // Extra automation steps pass their own action_type/action_config here;
+  // the base (AI-generated) action omits this and falls back to the
+  // automation's own columns, unchanged from before steps existed.
+  override?: { action_type: string; action_config: Record<string, unknown> }
 ): Promise<void> {
-  const { tenant_id, action_type, action_config } = automation
+  const { tenant_id } = automation
+  const action_type = override?.action_type ?? automation.action_type
+  const action_config = override?.action_config ?? automation.action_config
   const contact_id = contact.id
   const now = new Date()
 
@@ -329,6 +341,38 @@ async function runAction(
         break
       }
 
+      case 'send_webhook': {
+        const url = action_config.url as string
+        if (!url) {
+          console.warn(`[custom-automation-scanner] send_webhook: missing url, skipping`)
+          break
+        }
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              automation_id: automation.id,
+              tenant_id,
+              contact_id,
+              trigger_type: automation.trigger_type,
+              triggered_at: now.toISOString(),
+            }),
+            signal: controller.signal,
+          })
+        } catch (err) {
+          console.warn(
+            `[custom-automation-scanner] send_webhook failed for contact=${contact_id}:`,
+            err
+          )
+        } finally {
+          clearTimeout(timeout)
+        }
+        break
+      }
+
       default:
         console.warn(`[custom-automation-scanner] unknown action_type: ${action_type}`)
     }
@@ -386,9 +430,42 @@ export async function scan(): Promise<void> {
         `[custom-automation-scanner] automation=${automation.id} trigger=${automation.trigger_type} action=${automation.action_type} matched ${contacts.length} contact(s)`
       )
 
+      const { data: extraSteps } = await supabase
+        .from('custom_automation_steps')
+        .select('id')
+        .eq('automation_id', automation.id)
+        .limit(1)
+      const hasExtraSteps = (extraSteps ?? []).length > 0
+
       const slice = contacts.slice(0, MAX_CONTACTS_PER_RUN)
       for (const contact of slice) {
+        if (!hasExtraSteps) {
+          // No steps beyond the base action — exactly the pre-steps behavior.
+          await runAction(supabase, automation, contact)
+          continue
+        }
+
+        // With steps, the base action only fires once per contact (on first
+        // enrollment) rather than on every trigger match, since a trigger
+        // like no_response can keep matching the same contact for days.
+        const { data: existingEnrollment } = await supabase
+          .from('custom_automation_enrollments')
+          .select('id')
+          .eq('automation_id', automation.id)
+          .eq('contact_id', contact.id)
+          .maybeSingle()
+
+        if (existingEnrollment) continue
+
         await runAction(supabase, automation, contact)
+        await supabase.from('custom_automation_enrollments').insert({
+          tenant_id: automation.tenant_id,
+          automation_id: automation.id,
+          contact_id: contact.id,
+          current_step: 1,
+          status: 'active',
+          last_step_at: new Date().toISOString(),
+        })
       }
 
       // Update run stats
@@ -413,9 +490,139 @@ export async function scan(): Promise<void> {
       }
     }
 
+    await advanceSteps(supabase, pausedTenants)
+
     console.info('[custom-automation-scanner] scan complete')
   } catch (err) {
     console.error('[custom-automation-scanner] scan error:', err)
+  }
+}
+
+function evaluateCondition(
+  contactRow: Record<string, unknown>,
+  field: string,
+  op: string,
+  value: string | null
+): boolean {
+  const actual = contactRow[field]
+  switch (op) {
+    case 'exists':
+      return actual !== null && actual !== undefined && actual !== ''
+    case 'eq':
+      return String(actual ?? '') === (value ?? '')
+    case 'neq':
+      return String(actual ?? '') !== (value ?? '')
+    case 'contains':
+      if (Array.isArray(actual)) return actual.map(String).includes(value ?? '')
+      return String(actual ?? '').includes(value ?? '')
+    default:
+      return true
+  }
+}
+
+// Advances every active enrollment whose next step is due — the multi-step
+// half of custom automations. current_step is a cursor into
+// custom_automation_steps.step_order (starts at 1; step 0 is the base
+// action already run by runAction() above at enrollment time).
+async function advanceSteps(
+  supabase: ReturnType<typeof getServiceClient>,
+  pausedTenants: Set<string>
+): Promise<void> {
+  const { data: enrollments, error } = await supabase
+    .from('custom_automation_enrollments')
+    .select('id, tenant_id, automation_id, contact_id, current_step, last_step_at, enrolled_at')
+    .eq('status', 'active')
+
+  if (error) {
+    console.error(`[custom-automation-scanner] enrollments query error: ${error.message}`)
+    return
+  }
+  if (!enrollments || enrollments.length === 0) return
+
+  const now = Date.now()
+  let advanced = 0
+
+  for (const enrollment of enrollments) {
+    if (pausedTenants.has(enrollment.tenant_id)) continue
+    try {
+      const { data: automation } = await supabase
+        .from('custom_automations')
+        .select('*')
+        .eq('id', enrollment.automation_id)
+        .maybeSingle()
+      if (!automation || automation.status !== 'active') continue
+
+      const { data: step } = await supabase
+        .from('custom_automation_steps')
+        .select('*')
+        .eq('automation_id', enrollment.automation_id)
+        .eq('step_order', enrollment.current_step)
+        .maybeSingle()
+
+      if (!step) {
+        await supabase
+          .from('custom_automation_enrollments')
+          .update({ status: 'completed' })
+          .eq('id', enrollment.id)
+        continue
+      }
+
+      const referenceDate = enrollment.last_step_at ?? enrollment.enrolled_at
+      const daysSinceRef = (now - new Date(referenceDate).getTime()) / 86400000
+      if (daysSinceRef < (step.delay_days ?? 0)) continue
+
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('id', enrollment.contact_id)
+        .maybeSingle()
+      if (!contact) continue
+
+      const shouldRun =
+        !step.condition_field ||
+        evaluateCondition(
+          contact as Record<string, unknown>,
+          step.condition_field,
+          step.condition_op ?? 'exists',
+          step.condition_value
+        )
+
+      if (shouldRun) {
+        await runAction(supabase, automation as CustomAutomation, contact as Contact, {
+          action_type: step.action_type,
+          action_config: (step.action_config as Record<string, unknown>) ?? {},
+        })
+      } else {
+        console.info(
+          `[custom-automation-scanner] step ${enrollment.current_step} skipped (condition false) contact=${enrollment.contact_id}`
+        )
+      }
+
+      const nextStep = enrollment.current_step + 1
+      const { data: nextStepRow } = await supabase
+        .from('custom_automation_steps')
+        .select('id')
+        .eq('automation_id', enrollment.automation_id)
+        .eq('step_order', nextStep)
+        .maybeSingle()
+
+      await supabase
+        .from('custom_automation_enrollments')
+        .update({
+          current_step: nextStep,
+          last_step_at: new Date().toISOString(),
+          status: nextStepRow ? 'active' : 'completed',
+        })
+        .eq('id', enrollment.id)
+
+      advanced++
+    } catch (err) {
+      console.error(`[custom-automation-scanner] error advancing enrollment=${enrollment.id}:`, err)
+    }
+  }
+
+  if (advanced > 0) {
+    console.info(`[custom-automation-scanner] advanced ${advanced} step(s) across enrollments`)
   }
 }
 

@@ -277,6 +277,18 @@ export default function ContactDetailClient({ contact: initial }: Props) {
   const [complianceValues, setComplianceValues] = useState<Record<string, unknown>>({})
   const [complianceSaving, setComplianceSaving] = useState(false)
 
+  // Custom fields (per-vertical, labels from /api/contacts/field-definitions)
+  interface CustomFieldDef {
+    key: string
+    label: string
+    type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'boolean'
+    required: boolean
+    options?: string[]
+  }
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([])
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+  const [customFieldsSaving, setCustomFieldsSaving] = useState(false)
+
   // Lifecycle & lead score
   type LifecycleStage =
     | 'subscriber'
@@ -403,6 +415,7 @@ export default function ContactDetailClient({ contact: initial }: Props) {
           if (c.lead_grade) setLeadGrade(c.lead_grade)
           if (c.lead_score_updated_at) setLeadScoreUpdatedAt(c.lead_score_updated_at)
           if (c.compliance_fields) setComplianceValues(c.compliance_fields)
+          if (c.vertical_data) setCustomFieldValues(c.vertical_data)
           if (typeof c.sms_opt_in === 'boolean') setSmsOptIn(c.sms_opt_in)
           if (typeof c.email_opt_in === 'boolean') setEmailOptIn(c.email_opt_in)
           if (typeof c.call_opt_in === 'boolean') setCallOptIn(c.call_opt_in)
@@ -445,8 +458,8 @@ export default function ContactDetailClient({ contact: initial }: Props) {
   useEffect(() => {
     void fetch('/api/users')
       .then((r) => r.json())
-      .then((d: { users: { id: string; full_name: string }[] }) => {
-        if (d.users) setTenantUsers(d.users)
+      .then((d: { id: string; full_name: string }[]) => {
+        if (Array.isArray(d)) setTenantUsers(d)
       })
       .catch(() => {})
   }, [])
@@ -456,6 +469,15 @@ export default function ContactDetailClient({ contact: initial }: Props) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { fields?: ComplianceFieldDef[] } | null) => {
         if (d?.fields && d.fields.length > 0) setComplianceFields(d.fields)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    void fetch('/api/contacts/field-definitions')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { fields?: CustomFieldDef[] } | null) => {
+        if (d?.fields && d.fields.length > 0) setCustomFieldDefs(d.fields)
       })
       .catch(() => {})
   }, [])
@@ -654,6 +676,20 @@ export default function ContactDetailClient({ contact: initial }: Props) {
       body: JSON.stringify({ compliance_fields: complianceValues }),
     }).catch(() => {})
     setComplianceSaving(false)
+  }
+
+  const handleCustomFieldChange = (key: string, value: unknown) => {
+    setCustomFieldValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const saveCustomFields = async () => {
+    setCustomFieldsSaving(true)
+    await fetch(`/api/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: customFieldValues }),
+    }).catch(() => {})
+    setCustomFieldsSaving(false)
   }
 
   const saveFollowers = async (next: string[]) => {
@@ -1277,6 +1313,97 @@ export default function ContactDetailClient({ contact: initial }: Props) {
                   sx={{ mt: 2 }}
                 >
                   {complianceSaving ? 'Saving…' : 'Save Compliance'}
+                </Button>
+              </section>
+            )}
+
+            {/* Custom fields — per-vertical, defined in packages/shared/verticals,
+                stored in contacts.vertical_data */}
+            {customFieldDefs.length > 0 && (
+              <section>
+                <h2 className="text-[10px] font-semibold text-ink4 uppercase tracking-wider mb-3">
+                  Custom Fields
+                </h2>
+                <div className="space-y-3">
+                  {customFieldDefs.map((field) => {
+                    const value = customFieldValues[field.key]
+                    if (field.type === 'boolean') {
+                      return (
+                        <FormControlLabel
+                          key={field.key}
+                          className="!items-start"
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={!!value}
+                              onChange={(e) => handleCustomFieldChange(field.key, e.target.checked)}
+                            />
+                          }
+                          label={
+                            <span className="text-sm text-ink2">
+                              {field.label}
+                              {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                            </span>
+                          }
+                        />
+                      )
+                    }
+                    return (
+                      <div key={field.key}>
+                        <label className="text-xs text-ink3 block mb-1">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                        </label>
+                        {field.type === 'select' ? (
+                          <TextField
+                            select
+                            value={(value as string | undefined) ?? ''}
+                            onChange={(e) => handleCustomFieldChange(field.key, e.target.value)}
+                            size="small"
+                            fullWidth
+                          >
+                            <MenuItem value="">—</MenuItem>
+                            {(field.options ?? []).map((opt) => (
+                              <MenuItem key={opt} value={opt}>
+                                {opt}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        ) : (
+                          <TextField
+                            type={
+                              field.type === 'number'
+                                ? 'number'
+                                : field.type === 'date'
+                                  ? 'date'
+                                  : 'text'
+                            }
+                            value={(value as string | number | undefined) ?? ''}
+                            onChange={(e) =>
+                              handleCustomFieldChange(
+                                field.key,
+                                field.type === 'number' ? Number(e.target.value) : e.target.value
+                              )
+                            }
+                            multiline={field.type === 'textarea'}
+                            rows={field.type === 'textarea' ? 3 : undefined}
+                            size="small"
+                            fullWidth
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <Button
+                  onClick={() => void saveCustomFields()}
+                  disabled={customFieldsSaving}
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                  sx={{ mt: 2 }}
+                >
+                  {customFieldsSaving ? 'Saving…' : 'Save Custom Fields'}
                 </Button>
               </section>
             )}

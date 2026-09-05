@@ -6,6 +6,7 @@ import { formatCurrency } from '@nuatis/shared'
 import Button from '@mui/material/Button'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
+import { bucketAmountsByDay, sumTrend, MiniSparkline } from '@/lib/sparkline'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -125,6 +126,24 @@ export default function InvoicesPage() {
     )
     .reduce((sum, inv) => sum + Number(inv.total), 0)
 
+  // 7-day sparklines — real timestamps from the already-fetched invoice list,
+  // no fabricated trend data.
+  const issuedTrend = bucketAmountsByDay(
+    allInvoices
+      .filter((inv) => inv.status !== 'draft')
+      .map((inv) => ({ date: inv.issue_date, amount: Number(inv.total) }))
+  )
+  const overdueTrend = bucketAmountsByDay(
+    allInvoices
+      .filter((inv) => inv.status === 'overdue')
+      .map((inv) => ({ date: inv.due_date, amount: balanceDue(inv) }))
+  )
+  const receivedTrend = bucketAmountsByDay(
+    allInvoices
+      .filter((inv) => inv.status === 'received')
+      .map((inv) => ({ date: inv.paid_at, amount: Number(inv.total) }))
+  )
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   async function handleSend(id: string) {
@@ -206,31 +225,57 @@ export default function InvoicesPage() {
             {filter === 'all' ? `${invoices.length} shown` : `${invoices.length} ${filter}`}
           </p>
         </div>
-        <Button component={Link} href="/invoices/new" variant="contained">
-          + New Invoice
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button component={Link} href="/invoices/recurring" variant="outlined">
+            Recurring
+          </Button>
+          <Button component={Link} href="/invoices/new" variant="contained">
+            + New Invoice
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">
             Total Outstanding
           </p>
-          <p className="text-2xl font-bold text-ink">{formatCurrency(totalOutstanding)}</p>
-          <p className="text-xs text-ink4 mt-0.5">sent + due + overdue</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-ink">{formatCurrency(totalOutstanding)}</p>
+            <MiniSparkline trend={issuedTrend} color="#1b1d1f" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {sumTrend(issuedTrend) > 0
+              ? `${formatCurrency(sumTrend(issuedTrend))} issued this week`
+              : 'Nothing issued this week'}
+          </p>
         </div>
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">Overdue</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOverdue)}</p>
-          <p className="text-xs text-ink4 mt-0.5">past due date</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOverdue)}</p>
+            <MiniSparkline trend={overdueTrend} color="#dc2626" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {sumTrend(overdueTrend) > 0
+              ? `${formatCurrency(sumTrend(overdueTrend))} came due this week`
+              : 'Nothing came due this week'}
+          </p>
         </div>
-        <div className="bg-white rounded-xl border border-border-brand px-5 py-4">
+        <div className="bg-white rounded-xl border border-border-brand px-5 py-4 transition-shadow hover:shadow-md">
           <p className="text-xs text-ink4 font-medium uppercase tracking-wide mb-1">
             Received This Month
           </p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(receivedThisMonth)}</p>
-          <p className="text-xs text-ink4 mt-0.5">payments received</p>
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(receivedThisMonth)}</p>
+            <MiniSparkline trend={receivedTrend} color="#16a34a" />
+          </div>
+          <p className="text-xs text-ink4 mt-0.5">
+            {sumTrend(receivedTrend) > 0
+              ? `${formatCurrency(sumTrend(receivedTrend))} received this week`
+              : 'Nothing received this week'}
+          </p>
         </div>
       </div>
 

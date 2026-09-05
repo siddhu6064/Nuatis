@@ -22,6 +22,7 @@ const VALID_ACTIONS: CustomAutomationAction[] = [
   'add_tag',
   'update_field',
   'send_to_campaign',
+  'send_webhook',
 ]
 
 const FALLBACK_UNAVAILABLE: GeneratedAutomation = {
@@ -85,6 +86,7 @@ Valid action_type values (choose exactly one):
 - add_tag: Add a tag to contact (action_config should include { tag: "..." })
 - update_field: Update a contact field (action_config should include { field: "...", value: "..." })
 - send_to_campaign: Enroll contact in a campaign (action_config should include { campaign_name: "..." })
+- send_webhook: Send contact data to an external URL (action_config should include { url: "..." })
 
 For trigger_config, include relevant settings such as { days: N } for time-based triggers.
 

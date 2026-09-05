@@ -137,6 +137,84 @@ router.get(
   }
 )
 
+// ── GET /api/companies/:companyId/activity ───────────────────────────────────
+// Mirrors GET /api/contacts/:contactId/activity above, scoped to a company.
+router.get(
+  '/companies/:companyId/activity',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const { companyId } = req.params
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query['limit'] ?? '20'), 10) || 20))
+    const before = typeof req.query['before'] === 'string' ? req.query['before'] : null
+
+    const { data: company } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('id', companyId)
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' })
+      return
+    }
+
+    let query = supabase
+      .from('activity_log')
+      .select('id, tenant_id, company_id, type, body, metadata, actor_type, actor_id, created_at')
+      .eq('company_id', companyId)
+      .eq('tenant_id', authed.tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit + 1)
+
+    if (before) {
+      query = query.lt('created_at', before)
+    }
+
+    const { data: items, error } = await query
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    const rows = items ?? []
+    const hasMore = rows.length > limit
+    const page = hasMore ? rows.slice(0, limit) : rows
+
+    const userIds = [
+      ...new Set(
+        page.filter((i) => i.actor_type === 'user' && i.actor_id).map((i) => i.actor_id as string)
+      ),
+    ]
+    let userMap: Record<string, string> = {}
+    if (userIds.length > 0) {
+      const { data: users } = await supabase.from('users').select('id, full_name').in('id', userIds)
+      if (users) {
+        userMap = Object.fromEntries(users.map((u) => [u.id, u.full_name]))
+      }
+    }
+
+    const enriched = page.map((item) => ({
+      ...item,
+      actor_name:
+        item.actor_type === 'user' && item.actor_id
+          ? (userMap[item.actor_id] ?? null)
+          : item.actor_type === 'ai'
+            ? 'Maya AI'
+            : item.actor_type === 'contact'
+              ? 'Client'
+              : null,
+    }))
+
+    const nextCursor = hasMore && page.length > 0 ? page[page.length - 1]!.created_at : null
+
+    res.json({ items: enriched, hasMore, nextCursor })
+  }
+)
+
 // ── POST /api/contacts/:contactId/notes ──────────────────────────────────────
 router.post(
   '/contacts/:contactId/notes',

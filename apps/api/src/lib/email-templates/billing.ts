@@ -24,12 +24,33 @@ export function buildSubscriptionCanceledEmail(): BillingEmail {
   }
 }
 
-/** Sent when a subscription invoice payment fails (invoice.payment_failed). */
-export function buildPaymentFailedEmail(): BillingEmail {
+/**
+ * Sent when a subscription invoice payment fails (invoice.payment_failed).
+ * Escalates by attempt number instead of sending the identical email every
+ * time Stripe retries: 1st = standard notice, 2nd = warning, 3rd+ = final
+ * notice ahead of Stripe's own eventual subscription cancellation.
+ */
+export function buildPaymentFailedEmail(attemptNumber = 1): BillingEmail {
+  if (attemptNumber <= 1) {
+    return {
+      subject: 'Action required — Nuatis payment failed',
+      html: wrapBillingEmail(
+        `<p>We weren't able to charge your card for the latest Nuatis invoice. Your account is now in a past-due state. Service will continue for 7 days while you update your payment details.</p><p><a href="${webUrl()}/settings/billing">Update payment details</a></p>`
+      ),
+    }
+  }
+  if (attemptNumber === 2) {
+    return {
+      subject: 'Second attempt failed — please update your Nuatis payment method',
+      html: wrapBillingEmail(
+        `<p>We tried again and still couldn't charge your card for your Nuatis subscription. This is the second failed attempt — please update your payment details soon to avoid a service interruption.</p><p><a href="${webUrl()}/settings/billing">Update payment details</a></p>`
+      ),
+    }
+  }
   return {
-    subject: 'Action required — Nuatis payment failed',
+    subject: 'Final notice — your Nuatis subscription is at risk of cancellation',
     html: wrapBillingEmail(
-      `<p>We weren't able to charge your card for the latest Nuatis invoice. Your account is now in a past-due state. Service will continue for 7 days while you update your payment details.</p><p><a href="${webUrl()}/settings/billing">Update payment details</a></p>`
+      `<p>We've now tried ${attemptNumber} times and still can't charge your card for your Nuatis subscription. Please update your payment details right away — your subscription may be canceled if this isn't resolved.</p><p><a href="${webUrl()}/settings/billing">Update payment details</a></p>`
     ),
   }
 }

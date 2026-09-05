@@ -101,11 +101,6 @@ describe('POST /api/orders', () => {
     expect(res.body.status).toBe('pending')
     expect(res.body.subtotal).toBe(12.5)
     expect(res.body.total).toBe(12.5)
-    // Note: the shared supabase test mock (__test-support__/supabase-mock.ts)
-    // collapses a single-row insert().select() result to a bare object
-    // (mimicking .single() semantics) regardless of whether .single() was
-    // called — a pre-existing mock quirk, not a route bug. Using 2 line
-    // items here avoids tripping that collapse.
     expect(res.body.line_items).toHaveLength(2)
   })
 
@@ -592,5 +587,37 @@ describe('DELETE /api/orders/:id', () => {
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(400)
+  })
+})
+
+describe('Multi-location', () => {
+  it('stores location_id on create and filters GET / by it', async () => {
+    const app = makeApp()
+    const token = await makeToken()
+
+    await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        customer_name: 'Location A',
+        location_id: 'loc-a',
+        line_items: [{ description: 'Coffee', quantity: 1, unit_price: 3 }],
+      })
+    await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        customer_name: 'Location B',
+        location_id: 'loc-b',
+        line_items: [{ description: 'Tea', quantity: 1, unit_price: 3 }],
+      })
+
+    const filtered = await request(app)
+      .get('/api/orders?location_id=loc-a')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(filtered.status).toBe(200)
+    const names = (filtered.body.data as Row[]).map((o) => o['customer_name'] as string)
+    expect(names).toEqual(['Location A'])
   })
 })

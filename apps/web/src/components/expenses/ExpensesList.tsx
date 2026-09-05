@@ -111,7 +111,7 @@ export default function ExpensesList() {
               {expenses.map((e) => (
                 <tr
                   key={e.id}
-                  className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50"
+                  className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-ink">
                     <Link href={`/expenses/${e.id}`} className="hover:text-teal-700">
@@ -120,6 +120,16 @@ export default function ExpensesList() {
                     {e.recurring_expense_id && (
                       <span className="ml-2 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-teal-50 text-teal-600">
                         RECURRING
+                      </span>
+                    )}
+                    {e.approval_status === 'pending' && (
+                      <span className="ml-2 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-amber-50 text-amber-700">
+                        PENDING
+                      </span>
+                    )}
+                    {e.approval_status === 'rejected' && (
+                      <span className="ml-2 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-red-50 text-red-600">
+                        REJECTED
                       </span>
                     )}
                   </td>

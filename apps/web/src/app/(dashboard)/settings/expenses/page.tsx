@@ -7,12 +7,71 @@ import Switch from '@mui/material/Switch'
 import type { ExpenseCategory } from '@/components/expenses/types'
 import RecurringExpensesPanel from './RecurringExpensesPanel'
 
+interface UserRow {
+  id: string
+  full_name: string
+  email: string
+  monthly_expense_limit_cents: number | null
+}
+
 export default function ExpensesSettingsPage() {
   const [categories, setCategories] = useState<ExpenseCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const [threshold, setThreshold] = useState('')
+  const [thresholdLoading, setThresholdLoading] = useState(true)
+  const [thresholdSaving, setThresholdSaving] = useState(false)
+
+  const [users, setUsers] = useState<UserRow[]>([])
+  const [usersLoading, setUsersLoading] = useState(true)
+  const [limitDrafts, setLimitDrafts] = useState<Record<string, string>>({})
+  const [savingUserId, setSavingUserId] = useState<string | null>(null)
+
+  const fetchUsers = useCallback(async () => {
+    const res = await fetch('/api/users')
+    if (res.ok) {
+      const data = (await res.json()) as UserRow[]
+      setUsers(data)
+      setLimitDrafts(
+        Object.fromEntries(
+          data.map((u) => [
+            u.id,
+            u.monthly_expense_limit_cents != null
+              ? String(u.monthly_expense_limit_cents / 100)
+              : '',
+          ])
+        )
+      )
+    }
+    setUsersLoading(false)
+  }, [])
+
+  useEffect(() => {
+    void fetchUsers()
+  }, [fetchUsers])
+
+  async function handleSaveUserLimit(userId: string) {
+    setSavingUserId(userId)
+    try {
+      const raw = limitDrafts[userId]?.trim() ?? ''
+      const cents = raw === '' ? null : Math.round(Number(raw) * 100)
+      const res = await fetch(`/api/users/${userId}/expense-limit`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monthly_expense_limit_cents: cents }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      await fetchUsers()
+      setToast({ type: 'success', msg: 'Saved' })
+    } catch {
+      setToast({ type: 'error', msg: 'Failed to save' })
+    } finally {
+      setSavingUserId(null)
+    }
+  }
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/expense-categories?include_archived=true')
@@ -26,6 +85,35 @@ export default function ExpensesSettingsPage() {
   useEffect(() => {
     void fetchCategories()
   }, [fetchCategories])
+
+  useEffect(() => {
+    fetch('/api/settings/expenses')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { expenses_require_approval_above: number | null } | null) => {
+        if (data?.expenses_require_approval_above != null) {
+          setThreshold(String(data.expenses_require_approval_above))
+        }
+      })
+      .finally(() => setThresholdLoading(false))
+  }, [])
+
+  async function handleSaveThreshold() {
+    setThresholdSaving(true)
+    try {
+      const value = threshold.trim() === '' ? null : Number(threshold)
+      const res = await fetch('/api/settings/expenses', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expenses_require_approval_above: value }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      setToast({ type: 'success', msg: 'Saved' })
+    } catch {
+      setToast({ type: 'error', msg: 'Failed to save' })
+    } finally {
+      setThresholdSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!toast) return undefined
@@ -76,6 +164,91 @@ export default function ExpensesSettingsPage() {
       <p className="text-sm text-ink4 mb-6">
         Manage expense categories and recurring expense rules.
       </p>
+
+      <div className="bg-white rounded-xl border border-border-brand mb-8">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Approvals</h2>
+        </div>
+        <div className="px-5 py-4">
+          {thresholdLoading ? (
+            <p className="text-sm text-ink4">Loading…</p>
+          ) : (
+            <>
+              <p className="text-sm text-ink3 mb-3">
+                Require owner sign-off for any expense over this amount. Leave blank to never
+                require approval.
+              </p>
+              <div className="flex items-center gap-2">
+                <TextField
+                  size="small"
+                  type="number"
+                  placeholder="No threshold"
+                  value={threshold}
+                  onChange={(e) => setThreshold(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                  sx={{ maxWidth: 200 }}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={thresholdSaving}
+                  onClick={() => void handleSaveThreshold()}
+                >
+                  Save
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-border-brand mb-8">
+        <div className="px-5 py-4 border-b border-border-brand">
+          <h2 className="text-sm font-semibold text-ink">Per-user monthly limits</h2>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-sm text-ink3 mb-3">
+            When set, an expense that would push someone over their own monthly total routes to
+            approval too — separate from, and in addition to, the tenant-wide threshold above. Leave
+            blank for no personal limit.
+          </p>
+          {usersLoading ? (
+            <p className="text-sm text-ink4">Loading…</p>
+          ) : (
+            <div className="space-y-2">
+              {users.map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-2 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-sm text-ink truncate">{u.full_name}</p>
+                    <p className="text-xs text-ink4 truncate">{u.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <TextField
+                      size="small"
+                      type="number"
+                      placeholder="No limit"
+                      value={limitDrafts[u.id] ?? ''}
+                      onChange={(e) =>
+                        setLimitDrafts((prev) => ({ ...prev, [u.id]: e.target.value }))
+                      }
+                      slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                      sx={{ maxWidth: 140 }}
+                    />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={savingUserId === u.id}
+                      onClick={() => void handleSaveUserLimit(u.id)}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="bg-white rounded-xl border border-border-brand mb-8">
         <div className="px-5 py-4 border-b border-border-brand">

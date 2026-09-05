@@ -359,9 +359,14 @@ export default function DealsList({ viewToggle }: { viewToggle?: React.ReactNode
         <div>
           <h1 className="text-xl font-bold text-ink">Deals</h1>
           <p className="text-sm text-ink3 mt-0.5">
-            {activeDeals.length} active deals
+            Dollar-value opportunities — {activeDeals.length} active deals
             {' · '}
-            {formatValue(activeDeals.reduce((s, d) => s + Number(d.value), 0))} pipeline
+            {formatValue(activeDeals.reduce((s, d) => s + Number(d.value), 0))} pipeline. For a
+            contact&apos;s lead stage, see{' '}
+            <Link href="/pipeline" className="underline hover:text-ink2">
+              Lead Stages
+            </Link>
+            .
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -114,3 +114,15 @@ export const checkoutLimiter = rateLimit({
   legacyHeaders: false,
   skip: isTestEnv,
 })
+
+// Per-token (not per-IP) so one automation's legitimate burst from a single
+// external sender can't starve another tenant's automation sharing the same IP.
+export const inboundAutomationWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests. Try again shortly.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isTestEnv,
+  keyGenerator: (req: Request) => (req.params['token'] as string | undefined) ?? 'unknown',
+})

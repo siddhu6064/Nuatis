@@ -1,0 +1,11 @@
+-- New 'manager' role — between admin and staff. Can run day-to-day team ops
+-- (rep quotas, time-off approval, outbound call campaigns — none of which
+-- were role-gated at all before, so staff already had implicit access there;
+-- this mainly widens the few owner/admin-only gates that make sense for a
+-- manager too) but not billing, integrations, or org-level settings.
+--
+-- ALTER TYPE ... ADD VALUE cannot run inside the same transaction as a
+-- statement that uses the new value, so this migration does nothing but add
+-- the label — every other change (requireRole call sites, the role-picker UI)
+-- ships in application code, not here.
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'manager';

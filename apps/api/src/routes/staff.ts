@@ -1,9 +1,14 @@
+import { randomBytes } from 'node:crypto'
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import { getServiceClient } from '../lib/supabase.js'
-import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireAuth, requireRole, requireModule, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
 import { invalidateStaffCache } from '../lib/staff-cache.js'
-import { DATE_RE, validateShiftBody } from './staff-logic.js'
+import { logActivity } from '../lib/activity.js'
+import { authLimiter } from '../middleware/rate-limit.js'
+import { DATE_RE, validateShiftBody, validatePayFields } from './staff-logic.js'
+
+const WEB_URL = process.env['WEB_URL'] ?? 'http://localhost:3000'
 
 const router = Router()
 
@@ -62,6 +67,40 @@ async function checkShiftConflict(
   }
 }
 
+const DOW_TO_KEY = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+interface DayAvailability {
+  enabled?: boolean
+  start?: string
+  end?: string
+}
+
+// Checks a shift against the staff member's own declared weekly availability
+// (staff_members.availability). A day with no entry at all is treated as
+// "no preference declared" (not a conflict) — most staff never fill this in,
+// and blocking those would regress the common case. Only flags a real
+// mismatch: marked unavailable that day, or outside the declared window.
+function checkAvailabilityConflict(
+  availability: Record<string, DayAvailability> | null | undefined,
+  date: string,
+  startTime: string,
+  endTime: string
+): { conflict: boolean; reason?: string } {
+  if (!availability || typeof availability !== 'object') return { conflict: false }
+  const dow = new Date(`${date}T00:00:00Z`).getUTCDay()
+  const dayKey = DOW_TO_KEY[dow]!
+  const day = availability[dayKey]
+  if (day === undefined) return { conflict: false }
+  if (!day.enabled) return { conflict: true, reason: `not marked available on ${dayKey}` }
+  if (day.start && startTime < day.start) {
+    return { conflict: true, reason: `starts before declared availability (${day.start})` }
+  }
+  if (day.end && endTime > day.end) {
+    return { conflict: true, reason: `ends after declared availability (${day.end})` }
+  }
+  return { conflict: false }
+}
+
 // ── GET /api/staff ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, requireCrm, async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest
@@ -114,6 +153,12 @@ router.post('/', requireAuth, requireCrm, async (req: Request, res: Response): P
     return
   }
 
+  const payValidation = validatePayFields(b)
+  if (!payValidation.ok) {
+    res.status(400).json({ error: payValidation.error })
+    return
+  }
+
   const payload: Record<string, unknown> = {
     tenant_id: authed.tenantId,
     name,
@@ -124,6 +169,7 @@ router.post('/', requireAuth, requireCrm, async (req: Request, res: Response): P
     availability:
       b['availability'] && typeof b['availability'] === 'object' ? b['availability'] : {},
     notes: typeof b['notes'] === 'string' ? b['notes'] : null,
+    ...payValidation.updates,
   }
 
   const { data, error } = await supabase.from('staff_members').insert(payload).select('*').single()
@@ -245,6 +291,13 @@ router.put('/:id', requireAuth, requireCrm, async (req: Request, res: Response):
   if (typeof b['notes'] === 'string') updates['notes'] = b['notes']
   if (b['notes'] === null) updates['notes'] = null
 
+  const payValidation = validatePayFields(b)
+  if (!payValidation.ok) {
+    res.status(400).json({ error: payValidation.error })
+    return
+  }
+  Object.assign(updates, payValidation.updates)
+
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: 'No valid fields to update' })
     return
@@ -266,6 +319,225 @@ router.put('/:id', requireAuth, requireCrm, async (req: Request, res: Response):
   invalidateStaffCache(authed.tenantId)
   res.json(data)
 })
+
+// ── GET /api/staff/:id/services — which services this staff member can perform ─
+router.get(
+  '/:id/services',
+  requireAuth,
+  requireCrm,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const { data: staffRow, error: staffError } = await supabase
+      .from('staff_members')
+      .select('id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (staffError || !staffRow) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('staff_services')
+      .select('service_id')
+      .eq('tenant_id', authed.tenantId)
+      .eq('staff_id', req.params['id'])
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.json({ service_ids: (data ?? []).map((r) => r.service_id as string) })
+  }
+)
+
+// ── PUT /api/staff/:id/services — replace the set of services this staff can perform ─
+router.put(
+  '/:id/services',
+  requireAuth,
+  requireCrm,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const b = req.body as Record<string, unknown>
+
+    const { data: staffRow, error: staffError } = await supabase
+      .from('staff_members')
+      .select('id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (staffError || !staffRow) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+
+    const serviceIds = Array.isArray(b['service_ids'])
+      ? (b['service_ids'] as unknown[]).filter((v): v is string => typeof v === 'string')
+      : []
+
+    if (serviceIds.length > 0) {
+      const { data: validServices, error: validationError } = await supabase
+        .from('services')
+        .select('id')
+        .eq('tenant_id', authed.tenantId)
+        .in('id', serviceIds)
+
+      if (validationError) {
+        res.status(500).json({ error: validationError.message })
+        return
+      }
+      const validIds = new Set((validServices ?? []).map((s) => s.id as string))
+      const invalid = serviceIds.filter((id) => !validIds.has(id))
+      if (invalid.length > 0) {
+        res.status(400).json({ error: `Unknown service_ids: ${invalid.join(', ')}` })
+        return
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from('staff_services')
+      .delete()
+      .eq('tenant_id', authed.tenantId)
+      .eq('staff_id', req.params['id'])
+
+    if (deleteError) {
+      res.status(500).json({ error: deleteError.message })
+      return
+    }
+
+    if (serviceIds.length > 0) {
+      const { error: insertError } = await supabase.from('staff_services').insert(
+        serviceIds.map((serviceId) => ({
+          tenant_id: authed.tenantId,
+          staff_id: req.params['id'],
+          service_id: serviceId,
+        }))
+      )
+      if (insertError) {
+        res.status(500).json({ error: insertError.message })
+        return
+      }
+    }
+
+    res.json({ service_ids: serviceIds })
+  }
+)
+
+// ── POST /api/staff/:id/invite ───────────────────────────────────────────────
+// Provisions a real login (Supabase Auth + users row, role:'staff') for an
+// existing staff_members row, mirrors tenants.ts's signup provisioning +
+// rollback-on-failure pattern. Delivers a "set your password" email via
+// Supabase's own resetPasswordForEmail — lands on the existing
+// /reset-password page, no new invite-acceptance page needed.
+router.post(
+  '/:id/invite',
+  requireAuth,
+  requireRole('owner', 'admin'),
+  requireModule('staff-portal'),
+  authLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const b = req.body as Record<string, unknown>
+
+    const { data: member } = await supabase
+      .from('staff_members')
+      .select('id, name, email, user_id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .single()
+
+    if (!member) {
+      res.status(404).json({ error: 'Staff member not found' })
+      return
+    }
+    if (member.user_id) {
+      res.status(409).json({ error: 'This staff member already has a login' })
+      return
+    }
+
+    const email =
+      (typeof b['email'] === 'string' ? b['email'].trim() : '') || (member.email as string | null)
+    if (!email) {
+      res.status(400).json({ error: 'An email is required to invite this staff member' })
+      return
+    }
+
+    // Throwaway password — never surfaced. resetPasswordForEmail below is
+    // the real credential-setup path.
+    const tempPassword = randomBytes(24).toString('base64url')
+
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+    })
+
+    if (authError || !authData.user) {
+      if (authError?.message?.includes('already registered')) {
+        res.status(409).json({ error: 'An account with this email already exists' })
+        return
+      }
+      res.status(500).json({ error: 'Failed to create login' })
+      return
+    }
+
+    const supabaseUserId = authData.user.id
+
+    const { data: newUser, error: userError } = await supabase
+      .from('users')
+      .insert({
+        tenant_id: authed.tenantId,
+        authjs_user_id: supabaseUserId,
+        email,
+        full_name: member.name as string,
+        role: 'staff',
+      })
+      .select('id')
+      .single()
+
+    if (userError || !newUser) {
+      await supabase.auth.admin.deleteUser(supabaseUserId)
+      res.status(500).json({ error: 'Failed to create login' })
+      return
+    }
+
+    const { error: linkError } = await supabase
+      .from('staff_members')
+      .update({ user_id: newUser.id })
+      .eq('id', member.id)
+      .eq('tenant_id', authed.tenantId)
+
+    if (linkError) {
+      await supabase.from('users').delete().eq('id', newUser.id)
+      await supabase.auth.admin.deleteUser(supabaseUserId)
+      res.status(500).json({ error: 'Failed to link login' })
+      return
+    }
+
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${WEB_URL.replace(/\/+$/, '')}/reset-password`,
+    })
+
+    await logActivity({
+      tenantId: authed.tenantId,
+      type: 'system',
+      actorType: 'user',
+      actorId: authed.appUserId ?? undefined,
+      body: `Invited ${member.name as string} to the staff portal`,
+    })
+
+    invalidateStaffCache(authed.tenantId)
+    res.status(201).json({ success: true, email })
+  }
+)
 
 // ── DELETE /api/staff/:id (soft — flips is_active=false) ─────────────────────
 router.delete(
@@ -347,7 +619,7 @@ router.post(
     // Verify staff belongs to tenant
     const { data: staff } = await supabase
       .from('staff_members')
-      .select('id, name')
+      .select('id, name, availability')
       .eq('id', staffId)
       .eq('tenant_id', authed.tenantId)
       .single()
@@ -373,6 +645,13 @@ router.post(
       return
     }
 
+    const availabilityCheck = checkAvailabilityConflict(
+      staff.availability as Record<string, DayAvailability> | null,
+      v.date as string,
+      v.start_time as string,
+      v.end_time as string
+    )
+
     const { data, error } = await supabase
       .from('shifts')
       .insert({
@@ -390,7 +669,12 @@ router.post(
       res.status(500).json({ error: error.message })
       return
     }
-    res.status(201).json(data)
+    res.status(201).json({
+      ...data,
+      availability_warning: availabilityCheck.conflict
+        ? `${staff.name} is ${availabilityCheck.reason}`
+        : null,
+    })
   }
 )
 
@@ -454,13 +738,13 @@ router.put(
       effEnd,
       shiftId
     )
+    const { data: staff } = await supabase
+      .from('staff_members')
+      .select('name, availability')
+      .eq('id', staffId)
+      .eq('tenant_id', authed.tenantId)
+      .single()
     if (conflict.conflict && conflict.conflicting) {
-      const { data: staff } = await supabase
-        .from('staff_members')
-        .select('name')
-        .eq('id', staffId)
-        .eq('tenant_id', authed.tenantId)
-        .single()
       res.status(409).json({
         error: 'shift_conflict',
         message: `${staff?.name ?? 'Staff'} already has a shift ${conflict.conflicting.start_time}–${conflict.conflicting.end_time} on this day`,
@@ -468,6 +752,13 @@ router.put(
       })
       return
     }
+
+    const availabilityCheck = checkAvailabilityConflict(
+      (staff?.availability as Record<string, DayAvailability> | null) ?? null,
+      effDate,
+      effStart,
+      effEnd
+    )
 
     const { data, error } = await supabase
       .from('shifts')
@@ -481,7 +772,12 @@ router.put(
       res.status(500).json({ error: error?.message ?? 'Failed to update' })
       return
     }
-    res.json(data)
+    res.json({
+      ...data,
+      availability_warning: availabilityCheck.conflict
+        ? `${staff?.name ?? 'Staff'} is ${availabilityCheck.reason}`
+        : null,
+    })
   }
 )
 

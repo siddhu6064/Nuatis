@@ -19,13 +19,47 @@ function readFileAsBase64(file: File): Promise<string> {
 interface Props {
   expenseId: string
   hasReceipt: boolean
+  approvalStatus: 'pending' | 'approved' | 'rejected' | null
 }
 
-export default function ExpenseDetailActions({ expenseId, hasReceipt }: Props) {
+export default function ExpenseDetailActions({ expenseId, hasReceipt, approvalStatus }: Props) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  async function handleApprove() {
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/expenses/${expenseId}/approve`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to approve expense')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve expense')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleReject() {
+    const note = prompt('Reason for rejecting this expense (optional):') ?? ''
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/expenses/${expenseId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note.trim() || null }),
+      })
+      if (!res.ok) throw new Error('Failed to reject expense')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reject expense')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleReceiptSelected(file: File | undefined) {
     if (!file) return
@@ -88,6 +122,27 @@ export default function ExpenseDetailActions({ expenseId, hasReceipt }: Props) {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700 mb-4">
           {error}
+        </div>
+      )}
+      {approvalStatus === 'pending' && (
+        <div className="flex items-center gap-3 mb-4">
+          <Button
+            variant="contained"
+            size="small"
+            disabled={busy}
+            onClick={() => void handleApprove()}
+          >
+            Approve
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            disabled={busy}
+            onClick={() => void handleReject()}
+          >
+            Reject
+          </Button>
         </div>
       )}
       <div className="flex items-center gap-3">

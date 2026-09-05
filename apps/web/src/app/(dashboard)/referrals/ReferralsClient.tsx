@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
 import { formatCurrency } from '@nuatis/shared'
 import Button from '@mui/material/Button'
+import { bucketAmountsByDay, sumTrend, MiniSparkline } from '@/lib/sparkline'
 
 const API_URL = ''
 
 interface Signup {
-  email: string
+  referred_email: string
   status: 'signed_up' | 'active' | 'churned' | 'paid'
-  created_at: string
+  signed_up_at: string
+  commission_amount: number | null
 }
 
 function maskEmail(email: string): string {
@@ -99,6 +101,18 @@ export default function ReferralsClient() {
 
   const ratePct = Math.round(commissionRate)
 
+  // 7-day trends from the already-fetched signups list — real timestamps,
+  // no fabricated data. Link clicks has no per-event history available
+  // client-side (just a running counter), so it's left without a trend.
+  const signupsTrend = bucketAmountsByDay(
+    signupsList.map((s) => ({ date: s.signed_up_at, amount: 1 }))
+  )
+  const mrrAddedTrend = bucketAmountsByDay(
+    signupsList.map((s) => ({ date: s.signed_up_at, amount: Number(s.commission_amount ?? 0) }))
+  )
+  const signupsThisWeek = sumTrend(signupsTrend)
+  const mrrAddedThisWeek = sumTrend(mrrAddedTrend)
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Hero banner */}
@@ -144,19 +158,35 @@ export default function ReferralsClient() {
 
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white border border-border-brand rounded-xl p-6">
+        <div className="bg-white border border-border-brand rounded-xl p-6 transition-shadow hover:shadow-md">
           <p className="text-3xl font-bold text-ink">{loading ? '—' : clicks}</p>
           <p className="text-sm text-ink3 mt-1">Link clicks</p>
         </div>
-        <div className="bg-white border border-border-brand rounded-xl p-6">
-          <p className="text-3xl font-bold text-ink">{loading ? '—' : signups}</p>
-          <p className="text-sm text-ink3 mt-1">Signups</p>
-        </div>
-        <div className="bg-white border border-border-brand rounded-xl p-6">
-          <p className="text-3xl font-bold text-ink">
-            {loading ? '—' : formatCurrency(estimatedMrr)}
+        <div className="bg-white border border-border-brand rounded-xl p-6 transition-shadow hover:shadow-md">
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-3xl font-bold text-ink">{loading ? '—' : signups}</p>
+            {!loading && <MiniSparkline trend={signupsTrend} color="#1b1d1f" />}
+          </div>
+          <p className="text-sm text-ink3 mt-1">
+            Signups
+            {!loading &&
+              (signupsThisWeek > 0 ? ` · +${signupsThisWeek} this week` : ' · none this week')}
           </p>
-          <p className="text-sm text-ink3 mt-1">Est. monthly earnings</p>
+        </div>
+        <div className="bg-white border border-border-brand rounded-xl p-6 transition-shadow hover:shadow-md">
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-3xl font-bold text-ink">
+              {loading ? '—' : formatCurrency(estimatedMrr)}
+            </p>
+            {!loading && <MiniSparkline trend={mrrAddedTrend} color="#16a34a" />}
+          </div>
+          <p className="text-sm text-ink3 mt-1">
+            Est. monthly earnings
+            {!loading &&
+              (mrrAddedThisWeek > 0
+                ? ` · +${formatCurrency(mrrAddedThisWeek)} this week`
+                : ' · none added this week')}
+          </p>
         </div>
       </div>
 
@@ -177,6 +207,7 @@ export default function ReferralsClient() {
                 <tr className="border-b border-border-brand">
                   <th className="text-left py-2 px-3 text-ink4 font-medium">Email</th>
                   <th className="text-left py-2 px-3 text-ink4 font-medium">Status</th>
+                  <th className="text-left py-2 px-3 text-ink4 font-medium">Commission</th>
                   <th className="text-left py-2 px-3 text-ink4 font-medium">Joined</th>
                 </tr>
               </thead>
@@ -186,7 +217,7 @@ export default function ReferralsClient() {
                     key={i}
                     className="border-b border-border-brand last:border-0 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="py-3 px-3 font-mono text-ink">{maskEmail(s.email)}</td>
+                    <td className="py-3 px-3 font-mono text-ink">{maskEmail(s.referred_email)}</td>
                     <td className="py-3 px-3">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -197,7 +228,10 @@ export default function ReferralsClient() {
                       </span>
                     </td>
                     <td className="py-3 px-3 text-ink3">
-                      {new Date(s.created_at).toLocaleDateString('en-US', {
+                      {s.commission_amount != null ? formatCurrency(s.commission_amount) : '—'}
+                    </td>
+                    <td className="py-3 px-3 text-ink3">
+                      {new Date(s.signed_up_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',

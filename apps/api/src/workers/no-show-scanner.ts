@@ -9,6 +9,8 @@ import { getPausedTenants } from '../lib/scanner-pause.js'
 import { sendSms } from '../lib/sms.js'
 import { maskPhone } from '../voice/pre-call-lookup.js'
 import { buildNoShowRebookSms } from '../lib/sms-templates.js'
+import { createPaymentLink } from '../lib/payment-link.js'
+import { chargeContactSavedMethod } from '../lib/contact-payment-methods.js'
 
 const QUEUE_NAME = 'no-show-scanner'
 const GRACE_MINUTES = 15
@@ -104,6 +106,62 @@ export async function scan(): Promise<void> {
         url: '/calls',
       })
 
+      // No-show fee — tries an off-session charge against the contact's saved
+      // payment method first; falls back to the existing hosted payment-link
+      // flow when there's no saved method or the charge fails (e.g. 3DS
+      // required). Only fires when the tenant has set a fee.
+      let feeUrl: string | null = null
+      let feeCharged = false
+      if (appt.contact_id) {
+        try {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('no_show_fee_cents')
+            .eq('id', appt.tenant_id)
+            .single()
+
+          const feeCents = tenant?.no_show_fee_cents as number | null | undefined
+          if (feeCents && feeCents > 0) {
+            const charge = await chargeContactSavedMethod(supabase, {
+              tenantId: appt.tenant_id,
+              contactId: appt.contact_id,
+              amountCents: feeCents,
+              description: 'No-show fee',
+            })
+
+            if (charge.charged) {
+              feeCharged = true
+              await supabase
+                .from('appointments')
+                .update({
+                  fee_amount_cents: feeCents,
+                  fee_status: 'charged',
+                  fee_payment_intent_id: charge.paymentIntentId,
+                })
+                .eq('id', appt.id)
+            } else {
+              const link = await createPaymentLink({
+                tenantId: appt.tenant_id,
+                amount: feeCents / 100,
+                description: 'No-show fee',
+                contactId: appt.contact_id,
+              })
+              feeUrl = link.url
+              await supabase
+                .from('appointments')
+                .update({
+                  fee_amount_cents: feeCents,
+                  fee_payment_link_url: link.url,
+                  fee_status: 'link_sent',
+                })
+                .eq('id', appt.id)
+            }
+          }
+        } catch (feeErr) {
+          console.error(`[no-show-scanner] fee link error for appointment=${appt.id}:`, feeErr)
+        }
+      }
+
       // Send rebook SMS (best-effort)
       if (apiKey && appt.contact_id) {
         try {
@@ -124,7 +182,13 @@ export async function scan(): Promise<void> {
           const fromNumber = location?.telnyx_number
 
           if (toPhone && fromNumber) {
-            const smsText = buildNoShowRebookSms({ fromNumber })
+            const smsText =
+              buildNoShowRebookSms({ fromNumber }) +
+              (feeCharged
+                ? ' A no-show fee was charged to your card on file.'
+                : feeUrl
+                  ? ` A no-show fee applies: ${feeUrl}`
+                  : '')
 
             // sendSms runs the TCPA opt-in check internally; success=false covers
             // both suppression and send failure (sendSms logs the reason itself)

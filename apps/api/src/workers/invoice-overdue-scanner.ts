@@ -1,5 +1,6 @@
 import { Queue, Worker } from 'bullmq'
 import { getServiceClient } from '../lib/supabase.js'
+import { notifyOwner } from '../lib/notifications.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
 
@@ -16,7 +17,7 @@ export async function scan(): Promise<void> {
     // Find all sent/due invoices whose due_date < today
     const { data: overdueInvoices, error } = await supabase
       .from('invoices')
-      .select('id, tenant_id, invoice_number, due_date')
+      .select('id, tenant_id, invoice_number, due_date, total')
       .in('status', ['sent', 'due'])
       .lt('due_date', today)
 
@@ -50,15 +51,26 @@ export async function scan(): Promise<void> {
       return
     }
 
-    // Log per-tenant counts
-    const tenantCounts: Record<string, number> = {}
+    // Log + notify per-tenant counts. The status transition itself
+    // (sent/due -> overdue) is the natural once-only trigger — an invoice
+    // marked overdue today won't match this query again tomorrow, so no
+    // cooldown column is needed the way low-stock-scanner.ts needs one.
+    const tenantStats: Record<string, { count: number; total: number }> = {}
     for (const inv of activeInvoices) {
-      tenantCounts[inv.tenant_id] = (tenantCounts[inv.tenant_id] ?? 0) + 1
+      const stats = tenantStats[inv.tenant_id] ?? { count: 0, total: 0 }
+      stats.count += 1
+      stats.total += Number(inv.total ?? 0)
+      tenantStats[inv.tenant_id] = stats
     }
-    for (const [tenantId, count] of Object.entries(tenantCounts)) {
+    for (const [tenantId, stats] of Object.entries(tenantStats)) {
       console.info(
-        `[invoice-overdue-scanner] marked ${count} invoices overdue for tenant ${tenantId}`
+        `[invoice-overdue-scanner] marked ${stats.count} invoices overdue for tenant ${tenantId}`
       )
+      void notifyOwner(tenantId, 'invoice_overdue', {
+        pushTitle: 'Invoice(s) now overdue',
+        pushBody: `${stats.count} invoice${stats.count === 1 ? '' : 's'} just went overdue — $${stats.total.toFixed(2)} outstanding.`,
+        pushUrl: '/invoices',
+      })
     }
 
     console.info(

@@ -1,5 +1,10 @@
 import { describe, it, expect } from '@jest/globals'
-import { detectShiftConflict, validateShiftBody, validateStaffCreateBody } from './staff-logic.js'
+import {
+  detectShiftConflict,
+  validateShiftBody,
+  validateStaffCreateBody,
+  validatePayFields,
+} from './staff-logic.js'
 
 // ── Conflict detection (4 tests) ────────────────────────────────────────────
 
@@ -86,5 +91,46 @@ describe('validateShiftBody', () => {
       false
     )
     expect(result.ok).toBe(false)
+  })
+})
+
+describe('validatePayFields', () => {
+  it('accepts an hourly rate', () => {
+    const result = validatePayFields({ pay_type: 'hourly', hourly_rate_cents: 2500 })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.updates).toEqual({ pay_type: 'hourly', hourly_rate_cents: 2500 })
+  })
+
+  it('accepts a salary', () => {
+    const result = validatePayFields({ pay_type: 'salary', salary_cents: 6_000_000 })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.updates['salary_cents']).toBe(6_000_000)
+  })
+
+  it('rejects an invalid pay_type', () => {
+    const result = validatePayFields({ pay_type: 'commission' })
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects a negative rate', () => {
+    const result = validatePayFields({ hourly_rate_cents: -100 })
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects a non-integer rate', () => {
+    const result = validatePayFields({ hourly_rate_cents: 25.5 })
+    expect(result.ok).toBe(false)
+  })
+
+  it('returns no updates when no pay fields are present', () => {
+    const result = validatePayFields({ name: 'Jane' })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.updates).toEqual({})
+  })
+
+  it('allows clearing a field to null', () => {
+    const result = validatePayFields({ pay_type: null, hourly_rate_cents: null })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.updates).toEqual({ pay_type: null, hourly_rate_cents: null })
   })
 })

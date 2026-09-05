@@ -18,8 +18,9 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
 
 // ── Dynamic imports ───────────────────────────────────────────────────────────
 const { generateInvoiceNumber } = await import('../lib/invoice-number.js')
-const { calcInvoiceTotals, processRecordPayment, processVoidInvoice } =
-  await import('../routes/invoices.js')
+const { calcInvoiceTotals, processVoidInvoice } = await import('../routes/invoices.js')
+const { applyInvoicePayment } = await import('../lib/invoice-payment.js')
+const { getServiceClient } = await import('../lib/supabase.js')
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 describe('invoices', () => {
@@ -56,8 +57,11 @@ describe('invoices', () => {
   })
 
   // ── Test 3: record-payment sets status='received' when fully paid ────────────
+  // Exercises applyInvoicePayment directly — the same function both the
+  // authenticated record-payment route and the Stripe webhook call, so this
+  // test covers the real shared code path, not a parallel copy of it.
 
-  it('processRecordPayment sets status=received when fully paid', async () => {
+  it('applyInvoicePayment sets status=received when fully paid', async () => {
     store.tables['invoices'] = [
       {
         id: 'inv-1',
@@ -69,12 +73,24 @@ describe('invoices', () => {
       },
     ]
 
-    const result = await processRecordPayment('inv-1', 'tenant-1', 10, 'cash')
+    const result = await applyInvoicePayment(getServiceClient(), 'inv-1', 'tenant-1', 10)
 
-    expect(result.status).toBe(200)
+    expect(result.kind).toBe('ok')
     const row = store.tables['invoices']?.[0]
     expect(row?.['status']).toBe('received')
     expect(row?.['amount_paid']).toBe(100)
+  })
+
+  it('applyInvoicePayment is a no-op guard (invalid_status) for an already-received invoice', async () => {
+    store.tables['invoices'] = [
+      { id: 'inv-1', tenant_id: 'tenant-1', amount_paid: 100, total: 100, status: 'received' },
+    ]
+
+    const result = await applyInvoicePayment(getServiceClient(), 'inv-1', 'tenant-1', 10)
+
+    expect(result.kind).toBe('invalid_status')
+    // Confirms a Stripe webhook replay can't double-credit the invoice.
+    expect(store.tables['invoices']?.[0]?.['amount_paid']).toBe(100)
   })
 
   // ── Test 4: void returns 400 when status='received' ──────────────────────────

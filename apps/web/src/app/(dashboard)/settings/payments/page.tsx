@@ -15,6 +15,14 @@ interface SquareStatus {
   location_id?: string | null
 }
 
+interface StripeConnectStatus {
+  connected: boolean
+  status?: 'none' | 'pending' | 'active' | 'restricted'
+  charges_enabled?: boolean
+  payouts_enabled?: boolean
+  account_id?: string
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function PaymentsSettingsContent() {
@@ -25,6 +33,11 @@ function PaymentsSettingsContent() {
   const [squareLoading, setSquareLoading] = useState(true)
   const [squareError, setSquareError] = useState<string | null>(null)
   const [connectingSquare, setConnectingSquare] = useState(false)
+
+  const [stripeConnectStatus, setStripeConnectStatus] = useState<StripeConnectStatus | null>(null)
+  const [stripeConnectLoading, setStripeConnectLoading] = useState(true)
+  const [stripeConnectError, setStripeConnectError] = useState<string | null>(null)
+  const [connectingStripe, setConnectingStripe] = useState(false)
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -48,6 +61,16 @@ function PaymentsSettingsContent() {
       setToast({ type: 'error', msg: 'Failed to connect Square. Please try again.' })
       setTimeout(() => setToast(null), 5000)
     }
+
+    const stripeConnectParam = searchParams.get('stripe_connect')
+    if (stripeConnectParam === 'return') {
+      setToast({ type: 'success', msg: 'Stripe account status updated.' })
+      setTimeout(() => setToast(null), 5000)
+      refreshStripeConnectStatus()
+    } else if (stripeConnectParam === 'error') {
+      setToast({ type: 'error', msg: 'Failed to connect Stripe. Please try again.' })
+      setTimeout(() => setToast(null), 5000)
+    }
   }, [searchParams])
 
   // Fetch Square status on mount
@@ -61,6 +84,84 @@ function PaymentsSettingsContent() {
       .catch(() => {})
       .finally(() => setSquareLoading(false))
   }, []) // intentional: only fetch once on mount
+
+  function refreshStripeConnectStatus() {
+    setStripeConnectLoading(true)
+    fetch(`${API_URL}/api/stripe-connect/status`, { headers: authHeaders })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: StripeConnectStatus | null) => {
+        if (data) setStripeConnectStatus(data)
+      })
+      .catch(() => {})
+      .finally(() => setStripeConnectLoading(false))
+  }
+
+  // Fetch Stripe Connect status on mount
+  useEffect(() => {
+    refreshStripeConnectStatus()
+  }, []) // intentional: only fetch once on mount
+
+  async function handleConnectStripe() {
+    setConnectingStripe(true)
+    setStripeConnectError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/stripe-connect/connect`, { headers: authHeaders })
+      if (res.ok) {
+        const data = (await res.json()) as { url: string }
+        window.location.href = data.url
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setStripeConnectError(
+          (d as { error?: string }).error || 'Failed to start Stripe onboarding'
+        )
+      }
+    } catch {
+      setStripeConnectError('Failed to start Stripe onboarding')
+    } finally {
+      setConnectingStripe(false)
+    }
+  }
+
+  async function handleDisconnectStripe() {
+    setConnectingStripe(true)
+    setStripeConnectError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/stripe-connect/disconnect`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (res.ok) {
+        setStripeConnectStatus({ connected: false, status: 'none' })
+        setToast({ type: 'success', msg: 'Stripe disconnected successfully.' })
+        setTimeout(() => setToast(null), 4000)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setStripeConnectError((d as { error?: string }).error || 'Failed to disconnect Stripe')
+      }
+    } catch {
+      setStripeConnectError('Failed to disconnect Stripe')
+    } finally {
+      setConnectingStripe(false)
+    }
+  }
+
+  async function handleOpenStripeDashboard() {
+    setStripeConnectError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/stripe-connect/dashboard-link`, {
+        headers: authHeaders,
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { url: string }
+        window.open(data.url, '_blank', 'noopener,noreferrer')
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setStripeConnectError((d as { error?: string }).error || 'Failed to open Stripe dashboard')
+      }
+    } catch {
+      setStripeConnectError('Failed to open Stripe dashboard')
+    }
+  }
 
   async function handleConnectSquare() {
     setConnectingSquare(true)
@@ -127,20 +228,83 @@ function PaymentsSettingsContent() {
 
       {/* Cards grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* ── Stripe card ── */}
+        {/* ── Stripe Connect card ── */}
         <div className="bg-white rounded-xl border border-border-brand p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Stripe</h2>
-            {/* Stripe status is always env-var based — show a static badge */}
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-              Not configured
-            </span>
+            <h2 className="text-sm font-semibold" style={{ color: '#635BFF' }}>
+              Stripe
+            </h2>
+            {stripeConnectLoading ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">
+                Loading…
+              </span>
+            ) : stripeConnectStatus?.status === 'active' ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                Connected
+              </span>
+            ) : stripeConnectStatus?.status === 'restricted' ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                Restricted
+              </span>
+            ) : stripeConnectStatus?.status === 'pending' ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                Onboarding started
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                Not connected
+              </span>
+            )}
           </div>
+
           <p className="text-xs text-ink3">
-            Configure Stripe by setting{' '}
-            <code className="font-mono bg-bg px-1 py-0.5 rounded text-ink">STRIPE_SECRET_KEY</code>{' '}
-            in your environment.
+            Payments on invoices, gift cards, and payment links go straight to your own Stripe
+            account. Nuatis takes a 2% platform fee per transaction.
           </p>
+
+          {stripeConnectError && (
+            <p className="text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded-lg">
+              {stripeConnectError}
+            </p>
+          )}
+
+          {!stripeConnectLoading && (
+            <div className="pt-1 flex gap-2 flex-wrap">
+              {stripeConnectStatus?.status === 'active' ? (
+                <>
+                  <Button
+                    onClick={() => void handleOpenStripeDashboard()}
+                    size="small"
+                    sx={{ bgcolor: '#635BFF', color: 'white', '&:hover': { bgcolor: '#4f46d6' } }}
+                  >
+                    Open Stripe Dashboard
+                  </Button>
+                  <Button
+                    onClick={() => void handleDisconnectStripe()}
+                    disabled={connectingStripe}
+                    color="error"
+                    variant="outlined"
+                    size="small"
+                  >
+                    {connectingStripe ? 'Disconnecting…' : 'Disconnect'}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => void handleConnectStripe()}
+                  disabled={connectingStripe}
+                  size="small"
+                  sx={{ bgcolor: '#635BFF', color: 'white', '&:hover': { bgcolor: '#4f46d6' } }}
+                >
+                  {connectingStripe
+                    ? 'Starting…'
+                    : stripeConnectStatus?.status === 'pending'
+                      ? 'Finish onboarding'
+                      : 'Connect Stripe'}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Square card ── */}

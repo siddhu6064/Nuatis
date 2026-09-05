@@ -133,6 +133,36 @@ describe('PUT /api/deals/:id', () => {
     )
     expect(stageChangeCall).toBeDefined()
   })
+
+  it('saves lost_reason and includes it in the lost-deal activity log', async () => {
+    seedDealsEnabled()
+    const dealId = randomUUID()
+    ;(store.tables['deals'] as Row[]).push({
+      id: dealId,
+      tenant_id: TENANT_ID,
+      title: 'Lost Deal',
+      value: 500,
+      is_archived: false,
+      is_closed_won: false,
+      is_closed_lost: false,
+      lost_reason: null,
+    })
+
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .put(`/api/deals/${dealId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ is_closed_lost: true, lost_reason: 'Chose a competitor' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.lost_reason).toBe('Chose a competitor')
+
+    const lostCall = logActivity.mock.calls.find((c) =>
+      (c[0] as { body?: string }).body?.includes('Deal lost')
+    )
+    expect(lostCall).toBeDefined()
+    expect((lostCall![0] as { body?: string }).body).toContain('Chose a competitor')
+  })
 })
 
 // ── ENUM-1: pipeline_stages tenant scope on ?pipeline_id= ─────────────────────

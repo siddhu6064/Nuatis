@@ -102,3 +102,45 @@ export function validateStaffCreateBody(
   if (!role) return { ok: false, error: 'role is required' }
   return { ok: true, name, role }
 }
+
+export interface PayFieldsValidation {
+  ok: true
+  updates: Record<string, unknown>
+}
+
+export interface PayFieldsError {
+  ok: false
+  error: string
+}
+
+/**
+ * Pure data storage only — NOT tax withholding, pay runs, or a payroll
+ * provider integration. `pay_type` gates which of the two rate fields is
+ * meaningful; both are stored so switching types doesn't lose history.
+ */
+export function validatePayFields(
+  b: Record<string, unknown>
+): PayFieldsValidation | PayFieldsError {
+  const updates: Record<string, unknown> = {}
+
+  if (b['pay_type'] !== undefined) {
+    if (b['pay_type'] !== null && b['pay_type'] !== 'hourly' && b['pay_type'] !== 'salary') {
+      return { ok: false, error: "pay_type must be 'hourly', 'salary', or null" }
+    }
+    updates['pay_type'] = b['pay_type']
+  }
+
+  for (const field of ['hourly_rate_cents', 'salary_cents'] as const) {
+    if (b[field] === undefined) continue
+    if (b[field] === null) {
+      updates[field] = null
+      continue
+    }
+    if (typeof b[field] !== 'number' || !Number.isInteger(b[field]) || (b[field] as number) < 0) {
+      return { ok: false, error: `${field} must be a non-negative integer (cents) or null` }
+    }
+    updates[field] = b[field]
+  }
+
+  return { ok: true, updates }
+}

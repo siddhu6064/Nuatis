@@ -1,7 +1,11 @@
 import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '../lib/supabase.js'
 import { generateInvoiceNumber } from '../lib/invoice-number.js'
+import { applyInvoicePayment } from '../lib/invoice-payment.js'
+import { attachSetupIntentPaymentMethod } from '../lib/contact-payment-methods.js'
+import { notifyOwner } from '../lib/notifications.js'
 
 // Stripe v22 removed current_period_start/end from Subscription and moved
 // Invoice.subscription into Invoice.parent.subscription_details.subscription.
@@ -40,10 +44,94 @@ function resolveInvoiceSubscriptionId(inv: StripeInvoicePayload): string | null 
 
 const router = Router()
 
+// Shared by checkout.session.completed (card — synchronous) and
+// checkout.session.async_payment_succeeded (ACH — fires once the debit
+// actually clears, days later). Both mean the same thing: the money landed.
+export async function handleCheckoutSessionPaid(
+  supabase: SupabaseClient,
+  session: Stripe.Checkout.Session
+): Promise<void> {
+  if (session.metadata?.['kind'] === 'invoice_payment') {
+    const invoiceId = session.metadata['invoiceId']
+    const tenantId = session.metadata['tenantId']
+    const amountPaid = (session.amount_total ?? 0) / 100
+    if (invoiceId && tenantId && amountPaid > 0) {
+      // applyInvoicePayment's allowed-status gate doubles as the replay
+      // guard here: an already-'received' invoice (e.g. Stripe redelivering
+      // this event) hits invalid_status and no-ops.
+      const result = await applyInvoicePayment(supabase, invoiceId, tenantId, amountPaid)
+      if (result.kind === 'not_found') {
+        console.error(`[stripe-webhook] invoice payment: invoice not found ${invoiceId}`)
+      }
+    }
+  } else if (session.metadata?.['kind'] === 'gift_card_purchase') {
+    const giftCardId = session.metadata['giftCardId']
+    const tenantId = session.metadata['tenantId']
+    if (giftCardId && tenantId) {
+      // Only flips pending_payment → active — a redelivered event finds the
+      // card already 'active' and this is a no-op (replay guard).
+      await supabase
+        .from('gift_cards')
+        .update({ status: 'active' })
+        .eq('id', giftCardId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'pending_payment')
+    }
+  }
+}
+
 function getStripe(): Stripe | null {
   const key = process.env['STRIPE_SECRET_KEY']
   if (!key) return null
   return new Stripe(key)
+}
+
+// Shared by both webhook endpoints' checkout.session.async_payment_failed
+// case — the platform-account handler below and the Connect-account handler
+// in stripe-connect-webhooks.ts (a connected tenant's async payment methods
+// can fail exactly the same way a platform-account one can).
+export async function handleCheckoutSessionAsyncFailed(
+  supabase: SupabaseClient,
+  session: Stripe.Checkout.Session
+): Promise<void> {
+  if (session.metadata?.['kind'] === 'gift_card_purchase') {
+    const giftCardId = session.metadata['giftCardId']
+    const tenantId = session.metadata['tenantId']
+    if (giftCardId && tenantId) {
+      // Never became real money — revert out of pending_payment so the
+      // card doesn't sit forever looking like a purchase in progress.
+      // Guarded on the current status so a redelivered event, or one
+      // that lands after the card was somehow already activated, no-ops.
+      const { data: reverted } = await supabase
+        .from('gift_cards')
+        .update({ status: 'cancelled' })
+        .eq('id', giftCardId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'pending_payment')
+        .select('id')
+        .maybeSingle()
+      if (reverted) {
+        void notifyOwner(tenantId, 'payment_failed', {
+          pushTitle: 'Gift card payment failed',
+          pushBody: 'A customer’s bank payment for a gift card purchase did not clear.',
+          pushUrl: '/settings/gift-cards',
+        })
+      }
+    }
+  } else if (session.metadata?.['kind'] === 'invoice_payment') {
+    const invoiceId = session.metadata['invoiceId']
+    const tenantId = session.metadata['tenantId']
+    if (invoiceId && tenantId) {
+      // Nothing to revert — applyInvoicePayment only ever ran on the
+      // paid path, so the invoice was never marked received. Just
+      // surface it, since the customer likely believes they paid.
+      void notifyOwner(tenantId, 'payment_failed', {
+        pushTitle: 'Invoice payment failed',
+        pushBody: 'A customer’s bank payment for an invoice did not clear.',
+        pushUrl: `/invoices/${invoiceId}`,
+      })
+    }
+  }
 }
 
 function mapStripeStatus(stripeStatus: string): string {
@@ -188,6 +276,44 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             })
           }
         }
+        break
+      }
+
+      // checkout.session.completed fires the instant the payer submits —
+      // for a card that means paid, but for ACH direct debit the session
+      // completes with payment_status:'unpaid' while the bank debit is
+      // still processing (it can take days to actually clear or fail).
+      // Neither Payment Links call here (payment-link.ts, gift-cards.ts,
+      // gift-cards-public.ts, invoices.ts) restricts payment_method_types,
+      // so Stripe's dashboard-level "automatic payment methods" setting
+      // already offers ACH once enabled there — this handler is the part
+      // that must not treat "completed" as "paid" for that case.
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        if (session.payment_status === 'paid') {
+          await handleCheckoutSessionPaid(supabase, session)
+        }
+        // payment_status 'unpaid' here means an async method (ACH) is still
+        // processing — wait for async_payment_succeeded/failed below rather
+        // than acting now.
+        break
+      }
+
+      case 'checkout.session.async_payment_succeeded': {
+        const session = event.data.object as Stripe.Checkout.Session
+        await handleCheckoutSessionPaid(supabase, session)
+        break
+      }
+
+      case 'checkout.session.async_payment_failed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        await handleCheckoutSessionAsyncFailed(supabase, session)
+        break
+      }
+
+      case 'setup_intent.succeeded': {
+        const setupIntent = event.data.object as Stripe.SetupIntent
+        await attachSetupIntentPaymentMethod(supabase, setupIntent)
         break
       }
 

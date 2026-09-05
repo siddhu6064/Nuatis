@@ -1,7 +1,9 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
+import { Queue } from 'bullmq'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { isModuleEnabled } from '../lib/modules.js'
+import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { logActivity } from '../lib/activity.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import { generateOrderNumber } from '../lib/order-number.js'
@@ -131,6 +133,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
   const countOnly = req.query['count'] === 'true'
   const status = typeof req.query['status'] === 'string' ? req.query['status'] : ''
   const contactId = typeof req.query['contact_id'] === 'string' ? req.query['contact_id'] : ''
+  const locationId = typeof req.query['location_id'] === 'string' ? req.query['location_id'] : ''
   const q = typeof req.query['q'] === 'string' ? sanitizeSearchTerm(req.query['q']) : ''
 
   if (countOnly) {
@@ -140,6 +143,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
       .eq('tenant_id', authed.tenantId)
       .is('deleted_at', null)
     if (status) countQuery = countQuery.eq('status', status)
+    if (locationId) countQuery = countQuery.eq('location_id', locationId)
     const { count, error } = await countQuery
     if (error) {
       res.status(500).json({ error: error.message })
@@ -162,6 +166,7 @@ router.get('/', requireAuth, requireOrders, async (req: Request, res: Response):
 
   if (status) query = query.eq('status', status)
   if (contactId) query = query.eq('contact_id', contactId)
+  if (locationId) query = query.eq('location_id', locationId)
   if (q) {
     const pat = `%${q}%`
     query = query.or(`order_number.ilike.${pat},customer_name.ilike.${pat}`)
@@ -235,6 +240,7 @@ router.post('/', requireAuth, requireOrders, async (req: Request, res: Response)
       notes: (b['notes'] as string) || null,
       assigned_staff_id: (b['assigned_staff_id'] as string) || null,
       deal_id: (b['deal_id'] as string) || null,
+      location_id: (b['location_id'] as string) || null,
       metadata: isPlainObject(b['metadata']) ? b['metadata'] : {},
     })
     .select('*')
@@ -338,6 +344,8 @@ router.put(
     if (b['assigned_staff_id'] === null) updates['assigned_staff_id'] = null
     if (typeof b['deal_id'] === 'string') updates['deal_id'] = b['deal_id']
     if (b['deal_id'] === null) updates['deal_id'] = null
+    if (typeof b['location_id'] === 'string') updates['location_id'] = b['location_id']
+    if (b['location_id'] === null) updates['location_id'] = null
 
     if (b['fulfillment_type'] !== undefined) {
       if (
@@ -751,6 +759,45 @@ router.put(
           )
         }
       }
+
+      // Trigger customer-referral reward — mirrors the appointments.ts
+      // trigger (order completion is the other "first purchase" qualifying
+      // event; the worker's unique-constraint insert decides which trigger
+      // wins if both an appointment and an order complete for the same contact).
+      void (async () => {
+        try {
+          if (!order.contact_id) return
+          const { data: tenantData } = await supabase
+            .from('tenants')
+            .select('customer_referral_program_enabled')
+            .eq('id', authed.tenantId)
+            .single()
+          if (!tenantData?.customer_referral_program_enabled) return
+
+          const { data: contactRow } = await supabase
+            .from('contacts')
+            .select('referred_by_contact_id')
+            .eq('id', order.contact_id)
+            .eq('tenant_id', authed.tenantId)
+            .maybeSingle()
+          if (!contactRow?.referred_by_contact_id) return
+
+          const referralQueue = new Queue('customer-referral-reward', {
+            connection: createBullMQConnection(),
+            skipVersionCheck: true,
+          })
+          await referralQueue.add('issue-reward', {
+            tenantId: authed.tenantId,
+            referredContactId: order.contact_id,
+            referrerContactId: contactRow.referred_by_contact_id,
+            triggerType: 'order',
+            triggerId: order.id,
+          })
+          await referralQueue.close()
+        } catch (err) {
+          console.error('[orders] Failed to enqueue customer-referral reward:', err)
+        }
+      })()
     }
 
     // SMS notification — best-effort, never blocks the response.

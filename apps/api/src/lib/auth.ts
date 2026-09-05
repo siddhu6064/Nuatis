@@ -11,6 +11,15 @@ export interface AuthenticatedRequest extends Request {
   role: string
   vertical: string
   authProvider: 'authjs'
+  /** Present only on a session minted by admin-console.ts's "log in as this
+   *  tenant" flow — every request carrying this claim is a platform admin
+   *  acting inside a tenant, not the tenant itself. See lib/impersonation.ts. */
+  impersonation?: {
+    sessionId: string
+    platformUserId: string
+    platformUserEmail: string
+    expiresAt: string
+  }
 }
 
 function getAppUserIdCache(): Map<string, string> {
@@ -119,7 +128,20 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     authedReq.role = (payload['role'] as string) ?? 'staff'
     authedReq.vertical = (payload['vertical'] as string) ?? ''
     authedReq.authProvider = 'authjs'
+    const impersonation = payload['impersonation'] as AuthenticatedRequest['impersonation']
+    if (impersonation) authedReq.impersonation = impersonation
     res.locals['tenantId'] = tenantId
+
+    // Staff-portal isolation: only tokens explicitly minted for the staff
+    // self-service portal (portalScope claim, set at login time — never the
+    // `role` fallback above, which many older/test tokens omit and rely on
+    // for normal access) are confined to /api/staff-portal/*. This is a
+    // single choke point rather than auditing every existing manager route
+    // for a role check.
+    if (payload['portalScope'] === 'staff' && !req.originalUrl.startsWith('/api/staff-portal')) {
+      res.status(403).json({ error: 'Insufficient permissions' })
+      return
+    }
 
     next()
   } catch (err: unknown) {

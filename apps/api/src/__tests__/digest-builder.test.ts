@@ -50,6 +50,12 @@ const minimalData: WeeklyDigestData = {
   pipeline: { new_deals: 2, deals_won: 1, revenue_won: 500, open_pipeline_value: 5000 },
   maya_calls: { total_this_week: 10, bookings_from_calls: 3, avg_duration_seconds: 90 },
   sms_health: { sent_this_week: 50, delivery_rate: 95.5 },
+  operations: {
+    overdue_invoices: 2,
+    overdue_invoices_total: 350,
+    low_stock_items: 1,
+    quotes_expiring_7d: 3,
+  },
   top_insight: 'Test insight here',
 }
 
@@ -125,6 +131,31 @@ describe('digest-builder', () => {
       },
     ]
 
+    // Seed operations data
+    store.tables['invoices'] = [
+      { id: 'inv-1', tenant_id: TENANT_ID, status: 'overdue', total: 100 },
+      { id: 'inv-2', tenant_id: TENANT_ID, status: 'overdue', total: 50 },
+      { id: 'inv-3', tenant_id: TENANT_ID, status: 'paid', total: 999 },
+    ]
+    store.tables['inventory_items'] = [
+      { id: 'item-1', tenant_id: TENANT_ID, quantity: 1, reorder_threshold: 5, deleted_at: null },
+      { id: 'item-2', tenant_id: TENANT_ID, quantity: 20, reorder_threshold: 5, deleted_at: null },
+    ]
+    store.tables['quotes'] = [
+      {
+        id: 'q-1',
+        tenant_id: TENANT_ID,
+        status: 'sent',
+        valid_until: new Date(Date.now() + 3 * 86400000).toISOString(),
+      },
+      {
+        id: 'q-2',
+        tenant_id: TENANT_ID,
+        status: 'accepted',
+        valid_until: new Date(Date.now() + 3 * 86400000).toISOString(),
+      },
+    ]
+
     const data = await buildDigestData(TENANT_ID)
 
     // Assert all top-level keys exist
@@ -135,12 +166,19 @@ describe('digest-builder', () => {
     expect(data).toHaveProperty('pipeline')
     expect(data).toHaveProperty('maya_calls')
     expect(data).toHaveProperty('sms_health')
+    expect(data).toHaveProperty('operations')
     expect(data).toHaveProperty('top_insight')
     expect(data.top_insight).toBe('Mock insight text')
 
     // Assert period labels match "MMM D" format
     expect(data.period.from).toMatch(/^[A-Z][a-z]+ \d+$/)
     expect(data.period.to).toMatch(/^[A-Z][a-z]+ \d+$/)
+
+    // Assert operations metrics derived from the seeded rows above
+    expect(data.operations.overdue_invoices).toBe(2)
+    expect(data.operations.overdue_invoices_total).toBe(150)
+    expect(data.operations.low_stock_items).toBe(1)
+    expect(data.operations.quotes_expiring_7d).toBe(1)
   })
 
   it('renderWeeklyDigest subject includes business_name and period', () => {
@@ -148,6 +186,15 @@ describe('digest-builder', () => {
 
     expect(subject).toContain(minimalData.business_name)
     expect(subject).toContain(minimalData.period.to)
+  })
+
+  it('renderWeeklyDigest html contains the Operations section metrics', () => {
+    const { html } = renderWeeklyDigest(minimalData, 'test-token')
+
+    expect(html).toContain('Overdue Invoices')
+    expect(html).toContain('Low Stock Items')
+    expect(html).toContain('Quotes Expiring (7d)')
+    expect(html).toContain('$350')
   })
 
   it('renderWeeklyDigest html contains top_insight text', () => {

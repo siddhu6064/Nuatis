@@ -9,9 +9,12 @@ import {
 
 let store: MockStore = createStore()
 
+const notifyOwner = jest.fn(async () => undefined)
+
 jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: () => createMockSupabase(store),
 }))
+jest.unstable_mockModule('../lib/notifications.js', () => ({ notifyOwner }))
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000exp0001'
 const USER_ID = 'user-exp-001'
@@ -22,7 +25,13 @@ process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 async function makeToken(): Promise<string> {
   return mintTestToken(
-    { sub: USER_ID, tenantId: TENANT_ID, role: 'owner', vertical: 'restaurant' },
+    {
+      sub: USER_ID,
+      appUserId: USER_ID,
+      tenantId: TENANT_ID,
+      role: 'owner',
+      vertical: 'restaurant',
+    },
     { secret: SECRET }
   )
 }
@@ -61,6 +70,10 @@ beforeEach(() => {
   store.tables['expense_categories'] = []
   store.tables['recurring_expenses'] = []
   store.tables['activity_log'] = []
+  store.tables['users'] = [
+    { id: USER_ID, tenant_id: TENANT_ID, full_name: 'Owner', monthly_expense_limit_cents: null },
+  ]
+  notifyOwner.mockClear()
 })
 
 describe('expenses module gate', () => {
@@ -213,6 +226,60 @@ describe('POST /api/expenses', () => {
   })
 })
 
+describe('POST /api/expenses — per-user monthly spending limit', () => {
+  it('routes to pending approval when this expense pushes the user over their monthly limit', async () => {
+    store.tables['users'] = [
+      { id: USER_ID, tenant_id: TENANT_ID, full_name: 'Owner', monthly_expense_limit_cents: 10000 },
+    ]
+    const token = await makeToken()
+    const app = makeApp()
+
+    // $80 already logged this month by this user
+    ;(store.tables['expenses'] as Row[]).push({
+      id: 'existing-1',
+      tenant_id: TENANT_ID,
+      created_by: USER_ID,
+      amount: 80,
+      expense_date: new Date().toISOString().slice(0, 8) + '01',
+      deleted_at: null,
+    })
+
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 50, vendor: 'Over Limit Co' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBe('pending')
+    expect(notifyOwner).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not require approval when under the monthly limit', async () => {
+    store.tables['users'] = [
+      { id: USER_ID, tenant_id: TENANT_ID, full_name: 'Owner', monthly_expense_limit_cents: 10000 },
+    ]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 50, vendor: 'Under Limit Co' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBe(null)
+  })
+
+  it('never requires approval when the user has no limit set', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 100000, vendor: 'No Limit Co' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBe(null)
+  })
+})
+
 describe('PUT /api/expenses/:id', () => {
   it('edits amount, vendor, and notes', async () => {
     const token = await makeToken()
@@ -232,6 +299,117 @@ describe('PUT /api/expenses/:id', () => {
     expect(res.body.amount).toBe(75)
     expect(res.body.vendor).toBe('Updated Vendor')
     expect(res.body.notes).toBe('corrected amount')
+  })
+})
+
+describe('expense approval workflow', () => {
+  it('creates with approval_status null when no threshold is set', async () => {
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 5000 })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBeNull()
+    expect(notifyOwner).not.toHaveBeenCalled()
+  })
+
+  it('creates with approval_status "pending" and notifies the owner when amount exceeds the threshold', async () => {
+    store.tables['tenants'] = [
+      entitledTenant({ settings: { expenses_require_approval_above: 100 } }),
+    ]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 150 })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBe('pending')
+    expect(notifyOwner).toHaveBeenCalledTimes(1)
+    expect(notifyOwner.mock.calls[0]![1]).toBe('expense_pending_approval')
+  })
+
+  it('stays null when amount is at or below the threshold', async () => {
+    store.tables['tenants'] = [
+      entitledTenant({ settings: { expenses_require_approval_above: 100 } }),
+    ]
+    const token = await makeToken()
+    const res = await request(makeApp())
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 100 })
+
+    expect(res.status).toBe(201)
+    expect(res.body.approval_status).toBeNull()
+  })
+
+  it('approves a pending expense and stamps approved_by/approved_at', async () => {
+    store.tables['tenants'] = [
+      entitledTenant({ settings: { expenses_require_approval_above: 100 } }),
+    ]
+    const token = await makeToken()
+    const app = makeApp()
+    const createRes = await request(app)
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 500 })
+    const id = createRes.body.id as string
+
+    const res = await request(app)
+      .post(`/api/expenses/${id}/approve`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'looks right' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.approval_status).toBe('approved')
+    expect(res.body.approved_at).toBeTruthy()
+    expect(res.body.approval_note).toBe('looks right')
+  })
+
+  it('rejects a pending expense with a reason', async () => {
+    store.tables['tenants'] = [
+      entitledTenant({ settings: { expenses_require_approval_above: 100 } }),
+    ]
+    const token = await makeToken()
+    const app = makeApp()
+    const createRes = await request(app)
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 500 })
+    const id = createRes.body.id as string
+
+    const res = await request(app)
+      .post(`/api/expenses/${id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'wrong category, resubmit' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.approval_status).toBe('rejected')
+    expect(res.body.approval_note).toBe('wrong category, resubmit')
+  })
+
+  it('returns 400 approving/rejecting an expense that is not pending', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    const createRes = await request(app)
+      .post('/api/expenses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 50 })
+    const id = createRes.body.id as string
+
+    const approveRes = await request(app)
+      .post(`/api/expenses/${id}/approve`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(approveRes.status).toBe(400)
+
+    const rejectRes = await request(app)
+      .post(`/api/expenses/${id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(rejectRes.status).toBe(400)
   })
 })
 

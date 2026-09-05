@@ -225,19 +225,40 @@ describe('POST /api/campaigns/:id/send-now — non-draft status', () => {
   })
 })
 
-// ── Test 4b: /send-now on a segment-scoped campaign → rejected at the route ───
-describe('POST /api/campaigns/:id/send-now — segment guard', () => {
-  it('returns 400 without touching the queue when segment_id is set', async () => {
-    seedCampaign('camp-sn-seg', { status: 'draft', approved: true, segment_id: 'seg-1' })
+// ── Test 4b: /send-now on a segment-scoped campaign → schedules for real ──────
+describe('POST /api/campaigns/:id/send-now — segment-scoped', () => {
+  it('resolves the segment, snapshots its real contact_count, and enqueues a send job', async () => {
+    ;(store.tables['contacts'] as Row[]).push(
+      { id: 'c-1', tenant_id: 'tenant-1', full_name: 'A', is_archived: false },
+      { id: 'c-2', tenant_id: 'tenant-1', full_name: 'B', is_archived: false }
+    )
+    // sl-1 (seeded in beforeEach) has empty filters — matches all tenant contacts.
+    seedCampaign('camp-sn-seg', { status: 'draft', approved: true, segment_id: 'sl-1' })
 
     const res = await request(makeApp())
       .post('/api/campaigns/camp-sn-seg/send-now')
       .send({})
       .set('Content-Type', 'application/json')
 
-    expect(res.status).toBe(400)
-    expect((res.body as { error: string }).error).toMatch(/segment/i)
-    expect(mockQueueAdd).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+    const campaign = (res.body as { campaign: { contact_count: number } }).campaign
+    expect(campaign.contact_count).toBe(2)
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('schedules with contact_count: 0 rather than erroring for a deleted/missing smart list', async () => {
+    seedCampaign('camp-sn-seg-missing', { status: 'draft', approved: true, segment_id: 'gone' })
+
+    const res = await request(makeApp())
+      .post('/api/campaigns/camp-sn-seg-missing/send-now')
+      .send({})
+      .set('Content-Type', 'application/json')
+
+    // A missing smart list resolves to zero contacts, not a route-level error —
+    // the campaign still schedules with contact_count: 0.
+    expect(res.status).toBe(200)
+    const campaign = (res.body as { campaign: { contact_count: number } }).campaign
+    expect(campaign.contact_count).toBe(0)
   })
 })
 

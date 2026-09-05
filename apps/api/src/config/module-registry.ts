@@ -28,6 +28,8 @@ export type ModuleId =
   | 'companies'
   | 'deals'
   | 'appointments'
+  | 'staff-portal'
+  | 'sso'
 
 export type PlanTier = 'core' | 'pro' | 'scale'
 
@@ -115,6 +117,22 @@ export const MODULES: ModuleDef[] = [
     label: 'Expenses',
     description: 'Expense logging, category breakdown, recurring expenses, and P&L reporting.',
     minPlan: 'pro',
+    defaultOn: false,
+  },
+  {
+    id: 'staff-portal',
+    label: 'Staff Portal',
+    description:
+      'Self-service logins for your team — each staff member sees only their own schedule, assigned appointments, time clock, and pay rate.',
+    minPlan: 'pro',
+    defaultOn: false,
+  },
+  {
+    id: 'sso',
+    label: 'Single Sign-On',
+    description:
+      'Let your team log in through your own identity provider (SAML or OIDC) via WorkOS.',
+    minPlan: 'scale',
     defaultOn: false,
   },
   // ── Hidden modules — valid keys, no settings-UI toggle row ──────────────

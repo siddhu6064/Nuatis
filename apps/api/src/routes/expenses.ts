@@ -11,6 +11,7 @@ import { requirePlan } from '../middleware/require-plan.js'
 import { logActivity } from '../lib/activity.js'
 import { sanitizeSearchTerm } from '../lib/sanitize-search.js'
 import { generateExpenseNumber } from '../lib/expense-number.js'
+import { notifyOwner } from '../lib/notifications.js'
 
 const router = Router()
 router.use(requireAuth, requirePlan('expenses'))
@@ -84,6 +85,49 @@ async function uploadReceipt(
       receipt_file_size: buffer.length,
     },
   }
+}
+
+async function getApprovalThreshold(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string
+): Promise<number | null> {
+  const { data } = await supabase.from('tenants').select('settings').eq('id', tenantId).single()
+  const threshold = (data?.settings as Record<string, unknown> | null)?.[
+    'expenses_require_approval_above'
+  ]
+  return typeof threshold === 'number' ? threshold : null
+}
+
+// Returns true when logging this expense would push the creating user over
+// their own declared monthly cap — plugs into the same approval-routing
+// mechanism as the tenant-wide threshold above, rather than a hard block.
+async function exceedsUserMonthlyLimit(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string,
+  userId: string | null | undefined,
+  amount: number
+): Promise<boolean> {
+  if (!userId) return false
+  const { data: user } = await supabase
+    .from('users')
+    .select('monthly_expense_limit_cents')
+    .eq('id', userId)
+    .maybeSingle()
+  const limitCents = user?.monthly_expense_limit_cents as number | null | undefined
+  if (limitCents == null) return false
+
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const { data: monthExpenses } = await supabase
+    .from('expenses')
+    .select('amount')
+    .eq('tenant_id', tenantId)
+    .eq('created_by', userId)
+    .is('deleted_at', null)
+    .gte('expense_date', monthStart)
+
+  const spentSoFar = (monthExpenses ?? []).reduce((sum, e) => sum + Number(e.amount ?? 0), 0)
+  return (spentSoFar + amount) * 100 > limitCents
 }
 
 async function withSignedReceiptUrl<T extends { receipt_storage_path: string | null }>(
@@ -164,6 +208,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   const expenseNumber = await generateExpenseNumber(authed.tenantId)
+  const threshold = await getApprovalThreshold(supabase, authed.tenantId)
+  const overUserLimit = await exceedsUserMonthlyLimit(
+    supabase,
+    authed.tenantId,
+    authed.appUserId,
+    amount
+  )
+  const needsApproval = (threshold !== null && amount > threshold) || overUserLimit
 
   const { data: expense, error: insertErr } = await supabase
     .from('expenses')
@@ -176,6 +228,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       vendor: typeof b['vendor'] === 'string' ? b['vendor'].trim() : null,
       notes: (b['notes'] as string) || null,
       created_by: authed.appUserId,
+      approval_status: needsApproval ? 'pending' : null,
     })
     .select('*')
     .single()
@@ -183,6 +236,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   if (insertErr || !expense) {
     res.status(500).json({ error: insertErr?.message ?? 'Failed to create expense' })
     return
+  }
+
+  if (needsApproval) {
+    const reason =
+      threshold !== null && amount > threshold
+        ? `exceeds the $${threshold.toFixed(2)} approval threshold`
+        : "exceeds the submitting user's monthly spending limit"
+    void notifyOwner(authed.tenantId, 'expense_pending_approval', {
+      pushTitle: 'Expense needs approval',
+      pushBody: `${expenseNumber} — $${amount.toFixed(2)} ${reason}.`,
+      pushUrl: `/expenses/${expense.id}`,
+    })
   }
 
   const receiptInput = parseReceiptInput(b)
@@ -234,6 +299,111 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 
   res.json(await withSignedReceiptUrl(supabase, expense))
+})
+
+// ── POST /api/expenses/:id/approve ──────────────────────────────────────────
+router.post('/:id/approve', async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const b = req.body as Record<string, unknown>
+
+  const { data: expense } = await supabase
+    .from('expenses')
+    .select('id, expense_number, approval_status')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .is('deleted_at', null)
+    .single()
+
+  if (!expense) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+  if (expense.approval_status !== 'pending') {
+    res.status(400).json({ error: 'Expense is not pending approval' })
+    return
+  }
+
+  const note = typeof b['note'] === 'string' ? b['note'] : null
+
+  const { data: updated, error } = await supabase
+    .from('expenses')
+    .update({
+      approval_status: 'approved',
+      approved_by: authed.appUserId ?? null,
+      approved_at: new Date().toISOString(),
+      approval_note: note,
+    })
+    .eq('id', expense.id)
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single()
+
+  if (error || !updated) {
+    res.status(500).json({ error: error?.message ?? 'Failed to approve expense' })
+    return
+  }
+
+  void logActivity({
+    tenantId: authed.tenantId,
+    type: 'expense',
+    body: `Expense approved: ${expense.expense_number}`,
+    metadata: { expense_id: expense.id, note },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
+  res.json(await withSignedReceiptUrl(supabase, updated))
+})
+
+// ── POST /api/expenses/:id/reject ───────────────────────────────────────────
+router.post('/:id/reject', async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const b = req.body as Record<string, unknown>
+
+  const { data: expense } = await supabase
+    .from('expenses')
+    .select('id, expense_number, approval_status')
+    .eq('id', req.params['id'])
+    .eq('tenant_id', authed.tenantId)
+    .is('deleted_at', null)
+    .single()
+
+  if (!expense) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+  if (expense.approval_status !== 'pending') {
+    res.status(400).json({ error: 'Expense is not pending approval' })
+    return
+  }
+
+  const note = typeof b['note'] === 'string' ? b['note'] : null
+
+  const { data: updated, error } = await supabase
+    .from('expenses')
+    .update({ approval_status: 'rejected', approval_note: note })
+    .eq('id', expense.id)
+    .eq('tenant_id', authed.tenantId)
+    .select('*')
+    .single()
+
+  if (error || !updated) {
+    res.status(500).json({ error: error?.message ?? 'Failed to reject expense' })
+    return
+  }
+
+  void logActivity({
+    tenantId: authed.tenantId,
+    type: 'expense',
+    body: `Expense rejected: ${expense.expense_number}${note ? ` — ${note}` : ''}`,
+    metadata: { expense_id: expense.id, note },
+    actorType: 'user',
+    actorId: authed.userId,
+  })
+
+  res.json(await withSignedReceiptUrl(supabase, updated))
 })
 
 // ── PUT /api/expenses/:id ──────────────────────────────────────────────────────

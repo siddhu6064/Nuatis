@@ -21,6 +21,9 @@ interface Props {
   mayaOverageRate: number | null
 }
 
+const PLAN_ORDER: PlanKey[] = ['core', 'pro', 'scale']
+const PLAN_LABEL: Record<PlanKey, string> = { core: 'Core', pro: 'Pro', scale: 'Scale' }
+
 const STATUS_STYLE: Record<Status, { bg: string; fg: string; label: string }> = {
   trialing: { bg: '#fef3c7', fg: '#92400e', label: 'Trialing' },
   active: { bg: '#dcfce7', fg: '#166534', label: 'Active' },
@@ -45,13 +48,35 @@ function formatDate(iso: string | null): string {
   })
 }
 
+interface Invoice {
+  id: string
+  number: string | null
+  status: string | null
+  amount_paid_cents: number
+  currency: string
+  created: number
+  hosted_invoice_url: string | null
+  invoice_pdf: string | null
+}
+
 export default function BillingClient(props: Props) {
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalError, setPortalError] = useState<string | null>(null)
   const [now, setNow] = useState<number | null>(null)
+  const [changingPlan, setChangingPlan] = useState<PlanKey | null>(null)
+  const [changeError, setChangeError] = useState<string | null>(null)
+  const [changeSuccess, setChangeSuccess] = useState<string | null>(null)
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null)
 
   useEffect(() => {
     setNow(Date.now())
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/billing/invoices`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { invoices: [] }))
+      .then((data: { invoices: Invoice[] }) => setInvoices(data.invoices ?? []))
+      .catch(() => setInvoices([]))
   }, [])
 
   async function openPortal() {
@@ -72,6 +97,31 @@ export default function BillingClient(props: Props) {
       setPortalError('Could not reach the billing server')
     } finally {
       setPortalLoading(false)
+    }
+  }
+
+  async function changePlan(target: PlanKey) {
+    if (!props.plan || target === props.plan) return
+    setChangeError(null)
+    setChangeSuccess(null)
+    setChangingPlan(target)
+    try {
+      const res = await fetch(`${API_URL}/api/billing/change-plan`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: target, interval: 'month' }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        setChangeError(data.error ?? 'Could not change plan')
+        return
+      }
+      setChangeSuccess(`Switched to ${PLAN_LABEL[target]} — this may take a moment to reflect.`)
+    } catch {
+      setChangeError('Could not reach the billing server')
+    } finally {
+      setChangingPlan(null)
     }
   }
 
@@ -167,9 +217,9 @@ export default function BillingClient(props: Props) {
             <Button onClick={openPortal} disabled={portalLoading} variant="contained">
               {portalLoading ? 'Opening…' : 'Manage billing'}
             </Button>
-            {props.plan !== 'scale' && (
+            {!props.plan && (
               <Button component={Link} href="/pricing" color="inherit" variant="outlined">
-                Upgrade plan
+                Choose a plan
               </Button>
             )}
           </div>
@@ -178,6 +228,41 @@ export default function BillingClient(props: Props) {
             <p className="mt-3 text-sm" style={{ color: '#b91c1c' }}>
               {portalError}
             </p>
+          )}
+
+          {props.plan && (
+            <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
+              <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--ink4)' }}>
+                Switch plan
+              </p>
+              <div className="flex gap-2">
+                {PLAN_ORDER.map((key) => {
+                  const isCurrent = key === props.plan
+                  return (
+                    <Button
+                      key={key}
+                      onClick={() => void changePlan(key)}
+                      disabled={isCurrent || changingPlan !== null}
+                      variant={isCurrent ? 'contained' : 'outlined'}
+                      color={isCurrent ? 'primary' : 'inherit'}
+                      size="small"
+                    >
+                      {changingPlan === key ? 'Switching…' : PLAN_LABEL[key]}
+                    </Button>
+                  )
+                })}
+              </div>
+              {changeError && (
+                <p className="mt-2 text-sm" style={{ color: '#b91c1c' }}>
+                  {changeError}
+                </p>
+              )}
+              {changeSuccess && (
+                <p className="mt-2 text-sm" style={{ color: 'var(--teal-dark)' }}>
+                  {changeSuccess}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -238,6 +323,51 @@ export default function BillingClient(props: Props) {
                   {(props.mayaOverageRate ?? 0).toFixed(2)}/min.
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border p-6 bg-white" style={{ borderColor: 'var(--border)' }}>
+          <h3 className="text-sm font-semibold mb-3">Billing history</h3>
+          {invoices === null ? (
+            <p className="text-sm text-ink4">Loading…</p>
+          ) : invoices.length === 0 ? (
+            <p className="text-sm text-ink4">No invoices yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {invoices.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+                >
+                  <div>
+                    <p className="text-sm text-ink">
+                      {inv.number ?? inv.id} —{' '}
+                      {new Date(inv.created * 1000).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-xs text-ink4 capitalize">{inv.status}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-ink">
+                      ${(inv.amount_paid_cents / 100).toFixed(2)}
+                    </span>
+                    {inv.hosted_invoice_url && (
+                      <a
+                        href={inv.hosted_invoice_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-teal-700 hover:underline"
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

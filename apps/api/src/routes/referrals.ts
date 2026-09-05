@@ -30,10 +30,10 @@ router.get('/my-code', requireAuth, async (req: Request, res: Response): Promise
 
     // If none found, generate one
     if (!row) {
-      // Fetch tenant's business_name
+      // Fetch tenant's name
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select('business_name')
+        .select('name')
         .eq('id', authed.tenantId)
         .maybeSingle()
 
@@ -42,7 +42,7 @@ router.get('/my-code', requireAuth, async (req: Request, res: Response): Promise
         return
       }
 
-      const businessName = tenant?.business_name ?? 'Nuatis'
+      const businessName = tenant?.name ?? 'Nuatis'
       await generateReferralCode(authed.tenantId, businessName)
 
       // Re-query to get the full row

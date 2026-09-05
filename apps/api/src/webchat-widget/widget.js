@@ -19,11 +19,15 @@
   // ── State ────────────────────────────────────────────────────────────────────
   var sessionToken = null
   var messages = []
+  var seenIds = {}
   var isOpen = false
   var isInitialized = false
+  var chatMode = 'ai'
+  var lastMsgTimestamp = null
+  var pollTimer = null
 
   // ── DOM refs ─────────────────────────────────────────────────────────────────
-  var panel, bubble, messagesEl, inputEl
+  var panel, bubble, messagesEl, inputEl, handoffBtn
 
   // ── CSS ──────────────────────────────────────────────────────────────────────
   function injectStyles() {
@@ -67,6 +71,10 @@
       COLOR +
       ';color:#fff;border-bottom-right-radius:4px;}' +
       '.nw-msg.ai{align-self:flex-start;background:#f0f0f0;color:#1a1a1a;border-bottom-left-radius:4px;}' +
+      '.nw-msg.agent{align-self:flex-start;background:#e0f2fe;color:#075985;border-bottom-left-radius:4px;}' +
+      '#nw-handoff{background:none;border:none;color:#fff;opacity:.85;cursor:pointer;' +
+      'font-size:11px;font-family:system-ui,sans-serif;text-decoration:underline;padding:0;' +
+      'flex-shrink:0;}' +
       '#nw-footer{display:flex;gap:8px;padding:12px;border-top:1px solid #eee;flex-shrink:0;}' +
       '#nw-input{flex:1;border:1px solid #ddd;border-radius:8px;padding:8px 12px;' +
       'font-size:14px;font-family:system-ui,sans-serif;outline:none;}' +
@@ -109,13 +117,24 @@
     var nameSpan = document.createElement('span')
     nameSpan.id = 'nw-biz-name'
     nameSpan.textContent = 'Chat'
+    var headerRight = document.createElement('div')
+    headerRight.style.display = 'flex'
+    headerRight.style.alignItems = 'center'
+    headerRight.style.gap = '10px'
+    handoffBtn = document.createElement('button')
+    handoffBtn.id = 'nw-handoff'
+    handoffBtn.type = 'button'
+    handoffBtn.textContent = 'Talk to a human'
+    handoffBtn.addEventListener('click', requestHandoff)
     var closeBtn = document.createElement('button')
     closeBtn.id = 'nw-close'
     closeBtn.setAttribute('aria-label', 'Close chat')
     closeBtn.innerHTML = '&#x2715;'
     closeBtn.addEventListener('click', toggle)
+    headerRight.appendChild(handoffBtn)
+    headerRight.appendChild(closeBtn)
     header.appendChild(nameSpan)
-    header.appendChild(closeBtn)
+    header.appendChild(headerRight)
 
     // Messages area
     messagesEl = document.createElement('div')
@@ -163,12 +182,14 @@
           return
         }
         sessionToken = data.session_token
+        lastMsgTimestamp = new Date().toISOString()
         // Update header with real business name from API
         var nameEl = document.getElementById('nw-biz-name')
         if (nameEl) nameEl.textContent = data.business_name || 'Chat'
         // Show greeting: prefer server value, fall back to data attribute
         var greeting = data.greeting || GREETING
-        if (greeting) addMessage('ai', greeting)
+        if (greeting) addMessage('assistant', greeting)
+        startPolling()
       })
       .catch(function () {
         addMessage('ai', 'Sorry, chat is unavailable right now.')
@@ -176,16 +197,27 @@
   }
 
   // ── Message rendering ────────────────────────────────────────────────────────
-  function addMessage(role, text) {
-    messages.push({ role: role, text: text })
+  // role is one of 'user' | 'assistant' | 'agent'. id is the server row id when
+  // the message came from the API (used to dedupe against the poll loop); local
+  // -only messages (typing placeholder, handoff confirmation) omit it.
+  function addMessage(role, text, id) {
+    messages.push({ role: role, text: text, id: id || null })
+    if (id) seenIds[id] = true
     renderMessages()
+  }
+
+  function setMode(mode) {
+    if (mode !== 'ai' && mode !== 'human') return
+    chatMode = mode
+    handoffBtn.style.display = mode === 'human' ? 'none' : ''
   }
 
   function renderMessages() {
     messagesEl.innerHTML = ''
     messages.forEach(function (m) {
+      var cls = m.role === 'user' ? 'user' : m.role === 'agent' ? 'agent' : 'ai'
       var div = document.createElement('div')
-      div.className = 'nw-msg ' + (m.role === 'user' ? 'user' : 'ai')
+      div.className = 'nw-msg ' + cls
       div.textContent = m.text
       messagesEl.appendChild(div)
     })
@@ -202,10 +234,15 @@
     // Optimistic: show user message immediately
     addMessage('user', text)
 
-    // Typing indicator placeholder
+    // Typing indicator placeholder — only shown while the AI is generating a
+    // reply. In human mode there's no reply in the response, so it's removed
+    // instead of overwritten (previously this echoed the visitor's own text).
     var typingIdx = messages.length
-    messages.push({ role: 'ai', text: '…' })
-    renderMessages()
+    var showedTyping = chatMode !== 'human'
+    if (showedTyping) {
+      messages.push({ role: 'assistant', text: '…', id: null })
+      renderMessages()
+    }
 
     fetch(API_BASE + '/api/webchat/session/' + sessionToken + '/message', {
       method: 'POST',
@@ -216,18 +253,93 @@
         return r.json()
       })
       .then(function (data) {
-        // API returns { ai_reply: { content } } or { message: { content } }
-        var reply =
-          (data.ai_reply && data.ai_reply.content) ||
-          (data.message && data.message.content) ||
-          'Message received.'
-        messages[typingIdx] = { role: 'ai', text: reply }
+        if (data.mode) setMode(data.mode)
+        if (data.message && data.message.id) {
+          seenIds[data.message.id] = true
+          if (data.message.created_at) lastMsgTimestamp = data.message.created_at
+        }
+        if (data.reply) {
+          seenIds[data.reply.id] = true
+          lastMsgTimestamp = data.reply.created_at || lastMsgTimestamp
+          if (showedTyping) {
+            messages[typingIdx] = { role: 'assistant', text: data.reply.content, id: data.reply.id }
+          } else {
+            messages.push({ role: 'assistant', text: data.reply.content, id: data.reply.id })
+          }
+        } else if (showedTyping) {
+          messages.splice(typingIdx, 1)
+        }
         renderMessages()
       })
       .catch(function () {
-        messages[typingIdx] = { role: 'ai', text: 'Sorry, something went wrong. Please try again.' }
+        if (showedTyping) {
+          messages[typingIdx] = {
+            role: 'assistant',
+            text: 'Sorry, something went wrong. Please try again.',
+            id: null,
+          }
+        }
         renderMessages()
       })
+  }
+
+  // ── Human handoff ────────────────────────────────────────────────────────────
+  function requestHandoff() {
+    if (!sessionToken || chatMode === 'human') return
+    handoffBtn.disabled = true
+    fetch(API_BASE + '/api/webchat/session/' + sessionToken + '/handoff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+      .then(function (r) {
+        return r.json()
+      })
+      .then(function (data) {
+        if (data.mode) setMode(data.mode)
+        addMessage('agent', "You're connected with our team — someone will be with you shortly.")
+      })
+      .catch(function () {})
+      .finally(function () {
+        handoffBtn.disabled = false
+      })
+  }
+
+  // ── Poll for agent replies / mode changes ────────────────────────────────────
+  function poll() {
+    if (!sessionToken) return
+    var url =
+      API_BASE +
+      '/api/webchat/session/' +
+      sessionToken +
+      '/messages?after=' +
+      encodeURIComponent(lastMsgTimestamp || '')
+    fetch(url)
+      .then(function (r) {
+        return r.json()
+      })
+      .then(function (data) {
+        if (data.mode) setMode(data.mode)
+        ;(data.messages || []).forEach(function (m) {
+          if (seenIds[m.id]) return
+          seenIds[m.id] = true
+          messages.push({ role: m.role, text: m.content, id: m.id })
+          lastMsgTimestamp = m.created_at
+        })
+        if (data.messages && data.messages.length) renderMessages()
+      })
+      .catch(function () {})
+  }
+
+  function startPolling() {
+    if (pollTimer) return
+    pollTimer = setInterval(poll, 5000)
+  }
+
+  function stopPolling() {
+    if (!pollTimer) return
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 
   // ── Toggle open / close ──────────────────────────────────────────────────────
@@ -235,12 +347,14 @@
     isOpen = !isOpen
     if (isOpen) {
       panel.classList.add('nw-open')
-      initSession() // no-op after first open
+      initSession() // no-op after first open; starts polling once the session exists
+      if (sessionToken) startPolling()
       setTimeout(function () {
         inputEl.focus()
       }, 220)
     } else {
       panel.classList.remove('nw-open')
+      stopPolling()
     }
   }
 

@@ -67,7 +67,7 @@ function makeApp() {
 function seedTenant(enabled = true): void {
   ;(store.tables['tenants'] as Row[]).push({
     id: TENANT_ID,
-    business_name: 'Test Clinic',
+    name: 'Test Clinic',
     phone: '+15125550000',
     booking_page_slug: 'test-clinic',
     booking_page_enabled: enabled,
@@ -89,6 +89,9 @@ beforeEach(() => {
   store.tables['appointments'] = []
   store.tables['intake_forms'] = []
   store.tables['intake_submissions'] = []
+  store.tables['contact_referral_codes'] = []
+  store.tables['staff_members'] = []
+  store.tables['staff_services'] = []
 
   getTenantCalendarCredentials.mockClear()
   getTenantCalendarCredentials.mockResolvedValue({
@@ -147,6 +150,33 @@ describe('GET /api/booking/:slug', () => {
 
     expect(res.status).toBe(404)
   })
+
+  it('includes staffByService only for services with mapped, active staff', async () => {
+    seedTenant(true)
+    ;(store.tables['services'] as Row[]).push({
+      id: SERVICE_ID,
+      tenant_id: TENANT_ID,
+      name: 'Cleaning',
+      duration_minutes: 60,
+      unit_price: 150,
+      is_active: true,
+    })
+    ;(store.tables['staff_members'] as Row[]).push(
+      { id: 'staff-1', tenant_id: TENANT_ID, name: 'Jane', color_hex: '#111', is_active: true },
+      { id: 'staff-2', tenant_id: TENANT_ID, name: 'Inactive', color_hex: '#222', is_active: false }
+    )
+    ;(store.tables['staff_services'] as Row[]).push(
+      { id: 'ss-1', tenant_id: TENANT_ID, staff_id: 'staff-1', service_id: SERVICE_ID },
+      { id: 'ss-2', tenant_id: TENANT_ID, staff_id: 'staff-2', service_id: SERVICE_ID }
+    )
+
+    const res = await request(makeApp()).get('/api/booking/test-clinic')
+
+    expect(res.status).toBe(200)
+    expect(res.body.staffByService[SERVICE_ID]).toEqual([
+      { id: 'staff-1', name: 'Jane', color_hex: '#111' },
+    ])
+  })
 })
 
 describe('POST /api/booking/:slug/confirm', () => {
@@ -193,6 +223,129 @@ describe('POST /api/booking/:slug/confirm', () => {
     expect(args[2]).toBe('appointment_booked')
     expect(sendSms).toHaveBeenCalledTimes(1)
     expect(sendPushNotification).toHaveBeenCalledTimes(1)
+  })
+
+  it('attributes a new contact to the referrer when a valid referralCode is sent', async () => {
+    seedTenant(true)
+    ;(store.tables['services'] as Row[]).push({
+      id: SERVICE_ID,
+      tenant_id: TENANT_ID,
+      name: 'Cleaning',
+      duration_minutes: 60,
+      is_active: true,
+    })
+    ;(store.tables['locations'] as Row[]).push({
+      id: LOCATION_ID,
+      tenant_id: TENANT_ID,
+      is_primary: true,
+      telnyx_number: '+15125550100',
+    })
+    const REFERRER_ID = 'referrer-bp-001'
+    ;(store.tables['contact_referral_codes'] as Row[]).push({
+      id: 'code-1',
+      tenant_id: TENANT_ID,
+      contact_id: REFERRER_ID,
+      code: 'REFCODE1',
+      status: 'active',
+      clicks: 0,
+    })
+
+    const res = await request(makeApp()).post('/api/booking/test-clinic/confirm').send({
+      serviceId: SERVICE_ID,
+      date: '2026-05-04',
+      startTime: '10:00',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+      phone: '+15125550002',
+      referralCode: 'refcode1',
+    })
+
+    expect(res.status).toBe(201)
+    const contacts = store.tables['contacts'] as Row[]
+    const newContact = contacts.find((c) => c['phone'] === '+15125550002')
+    expect(newContact?.['referred_by_contact_id']).toBe(REFERRER_ID)
+    expect(newContact?.['source']).toBe('referral')
+  })
+
+  it('sets assigned_staff_id when staffId is mapped to the service', async () => {
+    seedTenant(true)
+    ;(store.tables['services'] as Row[]).push({
+      id: SERVICE_ID,
+      tenant_id: TENANT_ID,
+      name: 'Cleaning',
+      duration_minutes: 60,
+      is_active: true,
+    })
+    ;(store.tables['staff_members'] as Row[]).push({
+      id: 'staff-1',
+      tenant_id: TENANT_ID,
+      name: 'Jane',
+      color_hex: '#111',
+      is_active: true,
+    })
+    ;(store.tables['staff_services'] as Row[]).push({
+      id: 'ss-1',
+      tenant_id: TENANT_ID,
+      staff_id: 'staff-1',
+      service_id: SERVICE_ID,
+    })
+
+    const res = await request(makeApp()).post('/api/booking/test-clinic/confirm').send({
+      serviceId: SERVICE_ID,
+      date: '2026-05-04',
+      startTime: '10:00',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+      phone: '+15125550001',
+      staffId: 'staff-1',
+    })
+
+    expect(res.status).toBe(201)
+    const appts = store.tables['appointments'] as Row[]
+    expect(appts[0]!['assigned_staff_id']).toBe('staff-1')
+    expect(isSlotAvailable).toHaveBeenCalledWith(
+      expect.anything(),
+      '2026-05-04',
+      '10:00',
+      60,
+      'staff-1'
+    )
+  })
+
+  it('ignores a staffId that is not mapped to the service', async () => {
+    seedTenant(true)
+    ;(store.tables['services'] as Row[]).push({
+      id: SERVICE_ID,
+      tenant_id: TENANT_ID,
+      name: 'Cleaning',
+      duration_minutes: 60,
+      is_active: true,
+    })
+    ;(store.tables['staff_members'] as Row[]).push({
+      id: 'staff-1',
+      tenant_id: TENANT_ID,
+      name: 'Jane',
+      color_hex: '#111',
+      is_active: true,
+    })
+    // No staff_services row — staff-1 is not actually offered for this service.
+
+    const res = await request(makeApp()).post('/api/booking/test-clinic/confirm').send({
+      serviceId: SERVICE_ID,
+      date: '2026-05-04',
+      startTime: '10:00',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+      phone: '+15125550001',
+      staffId: 'staff-1',
+    })
+
+    expect(res.status).toBe(201)
+    const appts = store.tables['appointments'] as Row[]
+    expect(appts[0]!['assigned_staff_id']).toBe(null)
   })
 
   it('returns 409 when slot is no longer available', async () => {

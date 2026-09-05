@@ -26,6 +26,29 @@ export interface StatCardProps {
   icon: string
   color: string
   href?: string
+  trend?: number[]
+  delta?: string
+}
+
+/** Minimal inline sparkline — no charting lib for a 7-point line. */
+function Sparkline({ trend, color }: { trend: number[]; color: string }) {
+  const w = 64
+  const h = 20
+  const max = Math.max(...trend, 1)
+  const step = w / (trend.length - 1)
+  const points = trend.map((v, i) => `${i * step},${h - (v / max) * (h - 3) - 1.5}`).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
 }
 
 /**
@@ -35,7 +58,8 @@ export interface StatCardProps {
  * MUI's elevation transition on hover (0 -> 2) instead of a border-color
  * swap, and Typography's type scale instead of ad hoc text-* classes.
  */
-export function StatCard({ label, value, icon, color, href }: StatCardProps) {
+export function StatCard({ label, value, icon, color, href, trend, delta }: StatCardProps) {
+  const fg = COLOR_FG[color] ?? COLOR_FG['teal']!
   const content = (
     <CardContent>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -52,22 +76,37 @@ export function StatCard({ label, value, icon, color, href }: StatCardProps) {
             justifyContent: 'center',
             fontSize: 14,
             bgcolor: COLOR_BG[color] ?? COLOR_BG['teal'],
-            color: COLOR_FG[color] ?? COLOR_FG['teal'],
+            color: fg,
           }}
         >
           {icon}
         </Box>
       </Box>
-      {/*
-        component="p": a stat value isn't a document heading, and the
-        default h5 tag collides with the app's global `h1..h6 { font-family:
-        DM Serif Display }` rule (apps/web/src/app/globals.css) — the
-        original Tailwind version of this card used a plain <p>, sans-serif.
-        See docs/mui-v9-migration-plan.md phase 3.
-      */}
-      <Typography variant="h5" component="p" color="text.primary" sx={{ fontWeight: 700 }}>
-        {value}
-      </Typography>
+      <Box
+        sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1 }}
+      >
+        {/*
+          component="p": a stat value isn't a document heading, and the
+          default h5 tag collides with the app's global `h1..h6 { font-family:
+          DM Serif Display }` rule (apps/web/src/app/globals.css) — the
+          original Tailwind version of this card used a plain <p>, sans-serif.
+          See docs/mui-v9-migration-plan.md phase 3.
+        */}
+        <Typography
+          variant="h5"
+          component="p"
+          color={value === '0' ? 'text.disabled' : 'text.primary'}
+          sx={{ fontWeight: 700 }}
+        >
+          {value}
+        </Typography>
+        {trend && trend.length > 1 && <Sparkline trend={trend} color={fg} />}
+      </Box>
+      {delta && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          {delta}
+        </Typography>
+      )}
     </CardContent>
   )
 

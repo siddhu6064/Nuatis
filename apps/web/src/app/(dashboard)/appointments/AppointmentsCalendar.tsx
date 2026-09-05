@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, dateFnsLocalizer, View, Views, ToolbarProps } from 'react-big-calendar'
+import withDragAndDrop, {
+  type EventInteractionArgs,
+} from 'react-big-calendar/lib/addons/dragAndDrop'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import TextField from '@mui/material/TextField'
@@ -15,6 +18,9 @@ import { ColumnsButton } from '@/components/ColumnsButton'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { Modal } from '@/components/ui/Modal'
 import './calendar.css'
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
+
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -344,6 +350,55 @@ export default function AppointmentsCalendar({ initialAppointments, staff, userR
     }
   }, [])
 
+  // Drag-to-reschedule / resize-to-change-duration. Optimistic update with
+  // revert-on-error, mirroring the pattern already used for Kanban drags
+  // (PipelineContent.tsx) — the PATCH endpoint does no conflict checking on
+  // its own, so a failed request is the only signal to snap back.
+  const isDraggable = useCallback(
+    (event: CalendarEvent) =>
+      !event.resource.is_blocked &&
+      event.resource.status !== 'canceled' &&
+      event.resource.status !== 'completed',
+    []
+  )
+
+  const moveOrResize = useCallback(
+    async ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+      const newStart = new Date(start)
+      const newEnd = new Date(end)
+      const previous = appointments
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === event.id
+            ? { ...a, start_time: newStart.toISOString(), end_time: newEnd.toISOString() }
+            : a
+        )
+      )
+      try {
+        const res = await fetch(`/api/appointments/${event.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start_time: newStart.toISOString(),
+            end_time: newEnd.toISOString(),
+          }),
+        })
+        if (!res.ok) {
+          setAppointments(previous)
+          const body = (await res.json().catch(() => ({}))) as { error?: string }
+          setToast(body.error ?? 'Failed to reschedule')
+          return
+        }
+        setToast('Appointment rescheduled')
+      } catch {
+        setAppointments(previous)
+        setToast('Failed to reschedule')
+      }
+    },
+    [appointments]
+  )
+
   async function submitBlock() {
     setBlockError(null)
     if (!blockDate || !blockStart || !blockEnd) {
@@ -438,6 +493,9 @@ export default function AppointmentsCalendar({ initialAppointments, staff, userR
             Block Time
           </Button>
           <ColumnsButton columns={APPT_COLUMNS} visible={colVisible} onChange={toggleCol} />
+          <Button component="a" href="/appointments/recurring" color="inherit">
+            Recurring
+          </Button>
           <Button component="a" href="/appointments/new" variant="contained">
             + New Appointment
           </Button>
@@ -468,7 +526,7 @@ export default function AppointmentsCalendar({ initialAppointments, staff, userR
           loading ? ' opacity-60 pointer-events-none' : ''
         }`}
       >
-        <Calendar
+        <DnDCalendar
           localizer={localizer}
           events={events}
           view={view}
@@ -478,6 +536,11 @@ export default function AppointmentsCalendar({ initialAppointments, staff, userR
           onRangeChange={handleRangeChange}
           onSelectEvent={handleSelectEvent}
           onSelectSlot={handleSelectSlot}
+          onEventDrop={moveOrResize}
+          onEventResize={moveOrResize}
+          draggableAccessor={isDraggable}
+          resizableAccessor={isDraggable}
+          resizable
           selectable
           eventPropGetter={eventPropGetter}
           components={{ toolbar: CalendarToolbar }}

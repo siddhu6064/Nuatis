@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express'
+import { nanoid } from 'nanoid'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
@@ -15,7 +16,54 @@ const VALID_TRIGGER_TYPES = [
   'inactive_customer',
   'new_contact',
   'appointment_followup',
+  'inbound_webhook',
 ] as const
+
+const WEBHOOK_MATCH_FIELDS = ['email', 'phone'] as const
+const WEBHOOK_MAPPING_KEYS = ['email', 'phone', 'first_name', 'last_name'] as const
+
+// Manually configured, not AI-generated — the LLM can't know an external
+// system's payload shape. field_mapping keys are Nuatis contact fields, values
+// are the flat top-level JSON key to read from the incoming webhook body.
+function validateWebhookTriggerConfig(config: unknown): string | null {
+  const c = (config ?? {}) as Record<string, unknown>
+  const matchBy = c['match_by']
+  if (!(WEBHOOK_MATCH_FIELDS as readonly string[]).includes(matchBy as string)) {
+    return `trigger_config.match_by must be one of: ${WEBHOOK_MATCH_FIELDS.join(', ')}`
+  }
+  const mapping = c['field_mapping']
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+    return 'trigger_config.field_mapping is required'
+  }
+  const mappingObj = mapping as Record<string, unknown>
+  for (const key of Object.keys(mappingObj)) {
+    if (!(WEBHOOK_MAPPING_KEYS as readonly string[]).includes(key)) {
+      return `trigger_config.field_mapping keys must be one of: ${WEBHOOK_MAPPING_KEYS.join(', ')}`
+    }
+    if (typeof mappingObj[key] !== 'string' || !(mappingObj[key] as string).trim()) {
+      return `trigger_config.field_mapping.${key} must be a non-empty payload key`
+    }
+  }
+  if (!mappingObj[matchBy as string]) {
+    return `trigger_config.field_mapping must include a mapping for the match_by field (${matchBy})`
+  }
+  return null
+}
+
+async function generateInboundWebhookToken(
+  supabase: ReturnType<typeof getServiceClient>
+): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const token = nanoid(32)
+    const { data } = await supabase
+      .from('custom_automations')
+      .select('id')
+      .eq('inbound_webhook_token', token)
+      .maybeSingle()
+    if (!data) return token
+  }
+  throw new Error('Failed to generate unique webhook token after 5 attempts')
+}
 
 const VALID_ACTION_TYPES = [
   'send_sms',
@@ -24,6 +72,7 @@ const VALID_ACTION_TYPES = [
   'add_tag',
   'update_field',
   'send_to_campaign',
+  'send_webhook',
 ] as const
 
 // ── POST /api/custom-automations/generate ────────────────────────────────────
@@ -104,10 +153,6 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     res.status(400).json({ error: 'name is required' })
     return
   }
-  if (!natural_language_prompt?.trim()) {
-    res.status(400).json({ error: 'natural_language_prompt is required' })
-    return
-  }
   if (!trigger_type?.trim()) {
     res.status(400).json({ error: 'trigger_type is required' })
     return
@@ -131,21 +176,53 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     return
   }
 
+  const isWebhookTrigger = trigger_type === 'inbound_webhook'
+
+  // Every other trigger goes through the AI builder, which always produces a
+  // prompt; a webhook trigger is manually configured (no AI involved, since
+  // the AI can't know an external system's payload shape) so it has none.
+  if (!isWebhookTrigger && !natural_language_prompt?.trim()) {
+    res.status(400).json({ error: 'natural_language_prompt is required' })
+    return
+  }
+
+  if (isWebhookTrigger) {
+    const configErr = validateWebhookTriggerConfig(trigger_config)
+    if (configErr) {
+      res.status(400).json({ error: configErr })
+      return
+    }
+  }
+
   const supabase = getServiceClient()
 
   try {
+    let webhookToken: string | null = null
+    if (isWebhookTrigger) {
+      try {
+        webhookToken = await generateInboundWebhookToken(supabase)
+      } catch (err) {
+        console.error('[custom-automations] webhook token generation failed:', err)
+        res.status(500).json({ error: 'Failed to generate webhook token' })
+        return
+      }
+    }
+
     const { data, error } = await supabase
       .from('custom_automations')
       .insert({
         tenant_id: authed.tenantId,
         name: name.trim(),
         description: description ?? null,
-        natural_language_prompt: natural_language_prompt.trim(),
+        natural_language_prompt: isWebhookTrigger
+          ? 'Triggered by an inbound webhook (manually configured)'
+          : natural_language_prompt!.trim(),
         trigger_type,
         trigger_config: trigger_config ?? null,
         action_type,
         action_config: action_config ?? null,
         status: 'draft',
+        inbound_webhook_token: webhookToken,
       })
       .select('*')
       .single()
@@ -172,7 +249,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   try {
     const { data: existing } = await supabase
       .from('custom_automations')
-      .select('id')
+      .select('id, trigger_type')
       .eq('id', id)
       .eq('tenant_id', authed.tenantId)
       .maybeSingle()
@@ -190,6 +267,14 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
         trigger_config?: unknown
         action_config?: unknown
       }
+
+    if (trigger_config !== undefined && existing.trigger_type === 'inbound_webhook') {
+      const configErr = validateWebhookTriggerConfig(trigger_config)
+      if (configErr) {
+        res.status(400).json({ error: configErr })
+        return
+      }
+    }
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates['name'] = name
@@ -332,6 +417,126 @@ router.post('/:id/pause', requireAuth, async (req: Request, res: Response): Prom
     console.error('[custom-automations] pause error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
+})
+
+const CONDITION_OPS = ['eq', 'neq', 'contains', 'exists'] as const
+
+interface StepInput {
+  action_type: string
+  action_config?: Record<string, unknown>
+  delay_days?: number
+  condition_field?: string | null
+  condition_op?: (typeof CONDITION_OPS)[number] | null
+  condition_value?: string | null
+}
+
+function validateAutomationSteps(steps: unknown[]): string | null {
+  for (const s of steps) {
+    const step = s as Record<string, unknown>
+    if (!(VALID_ACTION_TYPES as readonly string[]).includes(step['action_type'] as string)) {
+      return `Each step's action_type must be one of: ${VALID_ACTION_TYPES.join(', ')}`
+    }
+    if (
+      step['condition_op'] !== undefined &&
+      step['condition_op'] !== null &&
+      !(CONDITION_OPS as readonly string[]).includes(step['condition_op'] as string)
+    ) {
+      return `condition_op must be one of: ${CONDITION_OPS.join(', ')}`
+    }
+  }
+  return null
+}
+
+// ── GET /api/custom-automations/:id/steps ────────────────────────────────────
+// Extra steps after the AI-generated base action — a manually-built surface,
+// unlike the trigger/action above (see automation-ai-builder.ts).
+router.get('/:id/steps', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { id } = req.params as { id: string }
+  const supabase = getServiceClient()
+
+  const { data: automation } = await supabase
+    .from('custom_automations')
+    .select('id')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+  if (!automation) {
+    res.status(404).json({ error: 'Automation not found' })
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('custom_automation_steps')
+    .select('*')
+    .eq('automation_id', id)
+    .order('step_order', { ascending: true })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.json({ steps: data ?? [] })
+})
+
+// ── PUT /api/custom-automations/:id/steps ────────────────────────────────────
+// Replaces the full step list (delete-then-reinsert), same pattern used for
+// deal/quote line items elsewhere in this codebase.
+router.put('/:id/steps', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const { id } = req.params as { id: string }
+  const supabase = getServiceClient()
+  const b = req.body as Record<string, unknown>
+
+  const { data: automation } = await supabase
+    .from('custom_automations')
+    .select('id')
+    .eq('id', id)
+    .eq('tenant_id', authed.tenantId)
+    .maybeSingle()
+  if (!automation) {
+    res.status(404).json({ error: 'Automation not found' })
+    return
+  }
+
+  const steps = Array.isArray(b['steps']) ? (b['steps'] as StepInput[]) : []
+  const stepsErr = validateAutomationSteps(steps)
+  if (stepsErr) {
+    res.status(400).json({ error: stepsErr })
+    return
+  }
+
+  await supabase.from('custom_automation_steps').delete().eq('automation_id', id)
+
+  if (steps.length === 0) {
+    res.json({ steps: [] })
+    return
+  }
+
+  const rows = steps.map((s, i) => ({
+    automation_id: id,
+    tenant_id: authed.tenantId,
+    step_order: i + 1,
+    delay_days: s.delay_days ?? 0,
+    action_type: s.action_type,
+    action_config: s.action_config ?? {},
+    condition_field: s.condition_field?.trim() || null,
+    condition_op: s.condition_field?.trim() ? (s.condition_op ?? 'exists') : null,
+    condition_value: s.condition_field?.trim() ? (s.condition_value ?? null) : null,
+  }))
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from('custom_automation_steps')
+    .insert(rows)
+    .select('*')
+
+  if (insertErr) {
+    res.status(500).json({ error: `Steps failed to save: ${insertErr.message}` })
+    return
+  }
+
+  res.json({ steps: inserted ?? [] })
 })
 
 export default router

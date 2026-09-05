@@ -72,13 +72,13 @@ export default function InboxList() {
 
   const fetchChatSessions = useCallback(async (): Promise<ChatSession[]> => {
     try {
-      const res = await fetch('/api/chat/sessions?status=active')
+      const res = await fetch('/api/webchat/sessions?status=active')
       if (!res.ok) return []
       const data = (await res.json()) as {
         sessions: Array<{
           id: string
           visitor_name?: string | null
-          last_message?: string | null
+          last_message_preview?: string | null
           last_message_at?: string | null
           unread_count?: number
         }>
@@ -86,7 +86,7 @@ export default function InboxList() {
       return (data.sessions ?? []).map((s) => ({
         id: s.id,
         visitor_name: s.visitor_name ?? null,
-        last_message: s.last_message ?? null,
+        last_message: s.last_message_preview ?? null,
         last_message_at: s.last_message_at ?? null,
         unread_count: s.unread_count ?? 0,
       }))

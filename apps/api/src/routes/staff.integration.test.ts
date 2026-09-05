@@ -59,6 +59,7 @@ beforeEach(() => {
   store.tables['staff_members'] = []
   store.tables['shifts'] = []
   store.tables['activity_log'] = []
+  store.tables['users'] = []
 })
 
 describe('POST /api/staff', () => {
@@ -212,5 +213,144 @@ describe('POST /api/staff/:id/shifts', () => {
     expect(conflict.status).toBe(409)
     expect(conflict.body.error).toBe('shift_conflict')
     expect(conflict.body.conflicting_shift).toBeDefined()
+  })
+
+  it('returns availability_warning (not a 409) when the shift falls outside declared availability', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    const monday = nextMondayIso()
+    const dow = new Date(`${monday}T12:00:00Z`).getUTCDay()
+    const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dow]!
+
+    const staffRes = await request(app)
+      .post('/api/staff')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Dr. Patel',
+        role: 'Dentist',
+        availability: { [dayKey]: { enabled: true, start: '09:00', end: '12:00' } },
+      })
+    const staffId = staffRes.body.id as string
+
+    const shiftRes = await request(app)
+      .post(`/api/staff/${staffId}/shifts`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ date: monday, start_time: '14:00', end_time: '17:00' })
+
+    expect(shiftRes.status).toBe(201)
+    expect(shiftRes.body.availability_warning).toContain('declared availability')
+  })
+
+  it('does not warn when the staff member has no availability declared at all', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    const monday = nextMondayIso()
+
+    const staffRes = await request(app)
+      .post('/api/staff')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Dr. Patel', role: 'Dentist' })
+    const staffId = staffRes.body.id as string
+
+    const shiftRes = await request(app)
+      .post(`/api/staff/${staffId}/shifts`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ date: monday, start_time: '09:00', end_time: '17:00' })
+
+    expect(shiftRes.status).toBe(201)
+    expect(shiftRes.body.availability_warning).toBe(null)
+  })
+})
+
+describe('POST /api/staff/:id/invite', () => {
+  it('provisions a login and links staff_members.user_id', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+
+    const staffRes = await request(app)
+      .post('/api/staff')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Jane Doe', role: 'Receptionist', email: 'jane@example.com' })
+    const staffId = staffRes.body.id as string
+
+    const inviteRes = await request(app)
+      .post(`/api/staff/${staffId}/invite`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+
+    expect(inviteRes.status).toBe(201)
+    expect(inviteRes.body.email).toBe('jane@example.com')
+
+    const users = store.tables['users'] as Array<{ role: string; email: string }>
+    expect(users).toHaveLength(1)
+    expect(users[0]?.role).toBe('staff')
+
+    const staff = store.tables['staff_members'] as Array<{ id: string; user_id: string | null }>
+    expect(staff.find((s) => s.id === staffId)?.user_id).toBeTruthy()
+  })
+
+  it('404s for a staff member in another tenant', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    store.tables['staff_members'] = [
+      { id: 'other-staff', tenant_id: 'other-tenant', name: 'X', email: 'x@example.com' },
+    ]
+
+    const res = await request(app)
+      .post('/api/staff/other-staff/invite')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(res.status).toBe(404)
+  })
+
+  it('409s when the staff member already has a login', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    store.tables['staff_members'] = [
+      {
+        id: 'linked-staff',
+        tenant_id: TENANT_ID,
+        name: 'Linked',
+        email: 'linked@example.com',
+        user_id: 'existing-user-id',
+      },
+    ]
+
+    const res = await request(app)
+      .post('/api/staff/linked-staff/invite')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(res.status).toBe(409)
+  })
+
+  it('400s when neither the staff row nor the request body has an email', async () => {
+    const token = await makeToken()
+    const app = makeApp()
+    store.tables['staff_members'] = [
+      { id: 'no-email-staff', tenant_id: TENANT_ID, name: 'No Email', email: null },
+    ]
+
+    const res = await request(app)
+      .post('/api/staff/no-email-staff/invite')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('403s a staff-role caller (owner/admin only — role gate runs before the module check)', async () => {
+    const staffToken = await mintTestToken(
+      { sub: 'a-staff-user', tenantId: TENANT_ID, role: 'staff' },
+      { secret: SECRET }
+    )
+    const app = makeApp()
+    store.tables['staff_members'] = [
+      { id: 'some-staff', tenant_id: TENANT_ID, name: 'Some One', email: 'someone@example.com' },
+    ]
+
+    const res = await request(app)
+      .post('/api/staff/some-staff/invite')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({})
+    expect(res.status).toBe(403)
   })
 })

@@ -141,6 +141,101 @@ export async function createSquarePayment(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Public: createSquareCheckoutLink
+// ---------------------------------------------------------------------------
+
+export async function createSquareCheckoutLink(params: {
+  tenantId: string
+  amountCents: number
+  currency: string
+  name: string
+  idempotencyKey?: string
+}): Promise<{ id: string; url: string }> {
+  const supabase = getServiceClient()
+
+  const { data: connection, error } = await supabase
+    .from('square_connections')
+    .select('id, access_token, refresh_token, token_expires_at, square_location_id')
+    .eq('tenant_id', params.tenantId)
+    .single()
+
+  if (error || !connection) {
+    throw new Error(`No Square connection found for tenant ${params.tenantId}`)
+  }
+
+  const accessToken = await maybeRefreshToken(connection)
+
+  const linkRes = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      'Square-Version': '2024-01-18',
+    },
+    body: JSON.stringify({
+      idempotency_key: params.idempotencyKey ?? randomUUID(),
+      quick_pay: {
+        name: params.name,
+        price_money: { amount: params.amountCents, currency: params.currency },
+        location_id: connection.square_location_id,
+      },
+    }),
+  })
+
+  const linkData = (await linkRes.json()) as {
+    payment_link?: { id: string; url: string }
+    errors?: Array<{ detail?: string }>
+  }
+
+  if (!linkRes.ok) {
+    throw new Error(
+      `Square payment link creation failed: ${linkData.errors?.[0]?.detail ?? linkRes.statusText}`
+    )
+  }
+
+  const link = linkData.payment_link!
+  return { id: link.id, url: link.url }
+}
+
+// ---------------------------------------------------------------------------
+// Public: deactivateSquareCheckoutLink
+// ---------------------------------------------------------------------------
+
+export async function deactivateSquareCheckoutLink(
+  tenantId: string,
+  paymentLinkId: string
+): Promise<void> {
+  const supabase = getServiceClient()
+
+  const { data: connection, error } = await supabase
+    .from('square_connections')
+    .select('id, access_token, refresh_token, token_expires_at')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (error || !connection) {
+    throw new Error(`No Square connection found for tenant ${tenantId}`)
+  }
+
+  const accessToken = await maybeRefreshToken(connection)
+
+  const res = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links/${paymentLinkId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Square-Version': '2024-01-18',
+    },
+  })
+
+  if (!res.ok) {
+    const data = (await res.json()) as { errors?: Array<{ detail?: string }> }
+    throw new Error(
+      `Square payment link deactivation failed: ${data.errors?.[0]?.detail ?? res.statusText}`
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public: getSquarePayment
 // ---------------------------------------------------------------------------
 
@@ -198,4 +293,63 @@ export async function getSquarePayment(
     amountCents: payment.amount_money?.amount ?? 0,
     currency: payment.amount_money?.currency ?? '',
   }
+}
+
+// ---------------------------------------------------------------------------
+// Public: createSquareRefund
+// ---------------------------------------------------------------------------
+
+// Square supports repeated partial refunds against one payment — the caller
+// is responsible for tracking how much of the original amount has already
+// been refunded and rejecting an over-refund before calling this (Square
+// itself would also reject it, but the caller's own running total is the
+// only reliable way to prevent a race across two concurrent requests).
+export async function createSquareRefund(params: {
+  tenantId: string
+  paymentId: string
+  amountCents: number
+  currency: string
+  reason?: string
+  idempotencyKey?: string
+}): Promise<{ refundId: string; status: string }> {
+  const supabase = getServiceClient()
+
+  const { data: connection, error } = await supabase
+    .from('square_connections')
+    .select('id, access_token, refresh_token, token_expires_at')
+    .eq('tenant_id', params.tenantId)
+    .single()
+
+  if (error || !connection) {
+    throw new Error(`No Square connection found for tenant ${params.tenantId}`)
+  }
+
+  const accessToken = await maybeRefreshToken(connection)
+
+  const res = await fetch(`${squareBaseUrl()}/v2/refunds`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      'Square-Version': '2024-01-18',
+    },
+    body: JSON.stringify({
+      idempotency_key: params.idempotencyKey ?? randomUUID(),
+      amount_money: { amount: params.amountCents, currency: params.currency },
+      payment_id: params.paymentId,
+      ...(params.reason !== undefined && { reason: params.reason }),
+    }),
+  })
+
+  const data = (await res.json()) as {
+    refund?: { id: string; status: string }
+    errors?: Array<{ detail?: string }>
+  }
+
+  if (!res.ok) {
+    throw new Error(`Square refund failed: ${data.errors?.[0]?.detail ?? res.statusText}`)
+  }
+
+  const refund = data.refund!
+  return { refundId: refund.id, status: refund.status }
 }

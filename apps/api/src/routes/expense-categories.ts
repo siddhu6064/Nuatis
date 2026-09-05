@@ -54,6 +54,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {}
   if (typeof b['name'] === 'string' && b['name'].trim()) updates['name'] = b['name'].trim()
   if (typeof b['is_archived'] === 'boolean') updates['is_archived'] = b['is_archived']
+  if (typeof b['gl_code'] === 'string') updates['gl_code'] = b['gl_code'].trim() || null
+  if (b['gl_code'] === null) updates['gl_code'] = null
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: 'No valid fields to update' })

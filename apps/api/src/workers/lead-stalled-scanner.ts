@@ -6,7 +6,6 @@ import { getPausedTenants } from '../lib/scanner-pause.js'
 
 const QUEUE_NAME = 'lead-stalled-scanner'
 const STALE_DAYS = 7
-const TERMINAL_STATUSES = ['won', 'lost']
 
 export async function scan(): Promise<void> {
   console.info('[lead-stalled-scanner] scanning for stalled leads...')
@@ -20,7 +19,7 @@ export async function scan(): Promise<void> {
     // and who are not archived
     const { data: contacts, error } = await supabase
       .from('contacts')
-      .select('id, tenant_id, full_name, updated_at, last_contacted')
+      .select('id, tenant_id, full_name, updated_at, last_contacted, pipeline_stage')
       .eq('is_archived', false)
       .lt('updated_at', cutoff)
 
@@ -61,24 +60,19 @@ export async function scan(): Promise<void> {
         : new Date(contact.updated_at).getTime()
       const daysStalled = Math.floor((now - lastActivity) / 86400000)
 
-      // Check pipeline entry status — skip terminal (won/lost)
-      const { data: entry } = await supabase
-        .from('pipeline_entries')
-        .select('status, pipeline_stages(name)')
-        .eq('contact_id', contact.id)
+      // Check the contact's current stage — skip terminal (won/lost) stages.
+      // contacts.pipeline_stage stores the stage NAME (not an id), matching
+      // the convention used by contacts.ts/pipelines.ts elsewhere.
+      const { data: stage } = await supabase
+        .from('pipeline_stages')
+        .select('name, is_terminal')
         .eq('tenant_id', contact.tenant_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('name', contact.pipeline_stage)
         .maybeSingle()
 
-      if (entry && TERMINAL_STATUSES.includes(entry.status)) continue
+      if (stage?.is_terminal) continue
 
-      const stageName =
-        entry?.pipeline_stages &&
-        typeof entry.pipeline_stages === 'object' &&
-        'name' in entry.pipeline_stages
-          ? String((entry.pipeline_stages as { name: string }).name)
-          : 'unknown'
+      const stageName = contact.pipeline_stage ?? stage?.name ?? 'unknown'
 
       void publishActivityEvent({
         tenant_id: contact.tenant_id,

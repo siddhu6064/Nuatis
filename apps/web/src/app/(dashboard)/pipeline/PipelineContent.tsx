@@ -541,9 +541,14 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-ink">Pipeline</h1>
+          <h1 className="text-xl font-bold text-ink">Lead Stages</h1>
           <p className="text-sm text-ink3 mt-0.5">
-            {activePipeline?.name ?? 'Contacts'} · {totalContacts} contact
+            Where each contact sits in {activePipeline?.name ?? 'your pipeline'} — for deal dollar
+            value, see{' '}
+            <Link href="/deals" className="underline hover:text-ink2">
+              Deals
+            </Link>
+            . {totalContacts} contact
             {totalContacts !== 1 ? 's' : ''}
           </p>
         </div>
@@ -742,6 +747,7 @@ export default function PipelineContent({ vertical = 'sales_crm' }: { vertical?:
                                           className="group bg-white rounded-md border border-border-brand p-3 transition-all duration-100 hover:shadow-sm cursor-default"
                                           style={{
                                             ...dragProvided.draggableProps.style,
+                                            borderLeft: `3px solid ${colColor}`,
                                             opacity: dragSnapshot.isDragging ? 0.7 : 1,
                                             boxShadow: dragSnapshot.isDragging
                                               ? '0 10px 25px -3px rgb(0 0 0 / 0.15)'

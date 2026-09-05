@@ -22,6 +22,8 @@ interface BookingSettings {
   confirmationMessage: string
   googleReviewUrl: string
   accentColor: string
+  noShowFeeCents: number | null
+  cancellationFeeNoticeHours: number | null
   availableServices: AvailableService[]
 }
 
@@ -34,6 +36,8 @@ const DEFAULT_SETTINGS: BookingSettings = {
   confirmationMessage: '',
   googleReviewUrl: '',
   accentColor: '#0d9488',
+  noShowFeeCents: null,
+  cancellationFeeNoticeHours: null,
   availableServices: [],
 }
 
@@ -262,6 +266,62 @@ export default function BookingSettingsPage() {
             size="small"
             sx={{ width: 128 }}
             slotProps={{ htmlInput: { min: 1, max: 90, step: 1 } }}
+          />
+        </div>
+      </div>
+
+      {/* Cancellation & No-Show Fee */}
+      <div className="bg-white rounded-xl border border-border-brand p-6 space-y-5">
+        <div>
+          <p className="text-sm font-semibold text-ink">Cancellation &amp; No-Show Fee</p>
+          <p className="text-xs text-ink4 mt-0.5">
+            When set, a client who no-shows (or cancels within the notice window below) gets a
+            payment link for this fee.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">Fee amount ($)</label>
+          <p className="text-xs text-ink4 mb-2">Leave blank to disable the fee entirely.</p>
+          <TextField
+            type="number"
+            value={settings.noShowFeeCents != null ? settings.noShowFeeCents / 100 : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              setSettings((s) => ({
+                ...s,
+                noShowFeeCents: v === '' ? null : Math.max(0, Math.round(Number(v) * 100)),
+              }))
+            }}
+            placeholder="0.00"
+            size="small"
+            sx={{ width: 144 }}
+            slotProps={{ htmlInput: { min: 0, step: '0.01' } }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">
+            Late-cancellation notice window (hours)
+          </label>
+          <p className="text-xs text-ink4 mb-2">
+            A cancellation inside this many hours of the appointment is charged the same fee. Leave
+            blank to only charge for actual no-shows.
+          </p>
+          <TextField
+            type="number"
+            value={settings.cancellationFeeNoticeHours ?? ''}
+            onChange={(e) => {
+              const v = e.target.value
+              setSettings((s) => ({
+                ...s,
+                cancellationFeeNoticeHours: v === '' ? null : Math.max(0, parseInt(v) || 0),
+              }))
+            }}
+            placeholder="24"
+            size="small"
+            sx={{ width: 144 }}
+            slotProps={{ htmlInput: { min: 0, step: 1 } }}
           />
         </div>
       </div>

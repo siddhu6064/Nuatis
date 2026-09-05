@@ -17,6 +17,8 @@ interface ExpenseRecord {
   recurring_expense_id: string | null
   created_at: string
   expense_categories: { name: string } | null
+  approval_status: 'pending' | 'approved' | 'rejected' | null
+  approval_note: string | null
 }
 
 interface Props {
@@ -66,6 +68,16 @@ export default async function ExpenseDetailPage({ params }: Props) {
                 Recurring
               </span>
             )}
+            {expense.approval_status === 'pending' && (
+              <span className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                Pending Approval
+              </span>
+            )}
+            {expense.approval_status === 'rejected' && (
+              <span className="text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                Rejected
+              </span>
+            )}
           </div>
           <p className="text-sm text-ink3 mt-1">
             {expense.expense_categories?.name ?? 'Uncategorized'}
@@ -93,6 +105,12 @@ export default async function ExpenseDetailPage({ params }: Props) {
             <span className="text-ink text-right">{expense.notes}</span>
           </div>
         )}
+        {expense.approval_status === 'rejected' && expense.approval_note && (
+          <div className="flex justify-between text-sm gap-6">
+            <span className="text-ink3 shrink-0">Rejection reason</span>
+            <span className="text-red-700 text-right">{expense.approval_note}</span>
+          </div>
+        )}
       </div>
 
       {expense.receipt_storage_path && (
@@ -113,7 +131,11 @@ export default async function ExpenseDetailPage({ params }: Props) {
         </div>
       )}
 
-      <ExpenseDetailActions expenseId={expense.id} hasReceipt={!!expense.receipt_storage_path} />
+      <ExpenseDetailActions
+        expenseId={expense.id}
+        hasReceipt={!!expense.receipt_storage_path}
+        approvalStatus={expense.approval_status}
+      />
     </div>
   )
 }

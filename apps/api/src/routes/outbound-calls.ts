@@ -23,7 +23,7 @@ router.post(
   '/',
   smsSendLimiter,
   requireAuth,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'manager'),
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const { contact_id, call_context } = req.body as {

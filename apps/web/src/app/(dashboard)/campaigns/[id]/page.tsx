@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 interface CampaignMessage {
   id: string
   channel: string
+  variant?: 'a' | 'b'
   subject: string | null
   body: string
   approved: boolean
@@ -239,6 +240,11 @@ interface ChannelEditorProps {
   regenerating: boolean
   onApprove: () => void
   onRegenerate: () => void
+  hasVariantB: boolean
+  activeVariant: 'a' | 'b'
+  onSelectVariant: (v: 'a' | 'b') => void
+  onGenerateVariantB: () => void
+  generatingVariantB: boolean
 }
 
 function ChannelEditor({
@@ -255,6 +261,11 @@ function ChannelEditor({
   regenerating,
   onApprove,
   onRegenerate,
+  hasVariantB,
+  activeVariant,
+  onSelectVariant,
+  onGenerateVariantB,
+  generatingVariantB,
 }: ChannelEditorProps) {
   const bodyLimit = channel === 'sms' ? 160 : channel === 'social' ? 100 : 0
   const subjectLimit = 50
@@ -272,6 +283,42 @@ function ChannelEditor({
 
   return (
     <div className="space-y-4">
+      {/* A/B variant switcher */}
+      {(hasVariantB || (msg && !isApproved)) && (
+        <div className="flex items-center justify-between">
+          {hasVariantB ? (
+            <div className="inline-flex rounded-lg border border-border-brand overflow-hidden">
+              {(['a', 'b'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => onSelectVariant(v)}
+                  className={`px-3 py-1 text-xs font-medium ${
+                    activeVariant === v ? 'bg-teal-600 text-white' : 'bg-white text-ink3'
+                  }`}
+                >
+                  Variant {v.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          {!hasVariantB && (
+            <Button
+              onClick={onGenerateVariantB}
+              disabled={generatingVariantB}
+              size="small"
+              color="inherit"
+              startIcon={generatingVariantB ? <Spinner small /> : undefined}
+              sx={{ fontSize: 12 }}
+            >
+              + Test a B variant
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Subject (email only) */}
       {channel === 'email' && (
         <div>
@@ -401,30 +448,39 @@ interface CopyEditorProps {
 
 function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProps) {
   const [activeChannel, setActiveChannel] = useState(channels[0] ?? 'sms')
+  const [activeVariant, setActiveVariant] = useState<Record<string, 'a' | 'b'>>({})
   const [localEdits, setLocalEdits] = useState<Record<string, { body: string; subject: string }>>(
     {}
   )
-  const [savingChannel, setSavingChannel] = useState<string | null>(null)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   const [approving, setApproving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [generatingVariantB, setGeneratingVariantB] = useState<string | null>(null)
   const [actionErr, setActionErr] = useState<string | null>(null)
+
+  function key(channel: string, variant: 'a' | 'b'): string {
+    return `${channel}:${variant}`
+  }
+  function msgFor(channel: string, variant: 'a' | 'b'): CampaignMessage | undefined {
+    return messages.find((m) => m.channel === channel && (m.variant ?? 'a') === variant)
+  }
 
   // Sync local edits when messages change
   useEffect(() => {
     const edits: Record<string, { body: string; subject: string }> = {}
     for (const msg of messages) {
-      edits[msg.channel] = { body: msg.body, subject: msg.subject ?? '' }
+      edits[key(msg.channel, msg.variant ?? 'a')] = { body: msg.body, subject: msg.subject ?? '' }
     }
     setLocalEdits(edits)
   }, [messages])
 
-  async function saveEdit(channel: string) {
-    const msg = messages.find((m) => m.channel === channel)
-    const edit = localEdits[channel]
+  async function saveEdit(channel: string, variant: 'a' | 'b') {
+    const msg = msgFor(channel, variant)
+    const edit = localEdits[key(channel, variant)]
     if (!msg || !edit) return
     if (edit.body === msg.body && edit.subject === (msg.subject ?? '')) return
-    setSavingChannel(channel)
+    setSavingKey(key(channel, variant))
     try {
       await fetch(`/api/campaigns/${campaignId}/messages/${msg.id}`, {
         method: 'PATCH',
@@ -438,7 +494,7 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
     } catch {
       // silently fail on blur-save; user will see stale indicator
     } finally {
-      setSavingChannel(null)
+      setSavingKey(null)
     }
   }
 
@@ -483,7 +539,33 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
     }
   }
 
-  const allApproved = channels.every((ch) => messages.find((m) => m.channel === ch)?.approved)
+  async function handleGenerateVariantB(channel: string) {
+    setGeneratingVariantB(channel)
+    setActionErr(null)
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variant: 'b' }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setActionErr((d as { error?: string }).error ?? 'Failed to generate variant B')
+        return
+      }
+      setActiveVariant((prev) => ({ ...prev, [channel]: 'b' }))
+      await onReload()
+    } catch {
+      setActionErr('Failed to generate variant B — please try again')
+    } finally {
+      setGeneratingVariantB(null)
+    }
+  }
+
+  const allApproved =
+    messages.length > 0 &&
+    messages.every((m) => m.approved) &&
+    channels.every((ch) => messages.some((m) => m.channel === ch))
 
   return (
     <div className="bg-white rounded-xl border border-border-brand overflow-hidden">
@@ -494,8 +576,8 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
         sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
       >
         {channels.map((ch) => {
-          const msg = messages.find((m) => m.channel === ch)
-          const approved = msg?.approved ?? false
+          const chMessages = messages.filter((m) => m.channel === ch)
+          const approved = chMessages.length > 0 && chMessages.every((m) => m.approved)
           return (
             <Tab
               key={ch}
@@ -519,29 +601,44 @@ function CopyEditor({ campaignId, channels, messages, onReload }: CopyEditorProp
           </div>
         )}
 
-        {channels.map((ch) => (
-          <div key={ch} className={activeChannel === ch ? '' : 'hidden'}>
-            <ChannelEditor
-              channel={ch}
-              msg={messages.find((m) => m.channel === ch)}
-              localBody={localEdits[ch]?.body ?? ''}
-              localSubject={localEdits[ch]?.subject ?? ''}
-              onBodyChange={(v) =>
-                setLocalEdits((prev) => ({ ...prev, [ch]: { ...prev[ch]!, body: v } }))
-              }
-              onSubjectChange={(v) =>
-                setLocalEdits((prev) => ({ ...prev, [ch]: { ...prev[ch]!, subject: v } }))
-              }
-              onBlurBody={() => saveEdit(ch)}
-              onBlurSubject={() => saveEdit(ch)}
-              saving={savingChannel === ch}
-              approving={approving}
-              regenerating={regenerating}
-              onApprove={handleApprove}
-              onRegenerate={() => setConfirmRegen(true)}
-            />
-          </div>
-        ))}
+        {channels.map((ch) => {
+          const variant = activeVariant[ch] ?? 'a'
+          const hasVariantB = !!msgFor(ch, 'b')
+          return (
+            <div key={ch} className={activeChannel === ch ? '' : 'hidden'}>
+              <ChannelEditor
+                channel={ch}
+                msg={msgFor(ch, variant)}
+                localBody={localEdits[key(ch, variant)]?.body ?? ''}
+                localSubject={localEdits[key(ch, variant)]?.subject ?? ''}
+                onBodyChange={(v) =>
+                  setLocalEdits((prev) => ({
+                    ...prev,
+                    [key(ch, variant)]: { ...prev[key(ch, variant)]!, body: v },
+                  }))
+                }
+                onSubjectChange={(v) =>
+                  setLocalEdits((prev) => ({
+                    ...prev,
+                    [key(ch, variant)]: { ...prev[key(ch, variant)]!, subject: v },
+                  }))
+                }
+                onBlurBody={() => saveEdit(ch, variant)}
+                onBlurSubject={() => saveEdit(ch, variant)}
+                saving={savingKey === key(ch, variant)}
+                approving={approving}
+                regenerating={regenerating}
+                onApprove={handleApprove}
+                onRegenerate={() => setConfirmRegen(true)}
+                hasVariantB={hasVariantB}
+                activeVariant={variant}
+                onSelectVariant={(v) => setActiveVariant((prev) => ({ ...prev, [ch]: v }))}
+                onGenerateVariantB={() => void handleGenerateVariantB(ch)}
+                generatingVariantB={generatingVariantB === ch}
+              />
+            </div>
+          )
+        })}
       </div>
 
       {/* Approve all */}

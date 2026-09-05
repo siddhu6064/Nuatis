@@ -78,7 +78,7 @@ describe('Webchat routes', () => {
     store.tables['tenants'] = [
       {
         id: 'tenant-1',
-        business_name: 'Test Biz',
+        name: 'Test Biz',
         webchat_enabled: true,
         webchat_greeting: 'Hi there!',
         webchat_color: '#0d9488',
@@ -109,7 +109,7 @@ describe('Webchat routes', () => {
       } as Row,
     ]
     store.tables['webchat_messages'] = []
-    store.tables['tenants'] = [{ id: 'tenant-1', business_name: 'Test Biz' } as Row]
+    store.tables['tenants'] = [{ id: 'tenant-1', name: 'Test Biz' } as Row]
 
     const res = await request(makeApp())
       .post('/api/webchat/session/tok-1/message')
@@ -171,5 +171,147 @@ describe('Webchat routes', () => {
     expect(res.status).toBe(200)
     expect(typeof res.body.webchat_enabled).toBe('boolean')
     expect(typeof res.body.webchat_greeting).toBe('string')
+  })
+
+  // Test 6: handoff flips mode to human
+  it('POST /api/webchat/session/:token/handoff — flips mode to human', async () => {
+    store.tables['tenants'] = [{ id: 'tenant-1', name: 'Test Biz' } as Row]
+    store.tables['webchat_sessions'] = [
+      {
+        id: 'sess-1',
+        session_token: 'tok-h1',
+        tenant_id: 'tenant-1',
+        status: 'active',
+        mode: 'ai',
+      } as Row,
+    ]
+
+    const res = await request(makeApp())
+      .post('/api/webchat/session/tok-h1/handoff')
+      .send({ reason: 'Wants pricing help' })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, mode: 'human' })
+    const row = (store.tables['webchat_sessions'] as Row[]).find((r) => r['id'] === 'sess-1')
+    expect(row?.['mode']).toBe('human')
+    expect(row?.['handoff_requested_at']).toBeTruthy()
+    expect(row?.['handoff_reason']).toBe('Wants pricing help')
+  })
+
+  // Test 7: handoff is idempotent
+  it('POST /api/webchat/session/:token/handoff — is idempotent when already human', async () => {
+    store.tables['tenants'] = [{ id: 'tenant-1', name: 'Test Biz' } as Row]
+    store.tables['webchat_sessions'] = [
+      {
+        id: 'sess-1',
+        session_token: 'tok-h2',
+        tenant_id: 'tenant-1',
+        status: 'active',
+        mode: 'human',
+        handoff_requested_at: '2026-01-01T00:00:00.000Z',
+      } as Row,
+    ]
+
+    const res = await request(makeApp()).post('/api/webchat/session/tok-h2/handoff').send({})
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, mode: 'human' })
+    const row = (store.tables['webchat_sessions'] as Row[]).find((r) => r['id'] === 'sess-1')
+    // untouched — no re-write on the already-human path
+    expect(row?.['handoff_requested_at']).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  // Test 8: AI is skipped once in human mode — this is the core regression guard
+  it('POST /api/webchat/session/:token/message — skips Gemini once mode is human', async () => {
+    store.tables['tenants'] = [{ id: 'tenant-1', name: 'Test Biz' } as Row]
+    store.tables['webchat_sessions'] = [
+      {
+        id: 'sess-1',
+        session_token: 'tok-m1',
+        tenant_id: 'tenant-1',
+        status: 'active',
+        mode: 'human',
+      } as Row,
+    ]
+    store.tables['webchat_messages'] = []
+
+    const { GoogleGenAI } = await import('@google/genai')
+    const genAiCtor = GoogleGenAI as unknown as jest.Mock
+    genAiCtor.mockClear()
+
+    const res = await request(makeApp())
+      .post('/api/webchat/session/tok-m1/message')
+      .send({ content: 'Is anyone there?', role: 'user' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.message.content).toBe('Is anyone there?')
+    expect(res.body.reply).toBeUndefined()
+    expect(res.body.mode).toBe('human')
+    expect(genAiCtor).not.toHaveBeenCalled()
+    expect(store.tables['webchat_messages']).toHaveLength(1)
+  })
+
+  // Test 9: cursor poll only returns messages after the given timestamp
+  it('GET /api/webchat/session/:token/messages?after= — filters by cursor', async () => {
+    store.tables['webchat_sessions'] = [
+      {
+        id: 'sess-1',
+        session_token: 'tok-p1',
+        tenant_id: 'tenant-1',
+        status: 'active',
+        mode: 'ai',
+      } as Row,
+    ]
+    store.tables['webchat_messages'] = [
+      {
+        id: 'msg-1',
+        session_id: 'sess-1',
+        role: 'user',
+        content: 'early',
+        created_at: '2026-01-01T00:00:00.000Z',
+      } as Row,
+      {
+        id: 'msg-2',
+        session_id: 'sess-1',
+        role: 'agent',
+        content: 'later',
+        created_at: '2026-01-01T00:05:00.000Z',
+      } as Row,
+    ]
+
+    const res = await request(makeApp())
+      .get('/api/webchat/session/tok-p1/messages')
+      .query({ after: '2026-01-01T00:01:00.000Z' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.mode).toBe('ai')
+    expect(res.body.messages).toHaveLength(1)
+    expect(res.body.messages[0].content).toBe('later')
+  })
+
+  // Test 10: GET /sessions status filter actually applies (was previously a no-op)
+  it('GET /api/webchat/sessions?status=active — filters out closed sessions', async () => {
+    store.tables['webchat_sessions'] = [
+      {
+        id: 'sess-1',
+        session_token: 'a',
+        tenant_id: 'tenant-1',
+        status: 'active',
+        mode: 'ai',
+      } as Row,
+      {
+        id: 'sess-2',
+        session_token: 'b',
+        tenant_id: 'tenant-1',
+        status: 'closed',
+        mode: 'ai',
+      } as Row,
+    ]
+
+    const res = await request(makeApp()).get('/api/webchat/sessions').query({ status: 'active' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.sessions).toHaveLength(1)
+    expect(res.body.sessions[0].id).toBe('sess-1')
   })
 })

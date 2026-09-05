@@ -15,6 +15,13 @@ interface Company {
   created_at: string
 }
 
+interface DuplicatePair {
+  company_a: { id: string; name: string }
+  company_b: { id: string; name: string }
+  confidence: number
+  match_reason: string
+}
+
 export default function CompaniesList() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
@@ -25,6 +32,10 @@ export default function CompaniesList() {
   const [newDomain, setNewDomain] = useState('')
   const [newIndustry, setNewIndustry] = useState('')
   const [saving, setSaving] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [duplicates, setDuplicates] = useState<DuplicatePair[] | null>(null)
+  const [merging, setMerging] = useState<string | null>(null)
 
   const fetchCompanies = useCallback(async () => {
     const params = new URLSearchParams()
@@ -71,6 +82,50 @@ export default function CompaniesList() {
     setCompanies((prev) => prev.filter((c) => c.id !== id))
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function archiveSelected() {
+    if (selectedIds.size === 0) return
+    await fetch('/api/companies/bulk/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    })
+    setCompanies((prev) => prev.filter((c) => !selectedIds.has(c.id)))
+    setSelectedIds(new Set())
+  }
+
+  async function loadDuplicates() {
+    setShowDuplicates(true)
+    const res = await fetch('/api/companies/duplicates')
+    if (res.ok) {
+      const data = (await res.json()) as { pairs: DuplicatePair[] }
+      setDuplicates(data.pairs)
+    }
+  }
+
+  async function mergePair(pair: DuplicatePair) {
+    setMerging(pair.company_b.id)
+    try {
+      await fetch('/api/companies/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ primary_id: pair.company_a.id, secondary_id: pair.company_b.id }),
+      })
+      setDuplicates((prev) => prev?.filter((p) => p !== pair) ?? null)
+      void fetchCompanies()
+    } finally {
+      setMerging(null)
+    }
+  }
+
   return (
     <div className="px-8 py-8">
       <div className="flex items-center justify-between mb-4">
@@ -78,14 +133,23 @@ export default function CompaniesList() {
           <h1 className="text-xl font-bold text-ink">Companies</h1>
           <p className="text-sm text-ink3 mt-0.5">{companies.length} companies</p>
         </div>
-        <Button
-          onClick={() => setShowCreate(true)}
-          variant="contained"
-          sx={{ textTransform: 'none' }}
-        >
-          <span className="text-base leading-none mr-1.5">+</span>
-          New Company
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => void loadDuplicates()}
+            color="inherit"
+            sx={{ textTransform: 'none' }}
+          >
+            Find duplicates
+          </Button>
+          <Button
+            onClick={() => setShowCreate(true)}
+            variant="contained"
+            sx={{ textTransform: 'none' }}
+          >
+            <span className="text-base leading-none mr-1.5">+</span>
+            New Company
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -96,6 +160,57 @@ export default function CompaniesList() {
           fullWidth
         />
       </div>
+
+      {showDuplicates && (
+        <div className="bg-white rounded-xl border border-border-brand p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-ink">Possible duplicates</h2>
+            <button
+              type="button"
+              onClick={() => setShowDuplicates(false)}
+              className="text-xs text-ink4 hover:text-ink"
+            >
+              Close
+            </button>
+          </div>
+          {duplicates === null ? (
+            <p className="text-sm text-ink4">Scanning…</p>
+          ) : duplicates.length === 0 ? (
+            <p className="text-sm text-ink4">No likely duplicates found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {duplicates.map((pair) => (
+                <li
+                  key={`${pair.company_a.id}:${pair.company_b.id}`}
+                  className="flex items-center justify-between border border-border-brand rounded-lg px-3 py-2"
+                >
+                  <span className="text-sm text-ink">
+                    {pair.company_a.name} <span className="text-ink4">↔</span> {pair.company_b.name}{' '}
+                    <span className="text-xs text-ink4">(matched on {pair.match_reason})</span>
+                  </span>
+                  <Button
+                    onClick={() => void mergePair(pair)}
+                    disabled={merging === pair.company_b.id}
+                    size="small"
+                    variant="outlined"
+                  >
+                    {merging === pair.company_b.id ? 'Merging…' : 'Merge into first'}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between bg-teal-50 border border-teal-100 rounded-lg px-4 py-2 mb-4">
+          <span className="text-sm text-teal-800">{selectedIds.size} selected</span>
+          <Button onClick={() => void archiveSelected()} size="small" color="error">
+            Archive selected
+          </Button>
+        </div>
+      )}
 
       {showCreate && (
         <div className="bg-white rounded-xl border border-border-brand p-4 mb-4">
@@ -154,6 +269,18 @@ export default function CompaniesList() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border-brand">
+                <th className="px-6 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all companies"
+                    checked={selectedIds.size > 0 && selectedIds.size === companies.length}
+                    onChange={(e) =>
+                      setSelectedIds(
+                        e.target.checked ? new Set(companies.map((c) => c.id)) : new Set()
+                      )
+                    }
+                  />
+                </th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Name</th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Domain</th>
                 <th className="text-left text-xs font-medium text-ink4 px-6 py-3">Industry</th>
@@ -169,6 +296,14 @@ export default function CompaniesList() {
                   className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/companies/${co.id}`)}
                 >
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${co.name}`}
+                      checked={selectedIds.has(co.id)}
+                      onChange={() => toggleSelected(co.id)}
+                    />
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-ink">{co.name}</td>
                   <td className="px-6 py-4 text-sm text-ink3">{co.domain ?? '\u2014'}</td>
                   <td className="px-6 py-4 text-sm text-ink3">{co.industry ?? '\u2014'}</td>
