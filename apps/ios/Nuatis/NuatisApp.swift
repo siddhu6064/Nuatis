@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct NuatisApp: App {
+    init() {
+        NuatisFontRegistrar.registerIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

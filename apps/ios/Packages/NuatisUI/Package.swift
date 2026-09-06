@@ -14,7 +14,10 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "NuatisUI"
+            name: "NuatisUI",
+            resources: [
+                .process("Resources/Fonts")
+            ]
         ),
         .testTarget(
             name: "NuatisUITests",
