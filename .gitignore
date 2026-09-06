@@ -60,3 +60,9 @@ MIGRATIONS_TO_APPLY.md
 audit-report.json
 secrets-report.json
 scratchpad/
+
+# Xcode
+apps/ios/**/xcuserdata/
+apps/ios/**/*.xcuserstate
+apps/ios/**/DerivedData/
+apps/ios/.swiftpm/
