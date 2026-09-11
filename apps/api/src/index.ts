@@ -56,6 +56,7 @@ import ordersSettingsRouter from './routes/orders-settings.js'
 import posMenuRouter from './routes/pos/menu.js'
 import posTicketsRouter from './routes/pos/tickets.js'
 import posDrawerRouter from './routes/pos/drawer.js'
+import posTerminalAuthRouter from './routes/pos/terminal-auth.js'
 import expensesRouter from './routes/expenses.js'
 import expenseCategoriesRouter from './routes/expense-categories.js'
 import recurringExpensesRouter from './routes/recurring-expenses.js'
@@ -242,6 +243,9 @@ app.use('/api', impersonationAuditMiddleware)
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
 app.use('/api/auth/mobile', authLimiter, mobileAuthRouter)
+// A 4-digit PIN is 10,000 combinations — this login needs authLimiter more
+// than the password routes do, not less.
+app.use('/api/pos/terminal', authLimiter, posTerminalAuthRouter)
 app.use('/api/auth/sso', authLimiter, ssoAuthRouter)
 app.use('/api/sso', ssoAdminRouter)
 app.use('/api/impersonate', authLimiter, impersonateAuthRouter)
