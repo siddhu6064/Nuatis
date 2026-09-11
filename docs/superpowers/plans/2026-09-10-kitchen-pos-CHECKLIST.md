@@ -40,8 +40,10 @@ Two pre-existing flaky tests (timing assertions in `security-hardening-misc`
 and `voice/tenant-helpers`) failed once under parallel load and passed on
 re-run and in isolation. Not caused by this work; tracked separately.
 
-**The one thing not done:** migrations 0195–0198 have never been executed
-against any database. See the pre-demo section below.
+**Migrations 0195–0198 applied to production 2026-09-11** and verified live:
+9 tables, RLS on all 9, 9 `current_tenant_id()` policies, both unique indexes
+present, and `orders_source_check` now reading `['staff','maya','pos']` — L1
+closed against the real database rather than by reading files.
 
 ---
 
@@ -268,8 +270,8 @@ Each of these makes a task look finished while being broken. Verify explicitly, 
 - [x] `npm run typecheck --workspace=apps/api` — clean
 - [x] `npx tsc --noEmit -p packages/pos-core` — clean
 - [x] `npm run lint` — clean at `--max-warnings 0`
-- [ ] Migrations 0195–0198 apply **in order** against a fresh scratch DB ⚠️ NOT VERIFIED — no scratch database available this session
-- [ ] RLS enabled on all 9 new tables (verified by source inspection — 9 policies, all current_tenant_id(); not verified against a live DB):
+- [x] Migrations 0195–0198 applied **in order** to the live database 2026-09-11 — each verified before the next
+- [x] RLS enabled on all 9 new tables — **verified live**: 9/9 tables, 9/9 rowsecurity=true, 9 policies, 9 using current_tenant_id(), 0 using app_metadata:
   ```sql
   SELECT tablename, rowsecurity FROM pg_tables
   WHERE tablename IN ('menu_categories','menu_items','modifier_groups',
@@ -286,7 +288,7 @@ Each of these makes a task look finished while being broken. Verify explicitly, 
 
 Not part of the plan's tasks, but required before anything is demonstrable — do not discover these on the day:
 
-- [ ] Migrations 0195–0198 applied to the **live** database ⚠️ NOT DONE — written but never executed anywhere (no Docker, no local psql, only a production project). Deferred by decision. (this project's migrations are applied deliberately, not automatically — several have sat pending in the past)
+- [x] Migrations 0195–0198 applied to the **live** database 2026-09-11 (the only Supabase project, `zhykavqqvvvpfpgtipzp`). Pre-flight confirmed zero table/column collisions and all FK targets present; each migration verified before the next; Supabase security advisors introduced no new findings.
 - [ ] `pos` module enabled on the demo tenant, or the tenant put on a plan that grants it
 - [ ] Demo tenant has at least one `location` row — every POS route requires `location_id`
 - [ ] A restaurant menu seeded for the demo tenant, with `kitchen_station` set on items so KDS routing is visible
