@@ -79,6 +79,12 @@ const MODULE_DISPLAY: ModuleDisplay[] = [
     minPlan: 'pro',
   },
   {
+    key: 'pos',
+    label: 'Point of Sale',
+    description: 'Register, kitchen display, and cash drawer for in-person sales.',
+    minPlan: 'scale',
+  },
+  {
     key: 'expenses',
     label: 'Expenses',
     description: 'Expense logging, category breakdown, recurring expenses, and P&L reporting.',

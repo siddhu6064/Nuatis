@@ -62,6 +62,7 @@ export const PLANS = {
       'campaigns',
       'cpq',
       'orders',
+      'pos',
       'expenses',
       'staff-portal',
       'sso',
@@ -136,6 +137,7 @@ export const TIER_GATED = new Set([
   'campaigns',
   'cpq',
   'orders',
+  'pos',
   'expenses',
   'staff-portal',
   'sso',
@@ -151,6 +153,12 @@ export function defaultEntitlement(
   product: string | null
 ): boolean {
   if (product === 'maya_only') return module === 'maya' // maya_only = maya only
+  // pos_only = the register plus the customer record it depends on (receipts,
+  // gift cards, loyalty). Deliberately excludes maya/scheduling/pipeline so a
+  // POS-only merchant is neither billed for nor shown the rest of the suite.
+  // Must precede the BASE_SUITE check — crm/scheduling are both base-suite, so
+  // a later branch would grant scheduling to a POS-only tenant.
+  if (product === 'pos_only') return module === 'pos' || module === 'crm'
   if (BASE_SUITE.has(module)) return true // suite base features
   if (TIER_GATED.has(module)) {
     const p = plan && PLANS[plan as PlanKey]
