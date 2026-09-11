@@ -6,8 +6,14 @@ Each migration is a numbered SQL file:
 
 - `0001_initial_schema.sql` — run once on a fresh database
 - `0002_add_feature.sql` — each new change gets the next number
-- Never edit a migration that has already been run in production
-- New changes always go in a new numbered file
+- Never edit a migration that has already been run in production **in any way
+  that changes the resulting schema** — new changes always go in a new numbered
+  file
+- The one permitted exception: making an already-run migration **re-runnable**
+  (`IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`). This
+  changes no schema, and it turns an accidental second paste into a no-op
+  instead of a confusing `42P07 already exists` error. Verify by re-running it
+  and confirming the state is unchanged. Applied to 0195–0197 on 2026-09-11.
 
 ## How to run a new migration
 
