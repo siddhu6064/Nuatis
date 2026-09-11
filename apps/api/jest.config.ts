@@ -8,10 +8,15 @@ const config: Config = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@nuatis/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     '^@nuatis/pos-core$': '<rootDir>/../../packages/pos-core/src/index.ts',
+    '^@nuatis/pos-web$': '<rootDir>/../../packages/pos-web/src/index.ts',
   },
-  // pos-core's tests live outside rootDir (apps/api), so the default testMatch
-  // would never discover them and the package would appear to have no tests.
-  roots: ['<rootDir>/src', '<rootDir>/../../packages/pos-core/src'],
+  // These packages' tests live outside rootDir (apps/api), so the default
+  // testMatch would never discover them and they would appear to have no tests.
+  roots: [
+    '<rootDir>/src',
+    '<rootDir>/../../packages/pos-core/src',
+    '<rootDir>/../../packages/pos-web/src',
+  ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
   },
