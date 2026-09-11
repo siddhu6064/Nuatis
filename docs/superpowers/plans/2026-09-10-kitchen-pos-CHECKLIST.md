@@ -14,14 +14,14 @@ The plan holds the code. This holds the **gates** — what must be true before a
 | ---------------------- | ------- | ------ |
 | Pre-flight             | —       | ☑ done |
 | A — Entitlement + menu | 1, 2, 3 | ☑ done |
-| B — Shared math        | 4       | ☐      |
+| B — Shared math        | 4       | ☑ done |
 | C — Kitchen            | 5, 6, 7 | ☐      |
 | D — Cash               | 8, 9    | ☐      |
 | E — Terminal auth      | 10      | ☐      |
 | Landmine guards        | L1–L6   | ☐      |
 | Final verification     | —       | ☐      |
 
-**Expected on completion:** 4 migrations (0195–0198), 4 route files, 1 new package, 1 new lib, **85 new tests** on top of the 1635 baseline.
+**Expected on completion:** 4 migrations (0195–0198), 4 route files, 1 new package, 1 new lib, **~120 new tests** on top of the 1635 baseline (running count; expanded by bugs found in-flight).
 
 ---
 
@@ -102,13 +102,13 @@ Before Task 1 touches anything:
 
 ### Task 4 — `@nuatis/pos-core`
 
-- [ ] `packages/pos-core` scaffolded with `package.json` + `tsconfig.json`
-- [ ] **Jest wiring done** — `moduleNameMapper` entry AND `roots` entry in `apps/api/jest.config.ts`. Without the `roots` entry the tests silently never run and the task looks finished
-- [ ] 25 tests pass — money 9, cart 8, tender 8
-- [ ] `0.1 + 0.2` float test passes
-- [ ] Tax rounds **once on the summed base**, not per line
-- [ ] Tip is excluded from the tax base
-- [ ] `npx tsc --noEmit -p packages/pos-core` clean
+- [x] `packages/pos-core` scaffolded with `package.json` + `tsconfig.json`
+- [x] **Jest wiring done** — `moduleNameMapper` entry AND `roots` entry in `apps/api/jest.config.ts`. Without the `roots` entry the tests silently never run and the task looks finished
+- [x] 41 tests pass — money 17, cart 13, tender 11 (expanded past the planned 25: negative rounding, float-epsilon cent loss, 5-leg split, integer guards)
+- [x] `0.1 + 0.2` float test passes
+- [x] Tax rounds **once on the summed base**, not per line
+- [x] Tip is excluded from the tax base
+- [x] `npx tsc --noEmit -p packages/pos-core` clean
 - [ ] Committed
 
 ---
@@ -227,7 +227,7 @@ Each of these makes a task look finished while being broken. Verify explicitly, 
 ## Final verification
 
 - [ ] `npm run test --workspace=apps/api` — full suite green
-- [ ] New test count is **85** above the 1635 baseline (final total 1720). If it's lower, a file isn't being discovered — most likely the `pos-core` `roots` entry
+- [ ] New test count is tracked per phase against the 1635 baseline. If it's lower, a file isn't being discovered — most likely the `pos-core` `roots` entry
 - [ ] `npm run typecheck --workspace=apps/api` — clean
 - [ ] `npx tsc --noEmit -p packages/pos-core` — clean
 - [ ] `npm run lint` — clean at `--max-warnings 0`

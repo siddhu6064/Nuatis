@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
+    "@nuatis/pos-core": "*",
     "@nuatis/shared": "*",
     "@sentry/node": "^10.48.0",
     "@supabase/supabase-js": "^2.99.3",
