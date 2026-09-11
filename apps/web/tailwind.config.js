@@ -1,4 +1,4 @@
-const tokens = require('./src/theme/tokens.js')
+const tokens = require('@nuatis/design-tokens')
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
