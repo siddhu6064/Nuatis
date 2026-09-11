@@ -2,7 +2,7 @@
 -- Kitchen tickets fired from a POS order, routed to a station, displayed and
 -- bumped on the KDS.
 
-CREATE TABLE kitchen_tickets (
+CREATE TABLE IF NOT EXISTS kitchen_tickets (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   -- NOT NULL: a ticket with no location cannot be routed to a kitchen screen
@@ -29,7 +29,7 @@ CREATE TABLE kitchen_tickets (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE kitchen_ticket_items (
+CREATE TABLE IF NOT EXISTS kitchen_ticket_items (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   ticket_id          uuid NOT NULL REFERENCES kitchen_tickets(id) ON DELETE CASCADE,
@@ -46,21 +46,23 @@ CREATE TABLE kitchen_ticket_items (
   created_at         timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_kitchen_tickets_tenant ON kitchen_tickets(tenant_id);
-CREATE INDEX idx_kitchen_tickets_location_status
+CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_tenant ON kitchen_tickets(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_location_status
   ON kitchen_tickets(location_id, status);
-CREATE INDEX idx_kitchen_tickets_order ON kitchen_tickets(order_id);
-CREATE INDEX idx_kitchen_ticket_items_ticket ON kitchen_ticket_items(ticket_id);
-CREATE INDEX idx_kitchen_ticket_items_tenant ON kitchen_ticket_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_order ON kitchen_tickets(order_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_ticket ON kitchen_ticket_items(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_tenant ON kitchen_ticket_items(tenant_id);
 
 -- Ticket numbers restart per location per service day. Enforced here rather
 -- than in application code so two registers firing simultaneously cannot
 -- collide: the read-max-then-insert in the route is racy on its own.
-CREATE UNIQUE INDEX idx_kitchen_tickets_number_per_day
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kitchen_tickets_number_per_day
   ON kitchen_tickets(location_id, service_date, ticket_number);
 
 ALTER TABLE kitchen_tickets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON kitchen_tickets;
 CREATE POLICY tenant_isolation ON kitchen_tickets USING (tenant_id = current_tenant_id());
 
 ALTER TABLE kitchen_ticket_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON kitchen_ticket_items;
 CREATE POLICY tenant_isolation ON kitchen_ticket_items USING (tenant_id = current_tenant_id());

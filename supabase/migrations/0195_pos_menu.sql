@@ -5,7 +5,7 @@
 -- auth.jwt()->'app_metadata' form) and numeric(10,2) dollars (not int cents,
 -- which would clash with orders.balance_due's generated numeric column).
 
-CREATE TABLE menu_categories (
+CREATE TABLE IF NOT EXISTS menu_categories (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name        text NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE menu_categories (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE menu_items (
+CREATE TABLE IF NOT EXISTS menu_items (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id        uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   category_id      uuid NOT NULL REFERENCES menu_categories(id) ON DELETE CASCADE,
@@ -30,7 +30,7 @@ CREATE TABLE menu_items (
   created_at       timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE modifier_groups (
+CREATE TABLE IF NOT EXISTS modifier_groups (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name        text NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE modifier_groups (
   CONSTRAINT modifier_groups_select_range CHECK (min_select <= max_select)
 );
 
-CREATE TABLE modifier_options (
+CREATE TABLE IF NOT EXISTS modifier_options (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   group_id     uuid NOT NULL REFERENCES modifier_groups(id) ON DELETE CASCADE,
@@ -53,7 +53,7 @@ CREATE TABLE modifier_options (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE menu_item_modifier_groups (
+CREATE TABLE IF NOT EXISTS menu_item_modifier_groups (
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   item_id     uuid NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
   group_id    uuid NOT NULL REFERENCES modifier_groups(id) ON DELETE CASCADE,
@@ -61,28 +61,33 @@ CREATE TABLE menu_item_modifier_groups (
   PRIMARY KEY (item_id, group_id)
 );
 
-CREATE INDEX idx_menu_categories_tenant ON menu_categories(tenant_id);
-CREATE INDEX idx_menu_items_tenant ON menu_items(tenant_id);
-CREATE INDEX idx_menu_items_category ON menu_items(category_id);
-CREATE INDEX idx_menu_items_station ON menu_items(tenant_id, kitchen_station);
-CREATE INDEX idx_modifier_groups_tenant ON modifier_groups(tenant_id);
-CREATE INDEX idx_modifier_options_group ON modifier_options(group_id);
-CREATE INDEX idx_mimg_item ON menu_item_modifier_groups(item_id);
-CREATE INDEX idx_mimg_group ON menu_item_modifier_groups(group_id);
+CREATE INDEX IF NOT EXISTS idx_menu_categories_tenant ON menu_categories(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_tenant ON menu_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_station ON menu_items(tenant_id, kitchen_station);
+CREATE INDEX IF NOT EXISTS idx_modifier_groups_tenant ON modifier_groups(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_modifier_options_group ON modifier_options(group_id);
+CREATE INDEX IF NOT EXISTS idx_mimg_item ON menu_item_modifier_groups(item_id);
+CREATE INDEX IF NOT EXISTS idx_mimg_group ON menu_item_modifier_groups(group_id);
 
 ALTER TABLE menu_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON menu_categories;
 CREATE POLICY tenant_isolation ON menu_categories USING (tenant_id = current_tenant_id());
 
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON menu_items;
 CREATE POLICY tenant_isolation ON menu_items USING (tenant_id = current_tenant_id());
 
 ALTER TABLE modifier_groups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON modifier_groups;
 CREATE POLICY tenant_isolation ON modifier_groups USING (tenant_id = current_tenant_id());
 
 ALTER TABLE modifier_options ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON modifier_options;
 CREATE POLICY tenant_isolation ON modifier_options USING (tenant_id = current_tenant_id());
 
 ALTER TABLE menu_item_modifier_groups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON menu_item_modifier_groups;
 CREATE POLICY tenant_isolation ON menu_item_modifier_groups USING (tenant_id = current_tenant_id());
 
 -- ── orders adaptations ──────────────────────────────────────────────────────
