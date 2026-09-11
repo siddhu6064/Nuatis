@@ -147,7 +147,7 @@ export function defaultEntitlement(
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `npm run test --workspace=apps/api -- pos-entitlement`
-Expected: PASS, 9 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 6: Run the existing suite to check nothing regressed**
 
@@ -995,7 +995,7 @@ export default router
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npm run test --workspace=apps/api -- pos/menu`
-Expected: PASS, 8 tests.
+Expected: PASS, 7 tests.
 
 If `menu_item_modifier_groups` assertions fail because the mock store's builder lacks a needed method, extend `__test-support__/supabase-mock.ts` — it is documented as intentionally narrow and extended case-by-case.
 
@@ -1471,7 +1471,7 @@ npm install
 npm run test --workspace=apps/api -- pos-core
 ```
 
-Expected: PASS, 20 tests.
+Expected: PASS, 25 tests (9 money + 8 cart + 8 tender).
 
 - [ ] **Step 11: Typecheck and commit**
 
@@ -3415,7 +3415,7 @@ grep -n "mobile-auth\|mobileAuthRouter" apps/api/src/index.ts
 - [ ] **Step 7: Run the full suite**
 
 Run: `npm run test --workspace=apps/api`
-Expected: PASS. The pre-existing suite (737+ tests) plus roughly 60 new ones.
+Expected: PASS. The pre-existing suite (737+ tests) plus 78 new ones (10 + 7 + 25 + 5 + 9 + 11 + 4 + 7).
 
 - [ ] **Step 8: Typecheck, lint, and commit**
 
