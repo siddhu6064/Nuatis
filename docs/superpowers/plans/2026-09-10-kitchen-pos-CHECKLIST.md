@@ -12,8 +12,8 @@ The plan holds the code. This holds the **gates** — what must be true before a
 
 | Phase                  | Tasks   | Status |
 | ---------------------- | ------- | ------ |
-| Pre-flight             | —       | ☐      |
-| A — Entitlement + menu | 1, 2, 3 | ☐      |
+| Pre-flight             | —       | ☑ done |
+| A — Entitlement + menu | 1, 2, 3 | ☑ done |
 | B — Shared math        | 4       | ☐      |
 | C — Kitchen            | 5, 6, 7 | ☐      |
 | D — Cash               | 8, 9    | ☐      |
@@ -21,7 +21,7 @@ The plan holds the code. This holds the **gates** — what must be true before a
 | Landmine guards        | L1–L6   | ☐      |
 | Final verification     | —       | ☐      |
 
-**Expected on completion:** 4 migrations (0195–0198), 4 route files, 1 new package, 1 new lib, **78 new tests** on top of the existing 737+.
+**Expected on completion:** 4 migrations (0195–0198), 4 route files, 1 new package, 1 new lib, **85 new tests** on top of the 1635 baseline.
 
 ---
 
@@ -60,7 +60,7 @@ Before Task 1 touches anything:
   ```bash
   npm run test --workspace=apps/api
   ```
-- [ ] Record the baseline test count, so "78 new" can actually be verified at the end
+- [ ] Record the baseline test count, so "85 new" can actually be verified at the end
 - [ ] Confirm `0194` is still the migration head; if someone landed `0195` meanwhile, renumber this plan's migrations rather than colliding
   ```bash
   ls supabase/migrations | tail -3
@@ -73,27 +73,27 @@ Before Task 1 touches anything:
 
 ### Task 1 — `pos` module + `pos_only` product
 
-- [ ] `pos-entitlement.test.ts` passes (10 tests)
-- [ ] `settings-modules` and `verticals` suites still pass — both derive from the registry you just changed
-- [ ] `pos_only` grants `pos` and `crm`, denies `maya` and `scheduling`
+- [x] `pos-entitlement.test.ts` passes (10 tests)
+- [x] `settings-modules` and `verticals` suites still pass — both derive from the registry you just changed
+- [x] `pos_only` grants `pos` and `crm`, denies `maya` and `scheduling`
 - [ ] Committed
 
 ### Task 2 — Migration 0195
 
-- [ ] 5 menu tables created, each with RLS enabled and a `current_tenant_id()` policy
-- [ ] **L1 guard** — `orders_source_check` now includes `'pos'` (see Landmines)
-- [ ] `order_line_items.menu_item_id` and `.modifiers` added
-- [ ] `orders.tip_amount` added
+- [x] 5 menu tables created, each with RLS enabled and a `current_tenant_id()` policy
+- [x] **L1 guard** — `orders_source_check` now includes `'pos'` (see Landmines)
+- [x] `order_line_items.menu_item_id` and `.modifiers` added
+- [x] `orders.tip_amount` added
 - [ ] Applies cleanly against the scratch DB
 - [ ] Committed
 
 ### Task 3 — Menu CRUD routes
 
-- [ ] `pos/menu.integration.test.ts` passes (7 tests)
-- [ ] `requirePos` is **exported** — Tasks 7 and 9 depend on it
-- [ ] Tenant isolation test passes: another tenant's categories are not returned
-- [ ] Delete is a **soft** delete — historical tickets must keep resolving
-- [ ] Router mounted in `index.ts` at `/api/pos/menu`
+- [x] `pos/menu.integration.test.ts` passes (14 tests — 7 planned + 7 added for the cross-tenant FK and false-204 bugs found during the task)
+- [x] `requirePos` is **exported** — Tasks 7 and 9 depend on it
+- [x] Tenant isolation test passes: another tenant's categories are not returned
+- [x] Delete is a **soft** delete — historical tickets must keep resolving
+- [x] Router mounted in `index.ts` at `/api/pos/menu`
 - [ ] Committed
 
 ---
@@ -227,7 +227,7 @@ Each of these makes a task look finished while being broken. Verify explicitly, 
 ## Final verification
 
 - [ ] `npm run test --workspace=apps/api` — full suite green
-- [ ] New test count is **78** above the recorded baseline. If it's lower, a file isn't being discovered — most likely the `pos-core` `roots` entry
+- [ ] New test count is **85** above the 1635 baseline (final total 1720). If it's lower, a file isn't being discovered — most likely the `pos-core` `roots` entry
 - [ ] `npm run typecheck --workspace=apps/api` — clean
 - [ ] `npx tsc --noEmit -p packages/pos-core` — clean
 - [ ] `npm run lint` — clean at `--max-warnings 0`
