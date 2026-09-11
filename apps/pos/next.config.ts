@@ -10,10 +10,17 @@ import type { NextConfig } from 'next'
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:3001'
 const WS_ORIGIN = API_ORIGIN.replace(/^http/, 'ws')
 
+const isDev = process.env.NODE_ENV !== 'production'
+
+// Note: Next's dev hot-reload socket is same-origin, and `'self'` in
+// connect-src covers it — no dev-only CSP exception is needed. (When HMR
+// appeared broken it was the proxy matcher swallowing /_next/webpack-hmr,
+// not this policy.)
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   // Next still requires 'unsafe-inline' for its bootstrap/hydration scripts.
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",

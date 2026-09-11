@@ -9,5 +9,9 @@ import { createPosProxy } from '@nuatis/pos-web'
 export const proxy = createPosProxy({ signInPath: '/sign-in' })
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Exclude ALL of /_next, not just static and image. Next's dev hot-reload
+  // runs over /_next/webpack-hmr, and a narrower exclusion sends that request
+  // to the sign-in redirect below — HMR then fails on every page load, with no
+  // symptom except edits silently not appearing.
+  matcher: ['/((?!_next/|favicon.ico).*)'],
 }
