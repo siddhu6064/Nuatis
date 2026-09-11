@@ -8,7 +8,9 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { MenuGrid } from '@/components/MenuGrid'
 import { CartPanel } from '@/components/CartPanel'
 import { ModifierDialog } from '@/components/ModifierDialog'
+import { CheckoutDialog } from '@/components/CheckoutDialog'
 import { useCart } from '@/lib/useCart'
+import { useCheckout, cashIntoDrawerCents } from '@/lib/useCheckout'
 import { canAddDirectly, type MenuCategoryDto, type MenuItemDto } from '@/lib/cart-lines'
 
 interface PosSettings {
@@ -23,10 +25,12 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingItem, setPendingItem] = useState<MenuItemDto | null>(null)
+  const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null)
 
   // Tax cannot be guessed: 0 until settings load, and the cart is not usable
   // before then anyway.
   const cart = useCart(settings?.tax_rate_bps ?? 0)
+  const checkout = useCheckout(cart.totals.totalCents)
 
   useEffect(() => {
     let cancelled = false
@@ -34,9 +38,10 @@ export default function RegisterPage() {
     async function load() {
       try {
         const locationId = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
-        const [menuRes, settingsRes] = await Promise.all([
+        const [menuRes, settingsRes, drawerRes] = await Promise.all([
           fetch('/api/pos/menu/tree'),
           fetch(`/api/pos/settings?location_id=${encodeURIComponent(locationId)}`),
+          fetch(`/api/pos/drawer/sessions/current?location_id=${encodeURIComponent(locationId)}`),
         ])
 
         if (menuRes.status === 401 || settingsRes.status === 401) {
@@ -59,6 +64,13 @@ export default function RegisterPage() {
         if (cancelled) return
         setCategories(menu.categories)
         setSettings(config)
+
+        // A missing drawer is not an error — it just means cash cannot be
+        // taken until someone opens one.
+        if (drawerRes.ok) {
+          const drawer = (await drawerRes.json()) as { session: { id: string } | null }
+          setDrawerSessionId(drawer.session?.id ?? null)
+        }
       } catch {
         if (!cancelled) setError('Could not reach the server.')
       } finally {
@@ -84,6 +96,32 @@ export default function RegisterPage() {
     },
     [cart]
   )
+
+  /**
+   * Close out a completed sale.
+   *
+   * Cash taken is posted to the open drawer session so the end-of-shift
+   * variance is real. A sale missing from the drawer is exactly the
+   * discrepancy the close-out exists to catch, so the failure is surfaced
+   * rather than swallowed.
+   */
+  const finishSale = useCallback(async () => {
+    const cash = cashIntoDrawerCents(checkout.state)
+    if (cash > 0 && drawerSessionId) {
+      try {
+        const res = await fetch(`/api/pos/drawer/sessions/${drawerSessionId}/events`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'sale', amount: Number((cash / 100).toFixed(2)) }),
+        })
+        if (!res.ok) setError('The sale completed but was not recorded in the cash drawer.')
+      } catch {
+        setError('The sale completed but was not recorded in the cash drawer.')
+      }
+    }
+    cart.clear()
+    checkout.cancel()
+  }, [cart, checkout, drawerSessionId])
 
   if (loading) {
     return (
@@ -133,8 +171,16 @@ export default function RegisterPage() {
           totals={cart.totals}
           onSetQuantity={cart.setQuantity}
           onClear={cart.clear}
+          onCharge={checkout.start}
         />
       </Box>
+
+      <CheckoutDialog
+        checkout={checkout}
+        preTipTotalCents={cart.totals.totalCents}
+        drawerSessionId={drawerSessionId}
+        onDone={finishSale}
+      />
 
       <ModifierDialog
         item={pendingItem}

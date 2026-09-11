@@ -12,9 +12,10 @@ interface CartPanelProps {
   totals: CartTotals
   onSetQuantity: (index: number, quantity: number) => void
   onClear: () => void
+  onCharge: () => void
 }
 
-export function CartPanel({ lines, totals, onSetQuantity, onClear }: CartPanelProps) {
+export function CartPanel({ lines, totals, onSetQuantity, onClear, onCharge }: CartPanelProps) {
   const empty = lines.length === 0
 
   return (
@@ -87,7 +88,13 @@ export function CartPanel({ lines, totals, onSetQuantity, onClear }: CartPanelPr
           <Typography variant="h6">Total</Typography>
           <Typography variant="h6">${toDollars(totals.totalCents)}</Typography>
         </Box>
-        <Button fullWidth variant="contained" disabled={empty} sx={{ mt: 2, height: 64 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          disabled={empty}
+          onClick={onCharge}
+          sx={{ mt: 2, height: 64 }}
+        >
           Charge ${toDollars(totals.totalCents)}
         </Button>
       </Box>
