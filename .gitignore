@@ -60,3 +60,7 @@ MIGRATIONS_TO_APPLY.md
 audit-report.json
 secrets-report.json
 scratchpad/
+
+# Swift Package Manager / Xcode build output (apps/ios)
+.build/
+DerivedData/
