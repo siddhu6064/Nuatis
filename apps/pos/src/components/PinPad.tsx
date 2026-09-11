@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
@@ -26,7 +25,6 @@ interface PinPadProps {
  * component.
  */
 export function PinPad({ tenantId, locationId }: PinPadProps) {
-  const router = useRouter()
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -48,8 +46,13 @@ export function PinPad({ tenantId, locationId }: PinPadProps) {
           setPin('')
           return
         }
-        // replace, not push: the PIN screen must not be reachable with Back.
-        router.replace('/')
+        // A full page load, not router.replace(). Before sign-in the proxy
+        // 307s '/' to '/sign-in', and Next's Router Cache keeps that redirect
+        // — so a client-side replace('/') resolves straight back here and the
+        // screen silently never changes, even though the RSC payload fetches
+        // 200. A hard navigation re-runs the proxy with the new cookie. This
+        // happens once per shift, so the cost is irrelevant.
+        window.location.assign('/')
       } catch {
         setError('Cannot reach the server')
         setPin('')
@@ -57,7 +60,7 @@ export function PinPad({ tenantId, locationId }: PinPadProps) {
         setSubmitting(false)
       }
     },
-    [tenantId, locationId, router]
+    [tenantId, locationId]
   )
 
   const press = useCallback(
