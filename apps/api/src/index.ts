@@ -54,6 +54,7 @@ import ordersRouter from './routes/orders.js'
 import orderTemplatesRouter from './routes/order-templates.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
 import posMenuRouter from './routes/pos/menu.js'
+import posTicketsRouter from './routes/pos/tickets.js'
 import expensesRouter from './routes/expenses.js'
 import expenseCategoriesRouter from './routes/expense-categories.js'
 import recurringExpensesRouter from './routes/recurring-expenses.js'
@@ -302,6 +303,7 @@ app.use('/api/orders', ordersRouter)
 app.use('/api/order-templates', orderTemplatesRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
 app.use('/api/pos/menu', posMenuRouter)
+app.use('/api/pos/tickets', posTicketsRouter)
 app.use('/api/expenses', expensesRouter)
 app.use('/api/expense-categories', expenseCategoriesRouter)
 app.use('/api/recurring-expenses', recurringExpensesRouter)
