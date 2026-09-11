@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { POS_COOKIE, readPosSession, isExpired } from './session.js'
+import { POS_COOKIE, readPosSession, isExpired } from './session'
 
 export interface PosProxyOptions {
   /** Where to send an unauthenticated page request, e.g. '/sign-in'. */
