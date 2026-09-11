@@ -1,39 +1,54 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
-import { toCents, toDollars } from '@nuatis/pos-core'
+import { toDollars } from '@nuatis/pos-core'
+import type { TenderMethod } from '@nuatis/pos-core'
 
-interface CashTenderProps {
+interface TenderAmountProps {
+  method: TenderMethod
   balanceCents: number
   onTake: (amountCents: number) => void
   onBack: () => void
 }
 
-/** Notes a cashier actually reaches for. */
+/** Notes a cashier actually reaches for, above the balance. */
 function quickAmounts(balanceCents: number): number[] {
-  const exact = balanceCents
   const notes = [500, 1000, 2000, 5000, 10000]
-  // Next note up from the balance, so the buttons are plausible tenders
-  // rather than a fixed list that is useless on a $90 order.
-  const useful = notes.filter((n) => n > exact).slice(0, 3)
-  return [exact, ...useful]
+  return [balanceCents, ...notes.filter((n) => n > balanceCents).slice(0, 3)]
 }
 
-export function CashTender({ balanceCents, onTake, onBack }: CashTenderProps) {
-  const [entry, setEntry] = useState('')
+const METHOD_LABEL: Record<TenderMethod, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  gift_card: 'Gift card',
+}
 
-  const entered = useMemo(() => {
-    if (entry === '') return 0
-    // Keypad entry is in cents: typing 1 2 3 4 means $12.34, which is how
-    // every till behaves — no decimal point to hunt for.
-    return Number(entry)
-  }, [entry])
+/**
+ * Amount entry for one payment.
+ *
+ * Used for both cash and card so any leg can be a partial amount — "put $10 on
+ * this card and the rest on another" is an ordinary request, and a card button
+ * hard-wired to the full balance cannot express it.
+ *
+ * Card is pre-filled with the balance, since charging the whole thing is the
+ * common case and the cashier can just confirm. Cash starts empty: the number
+ * that matters is what the customer actually handed over, and pre-filling it
+ * invites tapping through without counting.
+ *
+ * Only cash may exceed the balance — that is change. Overcharging a card is a
+ * refund waiting to happen, so the confirm button refuses it.
+ */
+export function TenderAmount({ method, balanceCents, onTake, onBack }: TenderAmountProps) {
+  const isCash = method === 'cash'
+  const [entry, setEntry] = useState(isCash ? '' : String(balanceCents))
 
-  const change = entered > balanceCents ? entered - balanceCents : 0
+  const entered = entry === '' ? 0 : Number(entry)
+  const change = isCash && entered > balanceCents ? entered - balanceCents : 0
   const short = entered > 0 && entered < balanceCents ? balanceCents - entered : 0
+  const overOnCard = !isCash && entered > balanceCents
 
   function press(key: string) {
     setEntry((current) => {
@@ -61,22 +76,28 @@ export function CashTender({ balanceCents, onTake, onBack }: CashTenderProps) {
         )}
         {short > 0 && (
           <Typography color="text.secondary">
-            ${toDollars(short)} still owing — this will be a split payment
+            ${toDollars(short)} left after this — the rest can go on another payment
           </Typography>
+        )}
+        {overOnCard && (
+          <Typography color="error">A card cannot be charged above the balance</Typography>
         )}
       </Box>
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-        {quickAmounts(balanceCents).map((amount, i) => (
+        {(isCash ? quickAmounts(balanceCents) : [balanceCents]).map((amount, i) => (
           <Button
             key={`${amount}-${i}`}
             variant="outlined"
             onClick={() => setEntry(String(amount))}
             sx={{ flex: '1 1 0', minWidth: 88 }}
           >
-            {i === 0 ? `Exact $${toDollars(amount)}` : `$${toDollars(amount)}`}
+            {i === 0 ? `Full $${toDollars(amount)}` : `$${toDollars(amount)}`}
           </Button>
         ))}
+        <Button variant="text" onClick={() => setEntry('')} sx={{ minWidth: 72 }}>
+          Clear
+        </Button>
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
@@ -99,18 +120,13 @@ export function CashTender({ balanceCents, onTake, onBack }: CashTenderProps) {
         <Button
           fullWidth
           variant="contained"
-          disabled={entered <= 0}
-          onClick={() => {
-            onTake(entered)
-            setEntry('')
-          }}
+          disabled={entered <= 0 || overOnCard}
+          onClick={() => onTake(entered)}
           sx={{ height: 60 }}
         >
-          Take ${toDollars(entered)}
+          {METHOD_LABEL[method]} ${toDollars(entered)}
         </Button>
       </Box>
     </Box>
   )
 }
-
-export { toCents }

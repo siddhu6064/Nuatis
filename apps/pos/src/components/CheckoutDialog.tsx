@@ -13,7 +13,8 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import { toDollars } from '@nuatis/pos-core'
 import { TipPicker } from './TipPicker'
-import { CashTender } from './CashTender'
+import { TenderAmount } from './TenderAmount'
+import type { TenderMethod } from '@nuatis/pos-core'
 import type { UseCheckout } from '@/lib/useCheckout'
 
 interface CheckoutDialogProps {
@@ -30,7 +31,13 @@ interface CheckoutDialogProps {
  * There is no separate "split payment" mode: the tender stage simply accepts
  * more than one leg, so a split is what happens when the first payment does
  * not cover the balance. That is one flow to build and one for a cashier to
- * learn, rather than a mode they have to decide to enter up front.
+ * learn, rather than a mode they have to decide to enter up front. Capped at
+ * five legs.
+ *
+ * Card has two routes on purpose. "Card · $X" charges the whole balance in one
+ * tap, which is nearly every sale. "Card — part of the balance" opens amount
+ * entry, because "put $10 on this one and the rest on another" is an ordinary
+ * request that a button hard-wired to the full balance cannot express.
  */
 export function CheckoutDialog({
   checkout,
@@ -39,12 +46,13 @@ export function CheckoutDialog({
   onDone,
 }: CheckoutDialogProps) {
   const { state, totalDueCents, balanceCents, isSettled, busy } = checkout
-  const [cashOpen, setCashOpen] = useState(false)
+  // Which method is having an amount entered, or null while choosing.
+  const [entering, setEntering] = useState<TenderMethod | null>(null)
 
   const open = state.stage !== 'idle'
 
   function close() {
-    setCashOpen(false)
+    setEntering(null)
     checkout.cancel()
   }
 
@@ -52,7 +60,7 @@ export function CheckoutDialog({
     <Dialog open={open} onClose={busy ? undefined : close} fullWidth maxWidth="xs">
       <DialogTitle>
         {state.stage === 'tip' && 'Add a tip'}
-        {state.stage === 'tender' && (cashOpen ? 'Cash' : 'Payment')}
+        {state.stage === 'tender' && (entering === null ? 'Payment' : 'Amount')}
         {state.stage === 'processing' && 'Processing'}
         {state.stage === 'receipt' && 'Paid'}
       </DialogTitle>
@@ -73,7 +81,7 @@ export function CheckoutDialog({
           />
         )}
 
-        {state.stage === 'tender' && !cashOpen && (
+        {state.stage === 'tender' && entering === null && (
           <Box>
             <Summary
               preTipTotalCents={preTipTotalCents}
@@ -124,8 +132,16 @@ export function CheckoutDialog({
                 </Button>
                 <Button
                   variant="outlined"
+                  disabled={busy}
+                  onClick={() => setEntering('card')}
+                  sx={{ height: 56 }}
+                >
+                  Card — part of the balance
+                </Button>
+                <Button
+                  variant="outlined"
                   disabled={busy || drawerSessionId === null}
-                  onClick={() => setCashOpen(true)}
+                  onClick={() => setEntering('cash')}
                   sx={{ height: 64 }}
                 >
                   Cash
@@ -140,14 +156,16 @@ export function CheckoutDialog({
           </Box>
         )}
 
-        {state.stage === 'tender' && cashOpen && (
-          <CashTender
+        {state.stage === 'tender' && entering !== null && (
+          <TenderAmount
+            method={entering}
             balanceCents={balanceCents}
             onTake={(amount) => {
-              checkout.takeCash(amount)
-              setCashOpen(false)
+              if (entering === 'cash') checkout.takeCash(amount)
+              else void checkout.takeCard(amount)
+              setEntering(null)
             }}
-            onBack={() => setCashOpen(false)}
+            onBack={() => setEntering(null)}
           />
         )}
 
@@ -182,7 +200,7 @@ export function CheckoutDialog({
             <Button onClick={close} disabled={busy}>
               Cancel
             </Button>
-            {state.stage === 'tender' && !cashOpen && (
+            {state.stage === 'tender' && entering === null && (
               <Button variant="contained" disabled={!isSettled || busy} onClick={checkout.complete}>
                 Finish
               </Button>

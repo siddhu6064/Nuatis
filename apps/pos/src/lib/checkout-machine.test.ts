@@ -289,3 +289,37 @@ describe('cashIntoDrawerCents', () => {
     expect(cashIntoDrawerCents(s)).toBe(0)
   })
 })
+
+describe('partial card amounts', () => {
+  it('accepts a card leg for part of the balance', () => {
+    // "Put $10 on this card and the rest on another."
+    const s = addLeg(atTender(), { method: 'card', amountCents: 1000 }, 1958)
+    expect(s.legs).toHaveLength(1)
+    expect(s.error).toBeNull()
+    expect(balanceCents(s, 1958)).toBe(958)
+  })
+
+  it('settles once a second card covers the remainder', () => {
+    let s = addLeg(atTender(), { method: 'card', amountCents: 1000 }, 1958)
+    s = addLeg(s, { method: 'card', amountCents: 958 }, 1958)
+    expect(isSettled(s, 1958)).toBe(true)
+    expect(complete(s, 1958).changeDueCents).toBe(0)
+  })
+
+  it('still refuses a partial card that exceeds what is left', () => {
+    const partial = addLeg(atTender(), { method: 'card', amountCents: 1000 }, 1958)
+    const over = addLeg(partial, { method: 'card', amountCents: 9999 }, 1958)
+    expect(over.legs).toHaveLength(1)
+    expect(over.error).toBeTruthy()
+  })
+
+  it('allows mixing a partial card with cash for the rest, including change', () => {
+    let s = addLeg(atTender(), { method: 'card', amountCents: 1000 }, 1958)
+    s = addLeg(s, { method: 'cash', amountCents: 1000 }, 1958)
+    const done = complete(s, 1958)
+    expect(done.stage).toBe('receipt')
+    expect(done.changeDueCents).toBe(42)
+    // The drawer keeps the cash owed, not the full note.
+    expect(cashIntoDrawerCents(done)).toBe(958)
+  })
+})
