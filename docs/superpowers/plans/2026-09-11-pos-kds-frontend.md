@@ -1090,8 +1090,33 @@ A script, run deliberately, that seeds a restaurant menu with `kitchen_station` 
   grep -r "nuatis_pos_session" apps/pos/.next/static 2>/dev/null   # expect no output
   ```
 
-## Open questions to settle before starting
+## Resolved before starting
 
-1. **The KDS socket token** (Task 8, Step 1) — returning the session token to JavaScript weakens the httpOnly guarantee. Accept for the demo, or add a short-lived socket-only endpoint?
-2. **The `tokens.js` extraction** (Task 2, Step 4a) touches the working dashboard. Confirm that is acceptable, or say so and the register gets its own copy with the drift risk accepted.
-3. **Deployment** — `apps/web` has no `vercel.json` and `apps/api` has a Dockerfile. How do two more Next apps get deployed, and on what hostnames? This decides the CSP and cookie domain.
+**1. The KDS socket credential — solved without a new API route, and without
+putting the 12h token in JavaScript.**
+
+`apps/web/src/proxy.ts` already mints JWTs locally with `AUTH_SECRET`, and
+`lib/pos-ws.ts` accepts any HS256 token with `iss: nuatis-web`,
+`aud: nuatis-api`, a matching `tenantId`, and a `locationId` that matches the
+channel. So the KDS app mints its **own 60-second socket ticket** server-side
+from the cookie session, rather than returning the register token.
+
+The socket verifies only at handshake, so a 60s ticket is sufficient for the
+life of the connection; the client fetches a fresh one per reconnect. A stolen
+ticket is useless within a minute and can only ever join one location's ticket
+feed. Task 8 Step 1 is now this, not the `ws-token` passthrough.
+
+**2. Design-token extraction — proceed.** Moving `tokens.js` to
+`packages/design-tokens` touches the working dashboard, but it is a mechanical
+move plus three import updates, gated behind a passing `npm run build
+--workspace=apps/web` in its own commit. The alternative — a third hand-copy of
+the palette — is the drift that already hid the missing `pos` entry in the web
+module list during the backend work.
+
+**3. Deployment — deliberately deferred, and nothing is blocked by it.** Both
+apps read their origin and API host from env (`API_BACKEND_URL`,
+`NEXT_PUBLIC_*`), and the CSP `connect-src` is built from those rather than
+hardcoded hostnames. Cookies are host-scoped with `sameSite: 'lax'`, so each
+app works on whatever hostname it lands on, including localhost. Pick
+hostnames when you deploy; only the production CSP `connect-src` and the
+API's `CORS_ORIGIN` need revisiting then.
