@@ -1,6 +1,7 @@
-// Extensionless specifiers, unlike apps/api's Node-ESM code: this package is
-// consumed by Next/Turbopack via transpilePackages, and Turbopack will not
-// resolve a './session.js' specifier to session.ts when bundling middleware.
+// Extensionless specifiers and consumed as source via transpilePackages.
+// Only Next imports this package, so Turbopack's resolution is the only one
+// that matters — unlike pos-core, which apps/api's tsc typechecks under
+// NodeNext and therefore has to ship built output.
 export {
   POS_COOKIE,
   readPosSession,

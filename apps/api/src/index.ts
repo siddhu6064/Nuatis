@@ -56,6 +56,7 @@ import ordersSettingsRouter from './routes/orders-settings.js'
 import posMenuRouter from './routes/pos/menu.js'
 import posTicketsRouter from './routes/pos/tickets.js'
 import posDrawerRouter from './routes/pos/drawer.js'
+import posSettingsRouter from './routes/pos/settings.js'
 import posTerminalAuthRouter from './routes/pos/terminal-auth.js'
 import expensesRouter from './routes/expenses.js'
 import expenseCategoriesRouter from './routes/expense-categories.js'
@@ -310,6 +311,7 @@ app.use('/api/settings/orders', ordersSettingsRouter)
 app.use('/api/pos/menu', posMenuRouter)
 app.use('/api/pos/tickets', posTicketsRouter)
 app.use('/api/pos/drawer', posDrawerRouter)
+app.use('/api/pos/settings', posSettingsRouter)
 app.use('/api/expenses', expensesRouter)
 app.use('/api/expense-categories', expenseCategoriesRouter)
 app.use('/api/recurring-expenses', recurringExpensesRouter)

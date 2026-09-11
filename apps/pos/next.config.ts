@@ -32,8 +32,9 @@ const CONTENT_SECURITY_POLICY = [
 
 const config: NextConfig = {
   output: 'standalone',
-  // Workspace packages ship as TypeScript/CJS source, not built output.
-  transpilePackages: ['@nuatis/pos-core', '@nuatis/pos-web', '@nuatis/design-tokens'],
+  // pos-web and design-tokens ship as source (TypeScript / CJS) so they need
+  // transpiling; pos-core ships built ESM from dist and does not.
+  transpilePackages: ['@nuatis/pos-web', '@nuatis/design-tokens'],
   async headers() {
     return [
       {
