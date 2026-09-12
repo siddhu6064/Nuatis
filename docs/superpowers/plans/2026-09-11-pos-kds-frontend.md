@@ -1047,48 +1047,39 @@ The KDS theme deliberately differs from the register's: a cook reads it from acr
 
 ---
 
-### Task 8: Live ticket board
+### Task 8: Live ticket board — DONE
 
 **Files:**
 
 - Create: `apps/kds/src/app/page.tsx`, `apps/kds/src/components/TicketCard.tsx`, `StationFilter.tsx`
-- Create: `apps/kds/src/lib/usePosSocket.ts`, `usePosSocket.test.ts`
-- Create: `apps/kds/src/app/api/ws-token/route.ts`
+- Create: `apps/kds/src/lib/pos-socket.ts` + test, `ticket-board.ts` + test, `usePosSocket.ts`
+- Create: `apps/kds/src/app/api/socket-ticket/route.ts` (the plan called it `ws-token`; renamed, because it hands out a short-lived ticket, not the session token)
+- Create: `packages/pos-web/src/socket-ticket-route.ts` + test
 
-**Interfaces:**
+- [x] **Step 1: The socket credential — a 60-second ticket, not the session token**
 
-- Consumes: `GET /api/pos/tickets?location_id=&status=`, `PATCH /api/pos/tickets/:id/status`, and the `/ws/pos` socket.
-- Produces: `usePosSocket({ onEvent })` handling connect, the auth frame, reconnect with backoff, and cleanup.
+A browser WebSocket connects to the API host directly, and unlike a `fetch()` the upgrade cannot be rewritten by the proxy, so the client genuinely needs a token in JavaScript. It does **not** get the 12h session token: that is httpOnly precisely so an XSS bug cannot walk off with a working register credential.
 
-- [ ] **Step 1: Solve the socket's credential problem first**
+`/api/socket-ticket` mints its own token from the same `AUTH_SECRET`, bound to the session's tenant and location, expiring in sixty seconds. `lib/pos-ws.ts` already accepts exactly that shape (HS256, `iss: nuatis-web`, `aud: nuatis-api`, matching `tenantId`, and a `locationId` that must match the channel), so **no new API endpoint was needed**. The ticket carries no `portalScope`, so it reaches no HTTP route at all, and a fresh one is minted per reconnect.
 
-This is the one genuinely awkward part. The proxy attaches the token to HTTP requests server-side, but a browser WebSocket connects to the API host **directly** and the client has no token — by design.
+- [x] **Step 2: The socket client**
 
-The socket's first frame must be `{ type: 'auth', token, tenantId, locationId }`. So the app needs a server route that hands the client a token for socket use only:
+`PosSocket` handles connect, the auth frame, reconnect with capped backoff and cleanup, with its WebSocket and timer injected so all of it is tested without a browser. Backoff resets only once the server sends `authenticated`, never on `open` — a socket that opens and is immediately rejected would otherwise become a tight loop at the base delay. `close()` is idempotent and cancels a reconnect already scheduled.
 
-```ts
-// apps/kds/src/app/api/ws-token/route.ts
-// The KDS socket connects to the API directly, so the browser needs a token
-// for that one purpose. This deliberately narrow endpoint returns the session
-// token and nothing else, and exists only because a WebSocket upgrade cannot
-// be proxied the way fetch() calls are.
-```
+- [x] **Step 3: The board**
 
-Returning the 12h token to JavaScript weakens the httpOnly guarantee for the KDS. Two ways to judge it: the kitchen screen is a fixed device in a staff-only area, and the token is confined to `/api/pos/*` by `requireAuth`. **Flag this trade-off to the user before implementing** — the alternative is a short-lived socket-only token, which needs a new API endpoint and is outside this plan's "no new API routes" constraint.
+Oldest first, elapsed time from `fired_at`, and a card edge that shifts colour at five and ten minutes — a cook reads this from across a line, so the signal is a colour, not a stopwatch. One clock for the whole board rather than a timer per card. Station filter; an unrouted ticket (NULL station) shows on every screen, as the schema intends. Bump is optimistic, and the socket echo is idempotent because `applyEvent` upserts.
 
-- [ ] **Step 2: Implement the socket hook**
+- [x] **Step 4: Two screens do not cross**
 
-Connect, send the auth frame, wait for `{"type":"authenticated"}`, then dispatch `ticket.fired` / `ticket.updated` / `ticket.bumped`. Reconnect with capped exponential backoff. Always close the socket in the effect cleanup — a leaked socket per re-render is exactly the bug class the API's own ping-leak fix dealt with.
+Checked directly against the socket rather than through two app instances: two clients on different `location_id`s, a ticket fired at one, and only that one received it (`A received: 1`, `B received: 0`). A ticket minted for location A was refused with `4001 Location mismatch` when it tried to join location B's channel.
 
-- [ ] **Step 3: Build the board**
+**Two bugs fixed on the way:**
 
-Tickets as columns or a grid, oldest first, with elapsed time since `fired_at` and a colour shift as it ages. A large bump button per ticket — the target is someone with full hands. Station filter reads `?station=`.
+1. The proxy forwarded _everything_ under `/api` upstream, so the KDS's own `/api/socket-ticket` was rewritten to the API and 404'd. It now forwards only `/api/pos/*` — an allowlist, because the denylist failed silently and the app simply looked broken for a reason nothing pointed at. Forwarding anything else was never useful: `requireAuth` confines a POS token to that prefix anyway.
+2. `POST /api/pos/tickets/fire` broadcast the **pre-insert** item rows, so every ticket arriving over the socket had items with no `id` — invisible until something needs to address one, and React rendered them all under the same undefined key. It now `.select()`s the stored rows.
 
-Load the initial list over HTTP, then apply socket events on top. Do not rely on the socket alone: a screen that connects after a ticket was fired would otherwise show an empty kitchen.
-
-- [ ] **Step 4: Verify two screens do not cross**
-
-With two browser windows on different `location_id`s, fire a ticket and confirm only the matching screen updates. This is the client-side half of the L5 guarantee the backend enforces.
+**Local setup:** `apps/kds/.env.local` needs `AUTH_SECRET` byte-identical to the API's, or the board sits on "Offline — retrying". See `apps/kds/.env.example`.
 
 ---
 
