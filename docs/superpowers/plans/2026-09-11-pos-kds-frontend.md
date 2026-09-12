@@ -1024,13 +1024,26 @@ Both the kitchen fire and the cash-drawer write now happen on the transition _in
 
 ---
 
-### Task 7: `apps/kds` scaffold
+### Task 7: `apps/kds` scaffold — DONE
 
 Same scaffold as Task 2, consuming the same `@nuatis/pos-web` proxy, with `signInPath: '/sign-in'` and its own PIN screen. A manager PINs the kitchen screen in once and it runs all shift on the 12h cookie.
 
-**Files:** mirror of Task 2 plus `apps/kds/src/app/api/session/route.ts` (identical to the register's).
+**Files:** mirror of Task 2 plus `apps/kds/src/app/api/session/route.ts`.
 
-If the session route is byte-identical to the register's, move it into `@nuatis/pos-web` as a shared handler factory rather than keeping two copies.
+- [x] Scaffold `apps/kds` on port 3003 (config copied from `apps/pos`; `next.config.ts`, Tailwind, PostCSS, tsconfig, Jest).
+- [x] Root `package.json` workspaces gains `apps/kds` **explicitly**, not an `apps/*` glob — `apps/ios` is a Swift project with no `package.json` and breaks `npm install` as a workspace.
+- [x] `.claude/launch.json` gains a `kds` entry on 3003 (gitignored, so not in the commit).
+
+**Two things moved into `@nuatis/pos-web` rather than being copied:**
+
+- `createSessionRoute()` — the session route was byte-identical, so each app is now two lines. The 503-vs-401 distinction, the deliberately uniform rejection, and the httpOnly cookie flags are exactly the details that get fixed in one copy and forgotten in the other. Its 14 tests moved with it.
+- `PinPad`, behind a separate `@nuatis/pos-web/ui` entry. React and MUI stay off the package root because `apps/api`'s Jest run imports that root for the proxy and session tests. The pad carries the Router-Cache workaround — a hard navigation after sign-in, because `router.replace('/')` resolves against the cached pre-login 307 and the screen silently never changes — a fix that would otherwise have had to be made twice.
+
+The KDS theme deliberately differs from the register's: a cook reads it from across a hot line, so the base font size goes up and every rem-sized control scales with it.
+
+**Verified:** `/` redirects to `/sign-in` with no cookie, PIN `1234` signs in and lands on the board placeholder, both apps build for production, 1851 API tests and 87 register tests pass.
+
+**Dev-only gotcha:** `localhost:3002` and `localhost:3003` share one cookie jar, because cookies ignore the port — signing into one signs into the other. The two apps deploy to different hostnames, so this does not exist in production, but it will mask a broken sign-in locally. Clear the cookie (`fetch('/api/session', { method: 'DELETE' })`) before testing a redirect.
 
 ---
 
