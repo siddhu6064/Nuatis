@@ -10,3 +10,4 @@ export {
   type PosSession,
 } from './session'
 export { createPosProxy, type PosProxyOptions } from './proxy'
+export { createSessionRoute, type SessionRoute, type SessionRouteOptions } from './session-route'

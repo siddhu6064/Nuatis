@@ -5,16 +5,22 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ui": "./src/ui/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "next": "^16.2.6"
+    "@mui/material": "^9.3.1",
+    "next": "^16.2.6",
+    "react": "^19.2.8"
   },
   "devDependencies": {
-    "typescript": "*",
-    "next": "^16.2.6"
+    "@mui/material": "^9.3.1",
+    "@types/react": "^19.2.18",
+    "next": "^16.2.6",
+    "react": "^19.2.8",
+    "typescript": "*"
   }
 }

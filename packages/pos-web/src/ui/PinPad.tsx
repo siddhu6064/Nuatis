@@ -10,13 +10,13 @@ import Alert from '@mui/material/Alert'
 const PIN_LENGTH = 4
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
 
-interface PinPadProps {
+export interface PinPadProps {
   tenantId: string
   locationId: string
 }
 
 /**
- * Register sign-in.
+ * PIN sign-in, shared by the register and the kitchen display.
  *
  * Keys are 88px: this is the control a cashier uses most, on a screen they may
  * be reaching across a counter to hit. The PIN is posted to this app's own

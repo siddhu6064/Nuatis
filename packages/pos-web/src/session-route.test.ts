@@ -1,7 +1,12 @@
-import { POST, DELETE } from './route'
-import { POS_COOKIE, readPosSession } from '@nuatis/pos-web'
+import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+import { createSessionRoute } from './session-route.js'
+import { POS_COOKIE, readPosSession } from './session.js'
 
-const fetchMock = jest.fn()
+const { POST, DELETE } = createSessionRoute({ apiBackendUrl: 'http://api.test' })
+
+// Typed loosely on purpose: these tests only care about `ok` and `json()`,
+// and building a full Response for each case would bury what is asserted.
+const fetchMock = jest.fn<(url: string, init: RequestInit) => Promise<unknown>>()
 global.fetch = fetchMock as unknown as typeof fetch
 
 function post(body: unknown): Request {
@@ -60,7 +65,7 @@ describe('POST /api/session — validation', () => {
 
 describe('POST /api/session — upstream failures', () => {
   it('passes a rejected PIN through as a uniform 401', async () => {
-    fetchMock.mockResolvedValue({ ok: false } as never)
+    fetchMock.mockResolvedValue({ ok: false })
     const res = await POST(post({ tenant_id: 't', location_id: 'l', pin: '0000' }))
     expect(res.status).toBe(401)
     expect(await res.json()).toEqual({ error: 'Invalid PIN' })
@@ -73,7 +78,7 @@ describe('POST /api/session — upstream failures', () => {
   })
 
   it('sets no cookie when sign-in fails', async () => {
-    fetchMock.mockResolvedValue({ ok: false } as never)
+    fetchMock.mockResolvedValue({ ok: false })
     const res = await POST(post({ tenant_id: 't', location_id: 'l', pin: '0000' }))
     expect(cookieFrom(res)).toBeNull()
   })
@@ -81,7 +86,7 @@ describe('POST /api/session — upstream failures', () => {
 
 describe('POST /api/session — success', () => {
   it('returns the staff name and location', async () => {
-    fetchMock.mockResolvedValue(okUpstream() as never)
+    fetchMock.mockResolvedValue(okUpstream())
     const res = await POST(post({ tenant_id: 't', location_id: 'loc-1', pin: '4821' }))
 
     expect(res.status).toBe(200)
@@ -92,19 +97,19 @@ describe('POST /api/session — success', () => {
   })
 
   it('never returns the token in the response body', async () => {
-    fetchMock.mockResolvedValue(okUpstream() as never)
+    fetchMock.mockResolvedValue(okUpstream())
     const res = await POST(post({ tenant_id: 't', location_id: 'loc-1', pin: '4821' }))
     expect(await res.text()).not.toContain('secret.jwt.value')
   })
 
   it('sets the session cookie httpOnly', async () => {
-    fetchMock.mockResolvedValue(okUpstream() as never)
+    fetchMock.mockResolvedValue(okUpstream())
     const res = await POST(post({ tenant_id: 't', location_id: 'loc-1', pin: '4821' }))
     expect(res.headers.get('set-cookie') ?? '').toContain('HttpOnly')
   })
 
   it('stores a session the proxy can read back', async () => {
-    fetchMock.mockResolvedValue(okUpstream() as never)
+    fetchMock.mockResolvedValue(okUpstream())
     const res = await POST(post({ tenant_id: 'tenant-9', location_id: 'loc-1', pin: '4821' }))
 
     const session = readPosSession(cookieFrom(res) ?? undefined)
@@ -119,20 +124,28 @@ describe('POST /api/session — success', () => {
     // The API scopes the token to the location it verified; if the two ever
     // disagreed, storing the caller's value would point the register at a
     // location its own token does not cover.
-    fetchMock.mockResolvedValue(okUpstream({ locationId: 'loc-verified' }) as never)
+    fetchMock.mockResolvedValue(okUpstream({ locationId: 'loc-verified' }))
     const res = await POST(post({ tenant_id: 't', location_id: 'loc-requested', pin: '4821' }))
 
     expect(readPosSession(cookieFrom(res) ?? undefined)?.locationId).toBe('loc-verified')
   })
 
   it('sends the PIN only to the API sign-in endpoint', async () => {
-    fetchMock.mockResolvedValue(okUpstream() as never)
+    fetchMock.mockResolvedValue(okUpstream())
     await POST(post({ tenant_id: 't', location_id: 'loc-1', pin: '4821' }))
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toContain('/api/pos/terminal/sign-in')
     expect(init.body).toContain('4821')
+  })
+
+  it('exchanges the PIN at the configured backend, not a hardcoded one', async () => {
+    fetchMock.mockResolvedValue(okUpstream())
+    await POST(post({ tenant_id: 't', location_id: 'loc-1', pin: '4821' }))
+
+    const [url] = fetchMock.mock.calls[0]!
+    expect(url).toBe('http://api.test/api/pos/terminal/sign-in')
   })
 })
 

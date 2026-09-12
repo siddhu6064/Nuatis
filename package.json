@@ -6,6 +6,7 @@
     "apps/api",
     "apps/web",
     "apps/pos",
+    "apps/kds",
     "packages/*"
   ],
   "engines": {
