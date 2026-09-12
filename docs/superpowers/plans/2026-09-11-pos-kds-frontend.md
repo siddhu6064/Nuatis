@@ -988,21 +988,39 @@ A cash leg posts a `sale` event to the open drawer session so the close-out vari
 
 **Files:**
 
-- Modify: `apps/pos/src/app/page.tsx`
+- Modify: `apps/pos/src/app/page.tsx`, `apps/pos/src/components/CheckoutDialog.tsx`
 - Create: `apps/pos/src/lib/createOrder.ts`, `createOrder.test.ts`
+- Create: `apps/api/src/routes/pos/orders.ts`, `orders.integration.test.ts` — **plan deviation, see below**
+- Modify: `apps/api/src/index.ts` (mount the router)
 
 **Interfaces:**
 
-- Consumes: `POST /api/orders` (existing route) then `POST /api/pos/tickets/fire`.
-- Produces: `createOrder(lines, opts)` returning the created order id.
+- Consumes: `POST /api/pos/orders` then `POST /api/pos/tickets/fire`.
+- Produces: `toOrderPayload`, `toPaymentInputs`, `createAndFireOrder(lines, opts)` returning `{ orderId, fired, ticketCount }`.
 
-- [ ] **Step 1: Create the order, then fire it**
+**Deviation: this task added an API route, which the plan's global constraints forbid.**
 
-The order must carry `source: 'pos'` and a `location_id`, and each line needs `menu_item_id` plus the `modifiers` snapshot. Firing without a `location_id` is rejected by the API by design.
+The plan said to reuse `POST /api/orders`. Three things make that impossible, each of which would be a bug if worked around:
 
-- [ ] **Step 2: Test the payload shape**
+1. A POS token carries `portalScope: 'pos'`, which `requireAuth` confines to `/api/pos/*`. Reaching the dashboard route means widening the one boundary keeping a register PIN away from `/api/contacts`.
+2. `POST /api/orders` hard-codes `source: 'staff'`. The `'pos'` value migration 0195 widened the constraint for is unreachable from it.
+3. Its line items have no `menu_item_id` and no `modifiers`, and `tickets/fire` routes by exactly those two columns — every line would land on the unrouted ticket.
 
-Assert `source === 'pos'` explicitly — the constraint that allows it only landed in migration 0195, and a regression here fails at runtime rather than at build.
+`POST /api/pos/orders` prices from the menu and ignores any price in the body, validates that a chosen option belongs to a group the item actually offers, folds modifier deltas into `unit_price` (because `order_line_items.total` is a generated `quantity * unit_price` column), and clamps recorded payments to the total so change given is not booked as revenue.
+
+- [x] **Step 1: Create the order, then fire it**
+
+The order carries `source: 'pos'` and a `location_id`, and each line has `menu_item_id` plus the `modifiers` snapshot. Firing without a `location_id` is rejected by the API by design.
+
+Both the kitchen fire and the cash-drawer write now happen on the transition _into_ the receipt, not when the cashier dismisses it — firing on dismissal means a receipt left on screen is food nobody started cooking. A ref guards against re-firing.
+
+**Bug fixed in passing:** a cash-drawer failure called `setError`, which renders a full-page alert and wiped the register out from under a cashier holding a customer's receipt. Post-payment problems are now warnings on the receipt.
+
+- [x] **Step 2: Test the payload shape**
+
+`source === 'pos'` is asserted explicitly. 18 API integration tests + 13 client tests, covering cross-tenant items and locations, an option not offered on the item, body-supplied prices being ignored, tax on the taxable base only, and the payment clamp.
+
+**Verified live** on a $23.10 split-card sale: order `ORD-1001` wrote `source: 'pos'`, `subtotal 18.00 / tax 1.58 / tip 3.52 / total 23.10 / balance_due 0.00`, two tickets (`grill` #1, `fry` #2) with the modifier snapshot intact, and two `order_payments` rows ($10.00 + $13.10).
 
 ---
 
