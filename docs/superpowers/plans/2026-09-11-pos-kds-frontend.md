@@ -1099,18 +1099,38 @@ A script, run deliberately, that seeds a restaurant menu with `kitchen_station` 
 
 ---
 
-## Verification
+## Verification — RUN 2026-09-11
 
-- [ ] `npm run test --workspace=apps/api` — full suite green, including the new `pos-web` tests
-- [ ] `npm run typecheck` across workspaces — clean
-- [ ] `npm run lint` — clean at `--max-warnings 0`
-- [ ] A cashier can PIN in, build a cart with modifiers, take cash with change due, and fire to the kitchen
-- [ ] The KDS shows the ticket within a second, and bumping it updates the register's view
-- [ ] Two locations never see each other's tickets
-- [ ] The register's API token is absent from `document.cookie` and from any client bundle:
+- [x] `npm run test --workspace=apps/api` — 1866 tests, 229 suites, **including the pos-web tests** (`session`, `proxy`, `session-route`, `socket-ticket-route`). See the flake note below.
+- [x] `npm run typecheck` across every workspace (api, web, pos, kds, pos-web, pos-core, shared) — clean.
+- [x] `npm run lint` across api, web, pos, kds — clean at `--max-warnings 0`.
+- [x] **A cashier can PIN in, build a cart with modifiers, take cash with change due, and fire to the kitchen.** Run end to end: PIN `1234` → Classic Burger (Medium rare, Cheddar) + Fries → $18.00 + $1.58 tax = **$19.58** → cash **$25.00** → **change due $5.42**.
+- [x] **The drawer records the cash the till actually keeps.** `cash_events` holds a single `sale` of **19.58**, not the 25.00 handed over. Closing the session: opening float 100.00, expected **119.58**, counted **119.58**, **variance 0.00**.
+- [x] **The KDS shows the ticket within a second.** Tickets #4 (grill) and #5 (fry) appeared with an elapsed time of `0:08`. Start and Bump both round-tripped, and bumping removed the ticket from the board.
+- [x] **Two locations never see each other's tickets.** Checked against the socket directly: two clients on different `location_id`s, a ticket fired at one — `A received: 1`, `B received: 0`. A ticket minted for location A was refused `4001 Location mismatch` when it tried to join location B's channel.
+- [x] **The register's API token is absent from `document.cookie` and from every client bundle.** Checked _while signed in and working_, which is the version that matters: `document.cookie` returns only `__next_hmr_refresh_hash__`, and `hasSessionCookie` is `false`.
   ```bash
-  grep -r "nuatis_pos_session" apps/pos/.next/static 2>/dev/null   # expect no output
+  grep -r "nuatis_pos_session" apps/pos/.next/static apps/kds/.next/static   # no output
   ```
+
+### NOT met: "bumping it updates the register's view"
+
+**The register has no ticket view, and no socket connection** — `grep -r "socket\|WebSocket" apps/pos/src` returns zero non-test files. Nothing in Tasks 1–8 builds one; the register fires an order and forgets it.
+
+This is an unbuilt feature, not a regression. A counter-service shop would want an "orders ready" strip on the register so the cashier knows when to call a number, and the plumbing for it already exists (`@nuatis/pos-web` socket ticket + `PosSocket`, both app-agnostic). Left unbuilt deliberately rather than marked done.
+
+### Known flake, pre-existing
+
+`src/__tests__/security-hardening-misc.test.ts` fails roughly **1 run in 4** under the full suite, always in `smsSendTenantLimiter › returns 429 for a tenant over the cap, keyed by tenant not IP` — a wall-clock rate-limit test that gets starved when 229 suites compete for CPU.
+
+- **Not caused by this branch:** `git log main..HEAD -- <that file>` returns **0 commits**.
+- **Passes in isolation:** 8 consecutive isolated runs, 10/10 each time (~550-760ms on the timing test).
+
+Tracked separately; it is not a POS defect.
+
+### Task 9 — already shipped
+
+`apps/api/src/scripts/seed-pos-demo.ts` exists and is the script that seeded the tenant everything above was tested against. It requires `<tenant_id> <location_id>` on argv, exits 1 without them, and refuses to seed when the location does not belong to the tenant — so it cannot run automatically, which was the requirement.
 
 ## Resolved before starting
 
