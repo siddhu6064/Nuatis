@@ -22,6 +22,8 @@ interface CheckoutDialogProps {
   preTipTotalCents: number
   /** Null when no drawer is open — cash is refused in that case. */
   drawerSessionId: string | null
+  /** Something failed after the money was taken. Shown on the receipt. */
+  warning?: string | null
   onDone: () => void
 }
 
@@ -43,6 +45,7 @@ export function CheckoutDialog({
   checkout,
   preTipTotalCents,
   drawerSessionId,
+  warning = null,
   onDone,
 }: CheckoutDialogProps) {
   const { state, totalDueCents, balanceCents, isSettled, busy } = checkout
@@ -184,6 +187,11 @@ export function CheckoutDialog({
             {state.changeDueCents > 0 && (
               <Alert severity="info" sx={{ mt: 2 }}>
                 Change due <strong>${toDollars(state.changeDueCents)}</strong>
+              </Alert>
+            )}
+            {warning && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                {warning}
               </Alert>
             )}
           </Box>

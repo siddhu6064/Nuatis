@@ -54,6 +54,7 @@ import ordersRouter from './routes/orders.js'
 import orderTemplatesRouter from './routes/order-templates.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
 import posMenuRouter from './routes/pos/menu.js'
+import posOrdersRouter from './routes/pos/orders.js'
 import posTicketsRouter from './routes/pos/tickets.js'
 import posDrawerRouter from './routes/pos/drawer.js'
 import posSettingsRouter from './routes/pos/settings.js'
@@ -309,6 +310,7 @@ app.use('/api/orders', ordersRouter)
 app.use('/api/order-templates', orderTemplatesRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
 app.use('/api/pos/menu', posMenuRouter)
+app.use('/api/pos/orders', posOrdersRouter)
 app.use('/api/pos/tickets', posTicketsRouter)
 app.use('/api/pos/drawer', posDrawerRouter)
 app.use('/api/pos/settings', posSettingsRouter)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
@@ -10,6 +10,7 @@ import { CartPanel } from '@/components/CartPanel'
 import { ModifierDialog } from '@/components/ModifierDialog'
 import { CheckoutDialog } from '@/components/CheckoutDialog'
 import { useCart } from '@/lib/useCart'
+import { createAndFireOrder, CreateOrderError } from '@/lib/createOrder'
 import { useCheckout, cashIntoDrawerCents } from '@/lib/useCheckout'
 import { canAddDirectly, type MenuCategoryDto, type MenuItemDto } from '@/lib/cart-lines'
 
@@ -26,6 +27,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(true)
   const [pendingItem, setPendingItem] = useState<MenuItemDto | null>(null)
   const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null)
+  // Something went wrong AFTER the money was taken. Deliberately not `error`:
+  // that renders a full-page alert, which would wipe the register out from
+  // under a cashier holding a customer's receipt.
+  const [saleWarning, setSaleWarning] = useState<string | null>(null)
 
   // Tax cannot be guessed: 0 until settings load, and the cart is not usable
   // before then anyway.
@@ -98,14 +103,37 @@ export default function RegisterPage() {
   )
 
   /**
-   * Close out a completed sale.
+   * Everything that happens once the money is in: the kitchen gets the order
+   * and the drawer gets the cash.
    *
-   * Cash taken is posted to the open drawer session so the end-of-shift
-   * variance is real. A sale missing from the drawer is exactly the
-   * discrepancy the close-out exists to catch, so the failure is surfaced
-   * rather than swallowed.
+   * Both run on the way INTO the receipt, not when the cashier dismisses it.
+   * Firing on dismissal means a receipt left on screen is food that never
+   * started cooking.
+   *
+   * Neither failure can undo a payment that has already been taken, so both are
+   * surfaced as warnings on the receipt rather than thrown away — a sale
+   * missing from the drawer is exactly the discrepancy the close-out exists to
+   * catch, and a sale missing from the kitchen is a customer waiting for food
+   * nobody is making.
    */
-  const finishSale = useCallback(async () => {
+  const settle = useCallback(async () => {
+    const problems: string[] = []
+
+    try {
+      await createAndFireOrder(cart.lines, {
+        locationId: process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? '',
+        tipCents: checkout.state.tipCents,
+        legs: checkout.state.legs,
+        totalDueCents: checkout.totalDueCents,
+      })
+    } catch (err) {
+      problems.push(
+        err instanceof CreateOrderError && err.orderId
+          ? 'The sale was recorded but the kitchen was not notified — tell them by hand.'
+          : 'The sale was paid but could not be recorded. Tell a manager before the next order.'
+      )
+    }
+
     const cash = cashIntoDrawerCents(checkout.state)
     if (cash > 0 && drawerSessionId) {
       try {
@@ -114,14 +142,41 @@ export default function RegisterPage() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ type: 'sale', amount: Number((cash / 100).toFixed(2)) }),
         })
-        if (!res.ok) setError('The sale completed but was not recorded in the cash drawer.')
+        if (!res.ok) problems.push('The cash was not recorded in the drawer.')
       } catch {
-        setError('The sale completed but was not recorded in the cash drawer.')
+        problems.push('The cash was not recorded in the drawer.')
       }
     }
+
+    setSaleWarning(problems.length > 0 ? problems.join(' ') : null)
+  }, [cart.lines, checkout.state, checkout.totalDueCents, drawerSessionId])
+
+  // Run `settle` exactly once per sale, on the transition into the receipt.
+  // Held in a ref so the effect depends only on the stage: settle changes
+  // identity whenever the cart does, and depending on it directly would re-fire
+  // the same order to the kitchen.
+  const settleRef = useRef(settle)
+  useEffect(() => {
+    settleRef.current = settle
+  }, [settle])
+
+  const settledRef = useRef(false)
+  useEffect(() => {
+    if (checkout.state.stage !== 'receipt') {
+      settledRef.current = false
+      return
+    }
+    if (settledRef.current) return
+    settledRef.current = true
+    void settleRef.current()
+  }, [checkout.state.stage])
+
+  /** Clear the till for the next customer. The sale is already settled. */
+  const startNextOrder = useCallback(() => {
+    setSaleWarning(null)
     cart.clear()
     checkout.cancel()
-  }, [cart, checkout, drawerSessionId])
+  }, [cart, checkout])
 
   if (loading) {
     return (
@@ -179,7 +234,8 @@ export default function RegisterPage() {
         checkout={checkout}
         preTipTotalCents={cart.totals.totalCents}
         drawerSessionId={drawerSessionId}
-        onDone={finishSale}
+        warning={saleWarning}
+        onDone={startNextOrder}
       />
 
       <ModifierDialog
