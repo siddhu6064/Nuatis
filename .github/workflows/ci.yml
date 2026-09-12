@@ -27,11 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # apps/api and apps/web resolve @nuatis/shared to packages/shared/dist/,
-      # which doesn't exist on a fresh checkout. Build shared before any
-      # workspace runs typecheck or tests.
-      - name: Build (Shared)
-        run: npm run build --workspace=packages/shared
+      # Packages that ship BUILT output resolve to their dist/, which does not
+      # exist on a fresh checkout. Build them before any workspace runs
+      # typecheck or tests, or every consumer fails with TS2307.
+      #
+      # Add a package here whenever its "main" points into dist/. (@nuatis/pos-web
+      # is deliberately absent: it ships source and is transpiled by Next.)
+      - name: Build (packages)
+        run: |
+          npm run build --workspace=packages/shared
+          npm run build --workspace=packages/pos-core
 
       - name: Lint
         run: npm run lint
@@ -88,4 +93,23 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: mock-service-role-key
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+
+      # The register and the kitchen display. Their NEXT_PUBLIC_* values only
+      # have to be present, not real: the pairing ids are read at build time and
+      # a missing one renders the "not paired yet" screen rather than crashing.
+      - name: Build (POS register)
+        run: npm run build --workspace=apps/pos --if-present
+        env:
+          API_BACKEND_URL: http://localhost:3001
+          NEXT_PUBLIC_API_ORIGIN: http://localhost:3001
+          NEXT_PUBLIC_POS_TENANT_ID: 00000000-0000-0000-0000-000000000000
+          NEXT_PUBLIC_POS_LOCATION_ID: 00000000-0000-0000-0000-000000000000
+
+      - name: Build (Kitchen display)
+        run: npm run build --workspace=apps/kds --if-present
+        env:
+          API_BACKEND_URL: http://localhost:3001
+          NEXT_PUBLIC_API_ORIGIN: http://localhost:3001
+          NEXT_PUBLIC_POS_TENANT_ID: 00000000-0000-0000-0000-000000000000
+          NEXT_PUBLIC_POS_LOCATION_ID: 00000000-0000-0000-0000-000000000000
           NEXTAUTH_URL: http://localhost:3000
