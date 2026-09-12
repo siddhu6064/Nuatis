@@ -10,6 +10,14 @@ export interface PosProxyOptions {
 const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
 /**
+ * Match on a path-segment boundary, so '/api/pos' does not also admit
+ * '/api/posturing'. Same shape as the API's own portalScope prefix check.
+ */
+function isUnderApiPos(pathname: string): boolean {
+  return pathname === '/api/pos' || pathname.startsWith('/api/pos/')
+}
+
+/**
  * Shared POS middleware for apps/pos and apps/kds.
  *
  * Mirrors apps/web/src/proxy.ts, with one deliberate difference: apps/web mints
@@ -39,10 +47,16 @@ export function createPosProxy(opts: PosProxyOptions) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      // The app's own session endpoint performs the PIN exchange and sets the
-      // cookie. It must not be proxied to the API or gated on having a session
-      // — it is how you get one.
-      if (pathname.startsWith('/api/session')) {
+      // Only /api/pos/* is forwarded upstream. Everything else under /api is
+      // one of the app's OWN route handlers — the PIN exchange that sets the
+      // cookie, the KDS socket ticket — and each does its own auth.
+      //
+      // An allowlist rather than a denylist, because getting it the other way
+      // round fails silently: a new local route gets rewritten to the API,
+      // which 404s, and the app looks broken for a reason nothing points at.
+      // Forwarding anything outside /api/pos was never useful anyway —
+      // requireAuth confines a POS token to exactly that prefix.
+      if (!isUnderApiPos(pathname)) {
         return NextResponse.next()
       }
 

@@ -89,6 +89,23 @@ beforeEach(() => {
 })
 
 describe('POST /api/pos/tickets/fire', () => {
+  it('broadcasts the STORED items, so every one carries an id', async () => {
+    await request(makeApp())
+      .post('/api/pos/tickets/fire')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ order_id: ORDER_ID })
+
+    const [, , event] = broadcastToLocation.mock.calls[0] as [
+      string,
+      string,
+      { ticket: { items: { id?: string }[] } },
+    ]
+    expect(event.ticket.items).toHaveLength(1)
+    // The pre-insert rows have no id. A screen that receives them cannot
+    // address an individual line, and React renders them all under one key.
+    expect(event.ticket.items[0]!.id).toBeTruthy()
+  })
+
   it('creates one ticket per station with snapshotted line text', async () => {
     const res = await request(makeApp())
       .post('/api/pos/tickets/fire')

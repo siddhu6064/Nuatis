@@ -11,3 +11,4 @@ export {
 } from './session'
 export { createPosProxy, type PosProxyOptions } from './proxy'
 export { createSessionRoute, type SessionRoute, type SessionRouteOptions } from './session-route'
+export { createSocketTicketRoute, type SocketTicketRoute } from './socket-ticket-route'

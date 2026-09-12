@@ -159,13 +159,21 @@ router.post(
         sort_order: index,
       }))
 
-      const { error: itemsError } = await supabase.from('kitchen_ticket_items').insert(itemRows)
+      // .select() so the broadcast carries the STORED rows, with their ids.
+      // Sending the pre-insert array instead gives every kitchen screen items
+      // with no id — invisible until something needs to address one of them,
+      // and React quietly renders them all under the same undefined key.
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from('kitchen_ticket_items')
+        .insert(itemRows)
+        .select()
+
       if (itemsError) {
         res.status(500).json({ error: 'Failed to create kitchen ticket items' })
         return
       }
 
-      const payload = { ...ticket, station: station || null, items: itemRows }
+      const payload = { ...ticket, station: station || null, items: insertedItems ?? itemRows }
       created.push(payload)
       broadcastToLocation(authed.tenantId, locationId, {
         type: 'ticket.fired',

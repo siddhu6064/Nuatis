@@ -132,7 +132,7 @@ describe('CSRF', () => {
   })
 })
 
-describe('session route passthrough', () => {
+describe("the app's own API routes", () => {
   it('never intercepts /api/session — it is how you sign in', async () => {
     const res = await proxy(req('/api/session', { method: 'POST' }))
     expect(res.status).not.toBe(401)
@@ -142,6 +142,27 @@ describe('session route passthrough', () => {
   it('still CSRF-protects the session route', async () => {
     const res = await proxy(req('/api/session', { method: 'POST', origin: 'https://evil.example' }))
     expect(res.status).toBe(403)
+  })
+
+  it('leaves the KDS socket ticket to the app, which does its own auth', async () => {
+    const res = await proxy(req('/api/socket-ticket'))
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull()
+    expect(res.status).not.toBe(401)
+  })
+
+  it('forwards nothing outside /api/pos — a POS token cannot reach it anyway', async () => {
+    const res = await proxy(req('/api/contacts', { cookie: live() }))
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+
+  it('does not treat /api/posturing as /api/pos', async () => {
+    const res = await proxy(req('/api/posturing', { cookie: live() }))
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+
+  it('still forwards /api/pos itself', async () => {
+    const res = await proxy(req('/api/pos', { cookie: live() }))
+    expect(res.headers.get('x-middleware-rewrite')).toContain('/api/pos')
   })
 })
 
