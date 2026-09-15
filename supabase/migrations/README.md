@@ -40,20 +40,58 @@ the `0001`-style numbers used for filenames here, so the two lists will not
 look alike. The numbered filenames are this repo's convention; the database is
 the authority on what actually ran.
 
-**Next migration number: 0199.**
+**Next migration number: 0204.**
 
 ## Migration log
 
-| File                         | Description                                       | Date       | Applied to prod |
-| ---------------------------- | ------------------------------------------------- | ---------- | --------------- |
-| 0001_initial_schema.sql      | Full schema — 17 tables, RLS, indexes, functions  | 2026-03-23 | yes             |
-| …                            | (log unmaintained between 0002 and 0194)          |            |                 |
-| 0195_pos_menu.sql            | POS menu model; widen `orders.source` to `'pos'`  | 2026-09-11 | yes — verified  |
-| 0196_pos_kitchen_tickets.sql | Kitchen tickets + ticket items for the KDS        | 2026-09-11 | yes — verified  |
-| 0197_pos_cash_drawer.sql     | Cash drawer sessions + cash events                | 2026-09-11 | yes — verified  |
-| 0198_pos_terminal_pin.sql    | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
+| File                                  | Description                                       | Date       | Applied to prod |
+| ------------------------------------- | ------------------------------------------------- | ---------- | --------------- |
+| 0001_initial_schema.sql               | Full schema — 17 tables, RLS, indexes, functions  | 2026-03-23 | yes             |
+| …                                     | (log unmaintained between 0002 and 0194)          |            |                 |
+| 0195_pos_menu.sql                     | POS menu model; widen `orders.source` to `'pos'`  | 2026-09-11 | yes — verified  |
+| 0196_pos_kitchen_tickets.sql          | Kitchen tickets + ticket items for the KDS        | 2026-09-11 | yes — verified  |
+| 0197_pos_cash_drawer.sql              | Cash drawer sessions + cash events                | 2026-09-11 | yes — verified  |
+| 0198_pos_terminal_pin.sql             | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
+| 0199_incidents.sql                    | Incident tracking + `tasks.incident_id`           | 2026-09-15 | yes — verified  |
+| 0200_incident_authoriser.sql          | `staff_members.pos_can_authorise`                 | 2026-09-15 | yes — verified  |
+| 0201_incident_sla_breach.sql          | `incidents.sla_breached_at` + partial index       | 2026-09-15 | yes — verified  |
+| 0202_incident_sla_open_index.sql      | Drop the SLA index nothing reads any more         | 2026-09-15 | yes — verified  |
+| 0203_incident_automation_triggers.sql | Incident trigger types on `custom_automations`    | 2026-09-15 | yes — verified  |
 
 0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
 9 `current_tenant_id()` policies, and `orders_source_check` reading
 `['staff','maya','pos']`. They are written to be **re-runnable**, so pasting
 one again is a no-op rather than an error.
+
+0199 was applied 2026-09-15 and verified live: 4 incident tables, RLS true on
+all 4, 4 `current_tenant_id()` policies, `incidents.cost_cents` as `integer`
+(not `numeric`), plus `tasks.incident_id` and
+`tenants.incident_auth_threshold_cents`. Re-running it is a no-op.
+
+0200, 0201 and 0202 were applied 2026-09-15. 0201 adds
+`incidents.sla_breached_at` — the column is what makes the SLA scanner notify
+once rather than every 15 minutes.
+
+0201 also created a partial index on unbreached rows, which 0202 drops again:
+once escalation rules gained a delay, the scanner had to revisit incidents it
+had already stamped, and the query it now runs is served by 0199's
+`idx_incidents_sla`. 0202 only drops, deliberately — recreating that index
+under a new name would have left the table carrying two identical indexes.
+Run in order, these land on the right state; 0201 re-run _on its own_ would
+recreate the dead index, so follow it with 0202.
+
+0203 was applied 2026-09-15 and verified live: the
+`custom_automations_trigger_type_check` constraint now also accepts
+`incident_created` and `incident_breached`. Altering a CHECK means dropping and
+recreating it, so the migration does both under the same constraint name and is
+safe to re-run.
+
+**Checking the next free number:** `max(name)` on
+`supabase_migrations.schema_migrations` does _not_ work — the table holds
+non-numeric names too, and `weekly_digest` sorts above `0198`. Order by the
+numeric prefix instead:
+
+```sql
+select name from supabase_migrations.schema_migrations
+ where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;
+```

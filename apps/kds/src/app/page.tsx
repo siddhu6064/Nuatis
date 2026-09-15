@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import CircularProgress from '@mui/material/CircularProgress'
 import { TicketCard } from '@/components/TicketCard'
 import { StationFilter } from '@/components/StationFilter'
+import { ReportTicketIssueDialog, type IncidentType } from '@/components/ReportTicketIssueDialog'
 import { usePosSocket } from '@nuatis/pos-web/ui'
 import {
   applyEvent,
@@ -34,6 +36,9 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyTicketId, setBusyTicketId] = useState<string | null>(null)
+  const [incidentTypes, setIncidentTypes] = useState<IncidentType[]>([])
+  const [reportingTicket, setReportingTicket] = useState<Ticket | null>(null)
+  const [reportedRef, setReportedRef] = useState<string | null>(null)
   // One clock for the whole board rather than a timer per card: fifty cards
   // each running their own interval is fifty re-renders a second.
   const [now, setNow] = useState(() => Date.now())
@@ -55,7 +60,18 @@ export default function BoardPage() {
     async function load() {
       try {
         const params = new URLSearchParams({ location_id: LOCATION_ID })
-        const res = await fetch(`/api/pos/tickets?${params.toString()}`)
+        const [res, typesRes] = await Promise.all([
+          fetch(`/api/pos/tickets?${params.toString()}`),
+          fetch('/api/pos/incidents/types'),
+        ])
+
+        // A failure here costs the report button, not the board. A kitchen
+        // display that will not show tickets because a reporting feature failed
+        // would be a poor trade.
+        if (typesRes.ok) {
+          const body = (await typesRes.json()) as { types: IncidentType[] }
+          setIncidentTypes(body.types)
+        }
 
         if (res.status === 401) {
           // The 12h session ran out. Back to the PIN screen rather than an
@@ -201,10 +217,25 @@ export default function BoardPage() {
               onStart={() => void setStatus(ticket, 'in_progress')}
               onReady={() => void setStatus(ticket, 'ready')}
               onBump={() => void setStatus(ticket, 'bumped')}
+              onReportIssue={() => setReportingTicket(ticket)}
             />
           ))}
         </Box>
       )}
+
+      <ReportTicketIssueDialog
+        ticket={reportingTicket}
+        types={incidentTypes}
+        onClose={() => setReportingTicket(null)}
+        onReported={setReportedRef}
+      />
+
+      <Snackbar
+        open={reportedRef !== null}
+        autoHideDuration={4000}
+        onClose={() => setReportedRef(null)}
+        message={`Reported as ${reportedRef}`}
+      />
     </Box>
   )
 }

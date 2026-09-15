@@ -14,6 +14,7 @@
       "@/*": ["./src/*"],
       "@nuatis/pos-web": ["../../packages/pos-web/src/index.ts"],
       "@nuatis/pos-web/tickets": ["../../packages/pos-web/src/tickets.ts"],
+      "@nuatis/pos-web/incidents": ["../../packages/pos-web/src/incidents.ts"],
       "@nuatis/pos-web/ui": ["../../packages/pos-web/src/ui/index.ts"]
     }
   },

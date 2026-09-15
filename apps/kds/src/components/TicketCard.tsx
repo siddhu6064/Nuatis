@@ -14,6 +14,7 @@ interface TicketCardProps {
   onStart: () => void
   onReady: () => void
   onBump: () => void
+  onReportIssue: () => void
   busy: boolean
 }
 
@@ -23,7 +24,15 @@ const TONE_COLOR = {
   late: 'error.main',
 } as const
 
-export function TicketCard({ ticket, now, onStart, onReady, onBump, busy }: TicketCardProps) {
+export function TicketCard({
+  ticket,
+  now,
+  onStart,
+  onReady,
+  onBump,
+  onReportIssue,
+  busy,
+}: TicketCardProps) {
   const tone = ageTone(ticket.fired_at, now)
   const started = ticket.status === 'in_progress'
   const ready = ticket.status === 'ready'
@@ -136,6 +145,22 @@ export function TicketCard({ ticket, now, onStart, onReady, onBump, busy }: Tick
             Handed over
           </Button>
         )}
+      </Box>
+
+      {/* Deliberately small and below the bump row. A remake is the rare
+          action, and it must not sit anywhere a cook clearing tickets at speed
+          can hit it by accident. */}
+      <Box sx={{ px: 1.5, pb: 1.5 }}>
+        <Button
+          variant="text"
+          size="small"
+          color="inherit"
+          onClick={onReportIssue}
+          disabled={busy}
+          sx={{ opacity: 0.7 }}
+        >
+          Report issue
+        </Button>
       </Box>
     </Paper>
   )
