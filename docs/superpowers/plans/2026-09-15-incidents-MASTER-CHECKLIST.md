@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 9 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 10 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**9 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**10 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -207,17 +207,29 @@ select i.reference, i.cost_cents, i.authorised_by_staff_id,
 
 ### Phase A5 — dashboard and reporting _(tasks 7, 10, 11)_
 
-> Task 7 done — the reporting **data** is ticked below. The three view boxes
-> (queue, detail, nav entry) belong to tasks 10 and 11 and are still open.
+> Tasks 7 and 10 done; task 11 (the reporting **view**) is the one box still
+> open. Verified in the browser as the demo tenant: the queue listed all 14
+> incidents with severity, cost and status; INC-1013 triaged and then resolved
+> through the UI, with Resolve correctly disabled until a root cause was
+> entered; the database confirmed `root_cause`, `resolved_at` and a timeline of
+> `reported → status_changed → status_changed`.
+>
+> **Known gap in the shared nav gate:** `Sidebar.tsx` uses
+> `modules[m] !== false`, so an **absent** key reads as enabled. Every tenant
+> provisioned through upgrade-to-suite gets explicit booleans, but a tenant
+> whose `modules` predates this module will see Incidents in the nav and then
+> meet a 403 from the API. The board handles that with a clear "not enabled on
+> this plan" message rather than a broken screen. Changing the gate's semantics
+> would affect every module and belongs in its own change.
 >
 > Proved live with the scenario the per-staff table exists for: six $9.99 comps
 > from one cashier, every one under the $10 threshold and none prompting for a
 > manager. The report shows Alex Brown at **$77.94 across 12 incidents** — one
 > row, impossible to miss. Recurrence picked up both patterns at the location.
 
-- [ ] `/incidents` queue: filter by status, severity, type, assignee
-- [ ] Detail view shows the `incident_events` timeline in order
-- [ ] Nav entry gated on the module, using the **existing** gating mechanism
+- [x] `/incidents` queue: filter by status, severity, type, assignee
+- [x] Detail view shows the `incident_events` timeline in order
+- [x] Nav entry gated on the module, using the **existing** gating mechanism
 - [x] Reporting: cost by type this month
 - [x] Reporting groups by `type_key`, not label, so renaming a category does not
       change last month's numbers
