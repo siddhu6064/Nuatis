@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 3 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 4 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**3 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**4 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -77,6 +77,12 @@ before writing a line of SQL.
 > **Demo tenant:** moved to the `scale` plan with all 15 modules explicitly
 > enabled on 2026-09-15, so it will not 403 on `/api/incidents` during task 6
 > verification. The other production tenant is untouched and still on `core`.
+>
+> Its `vertical` is `sales_crm` but it has 18 menu items and runs the restaurant
+> POS, so the lazy seed would have given it the generic default types. Its six
+> restaurant types were inserted directly instead of changing the vertical,
+> which would ripple into CRM custom fields, booking and Maya prompts. Incident
+> types are tenant-editable rows, so this is configuration, not a workaround.
 
 - [x] Migration creates `incidents`, `incident_types`, `incident_rules`,
       `incident_events`, plus `tasks.incident_id`
@@ -105,11 +111,11 @@ npm test --workspace=@nuatis/api -- src/lib/incident-module.test.ts   # 4 pass
 
 ### Phase A2 — core service and routes _(tasks 3, 4, 6)_
 
-> Task 3 done. Tasks 4 and 6 not started — the boxes below that mention types
-> seeding and `/api/incidents` are theirs.
+> Tasks 3 and 4 done. Task 6 not started — the boxes below mentioning
+> `/api/incidents`, foreign-key ownership and the no-op transition are its.
 
 - [x] SLA derivation, threshold rule and transition map are pure and tested
-- [ ] Incident types seed **lazily on first read**, so tenants created before
+- [x] Incident types seed **lazily on first read**, so tenants created before
       this shipped get them too
 - [ ] `/api/incidents` — list with filters, detail with timeline, create, patch
 - [ ] Every foreign key from a request body proven tenant-owned before write —
