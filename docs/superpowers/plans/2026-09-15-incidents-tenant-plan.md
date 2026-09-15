@@ -1278,47 +1278,196 @@ git commit -m "feat(incidents): POS report route with manager-PIN authorisation"
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `apps/api/src/routes/incidents.integration.test.ts` with the same harness as Task 5, but seeding `modules: { incidents: true }` and mounting at `/api/incidents`. Cover:
+Create `apps/api/src/routes/incidents.integration.test.ts`. The harness is the same as Task 5's — `jest.unstable_mockModule('@supabase/supabase-js', …)`, `createStore`, `createMockSupabase`, `seedEntitledTenant`, `mintTestToken` — but seed `modules: { incidents: true }` and mount at `/api/incidents`.
 
 ```ts
+import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+import { mintTestToken } from './__test-support__/jwt.js'
+import {
+  createStore,
+  createMockSupabase,
+  type MockStore,
+} from './__test-support__/supabase-mock.js'
+import { seedEntitledTenant } from './__test-support__/tenant-fixture.js'
+
+let store: MockStore = createStore()
+
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
+  createClient: () => createMockSupabase(store),
+}))
+
+const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000dsh0001'
+const OTHER_TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000dsh0002'
+const USER_ID = 'eeeeeeee-0000-0000-0000-00000user001'
+const OTHER_USER_ID = 'eeeeeeee-0000-0000-0000-00000user002'
+const INCIDENT_ID = 'ffffffff-0000-0000-0000-00000inc0001'
+const SECRET = process.env['AUTH_SECRET'] ?? 'test-secret-for-unit-tests-only-32ch'
+process.env['AUTH_SECRET'] = SECRET
+process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
+process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
+
+async function makeToken(): Promise<string> {
+  return mintTestToken(
+    { sub: USER_ID, appUserId: USER_ID, tenantId: TENANT_ID, role: 'owner' },
+    { secret: SECRET }
+  )
+}
+
+const { default: express } = await import('express')
+const { default: request } = await import('supertest')
+const { default: incidentsRouter } = await import('./incidents.js')
+
+function makeApp() {
+  const app = express()
+  app.use(express.json())
+  app.use('/api/incidents', incidentsRouter)
+  return app
+}
+
+function incidentRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: INCIDENT_ID,
+    tenant_id: TENANT_ID,
+    reference: 'INC-1001',
+    type_key: 'wrong_item',
+    severity: 'medium',
+    status: 'open',
+    title: 'Wrong side',
+    cost_cents: 450,
+    assigned_to_user_id: null,
+    resolved_at: null,
+    root_cause: null,
+    created_at: '2026-09-15T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  store = createStore()
+  seedEntitledTenant(store, TENANT_ID, { modules: { incidents: true } })
+  store.tables['users'] = [
+    { id: USER_ID, tenant_id: TENANT_ID, name: 'Dana' },
+    { id: OTHER_USER_ID, tenant_id: OTHER_TENANT_ID, name: 'Someone else' },
+  ]
+  store.tables['incidents'] = [incidentRow()]
+  store.tables['incident_events'] = []
+})
+
 describe('GET /api/incidents', () => {
-  it('lists only the caller tenant’s incidents', async () => {
-    /* seed two tenants, expect one */
+  it("lists only the caller tenant's incidents", async () => {
+    store.tables['incidents']!.push(
+      incidentRow({ id: 'foreign', tenant_id: OTHER_TENANT_ID, reference: 'INC-9999' })
+    )
+
+    const res = await request(makeApp())
+      .get('/api/incidents')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.data).toHaveLength(1)
+    expect(res.body.data[0].reference).toBe('INC-1001')
   })
+
   it('filters by status', async () => {
-    /* ?status=open */
+    store.tables['incidents']!.push(
+      incidentRow({ id: 'done', status: 'resolved', reference: 'INC-1002' })
+    )
+
+    const res = await request(makeApp())
+      .get('/api/incidents?status=resolved')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.body.data).toHaveLength(1)
+    expect(res.body.data[0].reference).toBe('INC-1002')
   })
+
   it('filters by severity', async () => {
-    /* ?severity=critical */
+    store.tables['incidents']!.push(
+      incidentRow({ id: 'crit', severity: 'critical', reference: 'INC-1003' })
+    )
+
+    const res = await request(makeApp())
+      .get('/api/incidents?severity=critical')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.body.data).toHaveLength(1)
+    expect(res.body.data[0].reference).toBe('INC-1003')
   })
+
   it('refuses a tenant without the incidents module', async () => {
-    /* expect 403 */
+    seedEntitledTenant(store, TENANT_ID, { modules: { incidents: false } })
+
+    const res = await request(makeApp())
+      .get('/api/incidents')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(403)
   })
 })
 
 describe('PATCH /api/incidents/:id', () => {
+  function patch(body: unknown, token: string) {
+    return request(makeApp())
+      .patch(`/api/incidents/${INCIDENT_ID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body as object)
+  }
+
   it('assigns an incident and writes an event', async () => {
-    /* expect incident_events + 1 */
+    const res = await patch({ assigned_to_user_id: USER_ID }, await makeToken())
+
+    expect(res.status).toBe(200)
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe(USER_ID)
+    expect(store.tables['incident_events']).toHaveLength(1)
+    expect(store.tables['incident_events']![0]!['kind']).toBe('assigned')
   })
+
   it('rejects an assignee from another tenant', async () => {
-    /* expect 400 */
+    const res = await patch({ assigned_to_user_id: OTHER_USER_ID }, await makeToken())
+
+    expect(res.status).toBe(400)
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
   })
+
   it('resolves with a root cause', async () => {
-    /* status resolved, resolved_at set */
+    const res = await patch(
+      { status: 'resolved', root_cause: 'Kitchen misread the ticket' },
+      await makeToken()
+    )
+
+    expect(res.status).toBe(200)
+    expect(store.tables['incidents']![0]!['status']).toBe('resolved')
+    expect(store.tables['incidents']![0]!['resolved_at']).toBeTruthy()
+    expect(store.tables['incidents']![0]!['root_cause']).toBe('Kitchen misread the ticket')
   })
+
   it('refuses to reopen a resolved incident', async () => {
-    /* expect 400 */
+    store.tables['incidents'] = [incidentRow({ status: 'resolved' })]
+
+    const res = await patch({ status: 'open' }, await makeToken())
+
+    expect(res.status).toBe(400)
+    expect(store.tables['incidents']![0]!['status']).toBe('resolved')
   })
+
   it('refuses a no-op transition so no empty event row is written', async () => {
-    /* expect 400 */
+    const res = await patch({ status: 'open' }, await makeToken())
+
+    expect(res.status).toBe(400)
+    expect(store.tables['incident_events']).toHaveLength(0)
   })
-  it('404s for another tenant’s incident and writes nothing', async () => {
-    /* expect 404 */
+
+  it("404s for another tenant's incident and writes nothing", async () => {
+    store.tables['incidents'] = [incidentRow({ tenant_id: OTHER_TENANT_ID })]
+
+    const res = await patch({ status: 'triaged' }, await makeToken())
+
+    expect(res.status).toBe(404)
+    expect(store.tables['incidents']![0]!['status']).toBe('open')
+    expect(store.tables['incident_events']).toHaveLength(0)
   })
 })
 ```
-
-Write each body out in full — the assertions follow the same shape as Task 5's.
 
 - [ ] **Step 2: Run them and watch them fail**
 
@@ -1330,18 +1479,296 @@ Expected: FAIL — module not found.
 
 - [ ] **Step 3: Write the route**
 
-Create `apps/api/src/routes/incidents.ts`. Structure:
+Create `apps/api/src/routes/incidents.ts`:
 
-- `GET /` — list, tenant-scoped, optional `status`, `severity`, `type_key`, `assigned_to_user_id` filters, newest first, paginated exactly as `routes/orders.ts` does (`page`, `limit`, capped at 100).
-- `GET /:id` — one incident plus its `incident_events`, both tenant-scoped.
-- `POST /` — create from the dashboard. `reported_by_user_id = authed.appUserId`. No PIN path: a dashboard user is already authenticated as a person, and the manager-PIN threshold exists because the register is a shared device.
-- `PATCH /:id` — triage, assign, resolve. Every change:
-  1. loads the incident tenant-scoped, 404 if absent;
-  2. for a status change, calls `canTransition(current, next)` and 400s if false;
-  3. proves `assigned_to_user_id` belongs to the tenant before writing it;
-  4. writes one `incident_events` row describing what changed.
+```ts
+import { Router, type Request, type Response } from 'express'
+import { getServiceClient } from '../lib/supabase.js'
+import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requireIncidents } from '../lib/incident-module.js'
+import {
+  canTransition,
+  generateIncidentReference,
+  slaDueAt,
+  INCIDENT_STATUSES,
+  SEVERITIES,
+  type IncidentStatus,
+  type Severity,
+} from '../lib/incidents.js'
 
-All four handlers are `requireAuth, requireIncidents`.
+const router = Router()
+
+interface IncidentRow {
+  id: string
+  status: IncidentStatus
+  assigned_to_user_id: string | null
+}
+
+// ── GET /api/incidents ──────────────────────────────────────────────────────
+router.get(
+  '/',
+  requireAuth,
+  requireIncidents,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const page = Math.max(1, Number(req.query['page']) || 1)
+    const limit = Math.min(100, Math.max(1, Number(req.query['limit']) || 50))
+    const from = (page - 1) * limit
+
+    let query = supabase
+      .from('incidents')
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', authed.tenantId)
+
+    const status = req.query['status']
+    if (typeof status === 'string' && (INCIDENT_STATUSES as readonly string[]).includes(status)) {
+      query = query.eq('status', status)
+    }
+    const severity = req.query['severity']
+    if (typeof severity === 'string' && (SEVERITIES as readonly string[]).includes(severity)) {
+      query = query.eq('severity', severity)
+    }
+    const typeKey = req.query['type_key']
+    if (typeof typeKey === 'string' && typeKey !== '') query = query.eq('type_key', typeKey)
+    const assignee = req.query['assigned_to_user_id']
+    if (typeof assignee === 'string' && assignee !== '') {
+      query = query.eq('assigned_to_user_id', assignee)
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, from + limit - 1)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+    res.json({ data: data ?? [], total: count ?? 0, page })
+  }
+)
+
+// ── GET /api/incidents/:id ──────────────────────────────────────────────────
+router.get(
+  '/:id',
+  requireAuth,
+  requireIncidents,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const { data: incident } = await supabase
+      .from('incidents')
+      .select('*')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle()
+
+    if (!incident) {
+      res.status(404).json({ error: 'Incident not found' })
+      return
+    }
+
+    const { data: events } = await supabase
+      .from('incident_events')
+      .select('*')
+      .eq('tenant_id', authed.tenantId)
+      .eq('incident_id', req.params['id'])
+
+    const timeline = ((events ?? []) as { at: string }[]).sort((a, b) => a.at.localeCompare(b.at))
+    res.json({ incident, events: timeline })
+  }
+)
+
+// ── POST /api/incidents ─────────────────────────────────────────────────────
+// No manager-PIN path here. The threshold exists because the register is a
+// shared device in a public room; a dashboard user is already authenticated as
+// a named person, and their user id lands on the row.
+router.post(
+  '/',
+  requireAuth,
+  requireIncidents,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const body = req.body as Record<string, unknown>
+
+    const typeKey = typeof body['type_key'] === 'string' ? body['type_key'] : ''
+    const title = typeof body['title'] === 'string' ? body['title'].trim() : ''
+    const costCents = typeof body['cost_cents'] === 'number' ? body['cost_cents'] : 0
+
+    if (!typeKey || !title) {
+      res.status(400).json({ error: 'type_key and title are required' })
+      return
+    }
+    if (!Number.isInteger(costCents) || costCents < 0) {
+      res.status(400).json({ error: 'cost_cents must be a non-negative integer' })
+      return
+    }
+
+    const { data: type } = await supabase
+      .from('incident_types')
+      .select('key, default_severity, requires_cost')
+      .eq('tenant_id', authed.tenantId)
+      .eq('key', typeKey)
+      .is('deleted_at', null)
+      .maybeSingle<{ key: string; default_severity: Severity; requires_cost: boolean }>()
+
+    if (!type) {
+      res.status(400).json({ error: `Unknown incident type: ${typeKey}` })
+      return
+    }
+    if (type.requires_cost && costCents <= 0) {
+      res.status(400).json({ error: 'This incident type needs an amount' })
+      return
+    }
+
+    const severity = (SEVERITIES as readonly string[]).includes(String(body['severity']))
+      ? (body['severity'] as Severity)
+      : type.default_severity
+
+    const now = new Date()
+    const reference = await generateIncidentReference(authed.tenantId)
+
+    const { data: incident, error } = await supabase
+      .from('incidents')
+      .insert({
+        tenant_id: authed.tenantId,
+        reference,
+        type_key: type.key,
+        severity,
+        status: 'open',
+        title,
+        description: typeof body['description'] === 'string' ? body['description'] : null,
+        cost_cents: costCents,
+        reported_by_user_id: authed.appUserId,
+        sla_due_at: slaDueAt(severity, now).toISOString(),
+      })
+      .select('*')
+      .single<{ id: string }>()
+
+    if (error || !incident) {
+      res.status(500).json({ error: error?.message ?? 'Failed to create incident' })
+      return
+    }
+
+    await supabase.from('incident_events').insert({
+      tenant_id: authed.tenantId,
+      incident_id: incident.id,
+      actor_kind: 'user',
+      actor_id: authed.appUserId,
+      kind: 'reported',
+      detail: { cost_cents: costCents },
+    })
+
+    res.status(201).json({ incident })
+  }
+)
+
+// ── PATCH /api/incidents/:id ────────────────────────────────────────────────
+router.patch(
+  '/:id',
+  requireAuth,
+  requireIncidents,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const body = req.body as Record<string, unknown>
+
+    const { data: current } = await supabase
+      .from('incidents')
+      .select('id, status, assigned_to_user_id')
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle<IncidentRow>()
+
+    if (!current) {
+      res.status(404).json({ error: 'Incident not found' })
+      return
+    }
+
+    const patch: Record<string, unknown> = {}
+    const events: { kind: string; detail: Record<string, unknown> }[] = []
+
+    // Assignment. The assignee must belong to this tenant — service-role
+    // bypasses RLS, so this check is the boundary.
+    if (typeof body['assigned_to_user_id'] === 'string') {
+      const assignee = body['assigned_to_user_id']
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', assignee)
+        .eq('tenant_id', authed.tenantId)
+        .maybeSingle<{ id: string }>()
+
+      if (!user) {
+        res.status(400).json({ error: 'Assignee not found' })
+        return
+      }
+      patch['assigned_to_user_id'] = assignee
+      events.push({ kind: 'assigned', detail: { assigned_to_user_id: assignee } })
+    }
+
+    // Status. The transition map is the rule, and it refuses a no-op so an event
+    // row is never written for a change that did not happen.
+    if (typeof body['status'] === 'string') {
+      const next = body['status'] as IncidentStatus
+      if (!(INCIDENT_STATUSES as readonly string[]).includes(next)) {
+        res.status(400).json({ error: `status must be one of: ${INCIDENT_STATUSES.join(', ')}` })
+        return
+      }
+      if (!canTransition(current.status, next)) {
+        res.status(400).json({ error: `Cannot move an incident from ${current.status} to ${next}` })
+        return
+      }
+      patch['status'] = next
+      if (next === 'resolved') patch['resolved_at'] = new Date().toISOString()
+      events.push({ kind: 'status_changed', detail: { from: current.status, to: next } })
+    }
+
+    if (typeof body['root_cause'] === 'string') patch['root_cause'] = body['root_cause']
+    if (typeof body['resolution_notes'] === 'string') {
+      patch['resolution_notes'] = body['resolution_notes']
+    }
+
+    if (Object.keys(patch).length === 0) {
+      res.status(400).json({ error: 'Nothing to update' })
+      return
+    }
+
+    patch['updated_at'] = new Date().toISOString()
+
+    const { data: updated, error } = await supabase
+      .from('incidents')
+      .update(patch)
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .select('*')
+      .single()
+
+    if (error || !updated) {
+      res.status(500).json({ error: error?.message ?? 'Failed to update incident' })
+      return
+    }
+
+    for (const e of events) {
+      await supabase.from('incident_events').insert({
+        tenant_id: authed.tenantId,
+        incident_id: current.id,
+        actor_kind: 'user',
+        actor_id: authed.appUserId,
+        kind: e.kind,
+        detail: e.detail,
+      })
+    }
+
+    res.json({ incident: updated })
+  }
+)
+
+export default router
+```
 
 - [ ] **Step 4: Mount the router**
 
@@ -1722,91 +2149,283 @@ git commit -m "feat(incidents): reporting view with per-staff comp totals"
 
 ---
 
-### Task 12: SLA scanner, escalation rules and automation triggers
+### Task 12: SLA breach scanner
+
+> Split out from what was one oversized task. Breach detection, escalation rules
+> and automation triggers are three deliverables a reviewer could accept or
+> reject independently, so they are three tasks. This one must work on its own:
+> an incident that breaches its SLA notifies the owner, exactly once.
 
 **Files:**
 
 - Create: `apps/api/src/workers/incident-sla-scanner.ts`
 - Create: `apps/api/src/workers/incident-sla-scanner.test.ts`
 - Modify: `apps/api/src/workers/index.ts`
+- Modify: `supabase/migrations/0199_incidents.sql`
 
 **Interfaces:**
 
 - Consumes: `createBullMQConnection` from `lib/bullmq-connection.js`; `getPausedTenants` from `lib/scanner-pause.js`; `notifyOwner` from `lib/notifications.js`.
-- Produces: `scan(): Promise<void>` and `createIncidentSlaScanner(): { queue: Queue; worker: Worker }`.
+- Produces: `scan(): Promise<void>`, `createIncidentSlaScanner(): { queue: Queue; worker: Worker }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Add the breach marker column**
 
-Create `apps/api/src/workers/incident-sla-scanner.test.ts`, modelled on `apps/api/src/workers/invoice-overdue.test.ts`:
+Append to `supabase/migrations/0199_incidents.sql`:
+
+```sql
+-- Set the first time the scanner notices a breach, so it notifies once rather
+-- than on every tick. A scanner that re-notifies every 15 minutes gets muted,
+-- and a muted SLA is decorative.
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS sla_breached_at timestamptz;
+```
+
+Re-apply the migration. It is idempotent, so this is safe.
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `apps/api/src/workers/incident-sla-scanner.test.ts`:
 
 ```ts
-it('selects only incidents past their SLA that are still live', async () => {
-  // Seed: one overdue open, one overdue resolved, one future open.
-  // Expect exactly one notification.
+import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+import {
+  createStore,
+  createMockSupabase,
+  type MockStore,
+} from '../routes/__test-support__/supabase-mock.js'
+
+let store: MockStore = createStore()
+const notifyOwner = jest.fn<() => Promise<void>>()
+const getPausedTenants = jest.fn<() => Promise<Set<string>>>()
+
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
+  createClient: () => createMockSupabase(store),
+}))
+jest.unstable_mockModule('../lib/notifications.js', () => ({ notifyOwner }))
+jest.unstable_mockModule('../lib/scanner-pause.js', () => ({ getPausedTenants }))
+
+const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000sla0001'
+process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
+process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
+
+const { scan } = await import('./incident-sla-scanner.js')
+
+const PAST = '2026-09-15T10:00:00.000Z'
+const FUTURE = '2099-01-01T00:00:00.000Z'
+
+function incident(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inc-1',
+    tenant_id: TENANT_ID,
+    reference: 'INC-1001',
+    severity: 'critical',
+    status: 'open',
+    sla_due_at: PAST,
+    sla_breached_at: null,
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  store = createStore()
+  notifyOwner.mockClear()
+  getPausedTenants.mockClear()
+  getPausedTenants.mockResolvedValue(new Set<string>())
+  store.tables['incidents'] = []
 })
 
-it('notifies once, not on every tick', async () => {
-  await scan()
-  await scan()
-  expect(notifyOwner).toHaveBeenCalledTimes(1)
-})
+describe('incident-sla-scanner', () => {
+  it('selects only live incidents past their SLA', async () => {
+    store.tables['incidents'] = [
+      incident({ id: 'overdue-open' }),
+      incident({ id: 'overdue-resolved', status: 'resolved' }),
+      incident({ id: 'not-yet', sla_due_at: FUTURE }),
+    ]
 
-it('skips paused tenants like every other scanner', async () => {
-  // getPausedTenants returns the tenant; expect no notification.
-})
+    await scan()
 
-it('applies an assign_to rule on breach', async () => {
-  // Seed an enabled rule matching severity 'critical'; expect the incident
-  // assigned to its target_user_id.
-})
+    expect(notifyOwner).toHaveBeenCalledTimes(1)
+  })
 
-it('ignores a rule belonging to another tenant', async () => {
-  // A foreign rule must never assign this tenant's incident.
+  it('notifies once, not on every tick', async () => {
+    store.tables['incidents'] = [incident()]
+
+    await scan()
+    await scan()
+
+    expect(notifyOwner).toHaveBeenCalledTimes(1)
+  })
+
+  it('stamps sla_breached_at so the second run has nothing to find', async () => {
+    store.tables['incidents'] = [incident()]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['sla_breached_at']).toBeTruthy()
+  })
+
+  it('skips paused tenants like every other scanner', async () => {
+    store.tables['incidents'] = [incident()]
+    getPausedTenants.mockResolvedValue(new Set([TENANT_ID]))
+
+    await scan()
+
+    expect(notifyOwner).not.toHaveBeenCalled()
+    // And it must not be marked breached, or unpausing would silently swallow it.
+    expect(store.tables['incidents']![0]!['sla_breached_at']).toBeNull()
+  })
+
+  it('does not notify when nothing has breached', async () => {
+    store.tables['incidents'] = [incident({ sla_due_at: FUTURE })]
+
+    await scan()
+
+    expect(notifyOwner).not.toHaveBeenCalled()
+  })
+
+  it('notifies each tenant separately rather than once for all', async () => {
+    store.tables['incidents'] = [
+      incident({ id: 'a', tenant_id: 'tenant-a' }),
+      incident({ id: 'b', tenant_id: 'tenant-b' }),
+    ]
+
+    await scan()
+
+    expect(notifyOwner).toHaveBeenCalledTimes(2)
+  })
 })
 ```
 
-The notify-once test is the important one: a scanner that re-notifies every tick trains people to mute it, and then the SLA is decorative.
+The paused-tenant assertion checks **both** halves: no notification _and_ no breach stamp. Stamping a paused tenant's incident would mean unpausing silently swallows the alert — the incident is already marked breached, so it never fires.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [ ] **Step 3: Run them and watch them fail**
 
 ```bash
 npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts
 ```
 
-Expected: FAIL — module not found.
-
-- [ ] **Step 3: Add a breach marker column**
-
-Append to `supabase/migrations/0199_incidents.sql`:
-
-```sql
--- Set the first time the SLA scanner notices a breach, so it notifies once
--- rather than on every tick.
-ALTER TABLE incidents ADD COLUMN IF NOT EXISTS sla_breached_at timestamptz;
-```
-
-Re-apply; idempotent.
+Expected: FAIL — `Cannot find module './incident-sla-scanner.js'`.
 
 - [ ] **Step 4: Write the scanner**
 
-Create `apps/api/src/workers/incident-sla-scanner.ts`, copying the structure of `workers/invoice-overdue-scanner.ts`: `QUEUE_NAME`, an exported `scan()`, and `createIncidentSlaScanner()` returning `{ queue, worker }`.
+Create `apps/api/src/workers/incident-sla-scanner.ts`:
 
-`scan()`:
+```ts
+import { Queue, Worker } from 'bullmq'
+import { getServiceClient } from '../lib/supabase.js'
+import { notifyOwner } from '../lib/notifications.js'
+import { createBullMQConnection } from '../lib/bullmq-connection.js'
+import { getPausedTenants } from '../lib/scanner-pause.js'
 
-1. `getPausedTenants(QUEUE_NAME)`;
-2. select incidents where `sla_due_at < now()`, `status not in ('resolved','cancelled')`, `sla_breached_at is null`;
-3. drop paused tenants;
-4. stamp `sla_breached_at` — **before** notifying, so a crash mid-notify cannot produce a second alert on the next tick;
-5. evaluate `incident_rules` where `when_event = 'breached'` and `enabled`, tenant-scoped, applying `assign_to` and `notify_owner`;
-6. `notifyOwner(tenantId, 'incident_sla_breached', { pushTitle, pushBody, pushUrl: '/incidents' })` — push and email only. **`notifyOwner` does not send SMS**; its SMS branch is commented out pending a personal phone field on `users`.
+const QUEUE_NAME = 'incident-sla-scanner'
 
-- [ ] **Step 5: Register it on a cron**
+interface BreachedRow {
+  id: string
+  tenant_id: string
+  reference: string
+  severity: string
+}
 
-In `apps/api/src/workers/index.ts`, mirroring the invoice scanner:
+export async function scan(): Promise<void> {
+  console.info('[incident-sla-scanner] scanning for SLA breaches...')
+
+  try {
+    const supabase = getServiceClient()
+    const pausedTenants = await getPausedTenants(QUEUE_NAME)
+    const nowIso = new Date().toISOString()
+
+    // sla_breached_at IS NULL is what makes this notify once. Without it the
+    // same incident is re-reported every 15 minutes until someone resolves it.
+    const { data, error } = await supabase
+      .from('incidents')
+      .select('id, tenant_id, reference, severity')
+      .lt('sla_due_at', nowIso)
+      .is('sla_breached_at', null)
+      .not('status', 'in', '("resolved","cancelled")')
+
+    if (error) {
+      console.error('[incident-sla-scanner] query error:', error.message)
+      return
+    }
+
+    const breached = ((data ?? []) as BreachedRow[]).filter(
+      (row) => !pausedTenants.has(row.tenant_id)
+    )
+
+    if (breached.length === 0) {
+      console.info('[incident-sla-scanner] no breaches')
+      return
+    }
+
+    // Stamp BEFORE notifying. A crash between the two costs one missed
+    // notification; the other order costs a duplicate on every tick forever,
+    // which is how a team learns to ignore the alert.
+    for (const row of breached) {
+      await supabase.from('incidents').update({ sla_breached_at: nowIso }).eq('id', row.id)
+    }
+
+    // One notification per tenant, not per incident: a kitchen that falls
+    // behind generates a dozen breaches at once and a dozen pushes is noise.
+    const byTenant = new Map<string, BreachedRow[]>()
+    for (const row of breached) {
+      const list = byTenant.get(row.tenant_id) ?? []
+      list.push(row)
+      byTenant.set(row.tenant_id, list)
+    }
+
+    for (const [tenantId, rows] of byTenant) {
+      const first = rows[0] as BreachedRow
+      void notifyOwner(tenantId, 'incident_sla_breached', {
+        pushTitle:
+          rows.length === 1 ? `${first.reference} is overdue` : `${rows.length} incidents overdue`,
+        pushBody:
+          rows.length === 1
+            ? `${first.reference} (${first.severity}) passed its response time.`
+            : `${rows.length} incidents have passed their response time.`,
+        pushUrl: '/incidents',
+        // NOTE: no smsBody. notifyOwner's SMS branch is commented out pending a
+        // personal phone field on users — passing one would be silently ignored.
+      })
+    }
+
+    console.info(
+      `[incident-sla-scanner] ${breached.length} breach(es) across ${byTenant.size} tenant(s)`
+    )
+  } catch (err) {
+    console.error('[incident-sla-scanner] scan error:', err)
+  }
+}
+
+export function createIncidentSlaScanner(): { queue: Queue; worker: Worker } {
+  const connection = createBullMQConnection()
+
+  const queue = new Queue(QUEUE_NAME, { connection, skipVersionCheck: true })
+  const worker = new Worker(QUEUE_NAME, async () => scan(), { connection, skipVersionCheck: true })
+
+  worker.on('failed', (job, err) => {
+    console.error(`[incident-sla-scanner] job ${job?.id} failed:`, err)
+  })
+
+  return { queue, worker }
+}
+```
+
+- [ ] **Step 5: Run the tests**
+
+```bash
+npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts
+```
+
+Expected: PASS, 6 tests.
+
+- [ ] **Step 6: Register it on a 15-minute cron**
+
+In `apps/api/src/workers/index.ts`:
 
 ```ts
 import { createIncidentSlaScanner } from './incident-sla-scanner.js'
 ```
+
+and alongside the other scanners:
 
 ```ts
 const incidentSlaScanner = createIncidentSlaScanner()
@@ -1819,25 +2438,406 @@ managed.push({ name: 'incident-sla-scanner', ...incidentSlaScanner })
 console.info('[workers] incident-sla-scanner started, cron */15 * * * *')
 ```
 
-Every 15 minutes, not daily: a one-hour critical SLA checked once a day is not an SLA.
+Every 15 minutes, not the daily `0 9 * * *` the other scanners use. A one-hour critical SLA checked once a day is not an SLA.
 
-- [ ] **Step 6: Emit automation triggers**
+- [ ] **Step 7: Commit**
 
-In `routes/pos/incidents.ts` and `routes/incidents.ts`, after a successful insert, fire `incident_created`; in the scanner, fire `incident_breached`. Follow the existing custom-automation trigger dispatch. Both are fire-and-forget and must not fail the request — a tenant without the automation module simply has no listener.
+```bash
+git add apps/api/src/workers/incident-sla-scanner.ts apps/api/src/workers/incident-sla-scanner.test.ts apps/api/src/workers/index.ts supabase/migrations/0199_incidents.sql
+git commit -m "feat(incidents): SLA breach scanner, notifying once per tenant"
+```
 
-- [ ] **Step 7: Run the tests**
+---
+
+### Task 13: Escalation rules
+
+**Files:**
+
+- Modify: `apps/api/src/workers/incident-sla-scanner.ts`
+- Modify: `apps/api/src/workers/incident-sla-scanner.test.ts`
+
+**Interfaces:**
+
+- Consumes: `incident_rules` rows from Task 1.
+- Produces: `applyRules(tenantId, incidentIds, when): Promise<void>` — exported from the scanner module for testing.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `apps/api/src/workers/incident-sla-scanner.test.ts`:
+
+```ts
+describe('escalation rules', () => {
+  beforeEach(() => {
+    store.tables['incident_rules'] = []
+    store.tables['incident_events'] = []
+  })
+
+  it('applies an assign_to rule on breach', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: TENANT_ID,
+        when_event: 'breached',
+        match_severity: 'critical',
+        match_type_key: null,
+        action: 'assign_to',
+        target_user_id: 'user-oncall',
+        delay_minutes: 0,
+        enabled: true,
+      },
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-oncall')
+  })
+
+  it('ignores a rule belonging to another tenant', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: 'someone-else',
+        when_event: 'breached',
+        match_severity: 'critical',
+        match_type_key: null,
+        action: 'assign_to',
+        target_user_id: 'their-user',
+        delay_minutes: 0,
+        enabled: true,
+      },
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('ignores a disabled rule', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: TENANT_ID,
+        when_event: 'breached',
+        match_severity: 'critical',
+        match_type_key: null,
+        action: 'assign_to',
+        target_user_id: 'user-oncall',
+        delay_minutes: 0,
+        enabled: false,
+      },
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('does not overwrite an assignee a human already chose', async () => {
+    store.tables['incidents'] = [
+      incident({ severity: 'critical', assigned_to_user_id: 'user-dana' }),
+    ]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: TENANT_ID,
+        when_event: 'breached',
+        match_severity: 'critical',
+        match_type_key: null,
+        action: 'assign_to',
+        target_user_id: 'user-oncall',
+        delay_minutes: 0,
+        enabled: true,
+      },
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-dana')
+  })
+
+  it('matches on type_key as well as severity', async () => {
+    store.tables['incidents'] = [incident({ severity: 'low', type_key: 'equipment' })]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: TENANT_ID,
+        when_event: 'breached',
+        match_severity: null,
+        match_type_key: 'equipment',
+        action: 'assign_to',
+        target_user_id: 'user-maint',
+        delay_minutes: 0,
+        enabled: true,
+      },
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-maint')
+  })
+
+  it('writes an event so the timeline shows the rule acted, not a person', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [
+      {
+        id: 'r1',
+        tenant_id: TENANT_ID,
+        when_event: 'breached',
+        match_severity: 'critical',
+        match_type_key: null,
+        action: 'assign_to',
+        target_user_id: 'user-oncall',
+        delay_minutes: 0,
+        enabled: true,
+      },
+    ]
+
+    await scan()
+
+    const events = store.tables['incident_events'] ?? []
+    expect(events).toHaveLength(1)
+    expect(events[0]!['actor_kind']).toBe('system')
+  })
+})
+```
+
+The "does not overwrite a human's assignee" case matters most: a rule that reassigns work someone already picked up is how automation gets turned off.
+
+- [ ] **Step 2: Run them and watch them fail**
+
+```bash
+npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts -t "escalation rules"
+```
+
+Expected: FAIL — nothing applies rules yet.
+
+- [ ] **Step 3: Implement rule evaluation**
+
+Add to `apps/api/src/workers/incident-sla-scanner.ts`, and call it from `scan()` after the breach stamp:
+
+```ts
+interface RuleRow {
+  id: string
+  tenant_id: string
+  when_event: string
+  match_type_key: string | null
+  match_severity: string | null
+  action: string
+  target_user_id: string | null
+  enabled: boolean
+}
+
+interface IncidentForRules {
+  id: string
+  tenant_id: string
+  severity: string
+  type_key: string
+  assigned_to_user_id: string | null
+}
+
+/**
+ * Apply a tenant's escalation rules to incidents that just changed state.
+ *
+ * Rules are loaded tenant-scoped. A rule with a null match field matches
+ * anything for that field, so a rule with both null applies to every incident
+ * at this event.
+ */
+export async function applyRules(
+  tenantId: string,
+  incidents: IncidentForRules[],
+  when: 'created' | 'breached' | 'unassigned'
+): Promise<void> {
+  const supabase = getServiceClient()
+
+  const { data } = await supabase
+    .from('incident_rules')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('when_event', when)
+    .eq('enabled', true)
+
+  const rules = (data ?? []) as RuleRow[]
+  if (rules.length === 0) return
+
+  for (const inc of incidents) {
+    for (const rule of rules) {
+      if (rule.match_severity && rule.match_severity !== inc.severity) continue
+      if (rule.match_type_key && rule.match_type_key !== inc.type_key) continue
+
+      if (rule.action === 'assign_to' && rule.target_user_id) {
+        // Never take work off a person who already picked it up. A rule that
+        // reassigns someone's incident out from under them is how a team
+        // decides the automation is more trouble than it is worth.
+        if (inc.assigned_to_user_id) continue
+
+        await supabase
+          .from('incidents')
+          .update({ assigned_to_user_id: rule.target_user_id })
+          .eq('id', inc.id)
+          .eq('tenant_id', tenantId)
+
+        await supabase.from('incident_events').insert({
+          tenant_id: tenantId,
+          incident_id: inc.id,
+          actor_kind: 'system',
+          actor_id: null,
+          kind: 'assigned',
+          detail: { by_rule: rule.id, assigned_to_user_id: rule.target_user_id },
+        })
+
+        // Keep the in-memory copy honest so a second matching rule sees it as
+        // taken rather than assigning over it.
+        inc.assigned_to_user_id = rule.target_user_id
+      }
+    }
+  }
+}
+```
+
+Widen the scanner's select to include `severity`, `type_key` and `assigned_to_user_id`, then call `applyRules(tenantId, rows, 'breached')` inside the per-tenant loop, before `notifyOwner`.
+
+- [ ] **Step 4: Run the tests**
 
 ```bash
 npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts
 ```
 
-Expected: PASS, 5 tests.
+Expected: PASS, 12 tests (6 from Task 12, 6 here).
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/workers/incident-sla-scanner.ts apps/api/src/workers/incident-sla-scanner.test.ts apps/api/src/workers/index.ts apps/api/src/routes/incidents.ts apps/api/src/routes/pos/incidents.ts supabase/migrations/0199_incidents.sql
-git commit -m "feat(incidents): SLA breach scanner, escalation rules and automation triggers"
+git add apps/api/src/workers/incident-sla-scanner.ts apps/api/src/workers/incident-sla-scanner.test.ts
+git commit -m "feat(incidents): escalation rules on SLA breach"
+```
+
+---
+
+### Task 14: Automation triggers
+
+**Files:**
+
+- Modify: `apps/api/src/routes/pos/incidents.ts`
+- Modify: `apps/api/src/routes/incidents.ts`
+- Modify: `apps/api/src/workers/incident-sla-scanner.ts`
+- Create: `apps/api/src/lib/incident-triggers.ts`
+- Create: `apps/api/src/lib/incident-triggers.test.ts`
+
+**Interfaces:**
+
+- Produces: `fireIncidentTrigger(tenantId, trigger, incident): void` — fire-and-forget, never throws.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `apps/api/src/lib/incident-triggers.test.ts`:
+
+```ts
+import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+
+const enqueueCustomAutomation = jest.fn<() => Promise<void>>()
+jest.unstable_mockModule('./custom-automation.js', () => ({ enqueueCustomAutomation }))
+
+const { fireIncidentTrigger } = await import('./incident-triggers.js')
+
+beforeEach(() => enqueueCustomAutomation.mockClear())
+
+describe('fireIncidentTrigger', () => {
+  it('enqueues the trigger with the incident payload', async () => {
+    fireIncidentTrigger('tenant-1', 'incident_created', { id: 'inc-1', reference: 'INC-1001' })
+    await Promise.resolve()
+
+    expect(enqueueCustomAutomation).toHaveBeenCalledTimes(1)
+  })
+
+  it('never throws when the automation module is absent', async () => {
+    enqueueCustomAutomation.mockRejectedValue(new Error('no automation module'))
+
+    // A missing automation module must not fail the request that reported the
+    // incident. The incident is the thing that matters; the trigger is a bonus.
+    expect(() => fireIncidentTrigger('tenant-1', 'incident_created', { id: 'inc-1' })).not.toThrow()
+    await Promise.resolve()
+  })
+
+  it('is fire-and-forget — it returns before the enqueue settles', () => {
+    let settled = false
+    enqueueCustomAutomation.mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+      settled = true
+    })
+
+    fireIncidentTrigger('tenant-1', 'incident_breached', { id: 'inc-1' })
+
+    expect(settled).toBe(false)
+  })
+})
+```
+
+- [ ] **Step 2: Run them and watch them fail**
+
+```bash
+npm test --workspace=@nuatis/api -- src/lib/incident-triggers.test.ts
+```
+
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Read the existing trigger dispatch before writing this**
+
+Open `apps/api/src/workers/custom-automation-worker.ts` and the route that fires `inbound_webhook` (`routes/automation-webhook-public.ts`). Match whatever enqueue function they already use — do **not** invent a new dispatch path. If the function name differs from `enqueueCustomAutomation`, use the real one and update the test's mock to match.
+
+- [ ] **Step 4: Write the module**
+
+Create `apps/api/src/lib/incident-triggers.ts`:
+
+```ts
+/**
+ * Emit an incident event into the automation engine.
+ *
+ * Deliberately fire-and-forget and deliberately silent on failure. Built-in
+ * escalation rules (incident_rules) are what make the incidents module work on
+ * its own; this is the extra reach for tenants who ALSO have the automation
+ * module. A tenant without it simply has no listener, and that must never turn
+ * into a failed incident report.
+ */
+export type IncidentTrigger = 'incident_created' | 'incident_breached'
+
+export function fireIncidentTrigger(
+  tenantId: string,
+  trigger: IncidentTrigger,
+  incident: Record<string, unknown>
+): void {
+  void (async () => {
+    try {
+      const { enqueueCustomAutomation } = await import('./custom-automation.js')
+      await enqueueCustomAutomation(tenantId, trigger, { incident })
+    } catch (err) {
+      console.error(`[incident-triggers] ${trigger} failed:`, err)
+    }
+  })()
+}
+```
+
+- [ ] **Step 5: Call it from the three places an incident changes state**
+
+- `routes/pos/incidents.ts`, after the successful insert: `fireIncidentTrigger(authed.tenantId, 'incident_created', incident)`
+- `routes/incidents.ts`, after the successful insert: the same
+- `workers/incident-sla-scanner.ts`, after stamping a breach: `fireIncidentTrigger(row.tenant_id, 'incident_breached', row)`
+
+- [ ] **Step 6: Run the full API suite**
+
+```bash
+npm test --workspace=@nuatis/api
+```
+
+Expected: green. The route tests from Tasks 5 and 6 must still pass — if a trigger failure breaks an incident report, the fire-and-forget is wrong.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/api/src/lib/incident-triggers.ts apps/api/src/lib/incident-triggers.test.ts apps/api/src/routes/incidents.ts apps/api/src/routes/pos/incidents.ts apps/api/src/workers/incident-sla-scanner.ts
+git commit -m "feat(incidents): emit automation triggers on create and breach"
 ```
 
 ---
@@ -1856,12 +2856,16 @@ Run before opening the PR. Every box names the command that proves it.
 - [ ] A manager can triage, assign and resolve from the dashboard, and the timeline shows every step
 - [ ] The per-staff report totals six $9.99 comps as $59.94 under one name
 - [ ] An overdue incident notifies exactly once across two scanner runs
+- [ ] A paused tenant's breached incident is neither notified nor stamped, so
+      unpausing does not silently swallow it
+- [ ] An escalation rule does not take work off a human who already picked it up
+- [ ] A failing automation trigger does not fail the incident report that fired it
 - [ ] A `pos_only` tenant can still report from the register but gets 403 from `/api/incidents`:
       `sql
-    update tenants set product = 'pos_only' where id = '<demo tenant>';
-    -- POST /api/pos/incidents  → 201
-    -- GET  /api/incidents      → 403
-    -- then set it back
-    `
+  update tenants set product = 'pos_only' where id = '<demo tenant>';
+  -- POST /api/pos/incidents  → 201
+  -- GET  /api/incidents      → 403
+  -- then set it back
+  `
 - [ ] Migration 0199 applied to production and recorded in `supabase/migrations/README.md`
 - [ ] Update the master checklist — tick Phase A boxes only where the proving command was actually run

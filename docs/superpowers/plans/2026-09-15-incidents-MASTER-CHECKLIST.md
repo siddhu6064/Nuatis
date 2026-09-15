@@ -20,8 +20,8 @@ the POS checklist's first draft asserted five things that turned out to be false
       these are answered; A is unblocked and does not depend on them.
 - [ ] **Next migration number confirmed against the live database**, not guessed:
       `sql
-    select max(name) from supabase_migrations.schema_migrations;
-    `
+  select max(name) from supabase_migrations.schema_migrations;
+  `
       POS assumed 0195 was free and hit `42P07: relation already exists`. Check
       first.
 - [ ] **Branch created off `main`**, not off a merged feature branch.
@@ -102,15 +102,33 @@ query showing the row with the right `order_id`/`kitchen_ticket_id` and reporter
 - [ ] Recurrence: `GROUP BY type_key, location_id` over a trailing window — a
       query, not an engine (spec §7)
 
-### Phase A6 — SLA, escalation, notifications
+### Phase A6 — SLA breach scanner _(plan Task 12)_
 
 - [ ] `sla_due_at` derived from severity at creation, per-tenant durations
 - [ ] `incident-sla-scanner` modelled on `workers/invoice-overdue-scanner.ts`
+- [ ] Runs every 15 minutes, not daily — a 1h critical SLA checked daily is not an SLA
 - [ ] `getPausedTenants` honoured, like every other scanner
-- [ ] Breach notifies **once**, not on every scan tick
-- [ ] `incident_rules` evaluated by the scanner
-- [ ] `incident_created` / `incident_breached` automation triggers emitted
+- [ ] A paused tenant's incident is **neither notified nor stamped**, so unpausing
+      does not silently swallow it
+- [ ] Breach notifies **once**, not on every scan tick — `sla_breached_at` stamped
+      _before_ notifying
+- [ ] One notification per tenant, not per incident
+
+### Phase A7 — escalation rules _(plan Task 13)_
+
+- [ ] `incident_rules` evaluated on breach, tenant-scoped
+- [ ] A disabled rule does nothing
+- [ ] Another tenant's rule never touches this tenant's incident
+- [ ] A rule **never overwrites an assignee a human chose** — reassigning work
+      out from under someone is how automation gets switched off
+- [ ] Rule-driven changes write an `incident_events` row with `actor_kind: 'system'`
+
+### Phase A8 — automation triggers _(plan Task 14)_
+
+- [ ] `incident_created` / `incident_breached` emitted
+- [ ] Fire-and-forget: a failing trigger never fails the incident report
 - [ ] Works with the automation module absent
+- [ ] Uses the existing dispatch path, not a new one
 - [ ] No UI offers SMS escalation — `notifyOwner`'s SMS branch is commented out
       pending a personal phone field on `users` (A §7)
 
