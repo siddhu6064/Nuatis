@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 5 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 6 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**5 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**6 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -111,8 +111,12 @@ npm test --workspace=@nuatis/api -- src/lib/incident-module.test.ts   # 4 pass
 
 ### Phase A2 — core service and routes _(tasks 3, 4, 6)_
 
-> Tasks 3 and 4 done. Task 6 not started — the boxes below mentioning
-> `/api/incidents`, foreign-key ownership and the no-op transition are its.
+> **Phase complete.** Verified live as well as against the mock:
+>
+> - a `portalScope: 'pos'` token gets **403** on `/api/incidents` and 200 on
+>   `/api/pos/incidents/types` — L4 confinement is real, not just configured
+> - `triaged → triaged` refused, `resolved → open` refused
+> - timeline read back as `reported → status_changed → status_changed`
 
 - [x] SLA derivation, threshold rule and transition map are pure and tested
 - [x] Incident types seed **lazily on first read**, so tenants created before
@@ -120,11 +124,11 @@ npm test --workspace=@nuatis/api -- src/lib/incident-module.test.ts   # 4 pass
 - [x] Seeding falls back to evidence when the vertical has no list — a tenant
       with menu items gets the restaurant reasons, because `vertical` is
       self-declared at signup and routinely wrong
-- [ ] `/api/incidents` — list with filters, detail with timeline, create, patch
-- [ ] Every foreign key from a request body proven tenant-owned before write —
+- [x] `/api/incidents` — list with filters, detail with timeline, create, patch
+- [x] Every foreign key from a request body proven tenant-owned before write —
       `assigned_to_user_id`, `type_key` (spec L1)
-- [ ] A no-op transition is refused, so no empty `incident_events` row is written
-- [ ] Reference numbers `INC-####` per tenant, unique index as the real guard
+- [x] A no-op transition is refused, so no empty `incident_events` row is written
+- [x] Reference numbers `INC-####` per tenant, unique index as the real guard
 
 **Proves it:**
 

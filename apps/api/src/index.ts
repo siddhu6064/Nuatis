@@ -53,6 +53,7 @@ import inventorySettingsRouter from './routes/inventory-settings.js'
 import ordersRouter from './routes/orders.js'
 import orderTemplatesRouter from './routes/order-templates.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
+import incidentsRouter from './routes/incidents.js'
 import posIncidentsRouter from './routes/pos/incidents.js'
 import posMenuRouter from './routes/pos/menu.js'
 import posOrdersRouter from './routes/pos/orders.js'
@@ -310,6 +311,7 @@ app.use('/api/settings/inventory', inventorySettingsRouter)
 app.use('/api/orders', ordersRouter)
 app.use('/api/order-templates', orderTemplatesRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
+app.use('/api/incidents', incidentsRouter)
 app.use('/api/pos/incidents', posIncidentsRouter)
 app.use('/api/pos/menu', posMenuRouter)
 app.use('/api/pos/orders', posOrdersRouter)
