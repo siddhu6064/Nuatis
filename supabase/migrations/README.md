@@ -52,8 +52,24 @@ the authority on what actually ran.
 | 0196_pos_kitchen_tickets.sql | Kitchen tickets + ticket items for the KDS        | 2026-09-11 | yes — verified  |
 | 0197_pos_cash_drawer.sql     | Cash drawer sessions + cash events                | 2026-09-11 | yes — verified  |
 | 0198_pos_terminal_pin.sql    | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
+| 0199_incidents.sql           | Incident tracking + `tasks.incident_id`           | 2026-09-15 | yes — verified  |
 
 0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
 9 `current_tenant_id()` policies, and `orders_source_check` reading
 `['staff','maya','pos']`. They are written to be **re-runnable**, so pasting
 one again is a no-op rather than an error.
+
+0199 was applied 2026-09-15 and verified live: 4 incident tables, RLS true on
+all 4, 4 `current_tenant_id()` policies, `incidents.cost_cents` as `integer`
+(not `numeric`), plus `tasks.incident_id` and
+`tenants.incident_auth_threshold_cents`. Re-running it is a no-op.
+
+**Checking the next free number:** `max(name)` on
+`supabase_migrations.schema_migrations` does _not_ work — the table holds
+non-numeric names too, and `weekly_digest` sorts above `0198`. Order by the
+numeric prefix instead:
+
+```sql
+select name from supabase_migrations.schema_migrations
+ where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;
+```

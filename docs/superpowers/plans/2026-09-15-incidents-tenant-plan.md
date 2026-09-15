@@ -13,7 +13,8 @@
 
 ## Global Constraints
 
-- **Migration number is 0199.** The highest on disk is `0198_pos_terminal_pin.sql`. **Confirm against the live database before writing SQL** — `select max(name) from supabase_migrations.schema_migrations;`. POS assumed a free number and hit `42P07: relation already exists`.
+- **Migration number is 0199.** The highest on disk is `0198_pos_terminal_pin.sql`. **Confirm against the live database before writing SQL** — `select name from supabase_migrations.schema_migrations
+where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;`. POS assumed a free number and hit `42P07: relation already exists`.
 - **Every migration is idempotent**: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`. Migrations here get applied by hand and re-run.
 - **RLS uses `current_tenant_id()`**, never the `auth.jwt()->'app_metadata'` form.
 - **`getServiceClient()` bypasses RLS.** Application-level `.eq('tenant_id', …)` is the real boundary. Every foreign key arriving in a request body must be proven tenant-owned before it is written — copy the `ownsRow()` helper pattern from `apps/api/src/routes/pos/menu.ts`.
@@ -41,10 +42,15 @@
 - [ ] **Step 1: Confirm the migration number against production**
 
 ```sql
-select max(name) from supabase_migrations.schema_migrations;
+select name from supabase_migrations.schema_migrations
+ where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;
 ```
 
-Expected: `0198_pos_terminal_pin`. If it is higher, rename this migration and every reference to it in this plan before continuing.
+Expected top row: `0198_pos_terminal_pin`, so **0199 is free**. `max(name)` does **not** work here — the table holds non-numeric
+names too (`weekly_digest` sorts above `0198`), so alphabetical max is
+meaningless. Order by the numeric prefix instead.
+
+If the top row is higher, renumber this migration and every reference to it before continuing.
 
 - [ ] **Step 2: Write the migration**
 
@@ -2862,10 +2868,10 @@ Run before opening the PR. Every box names the command that proves it.
 - [ ] A failing automation trigger does not fail the incident report that fired it
 - [ ] A `pos_only` tenant can still report from the register but gets 403 from `/api/incidents`:
       `sql
-  update tenants set product = 'pos_only' where id = '<demo tenant>';
-  -- POST /api/pos/incidents  → 201
-  -- GET  /api/incidents      → 403
-  -- then set it back
-  `
+update tenants set product = 'pos_only' where id = '<demo tenant>';
+-- POST /api/pos/incidents  → 201
+-- GET  /api/incidents      → 403
+-- then set it back
+`
 - [ ] Migration 0199 applied to production and recorded in `supabase/migrations/README.md`
 - [ ] Update the master checklist — tick Phase A boxes only where the proving command was actually run

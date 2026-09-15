@@ -4,7 +4,8 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: nothing implemented.** Every box below is unchecked and honest.
+**Status: task 1 of 14 done.** A box is ticked only when the command beside it
+was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
 | ----- | --------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------- |
@@ -15,7 +16,7 @@ the POS checklist's first draft asserted five things that turned out to be false
 
 ## Progress — sub-project A
 
-**0 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**1 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -43,15 +44,16 @@ and 7; 12 → 13 → 14 are sequential and only need 1–3.
 
 ## Gate 0 — before any code
 
-- [ ] **Branch created off `main`**, not off a merged feature branch.
+- [x] **Branch created off `main`**, not off a merged feature branch.
 
-- [ ] **Next migration number confirmed against the live database**, not guessed:
+- [x] **Next migration number confirmed against the live database**, not guessed:
 
 ```sql
-select max(name) from supabase_migrations.schema_migrations;
+select name from supabase_migrations.schema_migrations
+ where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;
 ```
 
-Expect `0198_pos_terminal_pin`. POS assumed 0195 was free and hit
+Expect the top row to be `0198_pos_terminal_pin`, so 0199 is free. `max(name)` does **not** work — the table holds non-numeric names (`weekly_digest` sorts above `0198`). POS assumed 0195 was free and hit
 `42P07: relation already exists`. If this returns something higher, renumber
 before writing a line of SQL.
 
@@ -65,12 +67,15 @@ before writing a line of SQL.
 
 ### Phase A1 — schema and module registration _(tasks 1–2)_
 
-- [ ] Migration creates `incidents`, `incident_types`, `incident_rules`,
+> Task 1 done and applied to production 2026-09-15. Task 2 (module
+> registration) not started — the last two boxes below are its.
+
+- [x] Migration creates `incidents`, `incident_types`, `incident_rules`,
       `incident_events`, plus `tasks.incident_id`
-- [ ] Every table has RLS using `current_tenant_id()` — **not** the
+- [x] Every table has RLS using `current_tenant_id()` — **not** the
       `auth.jwt()->'app_metadata'` form (spec L2)
-- [ ] `cost_cents` is `integer`, never `numeric` (spec L3)
-- [ ] Migration is **idempotent** — applying it twice is a no-op. Non-negotiable:
+- [x] `cost_cents` is `integer`, never `numeric` (spec L3)
+- [x] Migration is **idempotent** — applying it twice is a no-op. Non-negotiable:
       the POS migrations had to be rewritten after the fact.
 - [ ] `incidents` registered in `config/stripe-plans.ts` scale plan + `TIER_GATED`
 - [ ] `pos_only` does **not** imply `incidents` (spec §9)
