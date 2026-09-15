@@ -82,9 +82,26 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
     return
   }
   const ticketId = typeof body['kitchen_ticket_id'] === 'string' ? body['kitchen_ticket_id'] : null
-  if (ticketId && !(await ownsRow(supabase, 'kitchen_tickets', ticketId, authed.tenantId))) {
-    res.status(400).json({ error: 'Ticket not found' })
-    return
+  let ticketLocationId: string | null = null
+  if (ticketId) {
+    const { data: ticket } = await supabase
+      .from('kitchen_tickets')
+      .select('id, location_id')
+      .eq('id', ticketId)
+      .eq('tenant_id', authed.tenantId)
+      .maybeSingle<{ id: string; location_id: string | null }>()
+
+    if (!ticket) {
+      res.status(400).json({ error: 'Ticket not found' })
+      return
+    }
+    // The ticket is the authority on where this happened. The KDS deliberately
+    // sends no location, and a register sending one — by bug or otherwise —
+    // must not override it: that is how an incident gets filed against the
+    // wrong site in a multi-location tenant. Without this the location is null
+    // and the incident drops out of location-scoped reporting and recurrence
+    // entirely.
+    ticketLocationId = ticket.location_id
   }
   const reporterId =
     typeof body['reported_by_staff_id'] === 'string' ? body['reported_by_staff_id'] : null
@@ -129,7 +146,8 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
       title,
       description: typeof body['description'] === 'string' ? body['description'] : null,
       cost_cents: costCents,
-      location_id: typeof body['location_id'] === 'string' ? body['location_id'] : null,
+      location_id:
+        ticketLocationId ?? (typeof body['location_id'] === 'string' ? body['location_id'] : null),
       order_id: orderId,
       kitchen_ticket_id: ticketId,
       reported_by_staff_id: reporterId,

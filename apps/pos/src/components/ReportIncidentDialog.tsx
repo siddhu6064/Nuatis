@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import { toDollars } from '@nuatis/pos-core'
-import { needsManagerPin, reportIncident, type IncidentInput } from '@/lib/report-incident'
+import { needsManagerPin, reportIncident, type IncidentInput } from '@nuatis/pos-web/incidents'
 
 export interface IncidentType {
   key: string

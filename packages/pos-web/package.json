@@ -6,6 +6,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./incidents": "./src/incidents.ts",
     "./ui": "./src/ui/index.ts"
   },
   "scripts": {

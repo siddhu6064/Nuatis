@@ -5,7 +5,7 @@ import {
   reportIncident,
   ReportIncidentError,
   type IncidentInput,
-} from './report-incident'
+} from './report-incident.js'
 
 function input(overrides: Partial<IncidentInput> = {}): IncidentInput {
   return {

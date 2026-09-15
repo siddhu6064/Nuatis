@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 8 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 9 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**8 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**9 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -170,14 +170,24 @@ npm test --workspace=@nuatis/api -- src/routes/pos/incidents.integration.test.ts
 
 ### Phase A4 — register and KDS surfaces _(tasks 8–9)_
 
-> Task 8 done, task 9 (KDS) open. Verified in the browser end to end: a $13.50
-> "Wrong item" showed "Over $10.00 — a manager has to approve this" and disabled
-> Report; the cashier's own PIN was refused with the server's own wording and
-> the dialog stayed open with the PIN cleared; the manager's PIN went through as
-> INC-1013 with `authorised_by` recorded as Carlos Mendez.
+> **Phase complete.**
+>
+> Register (task 8), verified in the browser: a $13.50 "Wrong item" showed
+> "Over $10.00 — a manager has to approve this" and disabled Report; the
+> cashier's own PIN was refused with the server's own wording and the dialog
+> stayed open with the PIN cleared; the manager's PIN went through as INC-1013
+> with `authorised_by` recorded as Carlos Mendez.
+>
+> KDS (task 9): reported INC-1015 against ticket #2 in one tap. The ticket-
+> location check caught a real bug — the server was **not** deriving
+> `location_id` from the ticket, so INC-1014 was written with a null location
+> and would have dropped out of location-scoped reporting and recurrence
+> entirely. Both the plan and the client comment claimed the server did this;
+> neither was true until now. Fixed, two regression tests added, and the one
+> orphaned row backfilled.
 
 - [x] Register: "Report issue" against the current or a recent order
-- [ ] KDS: report against a ticket, inheriting the ticket's `location_id` (spec L5)
+- [x] KDS: report against a ticket, inheriting the ticket's `location_id` (spec L5)
 - [x] One dialog, not a wizard — this happens with a queue waiting
 - [x] The client threshold check mirrors the server's exactly, and the server
       remains authoritative
@@ -353,6 +363,10 @@ Recorded because each one already cost time on the POS work.
   `git log main..HEAD -- <file>` and an isolated run before chasing. Three is a
   pattern rather than three coincidences — the suite has a parallelism problem
   worth its own fix, separate from this work.
+- **"The server derives the ticket's location."** It did not, until task 9.
+  Comments describing behaviour are not evidence that the behaviour exists —
+  this one was written in the plan AND in the client before anything
+  implemented it. Check the row, not the comment.
 - **"`ownsRow` is importable from `routes/pos/menu.ts`."** It is not exported.
   Task 5 defines its own copy; widening a security helper's visibility belongs in
   its own commit.

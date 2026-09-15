@@ -17,6 +17,7 @@ const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000inc0001'
 const OTHER_TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000inc0002'
 const LOCATION_ID = 'bbbbbbbb-0000-0000-0000-00000loc0001'
 const ORDER_ID = 'cccccccc-0000-0000-0000-00000ord0001'
+const TICKET_ID = 'cccccccc-0000-0000-0000-00000tkt0001'
 const CASHIER_ID = 'dddddddd-0000-0000-0000-0000staff01'
 const MANAGER_ID = 'dddddddd-0000-0000-0000-0000staff02'
 const SECRET = process.env['AUTH_SECRET'] ?? 'test-secret-for-unit-tests-only-32ch'
@@ -95,6 +96,16 @@ beforeEach(async () => {
       default_severity: 'medium',
       requires_cost: false,
       deleted_at: null,
+    },
+  ]
+  store.tables['kitchen_tickets'] = [
+    {
+      id: TICKET_ID,
+      tenant_id: TENANT_ID,
+      location_id: LOCATION_ID,
+      order_id: ORDER_ID,
+      ticket_number: 1,
+      status: 'queued',
     },
   ]
   store.tables['incidents'] = []
@@ -291,6 +302,45 @@ describe('POST /api/pos/incidents', () => {
       await makeToken()
     )
     expect(store.tables['incidents']![0]!['sla_due_at']).toBeTruthy()
+  })
+
+  it('inherits the location from the ticket, so it is not lost from reporting', async () => {
+    // The KDS deliberately sends no location — a client-chosen one is how an
+    // incident gets filed against the wrong site. The server must take it from
+    // the ticket, or the incident has no location at all and drops out of
+    // location-scoped reporting and recurrence.
+    const res = await post(
+      {
+        type_key: 'complaint',
+        title: 'Remake',
+        cost_cents: 0,
+        kitchen_ticket_id: TICKET_ID,
+        reported_by_staff_id: CASHIER_ID,
+      },
+      await makeToken()
+    )
+
+    expect(res.status).toBe(201)
+    expect(store.tables['incidents']![0]!['location_id']).toBe(LOCATION_ID)
+  })
+
+  it('ignores a client-supplied location on a ticket-linked report', async () => {
+    // The ticket is the authority. A register sending a different location —
+    // by bug or otherwise — must not override it.
+    const res = await post(
+      {
+        type_key: 'complaint',
+        title: 'Remake',
+        cost_cents: 0,
+        kitchen_ticket_id: TICKET_ID,
+        location_id: 'bbbbbbbb-0000-0000-0000-0000wrongloc',
+        reported_by_staff_id: CASHIER_ID,
+      },
+      await makeToken()
+    )
+
+    expect(res.status).toBe(201)
+    expect(store.tables['incidents']![0]!['location_id']).toBe(LOCATION_ID)
   })
 
   it('refuses a tenant without the POS module', async () => {
