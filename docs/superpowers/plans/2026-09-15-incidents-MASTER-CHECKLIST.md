@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 6 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 7 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**6 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**7 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -191,15 +191,23 @@ select i.reference, i.cost_cents, i.authorised_by_staff_id,
 
 ### Phase A5 — dashboard and reporting _(tasks 7, 10, 11)_
 
+> Task 7 done — the reporting **data** is ticked below. The three view boxes
+> (queue, detail, nav entry) belong to tasks 10 and 11 and are still open.
+>
+> Proved live with the scenario the per-staff table exists for: six $9.99 comps
+> from one cashier, every one under the $10 threshold and none prompting for a
+> manager. The report shows Alex Brown at **$77.94 across 12 incidents** — one
+> row, impossible to miss. Recurrence picked up both patterns at the location.
+
 - [ ] `/incidents` queue: filter by status, severity, type, assignee
 - [ ] Detail view shows the `incident_events` timeline in order
 - [ ] Nav entry gated on the module, using the **existing** gating mechanism
-- [ ] Reporting: cost by type this month
-- [ ] Reporting groups by `type_key`, not label, so renaming a category does not
+- [x] Reporting: cost by type this month
+- [x] Reporting groups by `type_key`, not label, so renaming a category does not
       change last month's numbers
-- [ ] **Comps per staff member** — this is what makes the threshold safe, not
+- [x] **Comps per staff member** — this is what makes the threshold safe, not
       optional (spec §4). Sorted by total descending, so the outlier is row one.
-- [ ] Recurrence is a `GROUP BY`, not an engine (spec §7)
+- [x] Recurrence is a `GROUP BY`, not an engine (spec §7)
 
 **Proves it:** create six $9.99 incidents from one staff member via the register,
 then confirm the per-staff table shows one row, `count: 6`, `cost_cents: 5994`.
