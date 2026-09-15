@@ -49,6 +49,14 @@ testApp.get('/protected', requireAuth, (req, res) => {
 testApp.get('/api/staff-portal/protected', requireAuth, (req, res) => {
   res.json({ ok: true })
 })
+testApp.get('/api/pos/protected', requireAuth, (req, res) => {
+  res.json({ ok: true })
+})
+// Deliberately similar to /api/pos — proves the confinement matches on a path
+// segment rather than a bare string prefix.
+testApp.get('/api/posturing', requireAuth, (req, res) => {
+  res.json({ ok: true })
+})
 
 // ── Helpers ───────────────────────────────────────────────────
 const SECRET = process.env['AUTH_SECRET'] ?? 'test-secret-for-unit-tests-only-32ch'
@@ -255,5 +263,79 @@ describe('Auth middleware — staff-portal isolation (portalScope claim)', () =>
     const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
     expect(res.body.role).toBe('staff')
+  })
+
+  it('a portalScope=pos token is 403d outside /api/pos', async () => {
+    // A register PIN token must not reach contacts, invoices, or admin routes.
+    const token = await makeToken({
+      sub: 'pos:staff-1',
+      tenantId: TENANT_A,
+      role: 'owner',
+      portalScope: 'pos',
+    })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('a portalScope=pos token is allowed into /api/pos/*', async () => {
+    const token = await makeToken({
+      sub: 'pos:staff-1',
+      tenantId: TENANT_A,
+      role: 'owner',
+      portalScope: 'pos',
+    })
+    const res = await request(testApp)
+      .get('/api/pos/protected')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+  })
+
+  it('a portalScope=pos token cannot reach the staff portal', async () => {
+    const token = await makeToken({
+      sub: 'pos:staff-1',
+      tenantId: TENANT_A,
+      role: 'owner',
+      portalScope: 'pos',
+    })
+    const res = await request(testApp)
+      .get('/api/staff-portal/protected')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('a portalScope=staff token cannot reach the POS surface', async () => {
+    const token = await makeToken({
+      sub: 'staff-001',
+      tenantId: TENANT_A,
+      role: 'staff',
+      portalScope: 'staff',
+    })
+    const res = await request(testApp)
+      .get('/api/pos/protected')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('an unrecognised portalScope fails closed rather than granting full access', async () => {
+    const token = await makeToken({
+      sub: 'user-001',
+      tenantId: TENANT_A,
+      role: 'owner',
+      portalScope: 'something-new',
+    })
+    const res = await request(testApp).get('/protected').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('a scope prefix match is on a path segment, not a bare string prefix', async () => {
+    // '/api/posturing' must not satisfy the '/api/pos' confinement.
+    const token = await makeToken({
+      sub: 'pos:staff-1',
+      tenantId: TENANT_A,
+      role: 'owner',
+      portalScope: 'pos',
+    })
+    const res = await request(testApp).get('/api/posturing').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
   })
 })

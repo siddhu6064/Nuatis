@@ -24,6 +24,7 @@ export type ModuleId =
   | 'campaigns'
   | 'cpq'
   | 'orders'
+  | 'pos'
   | 'expenses'
   | 'companies'
   | 'deals'
@@ -110,6 +111,13 @@ export const MODULES: ModuleDef[] = [
     label: 'Orders',
     description: 'Order intake, kanban fulfillment tracking, payments, and inventory deduction.',
     minPlan: 'pro',
+    defaultOn: false,
+  },
+  {
+    id: 'pos',
+    label: 'Point of Sale',
+    description: 'Register, kitchen display, and cash drawer for in-person sales.',
+    minPlan: 'scale',
     defaultOn: false,
   },
   {

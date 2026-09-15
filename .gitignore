@@ -60,3 +60,13 @@ MIGRATIONS_TO_APPLY.md
 audit-report.json
 secrets-report.json
 scratchpad/
+
+# Swift Package Manager / Xcode build output (apps/ios)
+.build/
+DerivedData/
+
+# Next regenerates next-env.d.ts on every dev start and every build, flipping
+# its routes import between .next/dev/types and .next/types. Tracking it means
+# a permanently dirty working tree in three apps and a file that re-appears in
+# every `git add`.
+next-env.d.ts
