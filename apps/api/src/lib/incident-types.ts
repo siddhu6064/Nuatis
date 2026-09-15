@@ -82,8 +82,36 @@ export async function seedIncidentTypes(tenantId: string, vertical: string | nul
 
   if ((existing ?? []).length > 0) return
 
-  const seeds = SEEDED_TYPES[vertical ?? 'default'] ?? SEEDED_TYPES['default']!
+  const seeds = await chooseSeeds(supabase, tenantId, vertical)
   await supabase
     .from('incident_types')
     .insert(seeds.map((s, i) => ({ tenant_id: tenantId, ...s, sort_order: i })))
+}
+
+/**
+ * Which starting list this tenant gets.
+ *
+ * `vertical` is a self-declared signup field and it is routinely wrong — the
+ * demo tenant is `sales_crm` with eighteen menu items and a burger register,
+ * and a real merchant who picked the nearest-looking option at signup lands in
+ * the same place. Handing a kitchen "Service failure / Damage / Safety concern"
+ * is a bad enough first run that most people will never edit it, they will just
+ * stop using the feature.
+ *
+ * So when the vertical has no list of its own, fall back to evidence: a tenant
+ * with menu items has a kitchen, because menu_items carries kitchen_station.
+ * An explicit vertical still wins — if the merchant said what they are, believe
+ * them.
+ */
+async function chooseSeeds(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string,
+  vertical: string | null
+): Promise<IncidentTypeSeed[]> {
+  if (vertical && SEEDED_TYPES[vertical]) return SEEDED_TYPES[vertical]
+
+  const { data } = await supabase.from('menu_items').select('id').eq('tenant_id', tenantId).limit(1)
+
+  if ((data ?? []).length > 0) return SEEDED_TYPES['restaurant']!
+  return SEEDED_TYPES['default']!
 }

@@ -117,6 +117,9 @@ npm test --workspace=@nuatis/api -- src/lib/incident-module.test.ts   # 4 pass
 - [x] SLA derivation, threshold rule and transition map are pure and tested
 - [x] Incident types seed **lazily on first read**, so tenants created before
       this shipped get them too
+- [x] Seeding falls back to evidence when the vertical has no list — a tenant
+      with menu items gets the restaurant reasons, because `vertical` is
+      self-declared at signup and routinely wrong
 - [ ] `/api/incidents` — list with filters, detail with timeline, create, patch
 - [ ] Every foreign key from a request body proven tenant-owned before write —
       `assigned_to_user_id`, `type_key` (spec L1)

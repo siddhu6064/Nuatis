@@ -546,6 +546,11 @@ git commit -m "feat(incidents): severity, SLA, threshold and transition rules"
   - `interface IncidentTypeSeed { key: string; label: string; default_severity: Severity; requires_cost: boolean }`
   - `seedIncidentTypes(tenantId: string, vertical: string | null): Promise<void>` — idempotent
 
+> **Found during execution:** seeding on `vertical` alone is not enough — it is
+> self-declared at signup and routinely wrong. The real test file mocks the
+> Supabase client and covers the fallback, rather than being the pure-data tests
+> this task originally specified. 12 tests, not 5.
+
 - [ ] **Step 1: Write the failing test**
 
 Create `apps/api/src/lib/incident-types.test.ts`:
@@ -677,10 +682,36 @@ export async function seedIncidentTypes(tenantId: string, vertical: string | nul
 
   if ((existing ?? []).length > 0) return
 
-  const seeds = SEEDED_TYPES[vertical ?? 'default'] ?? SEEDED_TYPES['default']!
+  const seeds = await chooseSeeds(supabase, tenantId, vertical)
   await supabase
     .from('incident_types')
     .insert(seeds.map((s, i) => ({ tenant_id: tenantId, ...s, sort_order: i })))
+}
+
+/**
+ * Which starting list this tenant gets.
+ *
+ * `vertical` is a self-declared signup field and it is routinely wrong — the
+ * demo tenant is `sales_crm` with eighteen menu items and a burger register.
+ * Handing a kitchen "Service failure / Damage / Safety concern" is a bad enough
+ * first run that most people will never edit it, they will just stop using the
+ * feature.
+ *
+ * So when the vertical has no list of its own, fall back to evidence: a tenant
+ * with menu items has a kitchen, because menu_items carries kitchen_station.
+ * An explicit vertical still wins.
+ */
+async function chooseSeeds(
+  supabase: ReturnType<typeof getServiceClient>,
+  tenantId: string,
+  vertical: string | null
+): Promise<IncidentTypeSeed[]> {
+  if (vertical && SEEDED_TYPES[vertical]) return SEEDED_TYPES[vertical]
+
+  const { data } = await supabase.from('menu_items').select('id').eq('tenant_id', tenantId).limit(1)
+
+  if ((data ?? []).length > 0) return SEEDED_TYPES['restaurant']!
+  return SEEDED_TYPES['default']!
 }
 ```
 
