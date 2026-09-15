@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: task 1 of 14 done.** A box is ticked only when the command beside it
+**Status: 2 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**1 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**2 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -67,8 +67,16 @@ before writing a line of SQL.
 
 ### Phase A1 — schema and module registration _(tasks 1–2)_
 
-> Task 1 done and applied to production 2026-09-15. Task 2 (module
-> registration) not started — the last two boxes below are its.
+> **Phase complete.** Task 1 applied to production 2026-09-15; task 2 registers
+> the module and its gate.
+>
+> `incidents` is tier-gated to the scale plan, and both production tenants are
+> on `core`, so no existing tenant silently gained a module. Verified against
+> the live database rather than assumed.
+>
+> **Note for task 6:** the demo tenant is on `core` too, so it will 403 on
+> `/api/incidents` until it gets an explicit `modules.incidents = true` override
+> or moves to scale. That is the gate working, not a bug.
 
 - [x] Migration creates `incidents`, `incident_types`, `incident_rules`,
       `incident_events`, plus `tasks.incident_id`
@@ -77,8 +85,8 @@ before writing a line of SQL.
 - [x] `cost_cents` is `integer`, never `numeric` (spec L3)
 - [x] Migration is **idempotent** — applying it twice is a no-op. Non-negotiable:
       the POS migrations had to be rewritten after the fact.
-- [ ] `incidents` registered in `config/stripe-plans.ts` scale plan + `TIER_GATED`
-- [ ] `pos_only` does **not** imply `incidents` (spec §9)
+- [x] `incidents` registered in `config/stripe-plans.ts` scale plan + `TIER_GATED`
+- [x] `pos_only` does **not** imply `incidents` (spec §9)
 
 **Proves it:**
 
