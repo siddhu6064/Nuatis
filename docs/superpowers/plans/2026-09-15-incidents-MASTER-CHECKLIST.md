@@ -357,23 +357,78 @@ npm test --workspace=@nuatis/api    # full suite green, routes from tasks 5 and 
 
 ## Final acceptance — before the PR
 
-- [ ] A cashier reports a $4.50 comp with no PIN and a $13.50 comp with one
-- [ ] A cook reports against a ticket and it inherits the ticket's location
-- [ ] A manager triages, assigns and resolves, and the timeline shows every step
-- [ ] The per-staff report totals six $9.99 comps as $59.94 under one name
-- [ ] An overdue incident notifies exactly once across two scanner runs
-- [ ] A paused tenant's breached incident is neither notified nor stamped
-- [ ] An escalation rule does not take work off a human who already picked it up
-- [ ] A failing automation trigger does not fail the incident report that fired it
-- [ ] A `pos_only` tenant can still report from the register but gets 403 from
-      the dashboard routes:
+Run 2026-09-15. Each box names what proves it; none is ticked on inspection
+alone.
 
-```sql
-update tenants set product = 'pos_only' where id = '<demo tenant>';
--- POST /api/pos/incidents  → 201
--- GET  /api/incidents      → 403
-update tenants set product = 'suite' where id = '<demo tenant>';   -- put it back
-```
+**Mechanical, whole repo:**
+
+- [x] `npm run typecheck --workspaces --if-present` — clean, 7 workspaces
+- [x] `npm run lint` — clean at `--max-warnings 0`
+- [x] `npm test --workspaces --if-present` — 247 suites, 2120 tests, green
+- [x] `npm run build` for `apps/pos`, `apps/kds` and `apps/web` — all three
+      succeed; `/incidents`, `/incidents/[id]` and `/incidents/reports` present
+
+**Behaviour:**
+
+- [x] A cashier reports a $4.50 comp with no PIN and a $13.50 comp with one —
+      `records a small comp without a manager PIN`, `refuses a comp at or above
+  the threshold with no manager PIN`, and `treats the threshold itself as
+  needing a manager, not just above it`
+- [x] A cook reports against a ticket and it inherits the ticket's location —
+      `inherits the location from the ticket, so it is not lost from reporting`
+- [x] A manager triages, assigns and resolves, and the timeline shows every
+      step — `writes an opening event so the timeline starts at creation`,
+      `assigns an incident and writes an event`, `resolves with a root cause`,
+      `refuses to reopen a resolved incident`
+- [x] The per-staff report totals repeated just-under-threshold comps under one
+      name — `totals comps per staff member, which is what makes the threshold
+  safe`; also proved live, six $9.99 comps surfacing as a single row
+- [x] An overdue incident notifies exactly once across two scanner runs —
+      `notifies once, not on every tick`
+- [x] A paused tenant's breached incident is neither notified nor stamped —
+      `skips paused tenants without stamping them`
+- [x] An escalation rule does not take work off a human who already picked it
+      up — `does not overwrite an assignee a human already chose`
+- [x] A failing automation trigger does not fail the incident report that fired
+      it — `never throws when the lookup fails` and `is fire-and-forget`
+- [x] A `pos_only` tenant can still report from the register but gets 403 from
+      the dashboard routes — `refuses a tenant without the incidents module` on
+      both the queue and the reports route; also proved live, a register token
+      getting 403 from `/api/incidents` and 200 from `/api/pos/incidents/types`
+
+**Found and fixed by this pass** (see the bug sweep commit):
+
+- [x] `incidents.location_id` is a plain FK to `locations(id)` with no tenant in
+      it, and the POS route passed the client's value through unchecked while
+      proving ownership of `order_id`, `kitchen_ticket_id` and
+      `reported_by_staff_id` right beside it — a register could file against
+      another business's site. Verified against production: zero bad rows, so
+      no backfill.
+- [x] Same shape in the escalation rules — `incident_rules.target_user_id` and
+      `incidents.assigned_to_user_id` are both untenanted FKs to `users(id)`,
+      so a rule could assign someone who can never see the incident while it
+      reads as handled. No route writes rules yet, so defence in depth.
+- [x] Incident type seeding discarded its insert error, leaving the register
+      with no Report button and no trace of why. A unique violation there is
+      the expected race between register and KDS booting together; anything
+      else is now logged.
+
+**Checked and found sound**, recorded so the next pass does not re-derive them:
+
+- The `/summary` query has no row limit, but PostgREST `db_max_rows` is unset
+  on this project, so nothing is silently truncated and the money totals are
+  whole.
+- Client and server agree on the threshold comparison (`>=` in both
+  `needsManagerPin` and `requiresAuthorisation`), so the PIN pad appears exactly
+  when the server will demand one.
+- The register keypad caps entry at six digits, well inside `cost_cents`'
+  `integer`, so no overflow path into a 500.
+- `isModuleEnabled` fails closed on an unprovisioned tenant or a query error.
+- Every status button in `IncidentDetail` maps to a legal `ALLOWED_TRANSITIONS`
+  edge, so no button is offered that the API would refuse.
+- Reporter attribution is server-derived end to end: `terminal-auth` signs
+  `sub: pos:<staffId>`, `requireAuth` copies it to `authed.userId`, and the POS
+  route slices the prefix — the request body cannot spoof it.
 
 ---
 
