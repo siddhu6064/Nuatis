@@ -98,6 +98,14 @@ necessary.
 PIN verification reuses `lib/pos-pin.ts` (scrypt, `node:crypto`) and the staff PIN
 rows from 0198. No new credential.
 
+**Who counts as a manager is an explicit flag, not a role string.**
+`staff_members.role` is free text job titles in this schema — "Head Chef",
+"Front of House", "Cashier" — so a `role = 'manager'` check matches nothing in
+production and would refuse every comp forever. Migration 0200 adds
+`staff_members.pos_can_authorise`, defaulting to **false**: nobody can authorise
+until deliberately granted, which is the fail-closed direction for a control
+that exists to stop staff comping their friends' meals.
+
 ---
 
 ## 5. Data model

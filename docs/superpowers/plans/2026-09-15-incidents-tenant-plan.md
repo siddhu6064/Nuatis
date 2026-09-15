@@ -734,6 +734,14 @@ git commit -m "feat(incidents): seeded per-vertical incident types"
 
 ### Task 5: POS report route — `/api/pos/incidents`
 
+> **Found during execution:** this task's `resolveManager` filtered on
+> `row.role !== 'manager' && row.role !== 'owner'`. `staff_members.role` is free
+> text job titles, so that matches nothing in production and would have refused
+> every above-threshold comp forever. Migration 0200 adds an explicit
+> `pos_can_authorise` flag and the helper is `resolveAuthoriser`. It also now
+> checks `is_active` and compares against every candidate after a match, the way
+> `terminal-auth.ts` does, so response time is not an oracle. 15 tests, not 12.
+
 **Files:**
 
 - Create: `apps/api/src/routes/pos/incidents.ts`

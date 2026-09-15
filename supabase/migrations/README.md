@@ -53,6 +53,7 @@ the authority on what actually ran.
 | 0197_pos_cash_drawer.sql     | Cash drawer sessions + cash events                | 2026-09-11 | yes — verified  |
 | 0198_pos_terminal_pin.sql    | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
 | 0199_incidents.sql           | Incident tracking + `tasks.incident_id`           | 2026-09-15 | yes — verified  |
+| 0200_incident_authoriser.sql | `staff_members.pos_can_authorise`                 | 2026-09-15 | yes — verified  |
 
 0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
 9 `current_tenant_id()` policies, and `orders_source_check` reading

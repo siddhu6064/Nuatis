@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 4 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 5 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**4 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**5 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -139,17 +139,23 @@ negative-only suite and proves nothing — the POS menu routes learned this.
 
 ### Phase A3 — POS route and authorisation _(task 5)_
 
-- [ ] Lives under `/api/pos/*`. A register token carries `portalScope: 'pos'`,
+> **Phase complete.** Migration 0200 was needed: `staff_members.role` is free
+> text job titles, so "manager" is an explicit `pos_can_authorise` flag,
+> defaulting to false. Verified against the live database as well as the mock —
+> $4.50 no PIN → 201, $13.50 no PIN → 403, cashier's own PIN → 403, manager PIN
+> → 201 with `authorised_by` recorded.
+
+- [x] Lives under `/api/pos/*`. A register token carries `portalScope: 'pos'`,
       which `requireAuth` confines to that prefix (spec L4)
-- [ ] Gated on `pos`, **not** on `incidents` — a `pos_only` merchant can log a
+- [x] Gated on `pos`, **not** on `incidents` — a `pos_only` merchant can log a
       comp without buying the module (spec §9)
-- [ ] Below the threshold: no PIN required
-- [ ] At or above: manager PIN required, stored as `authorised_by_staff_id`
-- [ ] A non-manager PIN is refused at or above the threshold
-- [ ] Zero cost never prompts
-- [ ] The boundary case `cost == threshold` is tested explicitly, not assumed
-- [ ] `requires_cost` types reject a zero amount
-- [ ] The refusal message is **uniform** — never reveals whether the PIN was
+- [x] Below the threshold: no PIN required
+- [x] At or above: manager PIN required, stored as `authorised_by_staff_id`
+- [x] A non-manager PIN is refused at or above the threshold
+- [x] Zero cost never prompts
+- [x] The boundary case `cost == threshold` is tested explicitly, not assumed
+- [x] `requires_cost` types reject a zero amount
+- [x] The refusal message is **uniform** — never reveals whether the PIN was
       wrong or the staff member simply is not a manager
 
 **Proves it:**
