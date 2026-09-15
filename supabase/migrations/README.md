@@ -40,7 +40,7 @@ the `0001`-style numbers used for filenames here, so the two lists will not
 look alike. The numbered filenames are this repo's convention; the database is
 the authority on what actually ran.
 
-**Next migration number: 0199.**
+**Next migration number: 0202.**
 
 ## Migration log
 
@@ -54,6 +54,7 @@ the authority on what actually ran.
 | 0198_pos_terminal_pin.sql    | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
 | 0199_incidents.sql           | Incident tracking + `tasks.incident_id`           | 2026-09-15 | yes — verified  |
 | 0200_incident_authoriser.sql | `staff_members.pos_can_authorise`                 | 2026-09-15 | yes — verified  |
+| 0201_incident_sla_breach.sql | `incidents.sla_breached_at` + partial index       | 2026-09-15 | yes — verified  |
 
 0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
 9 `current_tenant_id()` policies, and `orders_source_check` reading
@@ -64,6 +65,11 @@ one again is a no-op rather than an error.
 all 4, 4 `current_tenant_id()` policies, `incidents.cost_cents` as `integer`
 (not `numeric`), plus `tasks.incident_id` and
 `tenants.incident_auth_threshold_cents`. Re-running it is a no-op.
+
+0200 and 0201 were applied 2026-09-15. 0201 adds `incidents.sla_breached_at`
+plus a partial index on unbreached, still-open incidents — the column is what
+makes the SLA scanner notify once rather than every 15 minutes. Both are
+re-runnable.
 
 **Checking the next free number:** `max(name)` on
 `supabase_migrations.schema_migrations` does _not_ work — the table holds

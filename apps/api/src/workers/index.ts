@@ -22,6 +22,7 @@ import { createScheduledReportWorker } from './scheduled-report-worker.js'
 import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
+import { createIncidentSlaScanner } from './incident-sla-scanner.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
@@ -343,6 +344,18 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'stale-approval-scanner', ...staleApprovalScanner })
   console.info('[workers] stale-approval-scanner started, cron 0 10 * * *')
+
+  // 37. Incident SLA breach scanner — every 15 minutes, not daily like the
+  // scanners above it. The shortest default SLA is one hour (critical), and a
+  // one-hour SLA checked once a day is not an SLA.
+  const incidentSlaScanner = createIncidentSlaScanner()
+  await incidentSlaScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '*/15 * * * *' }, jobId: 'incident-sla-scanner-15min' }
+  )
+  managed.push({ name: 'incident-sla-scanner', ...incidentSlaScanner })
+  console.info('[workers] incident-sla-scanner started, cron */15 * * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

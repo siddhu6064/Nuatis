@@ -16,23 +16,23 @@ was actually run.
 
 ## Progress — sub-project A
 
-**11 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**12 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
 | ---- | ----------------------------------------- | ----- | ---- |
-| 1    | Migration 0199 — incident schema          | A1    | [ ]  |
-| 2    | Module registration + entitlement gate    | A1    | [ ]  |
-| 3    | Core service module — SLA, threshold      | A2    | [ ]  |
-| 4    | Incident type seeding                     | A2    | [ ]  |
-| 5    | POS report route + manager PIN            | A3    | [ ]  |
-| 6    | Dashboard routes — queue, triage, resolve | A2    | [ ]  |
-| 7    | Reporting route — cost, per-staff, recur  | A5    | [ ]  |
-| 8    | Register report dialog                    | A4    | [ ]  |
-| 9    | KDS report action                         | A4    | [ ]  |
-| 10   | Dashboard queue and detail                | A5    | [ ]  |
-| 11   | Reporting view                            | A5    | [ ]  |
-| 12   | SLA breach scanner                        | A6    | [ ]  |
+| 1    | Migration 0199 — incident schema          | A1    | [x]  |
+| 2    | Module registration + entitlement gate    | A1    | [x]  |
+| 3    | Core service module — SLA, threshold      | A2    | [x]  |
+| 4    | Incident type seeding                     | A2    | [x]  |
+| 5    | POS report route + manager PIN            | A3    | [x]  |
+| 6    | Dashboard routes — queue, triage, resolve | A2    | [x]  |
+| 7    | Reporting route — cost, per-staff, recur  | A5    | [x]  |
+| 8    | Register report dialog                    | A4    | [x]  |
+| 9    | KDS report action                         | A4    | [x]  |
+| 10   | Dashboard queue and detail                | A5    | [x]  |
+| 11   | Reporting view                            | A5    | [x]  |
+| 12   | SLA breach scanner                        | A6    | [x]  |
 | 13   | Escalation rules                          | A7    | [ ]  |
 | 14   | Automation triggers                       | A8    | [ ]  |
 
@@ -242,22 +242,22 @@ Individually invisible, collectively $59.94 — that is the whole point of the v
 
 ### Phase A6 — SLA breach scanner _(task 12)_
 
-- [ ] `sla_due_at` derived from severity at creation
-- [ ] `incident-sla-scanner` modelled on `workers/invoice-overdue-scanner.ts`
-- [ ] Runs every 15 minutes, not daily — a 1h critical SLA checked daily is not
+- [x] `sla_due_at` derived from severity at creation
+- [x] `incident-sla-scanner` modelled on `workers/invoice-overdue-scanner.ts`
+- [x] Runs every 15 minutes, not daily — a 1h critical SLA checked daily is not
       an SLA
-- [ ] `getPausedTenants` honoured, like every other scanner
-- [ ] A paused tenant's incident is **neither notified nor stamped** — stamping
+- [x] `getPausedTenants` honoured, like every other scanner
+- [x] A paused tenant's incident is **neither notified nor stamped** — stamping
       it means unpausing silently swallows the alert forever
-- [ ] `sla_breached_at` stamped **before** notifying. A crash between the two
+- [x] `sla_breached_at` stamped **before** notifying. A crash between the two
       costs one missed notification; the other order costs a duplicate every 15
       minutes forever, which is how a team learns to mute the alert.
-- [ ] One notification per tenant, not per incident
+- [x] One notification per tenant, not per incident
 
 **Proves it:**
 
 ```bash
-npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts  # 6 pass
+npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts  # 8 pass
 ```
 
 The notify-once test runs `scan()` twice and asserts a single send.
