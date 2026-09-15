@@ -343,6 +343,46 @@ describe('POST /api/pos/incidents', () => {
     expect(store.tables['incidents']![0]!['location_id']).toBe(LOCATION_ID)
   })
 
+  it('attributes the report to the signed-in register, not to the request body', async () => {
+    // The POS token's sub is `pos:<staffId>` — the server already knows who is
+    // at the till. Taking the reporter from the body means the per-staff comp
+    // report, which is the entire mitigation for the authorisation threshold,
+    // only works when the client bothers to fill it in.
+    const posToken = await mintTestToken(
+      { sub: `pos:${CASHIER_ID}`, tenantId: TENANT_ID, portalScope: 'pos' },
+      { secret: SECRET }
+    )
+
+    const res = await post(
+      { type_key: 'complaint', title: 'Customer complained', cost_cents: 0 },
+      posToken
+    )
+
+    expect(res.status).toBe(201)
+    expect(store.tables['incidents']![0]!['reported_by_staff_id']).toBe(CASHIER_ID)
+  })
+
+  it('ignores a body-supplied reporter when the token says who is signed in', async () => {
+    // A register must not be able to attribute a comp to someone else.
+    const posToken = await mintTestToken(
+      { sub: `pos:${CASHIER_ID}`, tenantId: TENANT_ID, portalScope: 'pos' },
+      { secret: SECRET }
+    )
+
+    const res = await post(
+      {
+        type_key: 'complaint',
+        title: 'x',
+        cost_cents: 0,
+        reported_by_staff_id: MANAGER_ID,
+      },
+      posToken
+    )
+
+    expect(res.status).toBe(201)
+    expect(store.tables['incidents']![0]!['reported_by_staff_id']).toBe(CASHIER_ID)
+  })
+
   it('refuses a tenant without the POS module', async () => {
     seedEntitledTenant(store, TENANT_ID, { modules: { pos: false }, vertical: 'restaurant' })
     const res = await post(

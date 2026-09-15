@@ -70,9 +70,10 @@ export default function IncidentsBoard() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 2 }}>
-        Incidents
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 2 }}>
+        <Typography variant="h4">Incidents</Typography>
+        <Link href="/incidents/reports">Report</Link>
+      </Box>
 
       {error && (
         <Alert severity="warning" sx={{ mb: 2 }}>

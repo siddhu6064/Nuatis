@@ -103,8 +103,25 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
     // entirely.
     ticketLocationId = ticket.location_id
   }
+  // Who reported this. A register token's sub is `pos:<staffId>` (see
+  // routes/pos/terminal-auth.ts), so the server already knows who is signed in
+  // at the till and does not need the client to say.
+  //
+  // The token WINS over the body, deliberately. Trusting a client-supplied
+  // reporter would let a register attribute a comp to another staff member,
+  // and the per-staff comp report is the entire mitigation for the
+  // authorisation threshold — attribution that can be spoofed is no
+  // mitigation at all.
+  //
+  // The body is still honoured for a non-register caller (an owner token
+  // hitting this route), where there is no signed-in staff member to infer.
+  const staffFromToken = authed.userId?.startsWith('pos:')
+    ? authed.userId.slice('pos:'.length)
+    : null
   const reporterId =
-    typeof body['reported_by_staff_id'] === 'string' ? body['reported_by_staff_id'] : null
+    staffFromToken ??
+    (typeof body['reported_by_staff_id'] === 'string' ? body['reported_by_staff_id'] : null)
+
   if (reporterId && !(await ownsRow(supabase, 'staff_members', reporterId, authed.tenantId))) {
     res.status(400).json({ error: 'Staff member not found' })
     return

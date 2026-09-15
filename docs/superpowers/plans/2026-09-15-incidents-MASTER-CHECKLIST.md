@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 10 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 11 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**10 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**11 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -207,8 +207,7 @@ select i.reference, i.cost_cents, i.authorised_by_staff_id,
 
 ### Phase A5 — dashboard and reporting _(tasks 7, 10, 11)_
 
-> Tasks 7 and 10 done; task 11 (the reporting **view**) is the one box still
-> open. Verified in the browser as the demo tenant: the queue listed all 14
+> **Phase complete.** Verified in the browser as the demo tenant: the queue listed all 14
 > incidents with severity, cost and status; INC-1013 triaged and then resolved
 > through the UI, with Resolve correctly disabled until a root cause was
 > entered; the database confirmed `root_cause`, `resolved_at` and a timeline of
@@ -375,6 +374,12 @@ Recorded because each one already cost time on the POS work.
   `git log main..HEAD -- <file>` and an isolated run before chasing. Three is a
   pattern rather than three coincidences — the suite has a parallelism problem
   worth its own fix, separate from this work.
+- **"The register knows who is reporting."** It did not attribute anything until
+  task 11 — the dialog sent a null reporter, so register-reported comps were
+  missing from the per-staff table, which is the whole mitigation for the
+  threshold. The server now derives it from the POS token's `pos:<staffId>` sub
+  and ignores the body. Totals disagreeing between two sections of one report
+  is the symptom to watch for.
 - **"The server derives the ticket's location."** It did not, until task 9.
   Comments describing behaviour are not evidence that the behaviour exists —
   this one was written in the plan AND in the client before anything
