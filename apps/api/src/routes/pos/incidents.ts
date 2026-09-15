@@ -11,6 +11,7 @@ import {
   type Severity,
 } from '../../lib/incidents.js'
 import { seedIncidentTypes } from '../../lib/incident-types.js'
+import { fireIncidentTrigger } from '../../lib/incident-triggers.js'
 import { requirePos } from './menu.js'
 
 const router = Router()
@@ -187,6 +188,10 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
     kind: 'reported',
     detail: { cost_cents: costCents, authorised_by: authorisedBy },
   })
+
+  // Fire-and-forget: a tenant without the automation module has no listener,
+  // and a misconfigured one must never cost a cashier their incident report.
+  fireIncidentTrigger(authed.tenantId, 'incident_created', incident as Record<string, unknown>)
 
   res.status(201).json({ incident })
 })

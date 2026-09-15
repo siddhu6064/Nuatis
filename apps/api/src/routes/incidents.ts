@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requireIncidents } from '../lib/incident-module.js'
+import { fireIncidentTrigger } from '../lib/incident-triggers.js'
 import {
   canTransition,
   generateIncidentReference,
@@ -177,6 +178,9 @@ router.post(
       kind: 'reported',
       detail: { cost_cents: costCents },
     })
+
+    // Fire-and-forget — see the POS route for why this must not be awaited.
+    fireIncidentTrigger(authed.tenantId, 'incident_created', incident as Record<string, unknown>)
 
     res.status(201).json({ incident })
   }

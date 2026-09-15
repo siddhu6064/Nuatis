@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**13 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**14 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -34,7 +34,7 @@ committed. The phase sections below say what "done" actually means for each.
 | 11   | Reporting view                            | A5    | [x]  |
 | 12   | SLA breach scanner                        | A6    | [x]  |
 | 13   | Escalation rules                          | A7    | [x]  |
-| 14   | Automation triggers                       | A8    | [ ]  |
+| 14   | Automation triggers                       | A8    | [x]  |
 
 **Dependency order.** 1 → 2 → 3 → 4 gate everything. After that: 5 and 6 are
 independent of each other; 8 needs 5; 9 needs 5; 7 needs 6; 10 and 11 need 6
@@ -287,17 +287,34 @@ npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts  # 
 
 ### Phase A8 — automation triggers _(task 14)_
 
-- [ ] `incident_created` / `incident_breached` emitted
-- [ ] Fire-and-forget: a failing trigger never fails the incident report
-- [ ] Works with the automation module absent
-- [ ] Uses the **existing** dispatch path — read `custom-automation-worker.ts`
-      first; do not invent a new one
-- [ ] No UI offers SMS escalation. `notifyOwner`'s SMS branch is commented out
+- [x] `incident_created` / `incident_breached` emitted — from both create
+      routes and, once only, from the scanner's newly-breached rows
+- [x] Fire-and-forget: a failing trigger never fails the incident report
+- [x] Works with the automation module absent — no listeners means no work
+- [x] **Not** the existing dispatch path, and deliberately so. The plan assumed
+      `enqueueCustomAutomation` in `lib/custom-automation.js`; neither exists.
+      The real engine is `runAction(supabase, automation, contact)`, and it is
+      contact-centric: five of its seven actions write against a contact row,
+      which an incident does not have. Incident triggers therefore run their
+      own contact-free path supporting `create_task` (linked through
+      `tasks.incident_id`) and `send_webhook`, and
+      `routes/custom-automations.ts` **refuses to save** an incident-triggered
+      automation with any other action rather than storing one that reads as
+      active and does nothing.
+- [x] Migration 0203 widens `custom_automations_trigger_type_check`; without it
+      an incident-triggered automation could not be stored at all
+- [x] Found and fixed en route: the `create_task` action inserted `due_at`
+      (the column is `due_date`) with `status: 'pending'` (the check allows
+      `open`/`in_progress`/`done`), so it had never once succeeded for any
+      automation. The supabase test mock does not validate columns, which is
+      why a green suite never caught it.
+- [x] No UI offers SMS escalation. `notifyOwner`'s SMS branch is commented out
       pending a personal phone field on `users` (spec §7)
 
 **Proves it:**
 
 ```bash
+npm test --workspace=@nuatis/api -- src/lib/incident-triggers.test.ts  # 12 pass
 npm test --workspace=@nuatis/api    # full suite green, routes from tasks 5 and 6 still pass
 ```
 

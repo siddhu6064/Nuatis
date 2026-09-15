@@ -3,6 +3,7 @@ import { getServiceClient } from '../lib/supabase.js'
 import { notifyOwner } from '../lib/notifications.js'
 import { createBullMQConnection } from '../lib/bullmq-connection.js'
 import { getPausedTenants } from '../lib/scanner-pause.js'
+import { fireIncidentTrigger } from '../lib/incident-triggers.js'
 
 const QUEUE_NAME = 'incident-sla-scanner'
 
@@ -231,6 +232,17 @@ export async function scan(): Promise<void> {
     const nowMs = Date.parse(now)
     for (const [tenantId, incidents] of rulesByTenant) {
       await applyRules(tenantId, incidents, 'breached', nowMs)
+    }
+
+    // Only the rows that crossed the line on this tick, for the same reason the
+    // notification is limited to them: a trigger that re-fires every 15 minutes
+    // would keep creating the same follow-up task forever.
+    for (const inc of newlyBreached) {
+      fireIncidentTrigger(
+        inc.tenant_id,
+        'incident_breached',
+        inc as unknown as Record<string, unknown>
+      )
     }
 
     for (const [tenantId, incidents] of byTenant) {

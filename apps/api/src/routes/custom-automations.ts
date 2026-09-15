@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import { nanoid } from 'nanoid'
 import { getServiceClient } from '../lib/supabase.js'
+import { INCIDENT_SAFE_ACTIONS } from '../lib/incident-triggers.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
 import { requirePlan } from '../middleware/require-plan.js'
 
@@ -17,7 +18,14 @@ const VALID_TRIGGER_TYPES = [
   'new_contact',
   'appointment_followup',
   'inbound_webhook',
+  'incident_created',
+  'incident_breached',
 ] as const
+
+// Incident triggers carry no contact, so only the contact-free actions can
+// serve them. See lib/incident-triggers.ts for why running the others would be
+// worse than refusing them.
+const INCIDENT_TRIGGER_TYPES = ['incident_created', 'incident_breached'] as const
 
 const WEBHOOK_MATCH_FIELDS = ['email', 'phone'] as const
 const WEBHOOK_MAPPING_KEYS = ['email', 'phone', 'first_name', 'last_name'] as const
@@ -177,11 +185,23 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
   }
 
   const isWebhookTrigger = trigger_type === 'inbound_webhook'
+  const isIncidentTrigger = (INCIDENT_TRIGGER_TYPES as readonly string[]).includes(trigger_type)
+
+  // Refuse at save time rather than discovering at run time that the action
+  // had nowhere to go. An automation that stores cleanly, reads as active and
+  // does nothing is worse than a rejected one.
+  if (isIncidentTrigger && !INCIDENT_SAFE_ACTIONS.has(action_type)) {
+    res.status(400).json({
+      error: `An incident trigger has no contact attached, so action_type must be one of: ${[...INCIDENT_SAFE_ACTIONS].join(', ')}`,
+    })
+    return
+  }
 
   // Every other trigger goes through the AI builder, which always produces a
-  // prompt; a webhook trigger is manually configured (no AI involved, since
-  // the AI can't know an external system's payload shape) so it has none.
-  if (!isWebhookTrigger && !natural_language_prompt?.trim()) {
+  // prompt; webhook and incident triggers are manually configured (no AI
+  // involved — it can't know an external system's payload shape, and an
+  // incident event has no natural-language form) so they have none.
+  if (!isWebhookTrigger && !isIncidentTrigger && !natural_language_prompt?.trim()) {
     res.status(400).json({ error: 'natural_language_prompt is required' })
     return
   }
