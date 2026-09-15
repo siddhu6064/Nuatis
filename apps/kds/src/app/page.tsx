@@ -9,15 +9,15 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { TicketCard } from '@/components/TicketCard'
 import { StationFilter } from '@/components/StationFilter'
 import { ReportTicketIssueDialog, type IncidentType } from '@/components/ReportTicketIssueDialog'
-import { usePosSocket } from '@/lib/usePosSocket'
+import { usePosSocket } from '@nuatis/pos-web/ui'
 import {
   applyEvent,
   filterByStation,
   sortTickets,
   stationsOf,
+  type SocketStatus,
   type Ticket,
-} from '@/lib/ticket-board'
-import type { SocketStatus } from '@/lib/pos-socket'
+} from '@nuatis/pos-web/tickets'
 
 const LOCATION_ID = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:3001'
@@ -112,7 +112,7 @@ export default function BoardPage() {
   const status = usePosSocket({ url: SOCKET_URL, onEvent })
 
   const setStatus = useCallback(
-    async (ticket: Ticket, next: 'in_progress' | 'bumped') => {
+    async (ticket: Ticket, next: 'in_progress' | 'ready' | 'bumped') => {
       setBusyTicketId(ticket.id)
       // Optimistic: a cook who taps Bump and watches the ticket sit there taps
       // it again. The socket echo re-applies the same change, and applyEvent
@@ -215,6 +215,7 @@ export default function BoardPage() {
               now={now}
               busy={busyTicketId === ticket.id}
               onStart={() => void setStatus(ticket, 'in_progress')}
+              onReady={() => void setStatus(ticket, 'ready')}
               onBump={() => void setStatus(ticket, 'bumped')}
               onReportIssue={() => setReportingTicket(ticket)}
             />

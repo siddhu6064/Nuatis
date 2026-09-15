@@ -372,8 +372,8 @@ alone.
 
 - [x] A cashier reports a $4.50 comp with no PIN and a $13.50 comp with one —
       `records a small comp without a manager PIN`, `refuses a comp at or above
-  the threshold with no manager PIN`, and `treats the threshold itself as
-  needing a manager, not just above it`
+the threshold with no manager PIN`, and `treats the threshold itself as
+needing a manager, not just above it`
 - [x] A cook reports against a ticket and it inherits the ticket's location —
       `inherits the location from the ticket, so it is not lost from reporting`
 - [x] A manager triages, assigns and resolves, and the timeline shows every
@@ -382,7 +382,7 @@ alone.
       `refuses to reopen a resolved incident`
 - [x] The per-staff report totals repeated just-under-threshold comps under one
       name — `totals comps per staff member, which is what makes the threshold
-  safe`; also proved live, six $9.99 comps surfacing as a single row
+safe`; also proved live, six $9.99 comps surfacing as a single row
 - [x] An overdue incident notifies exactly once across two scanner runs —
       `notifies once, not on every tick`
 - [x] A paused tenant's breached incident is neither notified nor stamped —

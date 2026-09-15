@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals'
 import {
   ageTone,
   elapsedLabel,
@@ -6,7 +7,7 @@ import {
   stationsOf,
   filterByStation,
   type Ticket,
-} from './ticket-board'
+} from './ticket-board.js'
 
 const LOCATION = 'loc-1'
 const NOW = Date.parse('2026-09-11T18:00:00.000Z')

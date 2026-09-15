@@ -5,3 +5,4 @@
 // the root barrel would drag both into that runtime for no reason, so anything
 // that renders lives behind `@nuatis/pos-web/ui` instead.
 export { PinPad, type PinPadProps } from './PinPad'
+export { usePosSocket } from './usePosSocket'

@@ -11,11 +11,18 @@ import { MenuGrid } from '@/components/MenuGrid'
 import { CartPanel } from '@/components/CartPanel'
 import { ModifierDialog } from '@/components/ModifierDialog'
 import { CheckoutDialog } from '@/components/CheckoutDialog'
+import { ReadyStrip } from '@/components/ReadyStrip'
 import { ReportIncidentDialog, type IncidentType } from '@/components/ReportIncidentDialog'
 import { useCart } from '@/lib/useCart'
 import { createAndFireOrder, CreateOrderError } from '@/lib/createOrder'
+import { readyOnly, applyReadyEvent } from '@/lib/ready-orders'
+import { usePosSocket } from '@nuatis/pos-web/ui'
+import type { Ticket } from '@nuatis/pos-web/tickets'
 import { useCheckout, cashIntoDrawerCents } from '@/lib/useCheckout'
 import { canAddDirectly, type MenuCategoryDto, type MenuItemDto } from '@/lib/cart-lines'
+
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:3001'
+const SOCKET_URL = `${API_ORIGIN.replace(/^http/, 'ws')}/ws/pos`
 
 interface PosSettings {
   business_name: string | null
@@ -40,6 +47,11 @@ export default function RegisterPage() {
   // that renders a full-page alert, which would wipe the register out from
   // under a cashier holding a customer's receipt.
   const [saleWarning, setSaleWarning] = useState<string | null>(null)
+  // Orders the kitchen has cooked and the counter has not handed over yet.
+  const [readyTickets, setReadyTickets] = useState<Ticket[]>([])
+  const [handingOverId, setHandingOverId] = useState<string | null>(null)
+  // One clock for the whole strip rather than a timer per chip.
+  const [now, setNow] = useState(() => Date.now())
 
   // Tax cannot be guessed: 0 until settings load, and the cart is not usable
   // before then anyway.
@@ -52,10 +64,11 @@ export default function RegisterPage() {
     async function load() {
       try {
         const locationId = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
-        const [menuRes, settingsRes, drawerRes, typesRes] = await Promise.all([
+        const [menuRes, settingsRes, drawerRes, ticketsRes, typesRes] = await Promise.all([
           fetch('/api/pos/menu/tree'),
           fetch(`/api/pos/settings?location_id=${encodeURIComponent(locationId)}`),
           fetch(`/api/pos/drawer/sessions/current?location_id=${encodeURIComponent(locationId)}`),
+          fetch(`/api/pos/tickets?location_id=${encodeURIComponent(locationId)}`),
           fetch('/api/pos/incidents/types'),
         ])
 
@@ -87,6 +100,14 @@ export default function RegisterPage() {
           setDrawerSessionId(drawer.session?.id ?? null)
         }
 
+        // Seed the ready strip over HTTP, then let the socket keep it current.
+        // A register opened mid-service would otherwise show an empty counter
+        // while food sat under the lamp.
+        if (ticketsRes.ok) {
+          const board = (await ticketsRes.json()) as { tickets: Ticket[] }
+          setReadyTickets(readyOnly(board.tickets))
+        }
+
         // Incident types seed lazily on this call. A failure here costs the
         // report button, not the register — a till that cannot take money
         // because a reporting feature failed would be a poor trade.
@@ -106,6 +127,60 @@ export default function RegisterPage() {
       cancelled = true
     }
   }, [])
+
+  // The strip counts up, so it needs a ticking clock — but only while
+  // something is actually waiting. An idle register should not re-render once a
+  // second all shift.
+  useEffect(() => {
+    if (readyTickets.length === 0) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [readyTickets.length])
+
+  const onTicketEvent = useCallback((event: { type: string; ticket: unknown }) => {
+    setReadyTickets((current) =>
+      applyReadyEvent(current, event, process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? '')
+    )
+  }, [])
+
+  // The same socket the kitchen display uses, filtered to this location by the
+  // server. The register only ever reads from it — firing an order still goes
+  // over HTTP — so a dropped connection costs visibility, never a sale.
+  usePosSocket({ url: SOCKET_URL, onEvent: onTicketEvent })
+
+  /**
+   * Hand the food to the customer.
+   *
+   * Bumping from here rather than from the kitchen screen is deliberate: the
+   * cook is done when they mark it ready, and the ticket should clear when it
+   * physically leaves the counter. Optimistic, because a cashier holding a
+   * tray will not wait for a round trip — and the socket echo is idempotent.
+   */
+  const handOver = useCallback(
+    async (ticket: Ticket) => {
+      setHandingOverId(ticket.id)
+      const previous = readyTickets
+      setReadyTickets((current) => current.filter((t) => t.id !== ticket.id))
+
+      try {
+        const res = await fetch(`/api/pos/tickets/${ticket.id}/status`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: 'bumped' }),
+        })
+        if (!res.ok) {
+          setReadyTickets(previous)
+          setSaleWarning('That order could not be cleared — the kitchen still shows it as ready.')
+        }
+      } catch {
+        setReadyTickets(previous)
+        setSaleWarning('That order could not be cleared — the kitchen still shows it as ready.')
+      } finally {
+        setHandingOverId(null)
+      }
+    },
+    [readyTickets]
+  )
 
   const select = useCallback(
     (item: MenuItemDto) => {
@@ -243,6 +318,13 @@ export default function RegisterPage() {
           )}
         </Box>
       </Box>
+
+      <ReadyStrip
+        tickets={readyTickets}
+        now={now}
+        onHandOver={(ticket) => void handOver(ticket)}
+        busyTicketId={handingOverId}
+      />
 
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
