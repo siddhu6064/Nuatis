@@ -50,6 +50,30 @@ beforeEach(() => {
 })
 
 describe('GET /api/pos/settings', () => {
+  it('returns the incident authorisation threshold so the register knows when to ask', async () => {
+    seedEntitledTenant(store, TENANT_ID, {
+      modules: { pos: true },
+      name: 'Demo Diner',
+      tax_rate: '8.75',
+      incident_auth_threshold_cents: 2500,
+    })
+
+    const res = await request(makeApp())
+      .get(`/api/pos/settings?location_id=${LOCATION_ID}`)
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.body.incident_auth_threshold_cents).toBe(2500)
+  })
+
+  it('returns null for the threshold when the tenant has not set one', async () => {
+    // Null means the register falls back to the same default the server uses.
+    const res = await request(makeApp())
+      .get(`/api/pos/settings?location_id=${LOCATION_ID}`)
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.body.incident_auth_threshold_cents).toBeNull()
+  })
+
   it('converts the tenant tax percentage to basis points', async () => {
     const res = await request(makeApp())
       .get(`/api/pos/settings?location_id=${LOCATION_ID}`)

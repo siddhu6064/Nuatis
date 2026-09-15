@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 7 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 8 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**7 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**8 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -170,10 +170,16 @@ npm test --workspace=@nuatis/api -- src/routes/pos/incidents.integration.test.ts
 
 ### Phase A4 — register and KDS surfaces _(tasks 8–9)_
 
-- [ ] Register: "Report issue" against the current or a recent order
+> Task 8 done, task 9 (KDS) open. Verified in the browser end to end: a $13.50
+> "Wrong item" showed "Over $10.00 — a manager has to approve this" and disabled
+> Report; the cashier's own PIN was refused with the server's own wording and
+> the dialog stayed open with the PIN cleared; the manager's PIN went through as
+> INC-1013 with `authorised_by` recorded as Carlos Mendez.
+
+- [x] Register: "Report issue" against the current or a recent order
 - [ ] KDS: report against a ticket, inheriting the ticket's `location_id` (spec L5)
-- [ ] One dialog, not a wizard — this happens with a queue waiting
-- [ ] The client threshold check mirrors the server's exactly, and the server
+- [x] One dialog, not a wizard — this happens with a queue waiting
+- [x] The client threshold check mirrors the server's exactly, and the server
       remains authoritative
 
 **Proves it:** browser verification with all three servers up, then:
@@ -340,10 +346,13 @@ Recorded because each one already cost time on the POS work.
 - **"Recurrence needs a detection engine."** It is a `GROUP BY`. (A §7)
 - **"Nuatis should dogfood the tenant module for its own outages."** That is how
   the leak in A §1 gets built. (B §12)
-- **"A red full-suite run means I broke something."** Two suites on this repo
-  fail under parallel load and pass in isolation: `security-hardening-misc`
-  (rate-limit timing) and `admin-console.integration`. Neither is touched by
-  this branch. Confirm with `git log main..HEAD -- <file>` before chasing.
+- **"A red full-suite run means I broke something."** THREE suites on this repo
+  fail intermittently under parallel load and pass in isolation:
+  `security-hardening-misc` (rate-limit timing), `admin-console.integration`,
+  and `stripe-webhooks-checkout`. None is touched by this branch. Confirm with
+  `git log main..HEAD -- <file>` and an isolated run before chasing. Three is a
+  pattern rather than three coincidences — the suite has a parallelism problem
+  worth its own fix, separate from this work.
 - **"`ownsRow` is importable from `routes/pos/menu.ts`."** It is not exported.
   Task 5 defines its own copy; widening a security helper's visibility belongs in
   its own commit.

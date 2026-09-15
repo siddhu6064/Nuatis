@@ -4,11 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
+import Button from '@mui/material/Button'
+import Snackbar from '@mui/material/Snackbar'
 import CircularProgress from '@mui/material/CircularProgress'
 import { MenuGrid } from '@/components/MenuGrid'
 import { CartPanel } from '@/components/CartPanel'
 import { ModifierDialog } from '@/components/ModifierDialog'
 import { CheckoutDialog } from '@/components/CheckoutDialog'
+import { ReportIncidentDialog, type IncidentType } from '@/components/ReportIncidentDialog'
 import { useCart } from '@/lib/useCart'
 import { createAndFireOrder, CreateOrderError } from '@/lib/createOrder'
 import { useCheckout, cashIntoDrawerCents } from '@/lib/useCheckout'
@@ -18,6 +21,8 @@ interface PosSettings {
   business_name: string | null
   location_name: string | null
   tax_rate_bps: number
+  /** Null means the $10 default in the API's lib/incidents.ts. */
+  incident_auth_threshold_cents?: number | null
 }
 
 export default function RegisterPage() {
@@ -27,6 +32,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(true)
   const [pendingItem, setPendingItem] = useState<MenuItemDto | null>(null)
   const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null)
+  const [incidentTypes, setIncidentTypes] = useState<IncidentType[]>([])
+  const [reporting, setReporting] = useState(false)
+  // Confirmation of the last report — a cashier needs to see it landed.
+  const [reportedRef, setReportedRef] = useState<string | null>(null)
   // Something went wrong AFTER the money was taken. Deliberately not `error`:
   // that renders a full-page alert, which would wipe the register out from
   // under a cashier holding a customer's receipt.
@@ -43,10 +52,11 @@ export default function RegisterPage() {
     async function load() {
       try {
         const locationId = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
-        const [menuRes, settingsRes, drawerRes] = await Promise.all([
+        const [menuRes, settingsRes, drawerRes, typesRes] = await Promise.all([
           fetch('/api/pos/menu/tree'),
           fetch(`/api/pos/settings?location_id=${encodeURIComponent(locationId)}`),
           fetch(`/api/pos/drawer/sessions/current?location_id=${encodeURIComponent(locationId)}`),
+          fetch('/api/pos/incidents/types'),
         ])
 
         if (menuRes.status === 401 || settingsRes.status === 401) {
@@ -75,6 +85,14 @@ export default function RegisterPage() {
         if (drawerRes.ok) {
           const drawer = (await drawerRes.json()) as { session: { id: string } | null }
           setDrawerSessionId(drawer.session?.id ?? null)
+        }
+
+        // Incident types seed lazily on this call. A failure here costs the
+        // report button, not the register — a till that cannot take money
+        // because a reporting feature failed would be a poor trade.
+        if (typesRes.ok) {
+          const body = (await typesRes.json()) as { types: IncidentType[] }
+          setIncidentTypes(body.types)
         }
       } catch {
         if (!cancelled) setError('Could not reach the server.')
@@ -211,10 +229,19 @@ export default function RegisterPage() {
         }}
       >
         <Typography variant="h6">{settings?.business_name ?? 'Register'}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {settings?.location_name}
-          {cart.itemCount > 0 && ` · ${cart.itemCount} item${cart.itemCount === 1 ? '' : 's'}`}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {settings?.location_name}
+            {cart.itemCount > 0 && ` · ${cart.itemCount} item${cart.itemCount === 1 ? '' : 's'}`}
+          </Typography>
+          {/* Secondary on purpose: reporting an issue is the rare action, and
+              it must never sit where a thumb reaching for Charge can find it. */}
+          {incidentTypes.length > 0 && (
+            <Button size="small" variant="text" onClick={() => setReporting(true)}>
+              Report issue
+            </Button>
+          )}
+        </Box>
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -229,6 +256,24 @@ export default function RegisterPage() {
           onCharge={checkout.start}
         />
       </Box>
+
+      <ReportIncidentDialog
+        open={reporting}
+        types={incidentTypes}
+        thresholdCents={settings?.incident_auth_threshold_cents ?? 1000}
+        locationId={process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? null}
+        orderId={null}
+        reportedByStaffId={null}
+        onClose={() => setReporting(false)}
+        onReported={setReportedRef}
+      />
+
+      <Snackbar
+        open={reportedRef !== null}
+        autoHideDuration={4000}
+        onClose={() => setReportedRef(null)}
+        message={`Reported as ${reportedRef}`}
+      />
 
       <CheckoutDialog
         checkout={checkout}
