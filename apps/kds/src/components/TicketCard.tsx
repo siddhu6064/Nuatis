@@ -4,7 +4,7 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import { ageTone, elapsedLabel, type Ticket } from '@/lib/ticket-board'
+import { ageTone, elapsedLabel, type Ticket } from '@nuatis/pos-web/tickets'
 
 interface TicketCardProps {
   ticket: Ticket
@@ -12,6 +12,7 @@ interface TicketCardProps {
    *  agrees, and so the board drives a single re-render per second. */
   now: number
   onStart: () => void
+  onReady: () => void
   onBump: () => void
   busy: boolean
 }
@@ -22,9 +23,10 @@ const TONE_COLOR = {
   late: 'error.main',
 } as const
 
-export function TicketCard({ ticket, now, onStart, onBump, busy }: TicketCardProps) {
+export function TicketCard({ ticket, now, onStart, onReady, onBump, busy }: TicketCardProps) {
   const tone = ageTone(ticket.fired_at, now)
   const started = ticket.status === 'in_progress'
+  const ready = ticket.status === 'ready'
 
   return (
     <Paper
@@ -99,21 +101,41 @@ export function TicketCard({ ticket, now, onStart, onBump, busy }: TicketCardPro
         ))}
       </Box>
 
+      {/*
+        Three steps, not two: Start, Ready, Bump.
+        "Ready" is what tells the front counter the food is up — the register's
+        ready strip listens for exactly this. Going straight from in_progress to
+        bumped, as this board used to, leaves the cashier with no signal at all
+        and the plate sitting under the heat lamp.
+      */}
       <Box sx={{ display: 'flex', gap: 1, p: 1.5, pt: 0 }}>
-        {!started && (
+        {!started && !ready && (
           <Button variant="outlined" onClick={onStart} disabled={busy} sx={{ flex: 1, height: 64 }}>
             Start
           </Button>
         )}
-        <Button
-          variant="contained"
-          onClick={onBump}
-          disabled={busy}
-          // The target for someone with full hands, or the back of a knuckle.
-          sx={{ flex: 2, height: 64, fontSize: '1.25rem' }}
-        >
-          Bump
-        </Button>
+        {!ready && (
+          <Button
+            variant="contained"
+            onClick={onReady}
+            disabled={busy}
+            // The target for someone with full hands, or the back of a knuckle.
+            sx={{ flex: 2, height: 64, fontSize: '1.25rem' }}
+          >
+            Ready
+          </Button>
+        )}
+        {ready && (
+          <Button
+            variant="outlined"
+            color="success"
+            onClick={onBump}
+            disabled={busy}
+            sx={{ flex: 1, height: 64, fontSize: '1.25rem' }}
+          >
+            Handed over
+          </Button>
+        )}
       </Box>
     </Paper>
   )

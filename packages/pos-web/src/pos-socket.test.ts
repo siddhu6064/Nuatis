@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from '@jest/globals'
 import {
   PosSocket,
   backoffMs,
@@ -6,7 +7,7 @@ import {
   type SocketLike,
   type SocketStatus,
   type PosSocketEvent,
-} from './pos-socket'
+} from './pos-socket.js'
 
 const TICKET = { token: 'socket.ticket.jwt', tenantId: 'tenant-1', locationId: 'loc-1' }
 

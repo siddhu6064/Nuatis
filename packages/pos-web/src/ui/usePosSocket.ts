@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { PosSocket, type PosSocketEvent, type SocketStatus, type SocketTicket } from './pos-socket'
+import { PosSocket, type PosSocketEvent, type SocketStatus, type SocketTicket } from '../pos-socket'
 
 interface UsePosSocketOptions {
   /** The API's WebSocket URL, e.g. ws://localhost:3001/ws/pos. */

@@ -14,6 +14,7 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@nuatis/pos-core$': '<rootDir>/../../packages/pos-core/src/index.ts',
     '^@nuatis/pos-web$': '<rootDir>/../../packages/pos-web/src/index.ts',
+    '^@nuatis/pos-web/tickets$': '<rootDir>/../../packages/pos-web/src/tickets.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
