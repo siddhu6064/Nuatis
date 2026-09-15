@@ -247,13 +247,18 @@ export async function runAction(
       }
 
       case 'create_task': {
-        const dueAt = new Date(now.getTime() + 86400000).toISOString()
+        // `due_date` and status 'open', not `due_at` / 'pending': tasks has no
+        // due_at column and its status check allows only open/in_progress/done,
+        // so the previous payload failed on both counts for every automation
+        // that used this action. The supabase test mock does not validate
+        // columns, which is why nothing caught it.
+        const dueDate = new Date(now.getTime() + 86400000).toISOString()
         const { error } = await supabase.from('tasks').insert({
           tenant_id,
           contact_id,
           title: (action_config.title as string) ?? 'Follow up',
-          status: 'pending',
-          due_at: dueAt,
+          status: 'open',
+          due_date: dueDate,
         })
         if (error) {
           console.error(

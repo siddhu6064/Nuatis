@@ -179,6 +179,13 @@ const NAV_GROUPS: NavGroup[] = [
         requireModule: 'orders',
       },
       {
+        href: '/incidents',
+        label: 'Incidents',
+        icon: '⚠',
+        suiteOnly: true,
+        requireModule: 'incidents',
+      },
+      {
         href: '/expenses',
         label: 'Expenses',
         icon: '💵',

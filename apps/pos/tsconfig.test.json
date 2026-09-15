@@ -5,7 +5,17 @@
     "moduleResolution": "node",
     "jsx": "react-jsx",
     "isolatedModules": false,
-    "noEmit": true
+    "noEmit": true,
+    // node10 resolution predates package "exports", so it cannot see
+    // @nuatis/pos-web's subpaths the way the Next build (bundler resolution)
+    // can. Map them by hand, mirroring jest.config.cjs's moduleNameMapper —
+    // both exist for the same reason and must change together.
+    "paths": {
+      "@/*": ["./src/*"],
+      "@nuatis/pos-web": ["../../packages/pos-web/src/index.ts"],
+      "@nuatis/pos-web/incidents": ["../../packages/pos-web/src/incidents.ts"],
+      "@nuatis/pos-web/ui": ["../../packages/pos-web/src/ui/index.ts"]
+    }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules"]

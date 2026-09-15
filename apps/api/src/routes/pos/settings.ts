@@ -37,9 +37,14 @@ router.get('/', requireAuth, requirePos, async (req: Request, res: Response): Pr
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, tax_rate, timezone')
+    .select('name, tax_rate, timezone, incident_auth_threshold_cents')
     .eq('id', authed.tenantId)
-    .maybeSingle<{ name: string | null; tax_rate: string | null; timezone: string | null }>()
+    .maybeSingle<{
+      name: string | null
+      tax_rate: string | null
+      timezone: string | null
+      incident_auth_threshold_cents: number | null
+    }>()
 
   // tenants.tax_rate is a percentage (8.75 means 8.75%), but cartTotals works
   // in integer basis points. Convert here so no caller has to remember which
@@ -54,6 +59,11 @@ router.get('/', requireAuth, requirePos, async (req: Request, res: Response): Pr
     location_name: location.name,
     timezone: tenant?.timezone ?? 'America/Chicago',
     tax_rate_bps: taxRateBps,
+    // Above this, reporting an incident asks for a manager PIN. The register
+    // needs it so it knows when to show the PIN pad; the server enforces the
+    // rule regardless. Null means the DEFAULT_AUTH_THRESHOLD_CENTS in
+    // lib/incidents.ts, which the client mirrors.
+    incident_auth_threshold_cents: tenant?.incident_auth_threshold_cents ?? null,
   })
 })
 
