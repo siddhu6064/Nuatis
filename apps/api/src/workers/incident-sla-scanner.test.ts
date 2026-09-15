@@ -152,3 +152,155 @@ describe('incident-sla-scanner', () => {
     await expect(scan()).resolves.toBeUndefined()
   })
 })
+
+function rule(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'r1',
+    tenant_id: TENANT_ID,
+    when_event: 'breached',
+    match_severity: 'critical',
+    match_type_key: null,
+    action: 'assign_to',
+    target_user_id: 'user-oncall',
+    delay_minutes: 0,
+    enabled: true,
+    ...overrides,
+  }
+}
+
+function minutesAgo(n: number): string {
+  return new Date(Date.now() - n * 60_000).toISOString()
+}
+
+describe('escalation rules', () => {
+  beforeEach(() => {
+    store.tables['incident_rules'] = []
+    store.tables['incident_events'] = []
+  })
+
+  it('applies an assign_to rule on breach', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [rule()]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-oncall')
+  })
+
+  it('ignores a rule belonging to another tenant', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [
+      rule({ tenant_id: 'someone-else', target_user_id: 'their-user' }),
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('ignores a disabled rule', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [rule({ enabled: false })]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('does not overwrite an assignee a human already chose', async () => {
+    // A rule that reassigns work someone already picked up is how automation
+    // gets turned off.
+    store.tables['incidents'] = [
+      incident({ severity: 'critical', assigned_to_user_id: 'user-dana' }),
+    ]
+    store.tables['incident_rules'] = [rule()]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-dana')
+  })
+
+  it('matches on type_key as well as severity', async () => {
+    store.tables['incidents'] = [incident({ severity: 'low', type_key: 'equipment' })]
+    store.tables['incident_rules'] = [
+      rule({ match_severity: null, match_type_key: 'equipment', target_user_id: 'user-maint' }),
+    ]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-maint')
+  })
+
+  it('writes an event so the timeline shows the rule acted, not a person', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [rule()]
+
+    await scan()
+
+    const events = store.tables['incident_events'] ?? []
+    expect(events).toHaveLength(1)
+    expect(events[0]!['actor_kind']).toBe('system')
+    expect((events[0]!['detail'] as Record<string, unknown>)['by_rule']).toBe('r1')
+  })
+
+  it('honours a notify_owner rule instead of silently doing nothing', async () => {
+    // The schema allows two actions. Handling only assign_to would leave a
+    // configured notify_owner rule looking active while doing nothing.
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [rule({ action: 'notify_owner', target_user_id: null })]
+
+    await scan()
+
+    const escalations = notifyOwner.mock.calls.filter(
+      (c) => (c as unknown as string[])[1] === 'incident_escalated'
+    )
+    expect(escalations).toHaveLength(1)
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('holds a delayed rule until its delay has elapsed', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical', sla_breached_at: minutesAgo(5) })]
+    store.tables['incident_rules'] = [rule({ delay_minutes: 30 })]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
+  })
+
+  it('fires a delayed rule on a later tick, once the delay has passed', async () => {
+    // The whole point of a delay is "escalate if nobody has picked this up in
+    // 30 minutes", which only works if the scanner revisits breached rows.
+    store.tables['incidents'] = [
+      incident({ severity: 'critical', sla_breached_at: minutesAgo(40) }),
+    ]
+    store.tables['incident_rules'] = [rule({ delay_minutes: 30 })]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBe('user-oncall')
+  })
+
+  it('applies a rule once, not on every tick after the breach', async () => {
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['incident_rules'] = [rule({ action: 'notify_owner', target_user_id: null })]
+
+    await scan()
+    await scan()
+    await scan()
+
+    const escalations = notifyOwner.mock.calls.filter(
+      (c) => (c as unknown as string[])[1] === 'incident_escalated'
+    )
+    expect(escalations).toHaveLength(1)
+  })
+
+  it('does not re-notify the owner of a breach it has already announced', async () => {
+    // Revisiting breached rows for delayed rules must not resurrect the
+    // once-only breach notification.
+    store.tables['incidents'] = [incident({ sla_breached_at: minutesAgo(40) })]
+
+    await scan()
+
+    expect(notifyOwner).not.toHaveBeenCalled()
+  })
+})

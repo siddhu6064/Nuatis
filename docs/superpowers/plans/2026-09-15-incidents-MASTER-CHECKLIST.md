@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**12 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**13 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -33,7 +33,7 @@ committed. The phase sections below say what "done" actually means for each.
 | 10   | Dashboard queue and detail                | A5    | [x]  |
 | 11   | Reporting view                            | A5    | [x]  |
 | 12   | SLA breach scanner                        | A6    | [x]  |
-| 13   | Escalation rules                          | A7    | [ ]  |
+| 13   | Escalation rules                          | A7    | [x]  |
 | 14   | Automation triggers                       | A8    | [ ]  |
 
 **Dependency order.** 1 → 2 → 3 → 4 gate everything. After that: 5 and 6 are
@@ -264,18 +264,25 @@ The notify-once test runs `scan()` twice and asserts a single send.
 
 ### Phase A7 — escalation rules _(task 13)_
 
-- [ ] `incident_rules` evaluated on breach, tenant-scoped
-- [ ] A disabled rule does nothing
-- [ ] Another tenant's rule never touches this tenant's incident
-- [ ] A rule **never overwrites an assignee a human chose** — reassigning work
+- [x] `incident_rules` evaluated on breach, tenant-scoped
+- [x] A disabled rule does nothing
+- [x] Another tenant's rule never touches this tenant's incident
+- [x] A rule **never overwrites an assignee a human chose** — reassigning work
       out from under someone is how automation gets switched off
-- [ ] Rule-driven changes write an `incident_events` row with `actor_kind: 'system'`,
+- [x] Rule-driven changes write an `incident_events` row with `actor_kind: 'system'`,
       so the timeline shows a rule acted, not a person
+- [x] **`action: 'notify_owner'` actually notifies** — beyond the plan, which
+      implemented only `assign_to` and would have left the schema's other
+      action configurable but silent
+- [x] **`delay_minutes` is waited out** — beyond the plan, which never read the
+      column. "Escalate if nobody picks this up in 30 minutes" means nothing if
+      the rule fires instantly. Needed the scanner to revisit already-breached
+      incidents, with the append-only event log as the once-only guard.
 
 **Proves it:**
 
 ```bash
-npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts  # 12 pass
+npm test --workspace=@nuatis/api -- src/workers/incident-sla-scanner.test.ts  # 19 pass
 ```
 
 ### Phase A8 — automation triggers _(task 14)_
