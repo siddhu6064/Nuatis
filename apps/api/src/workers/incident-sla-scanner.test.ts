@@ -176,6 +176,11 @@ describe('escalation rules', () => {
   beforeEach(() => {
     store.tables['incident_rules'] = []
     store.tables['incident_events'] = []
+    store.tables['users'] = [
+      { id: 'user-oncall', tenant_id: TENANT_ID },
+      { id: 'user-maint', tenant_id: TENANT_ID },
+      { id: 'user-dana', tenant_id: TENANT_ID },
+    ]
   })
 
   it('applies an assign_to rule on breach', async () => {
@@ -241,6 +246,19 @@ describe('escalation rules', () => {
     expect(events).toHaveLength(1)
     expect(events[0]!['actor_kind']).toBe('system')
     expect((events[0]!['detail'] as Record<string, unknown>)['by_rule']).toBe('r1')
+  })
+
+  it('refuses to assign to a user outside the tenant', async () => {
+    // incidents.assigned_to_user_id is a plain FK to users(id), and so is
+    // incident_rules.target_user_id — neither carries a tenant. A rule naming
+    // someone else's user would hand them an incident they can never see.
+    store.tables['incidents'] = [incident({ severity: 'critical' })]
+    store.tables['users'] = [{ id: 'user-oncall', tenant_id: 'someone-else' }]
+    store.tables['incident_rules'] = [rule()]
+
+    await scan()
+
+    expect(store.tables['incidents']![0]!['assigned_to_user_id']).toBeNull()
   })
 
   it('honours a notify_owner rule instead of silently doing nothing', async () => {

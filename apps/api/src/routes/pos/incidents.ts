@@ -82,6 +82,7 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
     res.status(400).json({ error: 'Order not found' })
     return
   }
+  const bodyLocationId = typeof body['location_id'] === 'string' ? body['location_id'] : null
   const ticketId = typeof body['kitchen_ticket_id'] === 'string' ? body['kitchen_ticket_id'] : null
   let ticketLocationId: string | null = null
   if (ticketId) {
@@ -103,6 +104,25 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
     // and the incident drops out of location-scoped reporting and recurrence
     // entirely.
     ticketLocationId = ticket.location_id
+  }
+
+  // incidents.location_id is a plain FK to locations(id) with no tenant in it,
+  // so the database accepts any tenant's location. Without this check a
+  // register could file an incident against another business's site, where it
+  // would be invisible in this tenant's location-scoped reporting while
+  // sitting in someone else's data.
+  //
+  // Only checked when the body value is the one that would actually be stored.
+  // A ticket-linked report discards it either way, and refusing the whole
+  // report over a value that never reaches the database would cost a cook
+  // their incident for a client bug that changed nothing.
+  if (
+    ticketLocationId === null &&
+    bodyLocationId &&
+    !(await ownsRow(supabase, 'locations', bodyLocationId, authed.tenantId))
+  ) {
+    res.status(400).json({ error: 'Location not found' })
+    return
   }
   // Who reported this. A register token's sub is `pos:<staffId>` (see
   // routes/pos/terminal-auth.ts), so the server already knows who is signed in
@@ -164,8 +184,7 @@ router.post('/', requireAuth, requirePos, async (req: Request, res: Response): P
       title,
       description: typeof body['description'] === 'string' ? body['description'] : null,
       cost_cents: costCents,
-      location_id:
-        ticketLocationId ?? (typeof body['location_id'] === 'string' ? body['location_id'] : null),
+      location_id: ticketLocationId ?? bodyLocationId,
       order_id: orderId,
       kitchen_ticket_id: ticketId,
       reported_by_staff_id: reporterId,

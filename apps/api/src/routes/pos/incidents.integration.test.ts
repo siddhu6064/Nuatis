@@ -266,6 +266,45 @@ describe('POST /api/pos/incidents', () => {
     expect(store.tables['incidents']).toHaveLength(0)
   })
 
+  it('rejects a location belonging to another tenant', async () => {
+    // incidents.location_id is a plain FK to locations(id) with no tenant in
+    // it, so the database happily accepts another tenant's location. Every
+    // other foreign key on this route is proven owned; this one is the
+    // boundary too.
+    store.tables['locations']!.push({
+      id: 'cccccccc-0000-0000-0000-00000foreign',
+      tenant_id: OTHER_TENANT_ID,
+      name: 'Someone else',
+    })
+    const res = await post(
+      {
+        type_key: 'complaint',
+        title: 'x',
+        cost_cents: 0,
+        location_id: 'cccccccc-0000-0000-0000-00000foreign',
+        reported_by_staff_id: CASHIER_ID,
+      },
+      await makeToken()
+    )
+    expect(res.status).toBe(400)
+    expect(store.tables['incidents']).toHaveLength(0)
+  })
+
+  it('accepts the tenant own location', async () => {
+    const res = await post(
+      {
+        type_key: 'complaint',
+        title: 'x',
+        cost_cents: 0,
+        location_id: LOCATION_ID,
+        reported_by_staff_id: CASHIER_ID,
+      },
+      await makeToken()
+    )
+    expect(res.status).toBe(201)
+    expect(store.tables['incidents']![0]!['location_id']).toBe(LOCATION_ID)
+  })
+
   it('rejects a type_key the tenant does not have', async () => {
     const res = await post(
       { type_key: 'not_a_type', title: 'x', cost_cents: 0, reported_by_staff_id: CASHIER_ID },

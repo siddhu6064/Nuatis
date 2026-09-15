@@ -105,6 +105,25 @@ export async function applyRules(
         // decides the automation is more trouble than it is worth.
         if (inc.assigned_to_user_id) continue
 
+        // incident_rules.target_user_id and incidents.assigned_to_user_id are
+        // both plain FKs to users(id) with no tenant in them, so nothing in the
+        // schema stops a rule naming someone outside this tenant. Assigning
+        // them would hand an incident to a person who can never see it, and it
+        // would read as handled.
+        const { data: assignee } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', rule.target_user_id)
+          .eq('tenant_id', tenantId)
+          .maybeSingle<{ id: string }>()
+
+        if (!assignee) {
+          console.warn(
+            `[incident-sla-scanner] rule=${rule.id} targets a user outside tenant ${tenantId}, skipping`
+          )
+          continue
+        }
+
         await supabase
           .from('incidents')
           .update({ assigned_to_user_id: rule.target_user_id })

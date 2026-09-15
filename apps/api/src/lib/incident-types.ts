@@ -83,9 +83,18 @@ export async function seedIncidentTypes(tenantId: string, vertical: string | nul
   if ((existing ?? []).length > 0) return
 
   const seeds = await chooseSeeds(supabase, tenantId, vertical)
-  await supabase
+  const { error } = await supabase
     .from('incident_types')
     .insert(seeds.map((s, i) => ({ tenant_id: tenantId, ...s, sort_order: i })))
+
+  // A unique violation here is the expected outcome of a race, not a fault:
+  // the register and the KDS both read types on boot, and whichever loses
+  // finds the other's rows already in place. Anything else is a real failure
+  // that would otherwise leave the register with no Report button and no
+  // trace of why.
+  if (error && error.code !== '23505') {
+    console.error(`[incident-types] seeding failed for tenant ${tenantId}:`, error.message)
+  }
 }
 
 /**
