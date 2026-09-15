@@ -4,7 +4,7 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 2 of 14 tasks done.** A box is ticked only when the command beside it
+**Status: 3 of 14 tasks done.** A box is ticked only when the command beside it
 was actually run.
 
 |       | Spec                                                                        | Plan                                              | Status                       |
@@ -16,7 +16,7 @@ was actually run.
 
 ## Progress — sub-project A
 
-**2 / 14 tasks.** Tick a row only when its task's own tests pass and it is
+**3 / 14 tasks.** Tick a row only when its task's own tests pass and it is
 committed. The phase sections below say what "done" actually means for each.
 
 | Task | Deliverable                               | Phase | Done |
@@ -74,9 +74,9 @@ before writing a line of SQL.
 > on `core`, so no existing tenant silently gained a module. Verified against
 > the live database rather than assumed.
 >
-> **Note for task 6:** the demo tenant is on `core` too, so it will 403 on
-> `/api/incidents` until it gets an explicit `modules.incidents = true` override
-> or moves to scale. That is the gate working, not a bug.
+> **Demo tenant:** moved to the `scale` plan with all 15 modules explicitly
+> enabled on 2026-09-15, so it will not 403 on `/api/incidents` during task 6
+> verification. The other production tenant is untouched and still on `core`.
 
 - [x] Migration creates `incidents`, `incident_types`, `incident_rules`,
       `incident_events`, plus `tasks.incident_id`
@@ -105,7 +105,10 @@ npm test --workspace=@nuatis/api -- src/lib/incident-module.test.ts   # 4 pass
 
 ### Phase A2 — core service and routes _(tasks 3, 4, 6)_
 
-- [ ] SLA derivation, threshold rule and transition map are pure and tested
+> Task 3 done. Tasks 4 and 6 not started — the boxes below that mention types
+> seeding and `/api/incidents` are theirs.
+
+- [x] SLA derivation, threshold rule and transition map are pure and tested
 - [ ] Incident types seed **lazily on first read**, so tenants created before
       this shipped get them too
 - [ ] `/api/incidents` — list with filters, detail with timeline, create, patch
@@ -310,6 +313,10 @@ Recorded because each one already cost time on the POS work.
 - **"Recurrence needs a detection engine."** It is a `GROUP BY`. (A §7)
 - **"Nuatis should dogfood the tenant module for its own outages."** That is how
   the leak in A §1 gets built. (B §12)
+- **"A red full-suite run means I broke something."** Two suites on this repo
+  fail under parallel load and pass in isolation: `security-hardening-misc`
+  (rate-limit timing) and `admin-console.integration`. Neither is touched by
+  this branch. Confirm with `git log main..HEAD -- <file>` before chasing.
 - **"`ownsRow` is importable from `routes/pos/menu.ts`."** It is not exported.
   Task 5 defines its own copy; widening a security helper's visibility belongs in
   its own commit.
