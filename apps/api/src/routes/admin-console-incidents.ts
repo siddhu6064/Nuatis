@@ -8,8 +8,11 @@ import {
   PLATFORM_SEVERITIES,
   PLATFORM_STATUSES,
   ackDueAt,
+  canTransition,
   generatePlatformReference,
+  requiresPostmortem,
   type PlatformSeverity,
+  type PlatformStatus,
 } from '../lib/platform-incidents.js'
 
 const router = Router()
@@ -143,6 +146,135 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
   const timeline = ((events ?? []) as { at: string }[]).sort((a, b) => a.at.localeCompare(b.at))
   res.json({ incident, events: timeline })
+})
+
+// ── PATCH /api/admin-console/incidents/:id ───────────────────────────────────
+router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const body = req.body as Record<string, unknown>
+
+  const { data: current } = await supabase
+    .from('platform_incidents')
+    .select('id, status, severity, postmortem')
+    .eq('id', req.params['id'])
+    .maybeSingle<{
+      id: string
+      status: PlatformStatus
+      severity: PlatformSeverity
+      postmortem: string | null
+    }>()
+
+  if (!current) {
+    res.status(404).json({ error: 'Incident not found' })
+    return
+  }
+
+  const patch: Record<string, unknown> = {}
+  const events: { kind: string; detail: Record<string, unknown> }[] = []
+
+  if (typeof body['assigned_to_user_id'] === 'string') {
+    const assignee = body['assigned_to_user_id']
+    // users.id is a plain FK with no tenant in it, so nothing in the schema
+    // stops an incident being handed to a merchant's account — where it would
+    // read as owned by someone who can never see it.
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', assignee)
+      .eq('tenant_id', process.env['PLATFORM_TENANT_ID'] ?? '')
+      .maybeSingle<{ id: string }>()
+
+    if (!user) {
+      res.status(400).json({ error: 'Assignee is not a platform user' })
+      return
+    }
+    patch['assigned_to_user_id'] = assignee
+    events.push({ kind: 'assigned', detail: { assigned_to_user_id: assignee } })
+  }
+
+  if (typeof body['postmortem'] === 'string') {
+    patch['postmortem'] = body['postmortem']
+    events.push({ kind: 'postmortem_written', detail: {} })
+  }
+
+  if (typeof body['status'] === 'string') {
+    const next = body['status'] as PlatformStatus
+    if (!(PLATFORM_STATUSES as readonly string[]).includes(next)) {
+      res.status(400).json({ error: `status must be one of: ${PLATFORM_STATUSES.join(', ')}` })
+      return
+    }
+    if (!canTransition(current.status, next, current.severity)) {
+      const owesPostmortem =
+        current.status === 'resolved' && next === 'closed' && requiresPostmortem(current.severity)
+      res.status(400).json({
+        error: owesPostmortem
+          ? `A ${current.severity.toUpperCase()} needs a postmortem before it can be closed`
+          : `Cannot move an incident from ${current.status} to ${next}`,
+      })
+      return
+    }
+
+    // postmortem_due -> closed is legal in the map, but only once something is
+    // actually written. Otherwise the gate becomes a box to tick.
+    const writtenNow = typeof body['postmortem'] === 'string' ? body['postmortem'].trim() : ''
+    const alreadyWritten = (current.postmortem ?? '').trim()
+    if (
+      next === 'closed' &&
+      requiresPostmortem(current.severity) &&
+      !writtenNow &&
+      !alreadyWritten
+    ) {
+      res.status(400).json({ error: 'Write the postmortem before closing this incident' })
+      return
+    }
+
+    patch['status'] = next
+    const at = new Date().toISOString()
+    if (next === 'acknowledged') {
+      patch['acknowledged_at'] = at
+      patch['acknowledged_by'] = authed.appUserId
+    }
+    if (next === 'mitigating') patch['mitigated_at'] = at
+    if (next === 'resolved') patch['resolved_at'] = at
+    if (next === 'postmortem_due') {
+      // Five days. Without this the column is decorative — it exists in the
+      // schema and nothing ever writes it, which is how a deadline quietly
+      // stops being a deadline.
+      patch['postmortem_due_at'] = new Date(Date.now() + 5 * 86_400_000).toISOString()
+    }
+    events.push({ kind: 'status_changed', detail: { from: current.status, to: next } })
+  }
+
+  if (Object.keys(patch).length === 0) {
+    res.status(400).json({ error: 'Nothing to update' })
+    return
+  }
+  patch['updated_at'] = new Date().toISOString()
+
+  const { data: updated, error } = await supabase
+    .from('platform_incidents')
+    .update(patch)
+    .eq('id', req.params['id'])
+    .select('*')
+    .single()
+
+  if (error || !updated) {
+    res.status(500).json({ error: error?.message ?? 'Failed to update incident' })
+    return
+  }
+
+  for (const e of events) {
+    await supabase.from('platform_incident_events').insert({
+      incident_id: current.id,
+      actor_kind: 'user',
+      actor_user_id: authed.appUserId,
+      kind: e.kind,
+      detail: e.detail,
+    })
+  }
+
+  res.json({ incident: updated })
 })
 
 export default router

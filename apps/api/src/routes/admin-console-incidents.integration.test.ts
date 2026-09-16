@@ -255,3 +255,180 @@ describe('GET /api/admin-console/incidents/:id', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('PATCH /api/admin-console/incidents/:id', () => {
+  beforeEach(() => {
+    store.tables['platform_incidents'] = [
+      {
+        id: 'i1',
+        reference: 'SEV-2026-001',
+        severity: 'sev1',
+        status: 'detected',
+        title: 'x',
+        detected_at: '2026-01-01T00:00:00Z',
+        acknowledged_at: null,
+        acknowledged_by: null,
+        postmortem: null,
+        postmortem_due_at: null,
+      },
+    ]
+    store.tables['platform_incident_events'] = []
+  })
+
+  function row(): Record<string, unknown> {
+    return (store.tables['platform_incidents'] as Row[])[0]!
+  }
+
+  it('acknowledges, stamping who and when', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'acknowledged' })
+
+    expect(res.status).toBe(200)
+    expect(row()['acknowledged_at']).toEqual(expect.any(String))
+    expect(row()['acknowledged_by']).toBe(PLATFORM_USER_ID)
+  })
+
+  it('refuses to close a resolved SEV1 with no postmortem', async () => {
+    // The gate. The only thing standing between "we had an outage" and "we
+    // learned something".
+    row()['status'] = 'resolved'
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'closed' })
+
+    expect(res.status).toBe(400)
+    expect(String(res.body.error)).toContain('postmortem')
+  })
+
+  it('refuses to leave postmortem_due for closed while the postmortem is empty', async () => {
+    // postmortem_due -> closed is legal in the map, so without this the gate
+    // becomes a box to tick.
+    row()['status'] = 'postmortem_due'
+    row()['postmortem'] = '   '
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'closed' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('closes a SEV1 once the postmortem is written', async () => {
+    row()['status'] = 'postmortem_due'
+    row()['postmortem'] = '## What happened\nThe register could not reach Stripe.'
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'closed' })
+
+    expect(res.status).toBe(200)
+  })
+
+  it('accepts a postmortem written in the same request that closes it', async () => {
+    row()['status'] = 'postmortem_due'
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'closed', postmortem: '## What happened\nStripe key rotation.' })
+
+    expect(res.status).toBe(200)
+  })
+
+  it('lets a resolved SEV3 close directly', async () => {
+    row()['severity'] = 'sev3'
+    row()['status'] = 'resolved'
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'closed' })
+
+    expect(res.status).toBe(200)
+  })
+
+  it('stamps postmortem_due_at when it enters postmortem_due', async () => {
+    // Otherwise the column is decorative — it exists in the schema and nothing
+    // ever writes it.
+    row()['status'] = 'resolved'
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'postmortem_due' })
+
+    expect(res.status).toBe(200)
+    expect(row()['postmortem_due_at']).toEqual(expect.any(String))
+  })
+
+  it('refuses a no-op so no empty event row is written', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'detected' })
+
+    expect(res.status).toBe(400)
+    expect(store.tables['platform_incident_events']).toHaveLength(0)
+  })
+
+  it('stamps resolved_at on resolution', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'resolved' })
+
+    expect(res.status).toBe(200)
+    expect(row()['resolved_at']).toEqual(expect.any(String))
+  })
+
+  it('reassigns only to a user inside the platform tenant', async () => {
+    // users.id is a plain FK with no tenant in it, so nothing in the schema
+    // stops an incident being handed to a merchant's account.
+    store.tables['users'] = [{ id: 'user-outsider', tenant_id: OTHER_TENANT_ID }]
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ assigned_to_user_id: 'user-outsider' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('accepts a platform teammate as assignee', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ assigned_to_user_id: PLATFORM_USER_ID })
+
+    expect(res.status).toBe(200)
+    expect(row()['assigned_to_user_id']).toBe(PLATFORM_USER_ID)
+  })
+
+  it('writes an event for every change it accepts', async () => {
+    await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'acknowledged' })
+
+    const events = (store.tables['platform_incident_events'] ?? []) as Row[]
+    expect(events).toHaveLength(1)
+    expect(events[0]!['kind']).toBe('status_changed')
+  })
+
+  it('404s for an id that does not exist', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/nope')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ status: 'acknowledged' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('refuses a non-platform tenant', async () => {
+    const res = await request(makeApp())
+      .patch('/api/admin-console/incidents/i1')
+      .set('Authorization', `Bearer ${await makeOtherTenantToken()}`)
+      .send({ status: 'acknowledged' })
+
+    expect(res.status).toBe(403)
+  })
+})
