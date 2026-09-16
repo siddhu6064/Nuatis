@@ -7,9 +7,10 @@
  * reads and, for impersonation specifically, a genuine read-write session
  * into a target tenant — fingerprinted end to end (lib/impersonation.ts).
  */
-import { Router, type Request, type Response, type NextFunction } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { getServiceClient } from '../lib/supabase.js'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.js'
+import { requirePlatformOwner } from '../lib/platform-auth.js'
 import { PLANS, type PlanKey } from '../config/stripe-plans.js'
 import { startImpersonationSession, endImpersonationSession } from '../lib/impersonation.js'
 import { getFeatureUsageSummary } from '../lib/feature-usage.js'
@@ -24,16 +25,6 @@ const CONVERTED_STATUSES = new Set(['active'])
 const TRIALING_STATUSES = new Set(['trialing'])
 
 const router = Router()
-
-function requirePlatformOwner(req: Request, res: Response, next: NextFunction): void {
-  const authed = req as AuthenticatedRequest
-  const platformTenantId = process.env['PLATFORM_TENANT_ID']
-  if (!platformTenantId || authed.tenantId !== platformTenantId || authed.role !== 'owner') {
-    res.status(403).json({ error: 'Not authorized' })
-    return
-  }
-  next()
-}
 
 router.use(requireAuth, requirePlatformOwner)
 
