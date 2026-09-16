@@ -40,7 +40,7 @@ the `0001`-style numbers used for filenames here, so the two lists will not
 look alike. The numbered filenames are this repo's convention; the database is
 the authority on what actually ran.
 
-**Next migration number: 0204.**
+**Next migration number: 0205.**
 
 ## Migration log
 
@@ -57,6 +57,7 @@ the authority on what actually ran.
 | 0201_incident_sla_breach.sql          | `incidents.sla_breached_at` + partial index       | 2026-09-15 | yes — verified  |
 | 0202_incident_sla_open_index.sql      | Drop the SLA index nothing reads any more         | 2026-09-15 | yes — verified  |
 | 0203_incident_automation_triggers.sql | Incident trigger types on `custom_automations`    | 2026-09-15 | yes — verified  |
+| 0204_platform_incidents.sql           | Platform/internal-ops incidents + on-call rota    | 2026-09-15 | yes — verified  |
 
 0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
 9 `current_tenant_id()` policies, and `orders_source_check` reading
@@ -85,6 +86,13 @@ recreate the dead index, so follow it with 0202.
 `incident_created` and `incident_breached`. Altering a CHECK means dropping and
 recreating it, so the migration does both under the same constraint name and is
 safe to re-run.
+
+0204 was applied 2026-09-15 and verified live: 4 `platform_*` tables, RLS true
+on all 4 with **no policies** — these are reached only through the service-role
+client behind `requirePlatformOwner`, so deny-all is the correct default and a
+leaked anon key reads nothing. `platform_incidents` has **no `tenant_id`**,
+verified by query rather than by reading; that absence is the point of the
+tenant/platform split and the migration comments say so.
 
 **Checking the next free number:** `max(name)` on
 `supabase_migrations.schema_migrations` does _not_ work — the table holds
