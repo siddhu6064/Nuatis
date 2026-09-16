@@ -639,13 +639,22 @@ Recorded because each one already cost time on the POS work.
 
 Added with B's plan:
 
-- **`notifyPlatformTeam` is only as loud as web push is configured.** It sends to
-  the platform tenant through `sendPushNotification`, which returns early when
-  VAPID keys are unset — the test logs already show
-  `[push] VAPID keys not configured — skipping`. If VAPID is not configured in
-  production and no `PLATFORM_ALERT_WEBHOOK_URL` is set, **every platform alert
-  goes nowhere silently.** Task 11 must verify one of the two transports
-  actually delivers before the ack scanner is trusted.
+- **`notifyPlatformTeam` has no working transport today.** The earlier wording
+  here blamed unset VAPID keys; that was the wrong mechanism. VAPID _is_
+  configured. The real problem is that `push_subscriptions` is **empty across
+  the whole production database (0 rows)**, and `sendPushNotification` returns
+  early on `subs.length === 0` with **no log line at all** — the VAPID branch at
+  least warns, this one is silent.
+  So an alert with no webhook reaches nobody and leaves no trace. Mitigated, not
+  solved: `notifyPlatformTeam` now logs `ALERT UNDELIVERABLE` when it has
+  neither a webhook nor a single subscription, so the failure is visible. It
+  still needs someone to either set `PLATFORM_ALERT_WEBHOOK_URL` or subscribe a
+  browser while signed into the platform tenant before the ack scanner is worth
+  trusting.
+- **`PLATFORM_TENANT_ID` is unset in `apps/api/.env`.** If that is also true in
+  production, `requirePlatformOwner` fails closed and the entire admin console —
+  not just platform incidents — returns 403. Worth confirming against the real
+  deployment config, which this session cannot read.
 - The customer-message split is a structural guarantee **only while the tenant
   endpoint keeps reshaping field by field**. A future `select('*')` or object
   spread there would put internal ops text on a merchant's screen, and no test

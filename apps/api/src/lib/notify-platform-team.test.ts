@@ -1,12 +1,27 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+import {
+  createStore,
+  createMockSupabase,
+  type MockStore,
+} from '../routes/__test-support__/supabase-mock.js'
 
 const sendPushNotification = jest.fn<() => Promise<void>>()
 jest.unstable_mockModule('./push-client.js', () => ({ sendPushNotification }))
+
+let store: MockStore = createStore()
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
+  createClient: () => createMockSupabase(store),
+}))
+
+process.env['SUPABASE_URL'] = 'https://mock.supabase.co'
+process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'mock-service-key'
 
 const PLATFORM = 'aaaaaaaa-0000-0000-0000-00000platform'
 const { notifyPlatformTeam } = await import('./notify-platform-team.js')
 
 beforeEach(() => {
+  store = createStore()
+  store.tables['push_subscriptions'] = []
   sendPushNotification.mockClear()
   sendPushNotification.mockResolvedValue(undefined)
   process.env['PLATFORM_TENANT_ID'] = PLATFORM
@@ -65,5 +80,51 @@ describe('notifyPlatformTeam', () => {
   it('never throws when push itself fails', async () => {
     sendPushNotification.mockRejectedValue(new Error('push is down'))
     await expect(notifyPlatformTeam('x', { title: 'a', body: 'b' })).resolves.toBeUndefined()
+  })
+})
+
+describe('undeliverable alerts are loud', () => {
+  it('logs an error when there is no webhook and no push subscription', async () => {
+    // sendPushNotification returns early and logs nothing when a tenant has no
+    // subscriptions. An alert that reaches nobody must not also be invisible.
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    store.tables['push_subscriptions'] = []
+
+    await notifyPlatformTeam('platform_incident_declared', { title: 'SEV1', body: 'x' })
+
+    const logged = spy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(logged).toContain('ALERT UNDELIVERABLE')
+    spy.mockRestore()
+  })
+
+  it('stays quiet when a webhook is configured', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    process.env['PLATFORM_ALERT_WEBHOOK_URL'] = 'https://hooks.example.com/abc'
+    store.tables['push_subscriptions'] = []
+
+    await notifyPlatformTeam('platform_incident_declared', { title: 'SEV1', body: 'x' })
+
+    const logged = spy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(logged).not.toContain('ALERT UNDELIVERABLE')
+    spy.mockRestore()
+  })
+
+  it('stays quiet when the platform tenant has a subscription', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    store.tables['push_subscriptions'] = [
+      {
+        id: 'sub1',
+        tenant_id: PLATFORM,
+        endpoint: 'https://push.example/1',
+        p256dh: 'k',
+        auth: 'a',
+      },
+    ]
+
+    await notifyPlatformTeam('platform_incident_declared', { title: 'SEV1', body: 'x' })
+
+    const logged = spy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(logged).not.toContain('ALERT UNDELIVERABLE')
+    spy.mockRestore()
   })
 })

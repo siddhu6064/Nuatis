@@ -1,4 +1,5 @@
 import { sendPushNotification } from './push-client.js'
+import { getServiceClient } from './supabase.js'
 
 /**
  * Tell the Nuatis team about an internal incident.
@@ -22,6 +23,11 @@ import { sendPushNotification } from './push-client.js'
  *
  * Fire-and-forget and never throws: a failed notification must not fail the
  * incident operation that triggered it.
+ *
+ * It does, however, refuse to fail *silently*. Web push returns early with no
+ * log at all when the tenant has no subscriptions, so an alert with neither
+ * transport available would otherwise vanish without trace — which is the worst
+ * possible behaviour for the thing that tells you production is on fire.
  */
 export async function notifyPlatformTeam(
   eventType: string,
@@ -56,7 +62,15 @@ export async function notifyPlatformTeam(
     }
   }
 
+  let pushTargets = 0
   try {
+    const supabase = getServiceClient()
+    const { count } = await supabase
+      .from('push_subscriptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', platformTenantId)
+    pushTargets = count ?? 0
+
     await sendPushNotification(platformTenantId, {
       title: payload.title,
       body: payload.body,
@@ -64,5 +78,20 @@ export async function notifyPlatformTeam(
     })
   } catch (err) {
     console.error('[notify-platform-team] push failed:', err)
+  }
+
+  // The failure this guards against is silence, not an error.
+  //
+  // sendPushNotification returns early and logs NOTHING when the tenant has no
+  // push subscriptions, so an alert with no webhook and no subscribed browser
+  // disappears without leaving a trace — the worst possible behaviour for the
+  // thing that tells you production is on fire. Say so loudly instead.
+  if (!webhookUrl && pushTargets === 0) {
+    console.error(
+      `[notify-platform-team] ALERT UNDELIVERABLE (${eventType}): the platform tenant has no ` +
+        'push subscriptions and PLATFORM_ALERT_WEBHOOK_URL is unset, so this alert reached ' +
+        'nobody. Set PLATFORM_ALERT_WEBHOOK_URL, or open the admin console and enable ' +
+        'notifications.'
+    )
   }
 }
