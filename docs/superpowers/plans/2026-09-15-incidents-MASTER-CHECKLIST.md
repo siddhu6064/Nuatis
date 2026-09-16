@@ -4,13 +4,13 @@ Covers both incident specs. Every box is **verifiable** — it names the command
 query that proves it, not a claim you have to trust. This format exists because
 the POS checklist's first draft asserted five things that turned out to be false.
 
-**Status: 11 of 14 tasks done.** A box is ticked only when the command beside it
-was actually run.
+**Status: A complete and merged (14/14). B planned, 0/16 started.** A box is
+ticked only when the command beside it was actually run.
 
-|       | Spec                                                                        | Plan                                              | Status                       |
-| ----- | --------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------- |
-| **A** | [Tenant core + POS surface](../specs/2026-09-15-incidents-tenant-design.md) | [14 tasks](./2026-09-15-incidents-tenant-plan.md) | approved, not started        |
-| **B** | [Platform / internal ops](../specs/2026-09-15-incidents-platform-design.md) | not written                                       | **draft — 4 open decisions** |
+|       | Spec                                                                        | Plan                                                | Status                         |
+| ----- | --------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------ |
+| **A** | [Tenant core + POS surface](../specs/2026-09-15-incidents-tenant-design.md) | [14 tasks](./2026-09-15-incidents-tenant-plan.md)   | **shipped** — merged in PR #25 |
+| **B** | [Platform / internal ops](../specs/2026-09-15-incidents-platform-design.md) | [16 tasks](./2026-09-15-incidents-platform-plan.md) | approved, not started          |
 
 ---
 
@@ -57,9 +57,12 @@ Expect the top row to be `0198_pos_terminal_pin`, so 0199 is free. `max(name)` d
 `42P07: relation already exists`. If this returns something higher, renumber
 before writing a line of SQL.
 
-- [ ] **B's four open decisions resolved** — spec §8: on-call rota, tenant
-      visibility, auto-detection, postmortem storage. **Blocks B only.** A is
-      unblocked and depends on none of them, so do not hold A for this.
+- [x] **B's four open decisions resolved** — spec §8, resolved 2026-09-15. Two
+      went against the spec's own recommendation: an on-call rota **and** an
+      assignee column, and affected merchants **are** told through a separately
+      authored `customer_message`. Auto-detection stays manual with the hook
+      shipped disabled; the postmortem stays a `text` column. Reasoning is
+      recorded in the spec rather than just the outcome.
 
 ---
 
@@ -322,22 +325,141 @@ npm test --workspace=@nuatis/api    # full suite green, routes from tasks 5 and 
 
 ## Sub-project B — platform / internal ops
 
-> Blocked on Gate 0's third box. No plan written yet.
+**0 / 16 tasks.** Spec approved 2026-09-15, plan written:
+`2026-09-15-incidents-platform-plan.md` — 16 tasks, 87 steps. Tick a row only
+when its task's own tests pass and it is committed.
 
-| Phase | Deliverable                                          | Done |
-| ----- | ---------------------------------------------------- | ---- |
-| B1    | Schema — no `tenant_id`, with the comment saying why | [ ]  |
-| B2    | `/api/admin/incidents` + postmortem gate             | [ ]  |
-| B3    | Admin console UI                                     | [ ]  |
-| B4    | `notifyPlatformTeam` + ack-deadline scanner          | [ ]  |
+> The old four-row B1–B4 table here predated the plan and named the route
+> prefix `/api/admin/incidents`, which does not exist. The real prefix is
+> `/api/admin-console/*`, reusing the console's existing guard.
 
-- [ ] B1 — `platform_incidents` has **no `tenant_id`**, and the migration says
-      why, so nobody "fixes" it (spec P1)
-- [ ] B2 — behind the existing `requirePlatformOwner`; no new auth mode (spec P2)
-- [ ] B2 — transition map blocks `resolved → closed` for SEV1/SEV2 without a
-      postmortem (spec P4)
-- [ ] B4 — `notifyPlatformTeam`, **never** `notifyOwner`. Getting this wrong
-      emails every merchant about an internal outage (spec P3)
+| Task | Deliverable                                   | Phase | Done |
+| ---- | --------------------------------------------- | ----- | ---- |
+| 1    | Migration 0204 — schema with no `tenant_id`   | B1    | [ ]  |
+| 2    | Extract `requirePlatformOwner` into a lib     | B1    | [ ]  |
+| 3    | Severity, ack targets, postmortem gate        | B2    | [ ]  |
+| 4    | On-call rota resolver                         | B2    | [ ]  |
+| 5    | Declare, list and read                        | B3    | [ ]  |
+| 6    | Transitions, acknowledgement, postmortem gate | B3    | [ ]  |
+| 7    | Record which merchants were affected          | B3    | [ ]  |
+| 8    | Customer message, written and published       | B4    | [ ]  |
+| 9    | Tenant-facing notices endpoint                | B4    | [ ]  |
+| 10   | On-call rota routes                           | B3    | [ ]  |
+| 11   | `notifyPlatformTeam`                          | B5    | [ ]  |
+| 12   | Ack-deadline scanner                          | B5    | [ ]  |
+| 13   | Sentry auto-detection, shipped disabled       | B6    | [ ]  |
+| 14   | Admin console list and detail                 | B7    | [ ]  |
+| 15   | On-call rota editor                           | B7    | [ ]  |
+| 16   | Merchant-facing notice banner                 | B7    | [ ]  |
+
+**Dependency order.** 1 → 2 gate everything. 3 and 4 need only 1. 5 needs 2–4;
+6, 7, 8 need 5; 9 needs 8; 10 needs 2 and 4. 11 → 12 need 3. 13 needs 3 and 11.
+14–15 need 5–10; 16 needs 9.
+
+---
+
+### Gate 0 — before any code
+
+- [ ] Branch `feat/incidents-platform` created off `main`
+- [ ] Next migration number confirmed against the live database, ordering by
+      numeric prefix — `max(name)` returns `weekly_digest`. Confirmed
+      2026-09-15: latest is `0203`, so this plan uses **0204**
+
+### Phase B1 — schema and the guard _(tasks 1–2)_
+
+- [ ] `platform_incidents` has **no `tenant_id`**, and the migration comment
+      says why so nobody "fixes" it later (spec P1)
+- [ ] Proven by query, not by reading:
+      `select count(*) from information_schema.columns where table_name='platform_incidents' and column_name='tenant_id';` → **0**
+- [ ] All four tables have RLS enabled with no permissive policy — a leaked
+      anon key reads nothing
+- [ ] `requirePlatformOwner` **moved** to `lib/platform-auth.ts`, not copied.
+      It was private to `routes/admin-console.ts`, so the spec's "reuse the
+      existing guard" was not possible as written
+- [ ] It fails closed when `PLATFORM_TENANT_ID` is unset
+- [ ] The existing `admin-console.integration` suite still passes — that is the
+      regression check that moving it changed no behaviour
+
+### Phase B2 — severity, gate and rota _(tasks 3–4)_
+
+- [ ] SEV1 is defined by **money** — merchants cannot take payment — not by
+      component. The POS socket dropping is a SEV2 (spec §4)
+- [ ] SEV4 has a **null** deadline, not a large one. A deadline nobody intends
+      to meet teaches people to ignore the real ones
+- [ ] `resolved → closed` is refused for SEV1/SEV2 without a postmortem, in the
+      transition map rather than the UI (spec P4)
+- [ ] The rota returns **null** when nobody is on call, rather than falling back
+      to an arbitrary person — a wrong name looks owned, so nobody picks it up
+- [ ] Shifts are half-open `[starts_at, ends_at)`, so a handover instant belongs
+      to exactly one shift
+- [ ] An override wins over a regular shift covering the same instant
+
+### Phase B3 — incident and rota routes _(tasks 5, 6, 7, 10)_
+
+- [ ] Everything behind the existing `requirePlatformOwner`; no new auth mode,
+      no superuser concept, no second credential (spec P2)
+- [ ] Declaring assigns whoever the rota says is on call, and leaves the
+      assignee empty when nobody is
+- [ ] Assignment and rota shifts both refuse a user outside the platform tenant
+      — `users.id` is a plain FK with no tenant in it
+- [ ] `postmortem_due → closed` is refused while the postmortem text is empty.
+      The gate is enforced twice on purpose: the map allows that edge, and the
+      written text is what makes it mean something
+- [ ] A no-op transition is refused, so no empty event row is written
+- [ ] Tenant impact **replaces** the set rather than appending, so removing a
+      tenant works as the blast radius becomes clear
+
+### Phase B4 — the customer message _(tasks 8–9)_
+
+- [ ] Saving and publishing are **two operations**. One-step publishing means a
+      half-written sentence reaches every affected merchant on save
+- [ ] Publishing is refused while the text is empty
+- [ ] A published notice can be retracted — a wrong notice must be withdrawable
+- [ ] **The tenant endpoint never exposes `title`, `summary`, `component` or the
+      timeline.** Proven by grepping the response body for the internal text,
+      not by reading the select list
+- [ ] The response is reshaped field by field rather than spread, so a column
+      added to `platform_incidents` later cannot silently start appearing
+- [ ] An unpublished message is invisible even to an affected tenant
+- [ ] A tenant recorded with impact `none` sees nothing
+
+### Phase B5 — notifications and escalation _(tasks 11–12)_
+
+- [ ] `notifyPlatformTeam`, **never** `notifyOwner`. Getting this wrong tells
+      every merchant about an internal outage (spec P3)
+- [ ] It ships on push + optional webhook, **not email**. There is no
+      transactional email provider in this codebase — `lib/email-send.ts` is
+      per-tenant Gmail/Outlook OAuth for merchant mailboxes. An email branch
+      that cannot send is a notifier that silently drops alerts
+- [ ] A broken webhook URL still lets the push through
+- [ ] The ack scanner stamps `ack_breached_at` **before** notifying
+- [ ] It escalates once, not every five minutes
+- [ ] Cron is `*/5 * * * *`, not daily — a 15-minute SEV1 deadline checked
+      hourly is not a deadline
+- [ ] `getPausedTenants` is deliberately **not** consulted: it is a per-tenant
+      control and these incidents have no tenant
+
+### Phase B6 — auto-detection _(task 13)_
+
+- [ ] `PLATFORM_AUTO_DETECT` unset means nothing is ever auto-declared
+- [ ] Only the exact string `"true"` enables it — `1` and `yes` do not
+- [ ] Auto-declared incidents are never above **SEV3**. A machine may say
+      "something is wrong"; only a human decides merchants cannot take money
+- [ ] A spike lasting twenty minutes opens one incident, not four
+
+### Phase B7 — surfaces _(tasks 14–16)_
+
+- [ ] New `components/admin-console/` directory rather than growing the
+      existing 764-line `page.tsx`
+- [ ] The UI offers **Close** only where the API would accept it, so the button
+      is never offered and then rejected
+- [ ] The rota page says "Nobody is on call" plainly when the rota is empty,
+      rather than rendering a blank name
+- [ ] The merchant banner renders **nothing** when there are no notices, and a
+      failed fetch renders nothing — a broken status notice must never break
+      the dashboard
+- [ ] The banner renders only `message`, `published_at` and `resolved_at`,
+      because those are the only fields the endpoint returns
 
 ---
 
@@ -477,3 +599,22 @@ Recorded because each one already cost time on the POS work.
 - Two vocabularies for severity across A and B — deliberate, will confuse (B §12)
 - The `pos` / `incidents` entitlement line is a guess until a real tenant tests it
   (A §13)
+
+Added with B's plan:
+
+- **`notifyPlatformTeam` is only as loud as web push is configured.** It sends to
+  the platform tenant through `sendPushNotification`, which returns early when
+  VAPID keys are unset — the test logs already show
+  `[push] VAPID keys not configured — skipping`. If VAPID is not configured in
+  production and no `PLATFORM_ALERT_WEBHOOK_URL` is set, **every platform alert
+  goes nowhere silently.** Task 11 must verify one of the two transports
+  actually delivers before the ack scanner is trusted.
+- The customer-message split is a structural guarantee **only while the tenant
+  endpoint keeps reshaping field by field**. A future `select('*')` or object
+  spread there would put internal ops text on a merchant's screen, and no test
+  outside `platform-notices.integration` would notice.
+- The auto-detection threshold (100 errors per window) is **uncalibrated** — a
+  starting number, not a measured one. That is why the flag ships off.
+- Two vocabularies for severity across A and B is now two vocabularies for
+  _assignment_ too: A assigns through `incident_rules`, B through an on-call
+  rota. Deliberate, and a reader moving between them will feel it.
