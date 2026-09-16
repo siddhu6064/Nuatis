@@ -664,3 +664,20 @@ describe('customer message', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('declaration alerting is fire-and-forget', () => {
+  it('still declares the incident when the alert throws', async () => {
+    // An unhandled rejection from a fire-and-forget call terminates the
+    // process. A failing alert must cost the alert, not the API.
+    store.tables['platform_incidents'] = []
+    notifyPlatformTeam.mockRejectedValue(new Error('push is down'))
+
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ severity: 'sev1', title: 'Register cannot take payment' })
+
+    expect(res.status).toBe(201)
+    expect(store.tables['platform_incidents']).toHaveLength(1)
+  })
+})

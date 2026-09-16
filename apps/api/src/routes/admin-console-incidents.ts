@@ -83,10 +83,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   // Fire-and-forget, and deliberately notifyPlatformTeam rather than
   // notifyOwner: the latter targets a merchant's tenant and would tell every
   // customer about an internal outage.
+  //
+  // `.catch()` rather than a bare `void`: an unhandled rejection from a
+  // fire-and-forget call terminates the process, so a failing alert would take
+  // the API down rather than just going unsent.
   void notifyPlatformTeam('platform_incident_declared', {
     title: `${severity.toUpperCase()} declared — ${reference}`,
     body: title,
     url: `/admin-console/incidents/${incident.id}`,
+  }).catch((err: unknown) => {
+    console.error('[admin-console-incidents] declaration alert failed:', err)
   })
 
   res.status(201).json({ incident })
