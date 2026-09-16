@@ -208,6 +208,81 @@ router.get('/:id/tenants', async (req: Request, res: Response): Promise<void> =>
   res.json({ tenants: data ?? [] })
 })
 
+// ── PUT /api/admin-console/incidents/:id/customer-message ────────────────────
+// Saving is not sending. Publishing is a separate act below, because one-step
+// publishing means a half-written sentence reaches every affected merchant the
+// moment someone saves.
+//
+// This deliberately does NOT touch customer_message_published_at: a merchant
+// already reading the notice should not have it vanish because someone fixed a
+// typo.
+router.put('/:id/customer-message', async (req: Request, res: Response): Promise<void> => {
+  const supabase = getServiceClient()
+  const body = req.body as Record<string, unknown>
+  const text = typeof body['customer_message'] === 'string' ? body['customer_message'] : ''
+
+  const { data, error } = await supabase
+    .from('platform_incidents')
+    .update({ customer_message: text || null, updated_at: new Date().toISOString() })
+    .eq('id', req.params['id'])
+    .select('id, customer_message, customer_message_published_at')
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+  if (!data) {
+    res.status(404).json({ error: 'Incident not found' })
+    return
+  }
+  res.json({ incident: data })
+})
+
+// ── POST /api/admin-console/incidents/:id/customer-message/publish ───────────
+router.post('/:id/customer-message/publish', async (req: Request, res: Response): Promise<void> => {
+  const authed = req as AuthenticatedRequest
+  const supabase = getServiceClient()
+  const body = req.body as Record<string, unknown>
+  const publishing = body['published'] !== false
+
+  const { data: current } = await supabase
+    .from('platform_incidents')
+    .select('id, customer_message')
+    .eq('id', req.params['id'])
+    .maybeSingle<{ id: string; customer_message: string | null }>()
+
+  if (!current) {
+    res.status(404).json({ error: 'Incident not found' })
+    return
+  }
+  if (publishing && !(current.customer_message ?? '').trim()) {
+    res.status(400).json({ error: 'Write the customer message before publishing it' })
+    return
+  }
+
+  const at = publishing ? new Date().toISOString() : null
+  const { error } = await supabase
+    .from('platform_incidents')
+    .update({ customer_message_published_at: at, updated_at: new Date().toISOString() })
+    .eq('id', req.params['id'])
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  await supabase.from('platform_incident_events').insert({
+    incident_id: current.id,
+    actor_kind: 'user',
+    actor_user_id: authed.appUserId,
+    kind: publishing ? 'customer_message_published' : 'customer_message_retracted',
+    detail: {},
+  })
+
+  res.json({ published_at: at })
+})
+
 // ── PATCH /api/admin-console/incidents/:id ───────────────────────────────────
 router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest

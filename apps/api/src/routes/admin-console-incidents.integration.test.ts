@@ -536,3 +536,131 @@ describe('incident tenant impact', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('customer message', () => {
+  beforeEach(() => {
+    store.tables['platform_incidents'] = [
+      {
+        id: 'i1',
+        reference: 'SEV-2026-001',
+        severity: 'sev1',
+        status: 'mitigating',
+        title: 'Internal: stripe key rotation broke checkout',
+        detected_at: '2026-01-01T00:00:00Z',
+        customer_message: null,
+        customer_message_published_at: null,
+      },
+    ]
+    store.tables['platform_incident_events'] = []
+  })
+
+  function row(): Record<string, unknown> {
+    return (store.tables['platform_incidents'] as Row[])[0]!
+  }
+
+  it('saves a draft without publishing it', async () => {
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/customer-message')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ customer_message: 'Card payments were unavailable between 09:00 and 09:20.' })
+
+    expect(res.status).toBe(200)
+    expect(row()['customer_message']).toContain('Card payments')
+    // Saved is not sent.
+    expect(row()['customer_message_published_at']).toBeNull()
+  })
+
+  it('refuses to publish while the text is empty', async () => {
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({})
+
+    expect(res.status).toBe(400)
+  })
+
+  it('refuses to publish whitespace', async () => {
+    row()['customer_message'] = '   \n  '
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({})
+
+    expect(res.status).toBe(400)
+  })
+
+  it('publishes once the text is written', async () => {
+    row()['customer_message'] = 'Card payments were unavailable.'
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({})
+
+    expect(res.status).toBe(200)
+    expect(row()['customer_message_published_at']).toEqual(expect.any(String))
+  })
+
+  it('records publishing on the timeline', async () => {
+    row()['customer_message'] = 'text'
+    await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({})
+
+    const events = (store.tables['platform_incident_events'] ?? []) as Row[]
+    expect(events.some((e) => e['kind'] === 'customer_message_published')).toBe(true)
+  })
+
+  it('can be unpublished, because a wrong notice must be retractable', async () => {
+    row()['customer_message'] = 'text'
+    row()['customer_message_published_at'] = '2026-01-01T00:00:00Z'
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ published: false })
+
+    expect(res.status).toBe(200)
+    expect(row()['customer_message_published_at']).toBeNull()
+  })
+
+  it('records a retraction on the timeline too', async () => {
+    row()['customer_message'] = 'text'
+    row()['customer_message_published_at'] = '2026-01-01T00:00:00Z'
+    await request(makeApp())
+      .post('/api/admin-console/incidents/i1/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ published: false })
+
+    const events = (store.tables['platform_incident_events'] ?? []) as Row[]
+    expect(events.some((e) => e['kind'] === 'customer_message_retracted')).toBe(true)
+  })
+
+  it('editing a published message does not silently unpublish it', async () => {
+    // The merchant is already reading it; a typo fix must not make the notice
+    // vanish from their dashboard.
+    row()['customer_message'] = 'text'
+    row()['customer_message_published_at'] = '2026-01-01T00:00:00Z'
+    await request(makeApp())
+      .put('/api/admin-console/incidents/i1/customer-message')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ customer_message: 'text, corrected' })
+
+    expect(row()['customer_message_published_at']).toBe('2026-01-01T00:00:00Z')
+  })
+
+  it('404s for an id that does not exist', async () => {
+    const res = await request(makeApp())
+      .post('/api/admin-console/incidents/nope/customer-message/publish')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({})
+    expect(res.status).toBe(404)
+  })
+
+  it('refuses a non-platform tenant', async () => {
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/customer-message')
+      .set('Authorization', `Bearer ${await makeOtherTenantToken()}`)
+      .send({ customer_message: 'sneaky' })
+    expect(res.status).toBe(403)
+  })
+})
