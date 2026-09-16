@@ -93,6 +93,7 @@ import accountingExportRouter from './routes/accounting-export.js'
 import adminConsoleRouter from './routes/admin-console.js'
 import adminConsoleIncidentsRouter from './routes/admin-console-incidents.js'
 import platformNoticesRouter from './routes/platform-notices.js'
+import adminConsoleOncallRouter from './routes/admin-console-oncall.js'
 import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
 import auditLogRouter from './routes/audit-log.js'
 import smartListsRouter from './routes/smart-lists.js'
@@ -357,6 +358,7 @@ app.use('/api/accounting-export', accountingExportRouter)
 // prefix, so it would otherwise run its own auth middleware on every incident
 // request before falling through to here.
 app.use('/api/admin-console/incidents', adminConsoleIncidentsRouter)
+app.use('/api/admin-console/oncall', adminConsoleOncallRouter)
 app.use('/api/platform-notices', platformNoticesRouter)
 app.use('/api/admin-console', adminConsoleRouter)
 app.use('/api/settings/calendar', calendarSettingsRouter)
