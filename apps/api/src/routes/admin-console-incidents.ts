@@ -148,6 +148,66 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   res.json({ incident, events: timeline })
 })
 
+const IMPACTS = ['full', 'partial', 'none'] as const
+
+// ── PUT /api/admin-console/incidents/:id/tenants ─────────────────────────────
+// Replaces the whole set. Attaching is how a support conversation later answers
+// "was this tenant affected by anything last month", so it has to be editable
+// as the blast radius becomes clear — including shrinking.
+router.put('/:id/tenants', async (req: Request, res: Response): Promise<void> => {
+  const supabase = getServiceClient()
+  const body = req.body as { tenants?: { tenant_id?: unknown; impact?: unknown }[] }
+  const incoming = Array.isArray(body.tenants) ? body.tenants : []
+
+  // Everything is validated BEFORE the delete below. Validating as we go would
+  // mean a single typo wipes the existing impact list and then returns an
+  // error, losing work someone already did.
+  const rows: { incident_id: string; tenant_id: string; impact: string }[] = []
+  for (const entry of incoming) {
+    const tenantId = typeof entry.tenant_id === 'string' ? entry.tenant_id : ''
+    const impact = typeof entry.impact === 'string' ? entry.impact : 'partial'
+    if (!tenantId) {
+      res.status(400).json({ error: 'Each entry needs a tenant_id' })
+      return
+    }
+    if (!(IMPACTS as readonly string[]).includes(impact)) {
+      res.status(400).json({ error: `impact must be one of: ${IMPACTS.join(', ')}` })
+      return
+    }
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('id', tenantId)
+      .maybeSingle<{ id: string }>()
+    if (!tenant) {
+      res.status(400).json({ error: `Unknown tenant: ${tenantId}` })
+      return
+    }
+    rows.push({ incident_id: req.params['id'] as string, tenant_id: tenantId, impact })
+  }
+
+  await supabase.from('platform_incident_tenants').delete().eq('incident_id', req.params['id'])
+  if (rows.length > 0) {
+    const { error } = await supabase.from('platform_incident_tenants').insert(rows)
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+  }
+
+  res.json({ tenants: rows })
+})
+
+// ── GET /api/admin-console/incidents/:id/tenants ─────────────────────────────
+router.get('/:id/tenants', async (req: Request, res: Response): Promise<void> => {
+  const supabase = getServiceClient()
+  const { data } = await supabase
+    .from('platform_incident_tenants')
+    .select('tenant_id, impact')
+    .eq('incident_id', req.params['id'])
+  res.json({ tenants: data ?? [] })
+})
+
 // ── PATCH /api/admin-console/incidents/:id ───────────────────────────────────
 router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
   const authed = req as AuthenticatedRequest

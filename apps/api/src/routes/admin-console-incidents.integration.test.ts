@@ -432,3 +432,107 @@ describe('PATCH /api/admin-console/incidents/:id', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('incident tenant impact', () => {
+  beforeEach(() => {
+    store.tables['platform_incidents'] = [
+      {
+        id: 'i1',
+        reference: 'SEV-2026-001',
+        severity: 'sev2',
+        status: 'mitigating',
+        title: 'x',
+        detected_at: '2026-01-01T00:00:00Z',
+      },
+    ]
+    store.tables['platform_incident_tenants'] = []
+    store.tables['tenants'] = [{ id: 'tenant-a' }, { id: 'tenant-b' }]
+  })
+
+  it('attaches affected tenants with an impact level', async () => {
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({
+        tenants: [
+          { tenant_id: 'tenant-a', impact: 'full' },
+          { tenant_id: 'tenant-b', impact: 'partial' },
+        ],
+      })
+
+    expect(res.status).toBe(200)
+    expect(store.tables['platform_incident_tenants']).toHaveLength(2)
+  })
+
+  it('replaces the set rather than appending, so removing a tenant works', async () => {
+    store.tables['platform_incident_tenants'] = [
+      { incident_id: 'i1', tenant_id: 'tenant-b', impact: 'full' },
+    ]
+    await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ tenants: [{ tenant_id: 'tenant-a', impact: 'full' }] })
+
+    const rows = (store.tables['platform_incident_tenants'] ?? []) as Row[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!['tenant_id']).toBe('tenant-a')
+  })
+
+  it('clears the set when given an empty list', async () => {
+    store.tables['platform_incident_tenants'] = [
+      { incident_id: 'i1', tenant_id: 'tenant-a', impact: 'full' },
+    ]
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ tenants: [] })
+
+    expect(res.status).toBe(200)
+    expect(store.tables['platform_incident_tenants']).toHaveLength(0)
+  })
+
+  it('rejects a tenant id that does not exist, without clearing what was there', async () => {
+    // Validation must happen before the delete, or a typo wipes the existing
+    // impact list and returns an error.
+    store.tables['platform_incident_tenants'] = [
+      { incident_id: 'i1', tenant_id: 'tenant-a', impact: 'full' },
+    ]
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ tenants: [{ tenant_id: 'ghost', impact: 'full' }] })
+
+    expect(res.status).toBe(400)
+    expect(store.tables['platform_incident_tenants']).toHaveLength(1)
+  })
+
+  it('rejects an impact level outside the scale', async () => {
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+      .send({ tenants: [{ tenant_id: 'tenant-a', impact: 'catastrophic' }] })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('reads the attached tenants back', async () => {
+    store.tables['platform_incident_tenants'] = [
+      { incident_id: 'i1', tenant_id: 'tenant-a', impact: 'full' },
+    ]
+    const res = await request(makeApp())
+      .get('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makePlatformToken()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.tenants).toHaveLength(1)
+  })
+
+  it('refuses a non-platform tenant', async () => {
+    const res = await request(makeApp())
+      .put('/api/admin-console/incidents/i1/tenants')
+      .set('Authorization', `Bearer ${await makeOtherTenantToken()}`)
+      .send({ tenants: [{ tenant_id: 'tenant-a', impact: 'full' }] })
+
+    expect(res.status).toBe(403)
+  })
+})
