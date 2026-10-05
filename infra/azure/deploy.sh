@@ -34,6 +34,24 @@ az containerapp env create \
   --location "$LOCATION" \
   --output none 2>/dev/null || echo "    (environment already exists)"
 
+# Resolve an image tag to its immutable digest reference.
+#
+# `containerapp update --image` compares the image STRING, so pushing a new
+# build to the same tag and updating to that same tag is a no-op: the revision
+# does not change and the old container keeps serving. Deploying by digest
+# makes every build a distinct reference, so a redeploy always rolls.
+image_ref() {
+  local repo="$1"
+  local digest
+  digest=$(az acr manifest list-metadata --registry "$CONTAINER_REGISTRY" --name "$repo" \
+    --orderby time_desc --top 1 --query "[0].digest" -o tsv 2>/dev/null)
+  if [ -n "$digest" ]; then
+    echo "${LOGIN_SERVER}/${repo}@${digest}"
+  else
+    echo "${LOGIN_SERVER}/${repo}:${IMAGE_TAG}"
+  fi
+}
+
 echo "==> Deploying Container App: ${CONTAINER_APP_NAME}"
 LOGIN_SERVER=$(az acr show --name "$CONTAINER_REGISTRY" --query loginServer -o tsv)
 ACR_PASSWORD=$(az acr credential show --name "$CONTAINER_REGISTRY" --query "passwords[0].value" -o tsv)
@@ -52,7 +70,7 @@ if az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE
   az containerapp update \
     --name "$CONTAINER_APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
-    --image "${LOGIN_SERVER}/nuatis-api:${IMAGE_TAG}" \
+    --image "$(image_ref nuatis-api)" \
     --output none
 else
   az containerapp create \
@@ -105,6 +123,10 @@ az acr build \
   --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}" \
   --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
   --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.nuatis.com}" \
+  `# Without this the push-notification prompt silently does nothing: the key is` \
+  `# inlined into the client bundle at build time, and an empty one makes the` \
+  `# subscribe handler bail before it ever asks the browser.` \
+  --build-arg "NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}" \
   --build-arg "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}" \
   --build-arg "AUTH_SECRET=${AUTH_SECRET}" \
   .
@@ -115,7 +137,7 @@ if az containerapp show --name nuatis-web --resource-group "$RESOURCE_GROUP" --o
   az containerapp update \
     --name nuatis-web \
     --resource-group "$RESOURCE_GROUP" \
-    --image "${LOGIN_SERVER}/nuatis-web:${IMAGE_TAG}" \
+    --image "$(image_ref nuatis-web)" \
     --output none
 else
   az containerapp create \
