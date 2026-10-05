@@ -143,6 +143,11 @@ jobs:
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
 
+      # Mock values, exactly as the workspace "Build (Web)" step above uses.
+      # next build evaluates server modules while collecting page data, so the
+      # Supabase ones have to be present or the build fails with
+      # "supabaseUrl is required". CI only proves the image builds; a deploy
+      # passes the real values.
       - name: Build Web image
         uses: docker/build-push-action@v6
         with:
@@ -151,3 +156,9 @@ jobs:
           push: false
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://mock.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=mock-anon-key
+            NEXT_PUBLIC_API_URL=http://localhost:3001
+            SUPABASE_SERVICE_ROLE_KEY=mock-service-role-key
+            AUTH_SECRET=mock-auth-secret-for-build-only-32ch
