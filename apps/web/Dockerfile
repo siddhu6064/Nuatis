@@ -9,6 +9,11 @@ COPY package.json package-lock.json tsconfig.base.json ./
 # Copy shared package (web depends on it at build time)
 COPY packages/shared/ packages/shared/
 
+# Copy design tokens. Imported from apps/web/src and from the Tailwind config,
+# so Turbopack fails with "Cannot find module '@nuatis/design-tokens'" without
+# it. No build step — the package is plain files with main: ./tokens.js.
+COPY packages/design-tokens/ packages/design-tokens/
+
 # Copy web app
 COPY apps/web/ apps/web/
 
