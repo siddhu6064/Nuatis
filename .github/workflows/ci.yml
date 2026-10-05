@@ -113,3 +113,52 @@ jobs:
           NEXT_PUBLIC_POS_TENANT_ID: 00000000-0000-0000-0000-000000000000
           NEXT_PUBLIC_POS_LOCATION_ID: 00000000-0000-0000-0000-000000000000
           NEXTAUTH_URL: http://localhost:3000
+
+  # The workspace builds above never touch the Dockerfiles, so a package the
+  # images fail to copy stays invisible until someone deploys. That gap let
+  # three separate breakages sit unnoticed for a month: apps/api missing
+  # packages/pos-core, apps/web missing packages/design-tokens, and tsc running
+  # out of heap in the build container.
+  #
+  # Builds only — nothing is pushed or deployed. A separate job so it runs in
+  # parallel rather than lengthening the critical path above.
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Both use the repo root as build context, the same as `az acr build`
+      # does, so .dockerignore applies identically to CI and to a real deploy.
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      # Mock values, exactly as the workspace "Build (Web)" step above uses.
+      # next build evaluates server modules while collecting page data, so the
+      # Supabase ones have to be present or the build fails with
+      # "supabaseUrl is required". CI only proves the image builds; a deploy
+      # passes the real values.
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://mock.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=mock-anon-key
+            NEXT_PUBLIC_API_URL=http://localhost:3001
+            SUPABASE_SERVICE_ROLE_KEY=mock-service-role-key
+            AUTH_SECRET=mock-auth-secret-for-build-only-32ch
