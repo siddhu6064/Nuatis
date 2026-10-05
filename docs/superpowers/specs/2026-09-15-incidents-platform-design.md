@@ -1,13 +1,14 @@
 # Incidents — Platform / Internal Ops — Design
 
-**Status:** draft — carries open decisions, see §8. Not yet approved.
+**Status:** approved 2026-09-15. The four open decisions in §8 are resolved.
 **Sub-project B of two.** Sub-project A (tenant core + POS surface) has its own
 spec: `2026-09-15-incidents-tenant-design.md`, and is approved.
 
-> **Read §8 before planning this.** Sub-project A went through a full design
-> conversation; this one did not. The architecture below is settled — it follows
-> from A's split decision — but four product questions are genuinely open and are
-> marked as such rather than guessed at.
+> Sub-project A went through a full design conversation; this one did not. The
+> architecture below follows from A's split decision. The four product questions
+> that were open are resolved in §8, two of them against the spec's original
+> recommendation — read §8 before planning, because the scope is now larger than
+> the sections above it describe.
 
 ---
 
@@ -143,32 +144,74 @@ scanner does: a SEV1 undetected-by-a-human for 15 minutes escalates.
 
 ---
 
-## 8. Open decisions — resolve before planning
+## 8. Resolved decisions
 
-**8.1 — On-call rota, or just an assignee?**
-A rota (schedules, rotations, overrides, "who is on call right now") is a
-substantial feature and there are good off-the-shelf products for it. Recommended:
-**assignee only** for v1, and integrate PagerDuty later if the team grows past the
-point where "whoever is awake" works. Not yet confirmed.
+Resolved 2026-09-15. Two went against this spec's original recommendation, so
+the reasoning is recorded rather than just the outcome.
 
-**8.2 — Do merchants ever see any of this?**
-A public status page is a genuinely different product with a different threat
-model — it is the one surface where internal ops text becomes customer-facing, and
-a careless summary line becomes a support incident of its own. Recommended:
-**no tenant visibility in v1**, with `platform_incident_tenants` making a future
-status page cheap. Not yet confirmed.
+**8.1 — On-call: a rota _and_ an assignee.** _(against the recommendation)_
 
-**8.3 — Manual declaration only, or auto-detection?**
-Sentry is already wired (`@sentry/node`). An error-rate spike could open a SEV3
-automatically. Recommended: **manual only** in v1 — an incident tracker that
-declares its own incidents before anyone trusts its thresholds trains the team to
-ignore it. Not yet confirmed.
+The spec proposed assignee-only. Both are needed, and they are not the same
+thing. The rota answers "who should pick this up right now"; the
+`assigned_to_user_id` column records who actually owned it. Without the column,
+an incident from last Tuesday would render as assigned to whoever is on call
+today — the rota rotates and the historical record moves with it, which makes
+the timeline lie. Without the rota, "whoever is awake" stays a manual question
+at 3am.
 
-**8.4 — Where does the postmortem live?**
-A `text` column is simplest and keeps it next to the timeline. The alternative is
-the existing document storage. Recommended: **the column**, since postmortems are
-markdown and want to be diffable and searchable alongside the incident, not
-filed away. Not yet confirmed.
+So: a rota resolves the **default** assignee at declaration time, and the
+result is written onto the incident as a fact.
+
+**8.2 — Affected merchants are told, but only in words written for them.**
+
+The spec recommended no tenant visibility. From a paying merchant's point of
+view the worst outage experience is silence: they cannot tell whether the
+problem is theirs or ours, so they file a ticket and wait. That is a bad
+outcome we can fix cheaply, since `platform_incident_tenants` already records
+who was affected.
+
+The threat model concern is equally real — internal ops text ("migration locked
+a table, rolling back") must never become customer-facing. Both are satisfied by
+separating the channels rather than choosing between them:
+
+- A dedicated `customer_message` column, **null by default**, plus an explicit
+  `customer_message_published_at`. Nothing reaches a merchant until someone
+  deliberately writes that text and publishes it.
+- `title`, `summary`, `component` and the event timeline are **never** read by
+  the tenant-facing endpoint. Internal wording cannot leak, because it is not on
+  the path — a structural guarantee, not a review habit.
+- In-app notice to affected tenants only. **No public status page in v1**: it is
+  a different product with an unauthenticated surface, and
+  `platform_incident_tenants` keeps it cheap later.
+
+Default behaviour stays silent. Publishing is an act.
+
+**8.3 — Manual now, Sentry auto-detection behind a flag that ships off.**
+
+As recommended, plus the hook. A tracker that declares its own incidents before
+anyone trusts its thresholds trains the team to ignore it, so detection ships
+disabled and is switched on once thresholds are calibrated against real traffic.
+Building the hook now means calibration is a config change rather than a
+project.
+
+**8.4 — Postmortem stays a `text` column.**
+
+Merchants never read our postmortems; what they get from them is the same outage
+not happening twice. What produces that is postmortems actually being written,
+and the §5 transition gate is what produces _that_. The gate is only enforceable
+if the postmortem is a field the API can check — a pointer into document storage
+degrades it to "a link exists". Markdown in a column also stays diffable and
+searchable next to the timeline it was written from.
+
+### Scope consequences
+
+8.1 and 8.2 make this larger than §§3–7 describe. The plan must add:
+
+- `platform_oncall_shifts` (rota) and a "who is on call at time T" resolver
+- `platform_incidents.assigned_to_user_id`
+- `customer_message` + `customer_message_published_at`, and a tenant-facing
+  read endpoint that can only ever see those two fields
+- a Sentry detection hook, shipped disabled
 
 ---
 
