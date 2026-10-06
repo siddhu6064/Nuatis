@@ -25,6 +25,7 @@ export type ModuleId =
   | 'cpq'
   | 'orders'
   | 'pos'
+  | 'incidents'
   | 'expenses'
   | 'companies'
   | 'deals'
@@ -117,6 +118,14 @@ export const MODULES: ModuleDef[] = [
     id: 'pos',
     label: 'Point of Sale',
     description: 'Register, kitchen display, and cash drawer for in-person sales.',
+    minPlan: 'scale',
+    defaultOn: false,
+  },
+  {
+    id: 'incidents',
+    label: 'Incidents',
+    description:
+      'Log voids, comps, waste, and cash discrepancies from the register, with SLA tracking, escalation rules, and per-staff reporting.',
     minPlan: 'scale',
     defaultOn: false,
   },

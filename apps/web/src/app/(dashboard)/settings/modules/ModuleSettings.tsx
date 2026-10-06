@@ -85,10 +85,31 @@ const MODULE_DISPLAY: ModuleDisplay[] = [
     minPlan: 'scale',
   },
   {
+    key: 'incidents',
+    label: 'Incidents',
+    description:
+      'Log voids, comps, waste, and cash discrepancies from the register, with SLA tracking, escalation rules, and per-staff reporting.',
+    minPlan: 'scale',
+  },
+  {
     key: 'expenses',
     label: 'Expenses',
     description: 'Expense logging, category breakdown, recurring expenses, and P&L reporting.',
     minPlan: 'pro',
+  },
+  {
+    key: 'staff-portal',
+    label: 'Staff Portal',
+    description:
+      'Self-service logins for your team — each staff member sees only their own schedule, assigned appointments, time clock, and pay rate.',
+    minPlan: 'pro',
+  },
+  {
+    key: 'sso',
+    label: 'Single Sign-On',
+    description:
+      'Let your team log in through your own identity provider (SAML or OIDC) via WorkOS.',
+    minPlan: 'scale',
   },
   // Hidden — valid keys, no toggle row.
   { key: 'companies', label: 'Companies', description: '', minPlan: 'core', hidden: true },
