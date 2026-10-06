@@ -192,6 +192,94 @@ router.post(
   }
 )
 
+// ── GET /api/pos/menu/modifier-groups ───────────────────────────────────────
+//
+// Every live group with its options, independent of what it is attached to.
+// /tree nests groups under the items they are LINKED to, so a group that has
+// just been created and attached to nothing is invisible there — which leaves
+// an admin screen unable to offer it for attaching in the first place.
+router.get(
+  '/modifier-groups',
+  requireAuth,
+  requirePos,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+
+    const [groups, options] = await Promise.all([
+      supabase.from('modifier_groups').select('*').eq('tenant_id', authed.tenantId),
+      supabase.from('modifier_options').select('*').eq('tenant_id', authed.tenantId),
+    ])
+
+    const liveOptions = ((options.data ?? []) as OptionRow[]).filter((o) => !o.deleted_at)
+    const optionsByGroup = new Map<string, MenuOption[]>()
+    for (const o of liveOptions) {
+      const list = optionsByGroup.get(o.group_id) ?? []
+      list.push({ id: o.id, name: o.name, price_delta: o.price_delta, sort_order: o.sort_order })
+      optionsByGroup.set(o.group_id, list)
+    }
+
+    const body = ((groups.data ?? []) as GroupRow[])
+      .filter((g) => !g.deleted_at)
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        min_select: g.min_select,
+        max_select: g.max_select,
+        required: g.required,
+        options: (optionsByGroup.get(g.id) ?? []).sort((a, b) => a.sort_order - b.sort_order),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    res.json({ groups: body })
+  }
+)
+
+// ── PATCH /api/pos/menu/categories/:id ──────────────────────────────────────
+router.patch(
+  '/categories/:id',
+  requireAuth,
+  requirePos,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const body = req.body as Record<string, unknown>
+
+    const patch: Record<string, unknown> = {}
+    if ('name' in body) {
+      const name = trimmedString(body['name'])
+      if (!name) {
+        res.status(400).json({ error: 'name must not be blank' })
+        return
+      }
+      patch['name'] = name
+    }
+    if (typeof body['sort_order'] === 'number') patch['sort_order'] = body['sort_order']
+
+    if (Object.keys(patch).length === 0) {
+      res.status(400).json({ error: 'Nothing to update' })
+      return
+    }
+
+    const supabase = getServiceClient()
+    // .select().single() rather than a bare update: an update matching nothing
+    // returns no error, so without it another tenant's id would report a
+    // success it did not perform — the same false-204 this file already fixed
+    // for item deletes.
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .update(patch)
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .select()
+
+    if (error || !data || data.length === 0) {
+      res.status(404).json({ error: 'Category not found' })
+      return
+    }
+    res.json({ category: data[0] })
+  }
+)
+
 // ── DELETE /api/pos/menu/categories/:id ─────────────────────────────────────
 router.delete(
   '/categories/:id',
@@ -200,6 +288,36 @@ router.delete(
   async (req: Request, res: Response): Promise<void> => {
     const authed = req as AuthenticatedRequest
     const supabase = getServiceClient()
+
+    // Refuse while the category still holds live items.
+    //
+    // Deleting it anyway produced an item that was invisible AND still
+    // sellable: /tree groups items by category_id and filters deleted
+    // categories out, so the items vanished from the register — but they stayed
+    // priceable by id through POST /orders, because that route reads menu_items
+    // directly. A merchant would see a tidy menu and still be taking money for
+    // a product they thought they had removed.
+    //
+    // Refusing rather than cascading: soft-deleting a 30-item category from one
+    // tap is a destructive action nobody asked for, and the merchant is the one
+    // who should decide whether those items move or go.
+    const { data: items } = await supabase
+      .from('menu_items')
+      .select('id, deleted_at')
+      .eq('tenant_id', authed.tenantId)
+      .eq('category_id', req.params['id'])
+
+    const liveItems = ((items ?? []) as { deleted_at: string | null }[]).filter(
+      (i) => !i.deleted_at
+    )
+    if (liveItems.length > 0) {
+      res.status(409).json({
+        error: 'This category still has items. Move or delete them first.',
+        item_count: liveItems.length,
+      })
+      return
+    }
+
     const { data, error } = await supabase
       .from('menu_categories')
       .update({ deleted_at: new Date().toISOString() })
@@ -282,12 +400,30 @@ router.patch(
     }
     if (typeof body['sort_order'] === 'number') patch['sort_order'] = body['sort_order']
 
-    if (Object.keys(patch).length === 0) {
+    // Moving an item between categories. Deleting a category is refused while
+    // it still holds items and that refusal says to move them, so there has to
+    // be a way to. Validated below rather than here because proving the
+    // destination belongs to the caller needs a client.
+    const categoryId = typeof body['category_id'] === 'string' ? body['category_id'].trim() : ''
+
+    if (Object.keys(patch).length === 0 && !categoryId) {
       res.status(400).json({ error: 'No updatable fields supplied' })
       return
     }
 
     const supabase = getServiceClient()
+
+    // getServiceClient bypasses RLS, so this app-level check is the only thing
+    // stopping an item being filed under another tenant's category — the same
+    // hole that was closed for item creation.
+    if (categoryId) {
+      if (!(await ownsRow(supabase, 'menu_categories', categoryId, authed.tenantId))) {
+        res.status(404).json({ error: 'Category not found' })
+        return
+      }
+      patch['category_id'] = categoryId
+    }
+
     const { data, error } = await supabase
       .from('menu_items')
       .update(patch)
@@ -469,6 +605,60 @@ router.delete(
 
     if (error) {
       res.status(500).json({ error: 'Failed to unlink modifier group' })
+      return
+    }
+    res.status(204).send()
+  }
+)
+
+// ── DELETE /api/pos/menu/modifier-groups/:id ────────────────────────────────
+//
+// Soft, like every other delete here: a kitchen ticket snapshots its modifier
+// names at fire time, but an order still being priced resolves options live,
+// and hard-deleting a group mid-service would fail that lookup.
+//
+// Existing item links are left in place deliberately. /tree skips a link whose
+// group it cannot find, so a deleted group disappears from every item without
+// a second write that could half-succeed.
+router.delete(
+  '/modifier-groups/:id',
+  requireAuth,
+  requirePos,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const { data, error } = await supabase
+      .from('modifier_groups')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .select('id')
+
+    if (error || !data || data.length === 0) {
+      res.status(404).json({ error: 'Modifier group not found' })
+      return
+    }
+    res.status(204).send()
+  }
+)
+
+// ── DELETE /api/pos/menu/modifier-options/:id ───────────────────────────────
+router.delete(
+  '/modifier-options/:id',
+  requireAuth,
+  requirePos,
+  async (req: Request, res: Response): Promise<void> => {
+    const authed = req as AuthenticatedRequest
+    const supabase = getServiceClient()
+    const { data, error } = await supabase
+      .from('modifier_options')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', req.params['id'])
+      .eq('tenant_id', authed.tenantId)
+      .select('id')
+
+    if (error || !data || data.length === 0) {
+      res.status(404).json({ error: 'Modifier option not found' })
       return
     }
     res.status(204).send()
