@@ -19,6 +19,7 @@ import { readyOnly, applyReadyEvent } from '@/lib/ready-orders'
 import { usePosSocket } from '@nuatis/pos-web/ui'
 import type { Ticket } from '@nuatis/pos-web/tickets'
 import { useCheckout, cashIntoDrawerCents } from '@/lib/useCheckout'
+import { buildReceipt, type Receipt } from '@/lib/receipt'
 import { canAddDirectly, type MenuCategoryDto, type MenuItemDto } from '@/lib/cart-lines'
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:3001'
@@ -47,6 +48,14 @@ export default function RegisterPage() {
   // that renders a full-page alert, which would wipe the register out from
   // under a cashier holding a customer's receipt.
   const [saleWarning, setSaleWarning] = useState<string | null>(null)
+  // The sale just taken, snapshotted for the receipt. Held separately from the
+  // cart because `startNextOrder` clears the cart — a receipt that read live
+  // cart state would blank out the moment the cashier rang the next customer.
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  // Who is signed in, for the "Served by" line. The session cookie is httpOnly,
+  // so this comes back from the app's own /api/session rather than being read
+  // out of document.cookie.
+  const [cashierName, setCashierName] = useState<string | null>(null)
   // Orders the kitchen has cooked and the counter has not handed over yet.
   const [readyTickets, setReadyTickets] = useState<Ticket[]>([])
   const [handingOverId, setHandingOverId] = useState<string | null>(null)
@@ -107,6 +116,17 @@ export default function RegisterPage() {
           const board = (await ticketsRes.json()) as { tickets: Ticket[] }
           setReadyTickets(readyOnly(board.tickets))
         }
+
+        // Who is at the till, for the receipt's "Served by" line. Its own
+        // request rather than part of the Promise.all above: this is the app's
+        // own route, not the API, and a failure here should cost the receipt a
+        // name — not stop the menu from loading.
+        void fetch('/api/session')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((body: { staff?: { name?: string | null } } | null) => {
+            if (!cancelled && body?.staff?.name) setCashierName(body.staff.name)
+          })
+          .catch(() => {})
 
         // Incident types seed lazily on this call. A failure here costs the
         // report button, not the register — a till that cannot take money
@@ -212,13 +232,48 @@ export default function RegisterPage() {
   const settle = useCallback(async () => {
     const problems: string[] = []
 
+    // Snapshot the receipt BEFORE the network calls, so the cashier has an
+    // itemised receipt on screen even if the order or the drawer write fails —
+    // the money has already been taken either way, and a customer standing at
+    // the counter needs the paper more than the register needs a clean state.
+    //
+    // The totals come from what was actually charged, never recomputed here:
+    // `cart.totals` is pre-tip (useCart is given no tip), so the tip and the
+    // grand total are taken from the checkout, which is the figure the tender
+    // was settled against.
+    setReceipt(
+      buildReceipt({
+        businessName: settings?.business_name ?? null,
+        locationName: settings?.location_name ?? null,
+        orderNumber: null,
+        cashierName,
+        soldAt: new Date(),
+        lines: cart.lines,
+        totals: {
+          subtotalCents: cart.totals.subtotalCents,
+          taxCents: cart.totals.taxCents,
+          tipCents: checkout.state.tipCents,
+          totalCents: checkout.totalDueCents,
+        },
+        legs: checkout.state.legs,
+        changeDueCents: checkout.state.changeDueCents,
+      })
+    )
+
     try {
-      await createAndFireOrder(cart.lines, {
+      const fired = await createAndFireOrder(cart.lines, {
         locationId: process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? '',
         tipCents: checkout.state.tipCents,
         legs: checkout.state.legs,
         totalDueCents: checkout.totalDueCents,
       })
+      // Fill in the number the server assigned. It only exists after the order
+      // is created, which is why the snapshot above starts without one.
+      if (fired.orderNumber) {
+        setReceipt((current) =>
+          current ? { ...current, orderNumber: fired.orderNumber } : current
+        )
+      }
     } catch (err) {
       problems.push(
         err instanceof CreateOrderError && err.orderId
@@ -242,7 +297,15 @@ export default function RegisterPage() {
     }
 
     setSaleWarning(problems.length > 0 ? problems.join(' ') : null)
-  }, [cart.lines, checkout.state, checkout.totalDueCents, drawerSessionId])
+  }, [
+    cart.lines,
+    cart.totals,
+    cashierName,
+    checkout.state,
+    checkout.totalDueCents,
+    drawerSessionId,
+    settings,
+  ])
 
   // Run `settle` exactly once per sale, on the transition into the receipt.
   // Held in a ref so the effect depends only on the stage: settle changes
@@ -267,6 +330,7 @@ export default function RegisterPage() {
   /** Clear the till for the next customer. The sale is already settled. */
   const startNextOrder = useCallback(() => {
     setSaleWarning(null)
+    setReceipt(null)
     cart.clear()
     checkout.cancel()
   }, [cart, checkout])
@@ -362,6 +426,7 @@ export default function RegisterPage() {
         preTipTotalCents={cart.totals.totalCents}
         drawerSessionId={drawerSessionId}
         warning={saleWarning}
+        receipt={receipt}
         onDone={startNextOrder}
       />
 

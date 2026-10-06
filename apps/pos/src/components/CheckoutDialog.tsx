@@ -14,6 +14,8 @@ import Divider from '@mui/material/Divider'
 import { toDollars } from '@nuatis/pos-core'
 import { TipPicker } from './TipPicker'
 import { TenderAmount } from './TenderAmount'
+import { ReceiptView } from './ReceiptView'
+import type { Receipt } from '@/lib/receipt'
 import type { TenderMethod } from '@nuatis/pos-core'
 import type { UseCheckout } from '@/lib/useCheckout'
 
@@ -24,6 +26,13 @@ interface CheckoutDialogProps {
   drawerSessionId: string | null
   /** Something failed after the money was taken. Shown on the receipt. */
   warning?: string | null
+  /**
+   * The itemised receipt for the sale just taken. Null until the register has
+   * snapshotted it, and on the brief first frame of the receipt stage — the
+   * simple paid-confirmation below covers that frame so a cashier never sees
+   * an empty dialog.
+   */
+  receipt?: Receipt | null
   onDone: () => void
 }
 
@@ -46,6 +55,7 @@ export function CheckoutDialog({
   preTipTotalCents,
   drawerSessionId,
   warning = null,
+  receipt = null,
   onDone,
 }: CheckoutDialogProps) {
   const { state, totalDueCents, balanceCents, isSettled, busy } = checkout
@@ -179,30 +189,43 @@ export function CheckoutDialog({
           </Box>
         )}
 
-        {state.stage === 'receipt' && (
-          <Box sx={{ py: 2 }}>
-            <Typography variant="h4" sx={{ mb: 1 }}>
-              ${toDollars(totalDueCents)}
-            </Typography>
-            {state.changeDueCents > 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Change due <strong>${toDollars(state.changeDueCents)}</strong>
-              </Alert>
-            )}
-            {warning && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                {warning}
-              </Alert>
-            )}
-          </Box>
-        )}
+        {state.stage === 'receipt' &&
+          (receipt ? (
+            <ReceiptView receipt={receipt} warning={warning} />
+          ) : (
+            <Box sx={{ py: 2 }}>
+              <Typography variant="h4" sx={{ mb: 1 }}>
+                ${toDollars(totalDueCents)}
+              </Typography>
+              {state.changeDueCents > 0 && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Change due <strong>${toDollars(state.changeDueCents)}</strong>
+                </Alert>
+              )}
+              {warning && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  {warning}
+                </Alert>
+              )}
+            </Box>
+          ))}
       </DialogContent>
 
       <DialogActions sx={{ p: 2 }}>
         {state.stage === 'receipt' ? (
-          <Button fullWidth variant="contained" onClick={onDone} sx={{ height: 60 }}>
-            New order
-          </Button>
+          <>
+            <Button
+              variant="outlined"
+              onClick={() => window.print()}
+              disabled={!receipt}
+              sx={{ height: 60, flex: 1 }}
+            >
+              Print
+            </Button>
+            <Button variant="contained" onClick={onDone} sx={{ height: 60, flex: 2 }}>
+              New order
+            </Button>
+          </>
         ) : (
           <>
             <Button onClick={close} disabled={busy}>

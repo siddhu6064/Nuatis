@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { POS_COOKIE, serializePosSession } from './session'
+import { POS_COOKIE, readPosSession, serializePosSession } from './session'
 
 /** Matches the 12h expiry the API stamps on the terminal token. */
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000
@@ -12,6 +12,7 @@ export interface SessionRouteOptions {
 export interface SessionRoute {
   POST: (request: Request) => Promise<NextResponse>
   DELETE: () => Promise<NextResponse>
+  GET: (request: Request) => Promise<NextResponse>
 }
 
 /**
@@ -108,6 +109,37 @@ export function createSessionRoute(options: SessionRouteOptions = {}): SessionRo
     return res
   }
 
+  /**
+   * Who is signed in on this device.
+   *
+   * The session cookie is httpOnly precisely so the token cannot reach
+   * JavaScript, which also means the page cannot read the cashier's name back
+   * after a reload — and a receipt should say who served the customer. This
+   * returns the two fields a screen legitimately needs.
+   *
+   * The body is assembled field by field rather than by spreading the session.
+   * Spreading would put the 12h API token in a JSON response and undo the
+   * whole point of the httpOnly cookie; building it explicitly means a field
+   * added to `PosSession` later cannot leak here by default. Same reasoning as
+   * the platform-notices route.
+   */
+  async function GET(request: Request): Promise<NextResponse> {
+    const cookie = readCookie(request.headers.get('cookie'), POS_COOKIE)
+    const session = readPosSession(cookie)
+
+    // An absent, malformed or expired session is all the same answer: no
+    // session. Reporting a half-built one would let a screen render a cashier
+    // name for a register that can no longer call the API.
+    if (!session || session.expiresAt <= Date.now()) {
+      return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    }
+
+    return NextResponse.json({
+      staff: { id: session.staffId, name: session.staffName },
+      locationId: session.locationId,
+    })
+  }
+
   /** Sign out — clears the session on this device. */
   async function DELETE(): Promise<NextResponse> {
     const res = NextResponse.json({ ok: true })
@@ -115,5 +147,25 @@ export function createSessionRoute(options: SessionRouteOptions = {}): SessionRo
     return res
   }
 
-  return { POST, DELETE }
+  return { POST, DELETE, GET }
+}
+
+/**
+ * Pull one cookie out of a Cookie header.
+ *
+ * Matched on a `name=` boundary rather than with `includes`, so a cookie whose
+ * name merely ends with ours (`other_nuatis_pos_session`) cannot be read as
+ * the session — the same segment-boundary care the API's portalScope prefix
+ * map needed.
+ */
+function readCookie(header: string | null, name: string): string | undefined {
+  if (!header) return undefined
+  for (const part of header.split(';')) {
+    const trimmed = part.trim()
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    if (trimmed.slice(0, eq) !== name) continue
+    return decodeURIComponent(trimmed.slice(eq + 1))
+  }
+  return undefined
 }

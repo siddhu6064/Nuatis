@@ -2,7 +2,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 import { createSessionRoute } from './session-route.js'
 import { POS_COOKIE, readPosSession } from './session.js'
 
-const { POST, DELETE } = createSessionRoute({ apiBackendUrl: 'http://api.test' })
+const { POST, DELETE, GET } = createSessionRoute({ apiBackendUrl: 'http://api.test' })
 
 // Typed loosely on purpose: these tests only care about `ok` and `json()`,
 // and building a full Response for each case would bury what is asserted.
@@ -155,5 +155,74 @@ describe('DELETE /api/session', () => {
     const raw = res.headers.get('set-cookie') ?? ''
     expect(raw).toContain(POS_COOKIE)
     expect(raw).toMatch(/Max-Age=0/i)
+  })
+})
+
+describe('GET /api/session — who is signed in', () => {
+  function get(cookie?: string): Request {
+    return new Request('http://localhost:3002/api/session', {
+      method: 'GET',
+      ...(cookie ? { headers: { cookie: `${POS_COOKIE}=${encodeURIComponent(cookie)}` } } : {}),
+    })
+  }
+
+  function session(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      token: 'secret.jwt.value',
+      tenantId: 'tenant-1',
+      locationId: 'loc-1',
+      staffId: 'staff-1',
+      staffName: 'Dana',
+      expiresAt: Date.now() + 60_000,
+      ...overrides,
+    })
+  }
+
+  it('returns the signed-in staff name and location', async () => {
+    const res = await GET(get(session()))
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({
+      staff: { id: 'staff-1', name: 'Dana' },
+      locationId: 'loc-1',
+    })
+  })
+
+  it('never returns the API token, tenant id, or anything else held in the cookie', async () => {
+    // The whole reason the cookie is httpOnly is that the token must not reach
+    // JavaScript. A convenience endpoint that spreads the session into its
+    // response would hand it over anyway, so the body is built field by field
+    // and this test is what keeps it that way.
+    const res = await GET(get(session()))
+    const body = JSON.stringify(await res.json())
+
+    expect(body).not.toContain('secret.jwt.value')
+    expect(body).not.toContain('token')
+    expect(body).not.toContain('tenant-1')
+    expect(body).not.toContain('expiresAt')
+  })
+
+  it('401s when there is no session cookie', async () => {
+    const res = await GET(get())
+
+    expect(res.status).toBe(401)
+  })
+
+  it('401s on a malformed cookie rather than reporting a half-built session', async () => {
+    const res = await GET(get('not json at all'))
+
+    expect(res.status).toBe(401)
+  })
+
+  it('401s on an expired session, so the register goes back to the PIN pad', async () => {
+    const res = await GET(get(session({ expiresAt: Date.now() - 1000 })))
+
+    expect(res.status).toBe(401)
+  })
+
+  it('reports a null name for a staff member who has none', async () => {
+    const res = await GET(get(session({ staffName: null })))
+
+    await expect(res.json()).resolves.toMatchObject({ staff: { id: 'staff-1', name: null } })
   })
 })
