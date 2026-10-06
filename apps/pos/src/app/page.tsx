@@ -13,6 +13,7 @@ import { ModifierDialog } from '@/components/ModifierDialog'
 import { CheckoutDialog } from '@/components/CheckoutDialog'
 import { ReadyStrip } from '@/components/ReadyStrip'
 import { ReportIncidentDialog, type IncidentType } from '@/components/ReportIncidentDialog'
+import { DrawerDialog, type DrawerSession } from '@/components/DrawerDialog'
 import { useCart } from '@/lib/useCart'
 import { createAndFireOrder, CreateOrderError } from '@/lib/createOrder'
 import { readyOnly, applyReadyEvent } from '@/lib/ready-orders'
@@ -39,7 +40,8 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingItem, setPendingItem] = useState<MenuItemDto | null>(null)
-  const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null)
+  const [drawerSession, setDrawerSession] = useState<DrawerSession | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [incidentTypes, setIncidentTypes] = useState<IncidentType[]>([])
   const [reporting, setReporting] = useState(false)
   // Confirmation of the last report — a cashier needs to see it landed.
@@ -62,6 +64,9 @@ export default function RegisterPage() {
   // One clock for the whole strip rather than a timer per chip.
   const [now, setNow] = useState(() => Date.now())
 
+  const drawerSessionId = drawerSession?.id ?? null
+  const locationId = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
+
   // Tax cannot be guessed: 0 until settings load, and the cart is not usable
   // before then anyway.
   const cart = useCart(settings?.tax_rate_bps ?? 0)
@@ -72,7 +77,6 @@ export default function RegisterPage() {
 
     async function load() {
       try {
-        const locationId = process.env.NEXT_PUBLIC_POS_LOCATION_ID ?? ''
         const [menuRes, settingsRes, drawerRes, ticketsRes, typesRes] = await Promise.all([
           fetch('/api/pos/menu/tree'),
           fetch(`/api/pos/settings?location_id=${encodeURIComponent(locationId)}`),
@@ -105,8 +109,8 @@ export default function RegisterPage() {
         // A missing drawer is not an error — it just means cash cannot be
         // taken until someone opens one.
         if (drawerRes.ok) {
-          const drawer = (await drawerRes.json()) as { session: { id: string } | null }
-          setDrawerSessionId(drawer.session?.id ?? null)
+          const drawer = (await drawerRes.json()) as { session: DrawerSession | null }
+          setDrawerSession(drawer.session ?? null)
         }
 
         // Seed the ready strip over HTTP, then let the socket keep it current.
@@ -380,6 +384,17 @@ export default function RegisterPage() {
               Report issue
             </Button>
           )}
+          {/* The drawer's state is on the button itself. A cashier who cannot
+              tell whether a till is open is a cashier taking cash into one
+              that is not, which the close-out then cannot account for. */}
+          <Button
+            size="small"
+            variant={drawerSessionId ? 'text' : 'outlined'}
+            color={drawerSessionId ? 'inherit' : 'warning'}
+            onClick={() => setDrawerOpen(true)}
+          >
+            {drawerSessionId ? 'Drawer open' : 'No drawer'}
+          </Button>
         </Box>
       </Box>
 
@@ -419,6 +434,21 @@ export default function RegisterPage() {
         autoHideDuration={4000}
         onClose={() => setReportedRef(null)}
         message={`Reported as ${reportedRef}`}
+      />
+
+      <DrawerDialog
+        open={drawerOpen}
+        locationId={locationId}
+        session={drawerSession}
+        onCancel={() => setDrawerOpen(false)}
+        onOpened={(session) => {
+          setDrawerSession(session)
+          setDrawerOpen(false)
+        }}
+        onClosedOut={() => {
+          setDrawerSession(null)
+          setDrawerOpen(false)
+        }}
       />
 
       <CheckoutDialog
