@@ -30,6 +30,13 @@ export interface CreateOrderOptions {
 
 export interface FireResult {
   orderId: string
+  /**
+   * The human-facing number the server assigned, for the receipt. Null when
+   * the response omitted it or sent a non-string — a receipt printing a
+   * made-up number is worse than one printing none, because the customer
+   * would quote it back at a refund and nothing would match.
+   */
+  orderNumber: string | null
   /** False when the sale was recorded but the kitchen never received it. */
   fired: boolean
   ticketCount: number
@@ -123,8 +130,9 @@ export async function createAndFireOrder(
     throw new CreateOrderError(await errorTextOf(orderRes, 'The order could not be created.'))
   }
 
-  const order = (await orderRes.json()) as { id?: string }
+  const order = (await orderRes.json()) as { id?: string; order_number?: unknown }
   if (!order.id) throw new CreateOrderError('The order was created without an id.')
+  const orderNumber = typeof order.order_number === 'string' ? order.order_number : null
 
   const fireRes = await fetchImpl('/api/pos/tickets/fire', {
     method: 'POST',
@@ -140,7 +148,7 @@ export async function createAndFireOrder(
   }
 
   const fired = (await fireRes.json()) as { tickets?: unknown[] }
-  return { orderId: order.id, fired: true, ticketCount: fired.tickets?.length ?? 0 }
+  return { orderId: order.id, orderNumber, fired: true, ticketCount: fired.tickets?.length ?? 0 }
 }
 
 async function errorTextOf(res: Response, fallback: string): Promise<string> {

@@ -122,10 +122,39 @@ describe('createAndFireOrder', () => {
 
     const result = await createAndFireOrder([line()], opts(), fetchImpl)
 
-    expect(result).toEqual({ orderId: 'order-1', fired: true, ticketCount: 2 })
+    expect(result).toEqual({
+      orderId: 'order-1',
+      orderNumber: null,
+      fired: true,
+      ticketCount: 2,
+    })
     expect(fetchImpl.mock.calls[0]![0]).toBe('/api/pos/orders')
     expect(fetchImpl.mock.calls[1]![0]).toBe('/api/pos/tickets/fire')
     expect(JSON.parse(String(fetchImpl.mock.calls[1]![1]!.body))).toEqual({ order_id: 'order-1' })
+  })
+
+  it("returns the order number the server assigned, for the customer's receipt", async () => {
+    const fetchImpl = jest
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ id: 'order-1', order_number: 'ORD-1042' }, 201))
+      .mockResolvedValueOnce(jsonResponse({ tickets: [] }, 201))
+
+    const result = await createAndFireOrder([line()], opts(), fetchImpl)
+
+    expect(result.orderNumber).toBe('ORD-1042')
+  })
+
+  it('reports a null order number rather than inventing one when the server omits it', async () => {
+    // A receipt printing a made-up number is worse than one printing none —
+    // the customer would quote it back at a refund and nothing would match.
+    const fetchImpl = jest
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ id: 'order-1', order_number: 42 }, 201))
+      .mockResolvedValueOnce(jsonResponse({ tickets: [] }, 201))
+
+    const result = await createAndFireOrder([line()], opts(), fetchImpl)
+
+    expect(result.orderNumber).toBeNull()
   })
 
   it('does not fire when the order failed to create', async () => {

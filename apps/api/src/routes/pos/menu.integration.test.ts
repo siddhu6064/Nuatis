@@ -377,3 +377,362 @@ describe('DELETE /api/pos/menu/items/:id', () => {
     expect(store.tables['menu_items']![0]!['deleted_at']).not.toBeNull()
   })
 })
+
+describe('DELETE /api/pos/menu/categories/:id', () => {
+  function seedCategoryWithItem(itemOverrides: Record<string, unknown> = {}) {
+    store.tables['menu_categories'] = [
+      { id: 'cat-1', tenant_id: TENANT_ID, name: 'Mains', sort_order: 0, deleted_at: null },
+    ]
+    store.tables['menu_items'] = [
+      {
+        id: 'item-1',
+        tenant_id: TENANT_ID,
+        category_id: 'cat-1',
+        name: 'Burger',
+        price: '12.00',
+        taxable: true,
+        kitchen_station: 'grill',
+        available: true,
+        sort_order: 0,
+        deleted_at: null,
+        ...itemOverrides,
+      },
+    ]
+  }
+
+  it('refuses to delete a category that still has items, and says how many', async () => {
+    // Deleting it anyway drops the items out of /tree — they key off
+    // category_id, and a deleted category is filtered out — while leaving them
+    // priceable by id through POST /orders. That is an item invisible on the
+    // register and still sellable through the API, which is worse than a
+    // refusal a merchant can act on.
+    seedCategoryWithItem()
+
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(409)
+    expect(res.body.item_count).toBe(1)
+    expect(store.tables['menu_categories']![0]!['deleted_at']).toBeNull()
+  })
+
+  it('deletes a category whose only items are already soft-deleted', async () => {
+    seedCategoryWithItem({ deleted_at: '2026-10-01T00:00:00.000Z' })
+
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(204)
+    expect(store.tables['menu_categories']![0]!['deleted_at']).not.toBeNull()
+  })
+
+  it('does not count another tenant’s items as a reason to refuse', async () => {
+    store.tables['menu_categories'] = [
+      { id: 'cat-1', tenant_id: TENANT_ID, name: 'Mains', sort_order: 0, deleted_at: null },
+    ]
+    store.tables['menu_items'] = [
+      {
+        id: 'item-x',
+        tenant_id: OTHER_TENANT_ID,
+        category_id: 'cat-1',
+        name: 'Not ours',
+        price: '1.00',
+        taxable: true,
+        kitchen_station: null,
+        available: true,
+        sort_order: 0,
+        deleted_at: null,
+      },
+    ]
+
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(204)
+  })
+})
+
+describe('PATCH /api/pos/menu/categories/:id', () => {
+  beforeEach(() => {
+    store.tables['menu_categories'] = [
+      { id: 'cat-1', tenant_id: TENANT_ID, name: 'Mains', sort_order: 0, deleted_at: null },
+      {
+        id: 'cat-other',
+        tenant_id: OTHER_TENANT_ID,
+        name: 'Theirs',
+        sort_order: 0,
+        deleted_at: null,
+      },
+    ]
+  })
+
+  it('renames a category', async () => {
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ name: 'Main courses' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.category.name).toBe('Main courses')
+  })
+
+  it('changes the sort order', async () => {
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ sort_order: 3 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.category.sort_order).toBe(3)
+  })
+
+  it('rejects a blank name rather than storing an unnamed category', async () => {
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/categories/cat-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ name: '   ' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('404s for another tenant’s category instead of renaming it', async () => {
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/categories/cat-other')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ name: 'Mine now' })
+
+    expect(res.status).toBe(404)
+    expect(store.tables['menu_categories']![1]!['name']).toBe('Theirs')
+  })
+})
+
+describe('DELETE /api/pos/menu/modifier-options/:id', () => {
+  beforeEach(() => {
+    store.tables['modifier_options'] = [
+      {
+        id: 'opt-1',
+        tenant_id: TENANT_ID,
+        group_id: 'grp-1',
+        name: 'Bacon',
+        price_delta: '1.50',
+        sort_order: 0,
+        deleted_at: null,
+      },
+      {
+        id: 'opt-other',
+        tenant_id: OTHER_TENANT_ID,
+        group_id: 'grp-x',
+        name: 'Theirs',
+        price_delta: '0.00',
+        sort_order: 0,
+        deleted_at: null,
+      },
+    ]
+  })
+
+  it('soft-deletes, so a past ticket’s modifier snapshot still resolves', async () => {
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/modifier-options/opt-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(204)
+    expect(store.tables['modifier_options']![0]!['deleted_at']).not.toBeNull()
+  })
+
+  it('404s for another tenant’s option instead of reporting a false success', async () => {
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/modifier-options/opt-other')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(404)
+    expect(store.tables['modifier_options']![1]!['deleted_at']).toBeNull()
+  })
+})
+
+describe('DELETE /api/pos/menu/modifier-groups/:id', () => {
+  beforeEach(() => {
+    store.tables['modifier_groups'] = [
+      {
+        id: 'grp-1',
+        tenant_id: TENANT_ID,
+        name: 'Extras',
+        min_select: 0,
+        max_select: 3,
+        required: false,
+        deleted_at: null,
+      },
+      {
+        id: 'grp-other',
+        tenant_id: OTHER_TENANT_ID,
+        name: 'Theirs',
+        min_select: 0,
+        max_select: 1,
+        required: false,
+        deleted_at: null,
+      },
+    ]
+  })
+
+  it('soft-deletes the group', async () => {
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/modifier-groups/grp-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(204)
+    expect(store.tables['modifier_groups']![0]!['deleted_at']).not.toBeNull()
+  })
+
+  it('404s for another tenant’s group', async () => {
+    const res = await request(makeApp())
+      .delete('/api/pos/menu/modifier-groups/grp-other')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(404)
+    expect(store.tables['modifier_groups']![1]!['deleted_at']).toBeNull()
+  })
+})
+
+describe('GET /api/pos/menu/modifier-groups', () => {
+  beforeEach(() => {
+    store.tables['modifier_groups'] = [
+      {
+        id: 'grp-1',
+        tenant_id: TENANT_ID,
+        name: 'Extras',
+        min_select: 0,
+        max_select: 3,
+        required: false,
+        deleted_at: null,
+      },
+      {
+        id: 'grp-gone',
+        tenant_id: TENANT_ID,
+        name: 'Retired',
+        min_select: 0,
+        max_select: 1,
+        required: false,
+        deleted_at: '2026-10-01T00:00:00.000Z',
+      },
+      {
+        id: 'grp-other',
+        tenant_id: OTHER_TENANT_ID,
+        name: 'Theirs',
+        min_select: 0,
+        max_select: 1,
+        required: false,
+        deleted_at: null,
+      },
+    ]
+    store.tables['modifier_options'] = [
+      {
+        id: 'opt-1',
+        tenant_id: TENANT_ID,
+        group_id: 'grp-1',
+        name: 'Bacon',
+        price_delta: '1.50',
+        sort_order: 1,
+        deleted_at: null,
+      },
+      {
+        id: 'opt-0',
+        tenant_id: TENANT_ID,
+        group_id: 'grp-1',
+        name: 'Cheddar',
+        price_delta: '1.00',
+        sort_order: 0,
+        deleted_at: null,
+      },
+      {
+        id: 'opt-gone',
+        tenant_id: TENANT_ID,
+        group_id: 'grp-1',
+        name: 'Removed',
+        price_delta: '0.00',
+        sort_order: 2,
+        deleted_at: '2026-10-01T00:00:00.000Z',
+      },
+    ]
+  })
+
+  it('lists the tenant’s live groups with their options in sort order', async () => {
+    // /tree only nests groups under the items they are linked to, so a group
+    // that has just been created — and is not attached to anything yet — is
+    // invisible there. Without this the admin screen cannot offer it.
+    const res = await request(makeApp())
+      .get('/api/pos/menu/modifier-groups')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.groups).toHaveLength(1)
+    expect(res.body.groups[0].id).toBe('grp-1')
+    expect(res.body.groups[0].options.map((o: { name: string }) => o.name)).toEqual([
+      'Cheddar',
+      'Bacon',
+    ])
+  })
+
+  it('does not list another tenant’s groups', async () => {
+    const res = await request(makeApp())
+      .get('/api/pos/menu/modifier-groups')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+
+    expect(JSON.stringify(res.body)).not.toContain('Theirs')
+  })
+})
+
+describe('PATCH /api/pos/menu/items/:id — moving an item between categories', () => {
+  beforeEach(() => {
+    store.tables['menu_categories'] = [
+      { id: 'cat-1', tenant_id: TENANT_ID, name: 'Mains', sort_order: 0, deleted_at: null },
+      { id: 'cat-2', tenant_id: TENANT_ID, name: 'Sides', sort_order: 1, deleted_at: null },
+      {
+        id: 'cat-other',
+        tenant_id: OTHER_TENANT_ID,
+        name: 'Theirs',
+        sort_order: 0,
+        deleted_at: null,
+      },
+    ]
+    store.tables['menu_items'] = [
+      {
+        id: 'item-1',
+        tenant_id: TENANT_ID,
+        category_id: 'cat-1',
+        name: 'Fries',
+        price: '4.00',
+        taxable: true,
+        kitchen_station: 'fry',
+        available: true,
+        sort_order: 0,
+        deleted_at: null,
+      },
+    ]
+  })
+
+  it('moves the item to another of the tenant’s categories', async () => {
+    // Deleting a category is refused while it still holds items, and the
+    // refusal tells the merchant to move them — so there has to be a way to.
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/items/item-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ category_id: 'cat-2' })
+
+    expect(res.status).toBe(200)
+    expect(store.tables['menu_items']![0]!['category_id']).toBe('cat-2')
+  })
+
+  it('refuses to move an item into another tenant’s category', async () => {
+    // getServiceClient bypasses RLS, so this app-level check is the only
+    // boundary — the same hole this file already closed for item creation.
+    const res = await request(makeApp())
+      .patch('/api/pos/menu/items/item-1')
+      .set('Authorization', `Bearer ${await makeToken()}`)
+      .send({ category_id: 'cat-other' })
+
+    expect(res.status).toBe(404)
+    expect(store.tables['menu_items']![0]!['category_id']).toBe('cat-1')
+  })
+})
