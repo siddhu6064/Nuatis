@@ -21,6 +21,7 @@ import Checkbox from '@mui/material/Checkbox'
 import CircularProgress from '@mui/material/CircularProgress'
 import Snackbar from '@mui/material/Snackbar'
 import {
+  formatMoney,
   itemPayload,
   groupPayload,
   optionPayload,
@@ -33,7 +34,8 @@ import {
 interface OptionDto {
   id: string
   name: string
-  price_delta: string
+  /** numeric(10,2). supabase-js hands these back as numbers, not strings. */
+  price_delta: string | number
   sort_order: number
 }
 
@@ -49,7 +51,8 @@ interface GroupDto {
 interface ItemDto {
   id: string
   name: string
-  price: string
+  /** numeric(10,2) — a number at runtime despite the column's type. */
+  price: string | number
   taxable: boolean
   kitchen_station: string | null
   available: boolean
@@ -287,7 +290,7 @@ export default function MenuManager() {
                         )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        ${item.price}
+                        ${formatMoney(item.price)}
                         {item.taxable ? '' : ' · not taxed'}
                         {item.kitchen_station
                           ? ` · ${item.kitchen_station}`
@@ -480,7 +483,7 @@ function ItemDialog({
     item
       ? {
           name: item.name,
-          price: item.price,
+          price: String(item.price),
           taxable: item.taxable,
           kitchenStation: item.kitchen_station ?? '',
           available: item.available,
@@ -783,7 +786,7 @@ function ModifierGroupsPanel({ groups, send }: { groups: GroupDto[]; send: Send 
                       label={
                         Number(option.price_delta) === 0
                           ? option.name
-                          : `${option.name} +$${option.price_delta}`
+                          : `${option.name} +$${formatMoney(option.price_delta)}`
                       }
                       onDelete={() =>
                         void send(

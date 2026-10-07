@@ -18,6 +18,7 @@ import {
   closeDrawerPayload,
   describeVariance,
   summariseClose,
+  isCloseReadable,
   type CloseSummary,
 } from '@/lib/drawer'
 
@@ -64,6 +65,10 @@ export function DrawerDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<CloseSummary | null>(null)
+  // False when the close succeeded but the response could not be read. The
+  // drawer IS closed in that case, so the dialog still has to resolve — it
+  // just must not present three zeros as a balanced till.
+  const [summaryReadable, setSummaryReadable] = useState(true)
 
   const amountCents = parseMoneyInput(amount)
 
@@ -72,6 +77,7 @@ export function DrawerDialog({
     setNote('')
     setError(null)
     setSummary(null)
+    setSummaryReadable(true)
   }
 
   function cancel() {
@@ -128,9 +134,10 @@ export function DrawerDialog({
         setError(await errorTextOf(res, 'The drawer could not be closed.'))
         return
       }
-      const body = (await res.json()) as { session?: Record<string, string | null> }
+      const body = (await res.json()) as { session?: Record<string, string | number | null> }
       // The variance is shown from what the server computed, never from a
       // local subtraction — the server is the one that summed the events.
+      setSummaryReadable(isCloseReadable(body.session ?? {}))
       setSummary(summariseClose(body.session ?? {}))
     } catch {
       setError('Could not reach the server.')
@@ -146,17 +153,30 @@ export function DrawerDialog({
       <Dialog open={open} fullWidth maxWidth="xs">
         <DialogTitle>Drawer closed</DialogTitle>
         <DialogContent>
-          <Row label="Opening float" amount={summary.openingFloatCents} />
-          <Row label="Expected" amount={summary.expectedCents} />
-          <Row label="Counted" amount={summary.countedCents} bold />
-          <Divider sx={{ my: 1.5 }} />
-          <Alert severity={variance.tone === 'balanced' ? 'success' : 'warning'}>
-            {variance.text}
-          </Alert>
-          {variance.tone !== 'balanced' && (
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Tell a manager before the next shift takes the till.
-            </Typography>
+          {summaryReadable ? (
+            <>
+              <Row label="Opening float" amount={summary.openingFloatCents} />
+              <Row label="Expected" amount={summary.expectedCents} />
+              <Row label="Counted" amount={summary.countedCents} bold />
+              <Divider sx={{ my: 1.5 }} />
+              <Alert severity={variance.tone === 'balanced' ? 'success' : 'warning'}>
+                {variance.text}
+              </Alert>
+              {variance.tone !== 'balanced' && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: 'block' }}
+                >
+                  Tell a manager before the next shift takes the till.
+                </Typography>
+              )}
+            </>
+          ) : (
+            <Alert severity="warning">
+              The drawer is closed, but the register could not read the count back. Check the
+              close-out in the dashboard before the next shift takes the till.
+            </Alert>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

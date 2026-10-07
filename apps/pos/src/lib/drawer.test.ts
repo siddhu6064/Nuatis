@@ -4,6 +4,7 @@ import {
   closeDrawerPayload,
   describeVariance,
   summariseClose,
+  isCloseReadable,
 } from './drawer'
 
 describe('parseMoneyInput', () => {
@@ -125,5 +126,46 @@ describe('summariseClose', () => {
       countedCents: 0,
       varianceCents: 0,
     })
+  })
+})
+
+describe('summariseClose — numeric columns arrive as numbers', () => {
+  // Caught in the browser, not here: the close-out rendered $0.00 / $0.00 /
+  // $0.00 and declared the till "Balanced". supabase-js hands numeric back as
+  // a JS number, and the original guard returned 0 for anything non-string.
+  // These tests fed it strings, so they passed while the screen was wrong —
+  // and "Balanced" on a drawer nobody measured is worse than no answer, since
+  // it is what a manager signs off.
+
+  it('reads numeric values', () => {
+    expect(
+      summariseClose({
+        opening_float: 100 as unknown as string,
+        expected_total: 117.32 as unknown as string,
+        counted_total: 117.32 as unknown as string,
+        variance: 0 as unknown as string,
+      })
+    ).toEqual({
+      openingFloatCents: 10000,
+      expectedCents: 11732,
+      countedCents: 11732,
+      varianceCents: 0,
+    })
+  })
+
+  it('keeps the sign of a numeric shortfall', () => {
+    expect(summariseClose({ variance: -4.58 as unknown as string }).varianceCents).toBe(-458)
+  })
+})
+
+describe('isCloseReadable', () => {
+  it('is true when the server reported a variance', () => {
+    expect(isCloseReadable({ variance: '0.00' })).toBe(true)
+    expect(isCloseReadable({ variance: 0 as unknown as string })).toBe(true)
+  })
+
+  it('is false when the variance is missing, so nothing claims "Balanced"', () => {
+    expect(isCloseReadable({})).toBe(false)
+    expect(isCloseReadable({ variance: null })).toBe(false)
   })
 })

@@ -1,4 +1,5 @@
 import {
+  formatMoney,
   parsePriceInput,
   itemPayload,
   groupPayload,
@@ -149,5 +150,52 @@ describe('describeGroupRule', () => {
     expect(describeGroupRule({ min_select: 1, max_select: 3, required: true })).toBe(
       'Choose 1 to 3'
     )
+  })
+})
+
+describe('formatMoney', () => {
+  it('always shows two decimals, whatever the API sent', () => {
+    // Postgres numeric comes back as a string, and the driver does not promise
+    // trailing zeros — a live menu rendered "$12", "$15.5" and "+$1.5", which
+    // reads as a typo on a price list a merchant is checking.
+    expect(formatMoney('12')).toBe('12.00')
+    expect(formatMoney('15.5')).toBe('15.50')
+    expect(formatMoney('4.50')).toBe('4.50')
+  })
+
+  it('rounds to the cent', () => {
+    expect(formatMoney('12.345')).toBe('12.35')
+  })
+
+  it('shows zero as 0.00 rather than blank', () => {
+    expect(formatMoney('0')).toBe('0.00')
+  })
+
+  it('passes an unparseable value straight through instead of printing NaN', () => {
+    expect(formatMoney('')).toBe('')
+    expect(formatMoney('n/a')).toBe('n/a')
+  })
+})
+
+describe('numeric columns arrive as numbers, not strings', () => {
+  // Postgres numeric is typed as a string in the DTOs, but supabase-js hands
+  // these back as JS numbers. Typing alone cannot catch that — the compiler
+  // believed the annotation — and the first render of the menu threw
+  // "value.trim is not a function". Both entry points take either.
+
+  it('formats a numeric price', () => {
+    expect(formatMoney(12 as unknown as string)).toBe('12.00')
+    expect(formatMoney(15.5 as unknown as string)).toBe('15.50')
+    expect(formatMoney(0 as unknown as string)).toBe('0.00')
+  })
+
+  it('parses a numeric price without throwing', () => {
+    // Reached when the edit dialog seeds its form from an existing item.
+    expect(parsePriceInput(12.5 as unknown as string)).toBe(12.5)
+    expect(parsePriceInput(0 as unknown as string)).toBe(0)
+  })
+
+  it('still refuses a negative number', () => {
+    expect(parsePriceInput(-1 as unknown as string)).toBeNull()
   })
 })

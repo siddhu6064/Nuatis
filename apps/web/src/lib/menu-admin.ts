@@ -67,13 +67,35 @@ export interface OptionPayload {
  * "12.34.56" as 12.34 and "12abc" as 12, turning a typo into a wrong price on
  * every sale of that item.
  */
-export function parsePriceInput(text: string): number | null {
-  const cleaned = text.replace(/[$,\s]/g, '')
+export function parsePriceInput(input: string | number): number | null {
+  // String() first: these are typed as strings because the column is numeric,
+  // but supabase-js hands numerics back as JS numbers, and the edit dialog
+  // seeds its form straight from an item. Calling .replace on that throws.
+  const cleaned = String(input).replace(/[$,\s]/g, '')
   if (cleaned === '') return null
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return null
   const value = Number(cleaned)
   if (!Number.isFinite(value) || value < 0) return null
   return Number(value.toFixed(2))
+}
+
+/**
+ * A money value from the API, as two decimals.
+ *
+ * Postgres `numeric` arrives as a string and the driver makes no promise about
+ * trailing zeros, so a price stored as 15.50 can come back as "15.5". Rendered
+ * raw that reads as a typo on a price list a merchant is checking — the live
+ * menu showed "$12", "$15.5" and "+$1.5".
+ *
+ * An unparseable value is passed through untouched rather than becoming
+ * "NaN": showing the merchant the odd string the API actually sent is more
+ * use than showing them nothing at all.
+ */
+export function formatMoney(value: string | number): string {
+  const text = String(value).trim()
+  const parsed = Number(text)
+  if (text === '' || !Number.isFinite(parsed)) return text
+  return parsed.toFixed(2)
 }
 
 /** A whole number from a form field, with blank meaning zero. */

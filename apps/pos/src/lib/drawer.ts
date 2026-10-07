@@ -28,12 +28,20 @@ export interface VarianceDescription {
   text: string
 }
 
-/** The numeric columns a closed session comes back with, as strings. */
+/**
+ * The money columns a closed session comes back with.
+ *
+ * Typed `string | number` because that is what actually arrives: the columns
+ * are `numeric(10,2)`, which Postgres renders as a string, but supabase-js
+ * hands them to JavaScript as numbers. Typing them as strings alone is what
+ * made the close-out render $0.00 across the board and call the till
+ * "Balanced".
+ */
 export interface ClosedSessionRow {
-  opening_float?: string | null
-  expected_total?: string | null
-  counted_total?: string | null
-  variance?: string | null
+  opening_float?: string | number | null
+  expected_total?: string | number | null
+  counted_total?: string | number | null
+  variance?: string | number | null
 }
 
 export interface CloseSummary {
@@ -100,7 +108,10 @@ export function describeVariance(varianceCents: number): VarianceDescription {
  *
  * An absent or unparseable column reads as zero rather than NaN — this ends up
  * on a close-out a manager signs off, and "$NaN" is worse than a zero that is
- * visibly wrong next to the counted total.
+ * visibly wrong next to the counted total. Pair it with `isCloseReadable`:
+ * zeros alone are indistinguishable from a genuinely empty till, and a
+ * close-out that silently reports "Balanced" because it could not read the
+ * response is the one failure mode worth refusing outright.
  */
 export function summariseClose(row: ClosedSessionRow): CloseSummary {
   return {
@@ -111,8 +122,23 @@ export function summariseClose(row: ClosedSessionRow): CloseSummary {
   }
 }
 
-function centsOf(value: string | null | undefined): number {
-  if (typeof value !== 'string' || value.trim() === '') return 0
-  const cents = toCents(value)
+/**
+ * Whether the server actually reported a variance.
+ *
+ * The variance is the field the whole screen turns on, so it is the one worth
+ * checking. Without it the three zeros below are not a balanced till — they
+ * are a close-out nobody can read, and saying so is the honest answer.
+ */
+export function isCloseReadable(row: ClosedSessionRow): boolean {
+  const value = row.variance
+  if (typeof value === 'number') return Number.isFinite(value)
+  return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))
+}
+
+function centsOf(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0
+  const text = String(value).trim()
+  if (text === '' || !Number.isFinite(Number(text))) return 0
+  const cents = toCents(text)
   return Number.isFinite(cents) ? cents : 0
 }
