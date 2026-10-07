@@ -208,10 +208,19 @@ export function DrawerDialog({
           </Typography>
         )}
 
+        {/*
+          A plain label above the field rather than MUI's floating one. The
+          input is deliberately oversized for a touch register, and at that
+          size the floating label rendered across the outline with its glyphs
+          clipped instead of sitting in the notch. A static label is also the
+          better reading on a till: it never moves while a cashier is typing.
+        */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+          {closing ? 'Counted total' : 'Opening float'}
+        </Typography>
         <TextField
           autoFocus
           fullWidth
-          label={closing ? 'Counted total' : 'Opening float'}
           value={amount}
           onChange={(e) => {
             setAmount(e.target.value)

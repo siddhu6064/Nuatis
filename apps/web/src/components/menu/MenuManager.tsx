@@ -731,7 +731,9 @@ function ModifierGroupsPanel({ groups, send }: { groups: GroupDto[]; send: Send 
             its Edit dialog.
           </Typography>
         </Box>
-        <Button variant="outlined" onClick={() => setAdding(true)}>
+        {/* nowrap: at a narrow dashboard width the label broke across two
+            lines, which reads as a layout fault rather than a button. */}
+        <Button variant="outlined" onClick={() => setAdding(true)} sx={{ whiteSpace: 'nowrap' }}>
           Add group
         </Button>
       </Stack>
