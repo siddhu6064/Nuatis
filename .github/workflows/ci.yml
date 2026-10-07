@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
+      # These are the prefixes this repo actually uses. The list previously
+      # read 'feature/**', which has never matched a single branch here — so
+      # every feat/* and chore/* push ran no CI at all, and a branch only got
+      # checked once someone opened a PR from it. Deliberately NOT '**': the
+      # worktree-agent-* branches are local scratch and are not worth a run.
+      - 'feat/**'
       - 'fix/**'
+      - 'chore/**'
   pull_request:
     branches: [main]
 
