@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import DemoBanner from './DemoBanner'
 import ImpersonationBanner from './ImpersonationBanner'
 import { AnnouncementBanner } from '@/components/AnnouncementBanner'
+import { PlatformNoticeBanner } from '@/components/PlatformNoticeBanner'
 import { PushNotificationPrompt } from '@/components/PushNotificationPrompt'
 import { PostHogIdentify } from '@/components/PostHogIdentify'
 import { NPSSurvey } from '@/components/NPSSurvey'
@@ -80,6 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <ImpersonationBanner />
           <AnnouncementBanner />
+          <PlatformNoticeBanner />
           <DemoBanner />
           <PushNotificationPrompt />
           {children}

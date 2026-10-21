@@ -6,8 +6,14 @@ Each migration is a numbered SQL file:
 
 - `0001_initial_schema.sql` — run once on a fresh database
 - `0002_add_feature.sql` — each new change gets the next number
-- Never edit a migration that has already been run in production
-- New changes always go in a new numbered file
+- Never edit a migration that has already been run in production **in any way
+  that changes the resulting schema** — new changes always go in a new numbered
+  file
+- The one permitted exception: making an already-run migration **re-runnable**
+  (`IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`). This
+  changes no schema, and it turns an accidental second paste into a no-op
+  instead of a confusing `42P07 already exists` error. Verify by re-running it
+  and confirming the state is unchanged. Applied to 0195–0197 on 2026-09-11.
 
 ## How to run a new migration
 
@@ -15,8 +21,85 @@ Each migration is a numbered SQL file:
 2. Run it in Supabase SQL editor
 3. Commit the file to git
 
+## How to check what is already applied
+
+Don't guess from this log — it has drifted before. Ask the database:
+
+```sql
+-- Has a specific table landed?
+SELECT tablename, rowsecurity FROM pg_tables
+WHERE schemaname = 'public' AND tablename = 'menu_items';
+
+-- What has Supabase recorded, most recent first?
+SELECT version, name FROM supabase_migrations.schema_migrations
+ORDER BY version DESC LIMIT 20;
+```
+
+Note that `schema_migrations.version` holds Supabase's own timestamps, not
+the `0001`-style numbers used for filenames here, so the two lists will not
+look alike. The numbered filenames are this repo's convention; the database is
+the authority on what actually ran.
+
+**Next migration number: 0205.**
+
 ## Migration log
 
-| File                    | Description                                      | Date       |
-| ----------------------- | ------------------------------------------------ | ---------- |
-| 0001_initial_schema.sql | Full schema — 17 tables, RLS, indexes, functions | 2026-03-23 |
+| File                                  | Description                                       | Date       | Applied to prod |
+| ------------------------------------- | ------------------------------------------------- | ---------- | --------------- |
+| 0001_initial_schema.sql               | Full schema — 17 tables, RLS, indexes, functions  | 2026-03-23 | yes             |
+| …                                     | (log unmaintained between 0002 and 0194)          |            |                 |
+| 0195_pos_menu.sql                     | POS menu model; widen `orders.source` to `'pos'`  | 2026-09-11 | yes — verified  |
+| 0196_pos_kitchen_tickets.sql          | Kitchen tickets + ticket items for the KDS        | 2026-09-11 | yes — verified  |
+| 0197_pos_cash_drawer.sql              | Cash drawer sessions + cash events                | 2026-09-11 | yes — verified  |
+| 0198_pos_terminal_pin.sql             | `staff_members.pos_pin_hash` + `pos_location_ids` | 2026-09-11 | yes — verified  |
+| 0199_incidents.sql                    | Incident tracking + `tasks.incident_id`           | 2026-09-15 | yes — verified  |
+| 0200_incident_authoriser.sql          | `staff_members.pos_can_authorise`                 | 2026-09-15 | yes — verified  |
+| 0201_incident_sla_breach.sql          | `incidents.sla_breached_at` + partial index       | 2026-09-15 | yes — verified  |
+| 0202_incident_sla_open_index.sql      | Drop the SLA index nothing reads any more         | 2026-09-15 | yes — verified  |
+| 0203_incident_automation_triggers.sql | Incident trigger types on `custom_automations`    | 2026-09-15 | yes — verified  |
+| 0204_platform_incidents.sql           | Platform/internal-ops incidents + on-call rota    | 2026-09-15 | yes — verified  |
+
+0195–0198 were applied 2026-09-11 and verified live: 9 tables, RLS on all 9,
+9 `current_tenant_id()` policies, and `orders_source_check` reading
+`['staff','maya','pos']`. They are written to be **re-runnable**, so pasting
+one again is a no-op rather than an error.
+
+0199 was applied 2026-09-15 and verified live: 4 incident tables, RLS true on
+all 4, 4 `current_tenant_id()` policies, `incidents.cost_cents` as `integer`
+(not `numeric`), plus `tasks.incident_id` and
+`tenants.incident_auth_threshold_cents`. Re-running it is a no-op.
+
+0200, 0201 and 0202 were applied 2026-09-15. 0201 adds
+`incidents.sla_breached_at` — the column is what makes the SLA scanner notify
+once rather than every 15 minutes.
+
+0201 also created a partial index on unbreached rows, which 0202 drops again:
+once escalation rules gained a delay, the scanner had to revisit incidents it
+had already stamped, and the query it now runs is served by 0199's
+`idx_incidents_sla`. 0202 only drops, deliberately — recreating that index
+under a new name would have left the table carrying two identical indexes.
+Run in order, these land on the right state; 0201 re-run _on its own_ would
+recreate the dead index, so follow it with 0202.
+
+0203 was applied 2026-09-15 and verified live: the
+`custom_automations_trigger_type_check` constraint now also accepts
+`incident_created` and `incident_breached`. Altering a CHECK means dropping and
+recreating it, so the migration does both under the same constraint name and is
+safe to re-run.
+
+0204 was applied 2026-09-15 and verified live: 4 `platform_*` tables, RLS true
+on all 4 with **no policies** — these are reached only through the service-role
+client behind `requirePlatformOwner`, so deny-all is the correct default and a
+leaked anon key reads nothing. `platform_incidents` has **no `tenant_id`**,
+verified by query rather than by reading; that absence is the point of the
+tenant/platform split and the migration comments say so.
+
+**Checking the next free number:** `max(name)` on
+`supabase_migrations.schema_migrations` does _not_ work — the table holds
+non-numeric names too, and `weekly_digest` sorts above `0198`. Order by the
+numeric prefix instead:
+
+```sql
+select name from supabase_migrations.schema_migrations
+ where name ~ '^[0-9]{4}' order by substring(name from '^[0-9]{4}')::int desc limit 5;
+```

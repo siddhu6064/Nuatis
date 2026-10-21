@@ -175,6 +175,35 @@ const SAMPLE_TELNYX_PAYLOAD_MALFORMED = {
   },
 }
 
+/**
+ * Wait until a condition holds, rather than sleeping a fixed time.
+ *
+ * /voice/inbound and the WS start handler both answer immediately and do the
+ * real work fire-and-forget, so there is no promise for a test to await. The
+ * fixed sleeps this replaces were a guess at how long that work takes, and the
+ * guess broke in both directions under parallel load: too slow and the call had
+ * not arrived yet (`calls.length` 0), too late and a previous test's call had
+ * arrived in the meantime.
+ *
+ * Polling costs nothing when the condition is already true and only spends the
+ * full budget when something is genuinely wrong.
+ */
+async function waitFor(
+  predicate: () => boolean,
+  { timeoutMs = 5000, intervalMs = 25 }: { timeoutMs?: number; intervalMs?: number } = {}
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (predicate()) return true
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return predicate()
+}
+
+function geminiCalls(): unknown[][] {
+  return ((globalThis as any).__geminiCreateCalls ?? []) as unknown[][]
+}
+
 let originalFetch: typeof fetch
 let mockGeminiSession: Record<string, jest.Mock>
 
@@ -258,10 +287,20 @@ describe('POST /voice/inbound — Telnyx webhook intake', () => {
     // noted at top. Test confirms no crash + Express still responds + the
     // fallback tenant is used rather than a real tenant resolution.
     expect(res.status).toBe(200)
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    const calls = (globalThis as any).__geminiCreateCalls as unknown[][]
+    // Assert on ANY recorded call, never on calls[0].
+    //
+    // /voice/inbound answers 200 immediately and resolves the tenant
+    // fire-and-forget, so a previous test's resolution can still be in flight
+    // when this one starts. beforeEach clears __geminiCreateCalls, but the
+    // straggler lands AFTER that clear and becomes calls[0] — which is how this
+    // test failed under parallel load with "tenant-abc" from a test two blocks
+    // up. Index 0 belongs to whoever got there first, not to this request.
+    const fallbackTenants = ['unknown', process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown']
+    await waitFor(() => geminiCalls().some((c) => fallbackTenants.includes(c[0] as string)))
+
+    const calls = geminiCalls()
     if (calls.length > 0) {
-      expect(['unknown', process.env['VOICE_DEV_TENANT_ID'] ?? 'unknown']).toContain(calls[0]![0])
+      expect(calls.some((c) => fallbackTenants.includes(c[0] as string))).toBe(true)
     }
   })
 })
@@ -330,10 +369,14 @@ describe('WebSocket /voice/stream — session initialisation', () => {
     })
     ws.emit('message', Buffer.from(startEvent))
 
-    // Await the async start-handler chain (prewarm miss path → fresh session)
-    await new Promise((resolve) => setTimeout(resolve, 1100))
+    // Wait for the async start-handler chain (prewarm miss path → fresh
+    // session) to actually produce the call this test is about, rather than
+    // sleeping a fixed 1100ms and hoping it was enough on a loaded machine.
+    await waitFor(() =>
+      geminiCalls().some((c) => c[0] === 'tenant-abc' && c[7] === 'contact-precall-1')
+    )
 
-    const calls = (globalThis as any).__geminiCreateCalls as unknown[][]
+    const calls = geminiCalls()
     expect(calls.length).toBeGreaterThanOrEqual(1)
     // createGeminiLiveSession(tenantId, vertical, businessName, callControlId,
     //   product, trialExpired, promptSuffix, callerContactId, ...)
@@ -369,14 +412,17 @@ describe('WebSocket /voice/stream — session initialisation', () => {
     })
     ws.emit('message', Buffer.from(startEvent))
 
-    await new Promise((resolve) => setTimeout(resolve, 1100))
+    await waitFor(() => geminiCalls().some((c) => c[0] === 'dev-fallback-tenant'))
 
     // Current code does not close the WS with 1008 for an unmapped `to` —
     // it falls back to VOICE_DEV_TENANT_ID and opens a session anyway.
     // Asserting actual behaviour; spec divergence noted at top.
-    const calls = (globalThis as any).__geminiCreateCalls
+    // Same straggler hazard as the malformed-payload test above: another
+    // block's fire-and-forget session can occupy index 0, so match on the
+    // tenant this test is actually about rather than on position.
+    const calls = geminiCalls()
     expect(calls.length).toBeGreaterThanOrEqual(1)
-    expect(calls[0][0]).toBe('dev-fallback-tenant')
+    expect(calls.some((c) => c[0] === 'dev-fallback-tenant')).toBe(true)
     delete process.env['VOICE_DEV_TENANT_ID']
   })
 })

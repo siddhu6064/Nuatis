@@ -9,6 +9,11 @@ COPY package.json package-lock.json tsconfig.base.json ./
 # Copy shared package (web depends on it at build time)
 COPY packages/shared/ packages/shared/
 
+# Copy design tokens. Imported from apps/web/src and from the Tailwind config,
+# so Turbopack fails with "Cannot find module '@nuatis/design-tokens'" without
+# it. No build step — the package is plain files with main: ./tokens.js.
+COPY packages/design-tokens/ packages/design-tokens/
+
 # Copy web app
 COPY apps/web/ apps/web/
 
@@ -33,6 +38,28 @@ ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_SQUARE_ENVIRONMENT=$NEXT_PUBLIC_SQUARE_ENVIRONMENT
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+# Next evaluates server modules while collecting page data, and
+# app/api/auth/[...nextauth] builds a Supabase client at module scope — without
+# these the build dies with "supabaseUrl is required". They are build-time
+# inputs only; the running container gets its real values from its own
+# environment, and nothing here should be treated as a production secret.
+#
+# NEXT_PUBLIC_SUPABASE_URL and _ANON_KEY are also read by a client component
+# (the reset-password page), so whatever is passed here is inlined into the
+# browser bundle. A deploy must pass the real values — the empty defaults exist
+# so CI can prove the image builds, not so production can ship without them.
+ARG NEXT_PUBLIC_SUPABASE_URL=""
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+ARG NEXT_PUBLIC_API_URL=""
+ARG SUPABASE_SERVICE_ROLE_KEY=""
+ARG AUTH_SECRET=""
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+ENV AUTH_SECRET=$AUTH_SECRET
+ENV NEXTAUTH_SECRET=$AUTH_SECRET
 
 # Build Next.js (produces .next/standalone via output: 'standalone')
 RUN npm run build --workspace=apps/web

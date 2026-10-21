@@ -41,7 +41,7 @@ export default tseslint.config(
   {
     // Shared design tokens: plain CJS so tailwind.config.js above can
     // require() it without a build step. See its own file header.
-    files: ['**/theme/tokens.js'],
+    files: ['packages/design-tokens/tokens.js'],
     languageOptions: {
       globals: {
         module: 'writable',

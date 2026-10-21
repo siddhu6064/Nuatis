@@ -8,6 +8,7 @@ import helmet from 'helmet'
 import 'dotenv/config'
 import { WebSocketServer } from 'ws'
 import { initConversationsWs } from './lib/conversations-ws.js'
+import { initPosWs } from './lib/pos-ws.js'
 import { Sentry } from './lib/sentry.js'
 import { shutdownPostHog } from './lib/posthog.js'
 import tenantsRouter from './routes/tenants.js'
@@ -52,6 +53,15 @@ import inventorySettingsRouter from './routes/inventory-settings.js'
 import ordersRouter from './routes/orders.js'
 import orderTemplatesRouter from './routes/order-templates.js'
 import ordersSettingsRouter from './routes/orders-settings.js'
+import incidentsRouter from './routes/incidents.js'
+import incidentsReportsRouter from './routes/incidents-reports.js'
+import posIncidentsRouter from './routes/pos/incidents.js'
+import posMenuRouter from './routes/pos/menu.js'
+import posOrdersRouter from './routes/pos/orders.js'
+import posTicketsRouter from './routes/pos/tickets.js'
+import posDrawerRouter from './routes/pos/drawer.js'
+import posSettingsRouter from './routes/pos/settings.js'
+import posTerminalAuthRouter from './routes/pos/terminal-auth.js'
 import expensesRouter from './routes/expenses.js'
 import expenseCategoriesRouter from './routes/expense-categories.js'
 import recurringExpensesRouter from './routes/recurring-expenses.js'
@@ -81,6 +91,9 @@ import pipelinesRouter from './routes/pipelines.js'
 import dataExportRouter from './routes/data-export.js'
 import accountingExportRouter from './routes/accounting-export.js'
 import adminConsoleRouter from './routes/admin-console.js'
+import adminConsoleIncidentsRouter from './routes/admin-console-incidents.js'
+import platformNoticesRouter from './routes/platform-notices.js'
+import adminConsoleOncallRouter from './routes/admin-console-oncall.js'
 import calendarSettingsRouter, { calendarCallbackRouter } from './routes/calendar-settings.js'
 import auditLogRouter from './routes/audit-log.js'
 import smartListsRouter from './routes/smart-lists.js'
@@ -238,6 +251,9 @@ app.use('/api', impersonationAuditMiddleware)
 app.use('/api/tenants', tenantsRouter)
 app.use('/api/auth/google', googleAuthRouter)
 app.use('/api/auth/mobile', authLimiter, mobileAuthRouter)
+// A 4-digit PIN is 10,000 combinations — this login needs authLimiter more
+// than the password routes do, not less.
+app.use('/api/pos/terminal', authLimiter, posTerminalAuthRouter)
 app.use('/api/auth/sso', authLimiter, ssoAuthRouter)
 app.use('/api/sso', ssoAdminRouter)
 app.use('/api/impersonate', authLimiter, impersonateAuthRouter)
@@ -299,6 +315,15 @@ app.use('/api/settings/inventory', inventorySettingsRouter)
 app.use('/api/orders', ordersRouter)
 app.use('/api/order-templates', orderTemplatesRouter)
 app.use('/api/settings/orders', ordersSettingsRouter)
+// Mounted BEFORE /api/incidents so 'reports' is never matched as an :id.
+app.use('/api/incidents/reports', incidentsReportsRouter)
+app.use('/api/incidents', incidentsRouter)
+app.use('/api/pos/incidents', posIncidentsRouter)
+app.use('/api/pos/menu', posMenuRouter)
+app.use('/api/pos/orders', posOrdersRouter)
+app.use('/api/pos/tickets', posTicketsRouter)
+app.use('/api/pos/drawer', posDrawerRouter)
+app.use('/api/pos/settings', posSettingsRouter)
 app.use('/api/expenses', expensesRouter)
 app.use('/api/expense-categories', expenseCategoriesRouter)
 app.use('/api/recurring-expenses', recurringExpensesRouter)
@@ -329,6 +354,12 @@ app.use('/api/settings/notifications', notificationSettingsRouter)
 app.use('/api/pipelines', pipelinesRouter)
 app.use('/api/settings/data-export', dataExportRouter)
 app.use('/api/accounting-export', accountingExportRouter)
+// Mounted BEFORE the admin-console router: that one is mounted at the parent
+// prefix, so it would otherwise run its own auth middleware on every incident
+// request before falling through to here.
+app.use('/api/admin-console/incidents', adminConsoleIncidentsRouter)
+app.use('/api/admin-console/oncall', adminConsoleOncallRouter)
+app.use('/api/platform-notices', platformNoticesRouter)
 app.use('/api/admin-console', adminConsoleRouter)
 app.use('/api/settings/calendar', calendarSettingsRouter)
 app.use('/api/calendar', calendarCallbackRouter) // PUBLIC callback
@@ -694,9 +725,10 @@ const wss = new WebSocketServer({ noServer: true })
 registerVoiceWebSocket(wss)
 setWssRef(wss)
 const conversationsWss = initConversationsWs()
+const posWss = initPosWs()
 
 // ── Authoritative WebSocket upgrade router ────────────────────────────────────
-// All three WebSocket paths are handled here and nowhere else.
+// All four WebSocket paths are handled here and nowhere else.
 // voiceLiveProxy has ws:true removed, so it never auto-subscribes.
 server.on('upgrade', (req, socket, head) => {
   const pathname = req.url ? new URL(req.url, 'http://x').pathname : ''
@@ -719,6 +751,12 @@ server.on('upgrade', (req, socket, head) => {
   } else if (pathname === '/ws/conversations') {
     conversationsWss.handleUpgrade(req, socket, head, (ws) => {
       conversationsWss.emit('connection', ws, req)
+    })
+  } else if (pathname === '/ws/pos') {
+    // Credentials are not on the upgrade — pos-ws requires an auth frame as
+    // the first message and closes the socket if one does not arrive.
+    posWss.handleUpgrade(req, socket, head, (ws) => {
+      posWss.emit('connection', ws, req)
     })
   } else if (pathname.startsWith('/api/voice/live')) {
     // VOICE-02: the HTTP path is gated by requireAuth, but the WS upgrade
@@ -747,6 +785,7 @@ server.listen(PORT, () => {
   console.info(`Nuatis API running on http://localhost:${PORT}`)
   console.info(`Voice WebSocket listening at ws://localhost:${PORT}/voice/stream`)
   console.info(`Conversations WebSocket listening at ws://localhost:${PORT}/ws/conversations`)
+  console.info(`POS WebSocket listening at ws://localhost:${PORT}/ws/pos`)
 
   // Webhook signature + rate-limit middleware bypass when NODE_ENV==='test'.
   // Warn loudly if a deployed environment is neither production nor test.

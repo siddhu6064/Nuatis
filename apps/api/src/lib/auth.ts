@@ -97,6 +97,26 @@ function getErrorCode(err: unknown): string {
   return ''
 }
 
+/**
+ * portalScope claim → the only path prefix that scope may reach.
+ *
+ * Add an entry here when a new restricted login surface is introduced; a scope
+ * with no entry is refused everywhere (see the fail-closed note in requireAuth).
+ */
+const PORTAL_SCOPE_PREFIXES: Record<string, string> = {
+  staff: '/api/staff-portal',
+  pos: '/api/pos',
+}
+
+/**
+ * Prefix match on a path-segment boundary, so '/api/pos' does not also admit
+ * '/api/posturing'. Query strings are ignored — originalUrl carries them.
+ */
+function isUnderPathPrefix(originalUrl: string, prefix: string): boolean {
+  const path = originalUrl.split('?')[0] ?? ''
+  return path === prefix || path.startsWith(`${prefix}/`)
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization']
 
@@ -132,15 +152,23 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (impersonation) authedReq.impersonation = impersonation
     res.locals['tenantId'] = tenantId
 
-    // Staff-portal isolation: only tokens explicitly minted for the staff
-    // self-service portal (portalScope claim, set at login time — never the
-    // `role` fallback above, which many older/test tokens omit and rely on
-    // for normal access) are confined to /api/staff-portal/*. This is a
-    // single choke point rather than auditing every existing manager route
-    // for a role check.
-    if (payload['portalScope'] === 'staff' && !req.originalUrl.startsWith('/api/staff-portal')) {
-      res.status(403).json({ error: 'Insufficient permissions' })
-      return
+    // Restricted-surface isolation: a token explicitly minted for a limited
+    // portal (portalScope claim, set at login time — never the `role` fallback
+    // above, which many older/test tokens omit and rely on for normal access)
+    // is confined to that portal's path prefix. One choke point, rather than
+    // auditing every existing manager route for a role check.
+    //
+    // Unknown scopes fail CLOSED. A token carrying a scope this build does not
+    // recognise is a token from a newer or foreign minter; granting it the full
+    // API because no branch matched is how a register PIN ends up able to read
+    // /api/contacts.
+    const portalScope = payload['portalScope']
+    if (typeof portalScope === 'string' && portalScope !== '') {
+      const prefix = PORTAL_SCOPE_PREFIXES[portalScope]
+      if (!prefix || !isUnderPathPrefix(req.originalUrl, prefix)) {
+        res.status(403).json({ error: 'Insufficient permissions' })
+        return
+      }
     }
 
     next()

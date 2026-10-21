@@ -1,5 +1,5 @@
 import { createTheme } from '@mui/material/styles'
-import tokens from './tokens.js'
+import tokens from '@nuatis/design-tokens'
 
 /** Tailwind's fontFamily arrays -> MUI's CSS font-family string, quoting names with spaces. */
 function fontStack(stack: string[]): string {
@@ -8,7 +8,7 @@ function fontStack(stack: string[]): string {
 
 /**
  * MUI theme mapped onto the existing Tailwind design tokens. Both this
- * file and tailwind.config.js read from theme/tokens.js — see
+ * file and tailwind.config.js both read @nuatis/design-tokens — see
  * docs/mui-v9-migration-plan.md phase 3. Change a color/font in
  * tokens.js, not here or in tailwind.config.js.
  */

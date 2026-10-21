@@ -22,6 +22,8 @@ import { createScheduledReportWorker } from './scheduled-report-worker.js'
 import { createScheduledReportScanner } from './scheduled-report-scanner.js'
 import { createWeeklyDigestWorker } from './weekly-digest-worker.js'
 import { createInvoiceOverdueScanner } from './invoice-overdue-scanner.js'
+import { createIncidentSlaScanner } from './incident-sla-scanner.js'
+import { createPlatformAckScanner } from './platform-ack-scanner.js'
 import { createOutboundCallWorker } from './outbound-call-worker.js'
 import { createCustomAutomationWorker } from './custom-automation-worker.js'
 import { createMayaMemoryExtractor } from './maya-memory-extractor.js'
@@ -343,6 +345,31 @@ export async function startWorkers(): Promise<void> {
   )
   managed.push({ name: 'stale-approval-scanner', ...staleApprovalScanner })
   console.info('[workers] stale-approval-scanner started, cron 0 10 * * *')
+
+  // 37. Incident SLA breach scanner — every 15 minutes, not daily like the
+  // scanners above it. The shortest default SLA is one hour (critical), and a
+  // one-hour SLA checked once a day is not an SLA.
+  const incidentSlaScanner = createIncidentSlaScanner()
+  await incidentSlaScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '*/15 * * * *' }, jobId: 'incident-sla-scanner-15min' }
+  )
+  managed.push({ name: 'incident-sla-scanner', ...incidentSlaScanner })
+  console.info('[workers] incident-sla-scanner started, cron */15 * * * *')
+
+  // 38. Platform incident ack-deadline scanner — every 5 minutes. The shortest
+  // ack target is 15 minutes for a SEV1, and a 15-minute deadline checked
+  // hourly is not a deadline. Deliberately does not consult getPausedTenants:
+  // that is a per-tenant control and platform incidents have no tenant.
+  const platformAckScanner = createPlatformAckScanner()
+  await platformAckScanner.queue.add(
+    'scan',
+    {},
+    { repeat: { pattern: '*/5 * * * *' }, jobId: 'platform-ack-scanner-5min' }
+  )
+  managed.push({ name: 'platform-ack-scanner', ...platformAckScanner })
+  console.info('[workers] platform-ack-scanner started, cron */5 * * * *')
 }
 
 export async function stopWorkers(): Promise<void> {

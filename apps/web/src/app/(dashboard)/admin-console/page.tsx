@@ -267,6 +267,14 @@ export default function AdminConsolePage() {
           Internal — cross-tenant view. Click a tenant to view activity or log in as them; every
           impersonation session is fingerprinted below.
         </p>
+        <div className="mt-3 flex gap-4 text-sm">
+          <a href="/admin-console/incidents" className="text-brand hover:underline">
+            Incidents
+          </a>
+          <a href="/admin-console/oncall" className="text-brand hover:underline">
+            On-call rota
+          </a>
+        </div>
       </div>
 
       {summary && (

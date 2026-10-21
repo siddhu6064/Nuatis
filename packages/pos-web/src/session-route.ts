@@ -1,0 +1,171 @@
+import { NextResponse } from 'next/server'
+import { POS_COOKIE, readPosSession, serializePosSession } from './session'
+
+/** Matches the 12h expiry the API stamps on the terminal token. */
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000
+
+export interface SessionRouteOptions {
+  /** Where the PIN is exchanged. Defaults to API_BACKEND_URL, then localhost. */
+  apiBackendUrl?: string
+}
+
+export interface SessionRoute {
+  POST: (request: Request) => Promise<NextResponse>
+  DELETE: () => Promise<NextResponse>
+  GET: (request: Request) => Promise<NextResponse>
+}
+
+/**
+ * The `/api/session` route handlers, shared by the register and the KDS.
+ *
+ * Both apps need an identical PIN exchange, and every subtlety below is the
+ * kind that gets fixed in one copy and forgotten in the other: the 503-vs-401
+ * distinction, the deliberately uniform rejection, the httpOnly cookie flags.
+ * One implementation, and two `export const { POST, DELETE } =
+ * createSessionRoute()` lines.
+ *
+ * Exchanges a PIN for a register session.
+ *
+ * Runs server-side so the PIN never leaves this process and the returned token
+ * never enters a client bundle. The cookie is httpOnly, so an XSS bug — in a
+ * menu item name, say — cannot read a working register credential out of the
+ * browser.
+ *
+ * The proxy deliberately does not gate /api/session: this is how a register
+ * gets a session in the first place. It does still CSRF-check it, since this is
+ * a state-mutating POST that sets a cookie.
+ */
+export function createSessionRoute(options: SessionRouteOptions = {}): SessionRoute {
+  const apiBackend =
+    options.apiBackendUrl ?? process.env['API_BACKEND_URL'] ?? 'http://localhost:3001'
+
+  async function POST(request: Request): Promise<NextResponse> {
+    let body: Record<string, unknown>
+    try {
+      body = (await request.json()) as Record<string, unknown>
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
+    const tenantId = typeof body['tenant_id'] === 'string' ? body['tenant_id'] : ''
+    const locationId = typeof body['location_id'] === 'string' ? body['location_id'] : ''
+    const pin = typeof body['pin'] === 'string' ? body['pin'] : ''
+
+    if (!tenantId || !locationId || !pin) {
+      return NextResponse.json(
+        { error: 'tenant_id, location_id and pin are required' },
+        { status: 400 }
+      )
+    }
+
+    let upstream: Response
+    try {
+      upstream = await fetch(`${apiBackend}/api/pos/terminal/sign-in`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId, location_id: locationId, pin }),
+      })
+    } catch {
+      // The API being unreachable is an outage, not a bad PIN. Saying so stops a
+      // cashier retyping a correct PIN at a dead backend.
+      return NextResponse.json({ error: 'Cannot reach the server' }, { status: 503 })
+    }
+
+    if (!upstream.ok) {
+      // Pass the API's deliberately uniform rejection straight through.
+      // Distinguishing "wrong PIN" from "unknown tenant" here would rebuild the
+      // enumeration oracle the API route was careful not to be.
+      return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 })
+    }
+
+    const data = (await upstream.json()) as {
+      token: string
+      staff: { id: string; name: string | null }
+      locationId: string
+    }
+
+    // Response body carries the staff name for the header and nothing else — in
+    // particular, never the token.
+    const res = NextResponse.json({ staff: data.staff, locationId: data.locationId })
+
+    res.cookies.set(
+      POS_COOKIE,
+      serializePosSession({
+        token: data.token,
+        tenantId,
+        locationId: data.locationId,
+        staffId: data.staff.id,
+        staffName: data.staff.name,
+        expiresAt: Date.now() + TWELVE_HOURS_MS,
+      }),
+      {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env['NODE_ENV'] === 'production',
+        path: '/',
+        maxAge: TWELVE_HOURS_MS / 1000,
+      }
+    )
+    return res
+  }
+
+  /**
+   * Who is signed in on this device.
+   *
+   * The session cookie is httpOnly precisely so the token cannot reach
+   * JavaScript, which also means the page cannot read the cashier's name back
+   * after a reload — and a receipt should say who served the customer. This
+   * returns the two fields a screen legitimately needs.
+   *
+   * The body is assembled field by field rather than by spreading the session.
+   * Spreading would put the 12h API token in a JSON response and undo the
+   * whole point of the httpOnly cookie; building it explicitly means a field
+   * added to `PosSession` later cannot leak here by default. Same reasoning as
+   * the platform-notices route.
+   */
+  async function GET(request: Request): Promise<NextResponse> {
+    const cookie = readCookie(request.headers.get('cookie'), POS_COOKIE)
+    const session = readPosSession(cookie)
+
+    // An absent, malformed or expired session is all the same answer: no
+    // session. Reporting a half-built one would let a screen render a cashier
+    // name for a register that can no longer call the API.
+    if (!session || session.expiresAt <= Date.now()) {
+      return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    }
+
+    return NextResponse.json({
+      staff: { id: session.staffId, name: session.staffName },
+      locationId: session.locationId,
+    })
+  }
+
+  /** Sign out — clears the session on this device. */
+  async function DELETE(): Promise<NextResponse> {
+    const res = NextResponse.json({ ok: true })
+    res.cookies.set(POS_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 })
+    return res
+  }
+
+  return { POST, DELETE, GET }
+}
+
+/**
+ * Pull one cookie out of a Cookie header.
+ *
+ * Matched on a `name=` boundary rather than with `includes`, so a cookie whose
+ * name merely ends with ours (`other_nuatis_pos_session`) cannot be read as
+ * the session — the same segment-boundary care the API's portalScope prefix
+ * map needed.
+ */
+function readCookie(header: string | null, name: string): string | undefined {
+  if (!header) return undefined
+  for (const part of header.split(';')) {
+    const trimmed = part.trim()
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    if (trimmed.slice(0, eq) !== name) continue
+    return decodeURIComponent(trimmed.slice(eq + 1))
+  }
+  return undefined
+}

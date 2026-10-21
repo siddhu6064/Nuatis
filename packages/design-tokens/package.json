@@ -1,0 +1,6 @@
+{
+  "name": "@nuatis/design-tokens",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./tokens.js"
+}
