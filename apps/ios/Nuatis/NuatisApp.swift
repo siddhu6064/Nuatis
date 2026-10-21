@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import NuatisUI
 
 @main
 struct NuatisApp: App {

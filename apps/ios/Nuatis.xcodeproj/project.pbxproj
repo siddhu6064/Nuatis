@@ -29,6 +29,10 @@
 		F0EBE67F304CE748006FA392 /* NuatisUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NuatisUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXBuildFile section */
+		F0EBE702304CE73F006FA392 /* NuatisUI in Frameworks */ = {isa = PBXBuildFile; productRef = F0EBE701304CE73F006FA392 /* NuatisUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F0EBE66A304CE73F006FA392 /* Nuatis */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0EBE702304CE73F006FA392 /* NuatisUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = Nuatis;
 			packageProductDependencies = (
+				F0EBE701304CE73F006FA392 /* NuatisUI */,
 			);
 			productName = Nuatis;
 			productReference = F0EBE668304CE73F006FA392 /* Nuatis.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = F0EBE65F304CE73F006FA392;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F0EBE700304CE73F006FA392 /* XCLocalSwiftPackageReference "Packages/NuatisUI" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F0EBE669304CE73F006FA392 /* Products */;
 			projectDirPath = "";
@@ -267,6 +276,20 @@
 			targetProxy = F0EBE680304CE748006FA392 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F0EBE700304CE73F006FA392 /* XCLocalSwiftPackageReference "Packages/NuatisUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NuatisUI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F0EBE701304CE73F006FA392 /* NuatisUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NuatisUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F0EBE687304CE748006FA392 /* Debug */ = {
